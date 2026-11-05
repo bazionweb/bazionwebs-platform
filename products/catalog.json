@@ -71,12 +71,12 @@
     },
     {
       "id": "contacts-crm",
-      "name": "People, organizations, subscribers and customer records",
+      "name": "Contacts, CRM and customer directory",
       "sourcePath": [
         "packages/contacts"
       ],
       "status": "planned",
-      "scope": "Reusable contact records, relationships, notes, communication preferences and imports."
+      "scope": "Reusable people, households, organizations, subscribers and customer records; relationships, notes, tags, consent, communication preferences and imports/exports."
     },
     {
       "id": "search-seo-localization",
@@ -311,15 +311,6 @@
       ],
       "status": "partial",
       "scope": "Event/sink contract exists. Add reports, conversion metrics, exports, retention and tenant dashboards."
-    },
-    {
-      "id": "contacts-crm",
-      "name": "Contacts, customer directory and CRM",
-      "sourcePath": [
-        "packages/contacts"
-      ],
-      "status": "planned",
-      "scope": "Reusable people, household and organization records, relationships, notes, tags and communication preferences."
     },
     {
       "id": "solution-assembler",
