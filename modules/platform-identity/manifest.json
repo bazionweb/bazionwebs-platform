@@ -1,0 +1,56 @@
+{
+  "id": "platform-identity",
+  "name": "Platform identity and tenant access",
+  "version": "1.0.0",
+  "owner": "platform",
+  "status": "partial",
+  "entrypoints": {
+    "api": "packages/auth"
+  },
+  "tenantModel": "mixed",
+  "permissions": [
+    {
+      "resource": "organization",
+      "actions": [
+        "update"
+      ]
+    },
+    {
+      "resource": "member",
+      "actions": [
+        "create",
+        "update",
+        "delete"
+      ]
+    },
+    {
+      "resource": "invitation",
+      "actions": [
+        "create",
+        "cancel"
+      ]
+    }
+  ],
+  "dependencies": [],
+  "operations": {
+    "logs": true,
+    "metrics": false,
+    "retention": "Security events are retained in the platform audit trail; credentials and personal contact data are excluded.",
+    "recovery": "Restore the auth schema and tenant identity mappings from verified backups; re-run versioned Better Auth migrations.",
+    "enableDisable": "Required platform module; disable only through an approved maintenance procedure."
+  },
+  "events": [
+    "identity.session.created",
+    "identity.member.role.updated"
+  ],
+  "jobs": [],
+  "providers": [
+    "Better Auth"
+  ],
+  "tests": [
+    "packages/auth/src"
+  ],
+  "docs": [
+    "docs/architecture/authentication-and-tenant-isolation.md"
+  ]
+}
