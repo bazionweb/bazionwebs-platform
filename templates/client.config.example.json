@@ -1,0 +1,25 @@
+{
+  "tenantSlug": "example-client",
+  "displayName": "Example Client",
+  "branding": {
+    "logoPath": "/brand/logo.svg",
+    "primaryColor": "#1F2937",
+    "accentColor": "#E44736",
+    "fontFamily": "DM Sans"
+  },
+  "commerce": {
+    "enabled": true,
+    "currency": "KES",
+    "paymentProviders": ["mpesa"],
+    "inventoryEnabled": true,
+    "shippingEnabled": true
+  },
+  "modules": {
+    "booking": false,
+    "notifications": true,
+    "analytics": true,
+    "fileManagement": true
+  },
+  "localization": { "locale": "en-KE", "timeZone": "Africa/Nairobi" },
+  "domains": ["shop.example-client.test"]
+}

@@ -1,0 +1,8 @@
+{
+  "name": "@bazion/storefront",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": { "dev": "next dev -p 3000", "build": "next build", "start": "next start -p 3000", "typecheck": "tsc --noEmit" },
+  "dependencies": { "next": "16.4.5", "react": "^19.2.0", "react-dom": "^19.2.0" },
+  "devDependencies": { "@types/node": "^26.6.6", "@types/react": "^19.2.2", "@types/react-dom": "^19.2.2", "typescript": "^5.9.3" }
+}

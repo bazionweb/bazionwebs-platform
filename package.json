@@ -1,0 +1,27 @@
+{
+  "name": "@bazion/platform",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@12.18.0",
+  "engines": {
+    "node": ">=22.16.0 <27"
+  },
+  "scripts": {
+    "dev": "dotenv -e .env -- turbo run dev --parallel",
+    "build": "turbo run build",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "db:up": "docker compose up -d db",
+    "db:down": "docker compose down",
+    "db:migrate": "dotenv -e .env -- pnpm --filter @bazion/database migrate",
+    "db:seed": "dotenv -e .env -- pnpm --filter @bazion/database seed"
+  },
+  "devDependencies": {
+    "dotenv-cli": "^10.0.0",
+    "@types/node": "^26.6.6",
+    "prettier": "^3.6.2",
+    "turbo": "^2.5.8",
+    "typescript": "^5.9.3",
+    "vitest": "^5.1.0"
+  }
+}

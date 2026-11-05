@@ -1,0 +1,23 @@
+services:
+  db:
+    image: postgres:18-alpine
+    container_name: bazion-platform-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: bazion_platform
+      POSTGRES_USER: bazion_admin
+      POSTGRES_PASSWORD: ${POSTGRES_ADMIN_PASSWORD:-bazion_admin_local_only}
+      BAZION_APP_PASSWORD: ${BAZION_APP_PASSWORD:-bazion_app_local_only}
+      BAZION_MIGRATOR_PASSWORD: ${BAZION_MIGRATOR_PASSWORD:-bazion_migrator_local_only}
+    ports:
+      - "5432:5432"
+    volumes:
+      - bazion_pgdata:/var/lib/postgresql
+      - ./packages/database/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bazion_admin -d bazion_platform"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+volumes:
+  bazion_pgdata:

@@ -1,0 +1,54 @@
+{
+  "$schema": "https://turborepo.dev/schema.json",
+  "tasks": {
+    "build": {
+      "dependsOn": [
+        "^build"
+      ],
+      "outputs": [
+        "dist/**",
+        ".next/**",
+        "!.next/cache/**"
+      ]
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true
+    },
+    "typecheck": {
+      "dependsOn": [
+        "^build"
+      ],
+      "outputs": []
+    },
+    "test": {
+      "dependsOn": [
+        "^build"
+      ],
+      "outputs": [
+        "coverage/**"
+      ]
+    },
+    "lint": {
+      "dependsOn": [
+        "^build"
+      ],
+      "outputs": []
+    }
+  },
+  "globalEnv": [
+    "NODE_ENV",
+    "API_BASE_URL"
+  ],
+  "globalPassThroughEnv": [
+    "PORT",
+    "LOG_LEVEL",
+    "DATABASE_URL",
+    "DEFAULT_TENANT_ID",
+    "TENANT_RESOLUTION_MODE",
+    "CORS_ORIGINS",
+    "PUBLIC_STOREFRONT_URL",
+    "PAYMENT_PROVIDER",
+    "DEV_PAYMENT_SECRET"
+  ]
+}
