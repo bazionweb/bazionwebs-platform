@@ -4,6 +4,8 @@ import { adminRoutes } from "./routes.js";
 
 const mocks = vi.hoisted(() => ({
   requirePermission: vi.fn(),
+  requirePlatformRole: vi.fn(),
+  reconcileProvisioningTenants: vi.fn(),
   listMembers: vi.fn(),
   listInvitations: vi.fn(),
   createInvitation: vi.fn(),
@@ -12,8 +14,8 @@ const mocks = vi.hoisted(() => ({
   removeMember: vi.fn(),
 }));
 
-vi.mock("@bazion/auth", () => ({ requireActiveTenantPermission: mocks.requirePermission }));
-vi.mock("@bazion/auth/server", () => ({ auth: { api: {
+vi.mock("@bazion/auth", () => ({ requireActiveTenantPermission: mocks.requirePermission, requirePlatformRole: mocks.requirePlatformRole }));
+vi.mock("@bazion/auth/server", () => ({ reconcileProvisioningTenants: mocks.reconcileProvisioningTenants, auth: { api: {
   listMembers: mocks.listMembers,
   listInvitations: mocks.listInvitations,
   createInvitation: mocks.createInvitation,
@@ -46,6 +48,8 @@ describe("client administration API", () => {
   beforeEach(() => {
     Object.values(mocks).forEach((mock) => mock.mockReset());
     mocks.requirePermission.mockResolvedValue(context);
+    mocks.requirePlatformRole.mockResolvedValue({ userId: "platform-admin", email: "admin@bazion.test", role: "platform_admin" });
+    mocks.reconcileProvisioningTenants.mockResolvedValue({ scanned: 2, activated: 1, unmatched: [{ tenantId: "tenant-stuck", slug: "stuck" }], conflicted: [] });
     mocks.listMembers.mockResolvedValue({ members: [], total: 0 });
     mocks.listInvitations.mockResolvedValue([]);
     mocks.createInvitation.mockResolvedValue({ id: "invite-alpha", email: "staff@example.test" });
@@ -137,6 +141,80 @@ describe("client administration API", () => {
       expect(mocks.removeMember).toHaveBeenCalledWith(expect.objectContaining({
         body: { memberIdOrEmail: "user-alpha", organizationId: "org-alpha" },
       }));
+    } finally {
+      await app.close();
+    }
+  });
+});
+
+
+describe("platform tenant provisioning recovery", () => {
+  beforeEach(() => {
+    mocks.requirePlatformRole.mockReset();
+    mocks.reconcileProvisioningTenants.mockReset();
+    mocks.requirePlatformRole.mockResolvedValue({ userId: "platform-admin", email: "admin@bazion.test", role: "platform_admin" });
+    mocks.reconcileProvisioningTenants.mockResolvedValue({
+      scanned: 2,
+      activated: 1,
+      unmatched: [{ tenantId: "tenant-stuck", slug: "stuck" }],
+      conflicted: [],
+    });
+  });
+
+  it("allows only a platform owner or administrator to reconcile stale provisioning rows", async () => {
+    const app = await makeApp();
+    try {
+      const response = await app.inject({
+        method: "POST",
+        url: "/v1/admin/platform/tenants/reconcile-provisioning",
+        payload: { staleMinutes: 15, limit: 25 },
+      });
+      expect(response.statusCode).toBe(200);
+      expect(mocks.requirePlatformRole).toHaveBeenCalledWith(
+        expect.any(Object),
+        ["platform_owner", "platform_admin"],
+      );
+      expect(mocks.reconcileProvisioningTenants).toHaveBeenCalledWith({ staleMinutes: 15, limit: 25 });
+      expect(response.json()).toEqual({
+        scanned: 2,
+        activated: 1,
+        unmatched: [{ tenantId: "tenant-stuck", slug: "stuck" }],
+        conflicted: [],
+      });
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("rejects client-supplied tenant selectors and malformed reconciliation options", async () => {
+    const app = await makeApp();
+    try {
+      const response = await app.inject({
+        method: "POST",
+        url: "/v1/admin/platform/tenants/reconcile-provisioning",
+        payload: { tenantId: "tenant-other", staleMinutes: 1 },
+      });
+      expect(response.statusCode).toBe(400);
+      expect(mocks.requirePlatformRole).not.toHaveBeenCalled();
+      expect(mocks.reconcileProvisioningTenants).not.toHaveBeenCalled();
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("does not run reconciliation when the caller lacks a platform role", async () => {
+    const app = await makeApp();
+    try {
+      mocks.requirePlatformRole.mockRejectedValue(Object.assign(new Error("Forbidden"), {
+        statusCode: 403, code: "PLATFORM_PERMISSION_DENIED",
+      }));
+      const response = await app.inject({
+        method: "POST",
+        url: "/v1/admin/platform/tenants/reconcile-provisioning",
+        payload: {},
+      });
+      expect(response.statusCode).toBe(403);
+      expect(mocks.reconcileProvisioningTenants).not.toHaveBeenCalled();
     } finally {
       await app.close();
     }
