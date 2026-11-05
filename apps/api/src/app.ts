@@ -90,14 +90,15 @@ export async function buildApp(config: AppConfig) {
   await app.register(commerceRoutes, { prefix: "/v1", config });
 
   app.setErrorHandler((error, request, reply) => {
-    const statusCode = typeof (error as { statusCode?: number }).statusCode === "number"
-      ? (error as { statusCode: number }).statusCode
-      : 500;
-    const code = (error as { code?: string }).code ?? "INTERNAL_ERROR";
-    if (statusCode >= 500) request.log.error({ errorName: error.name, errorCode: code }, "Unhandled API error");
+    const candidate = error as { statusCode?: unknown; code?: unknown };
+    const statusCode = typeof candidate.statusCode === "number" ? candidate.statusCode : 500;
+    const code = typeof candidate.code === "string" ? candidate.code : "INTERNAL_ERROR";
+    const errorName = error instanceof Error ? error.name : "UnknownError";
+    const message = error instanceof Error ? error.message : "Request failed.";
+    if (statusCode >= 500) request.log.error({ errorName, errorCode: code }, "Unhandled API error");
     return reply.code(statusCode).send({
       error: code,
-      message: statusCode >= 500 ? "An unexpected error occurred." : error.message,
+      message: statusCode >= 500 ? "An unexpected error occurred." : message,
     });
   });
 

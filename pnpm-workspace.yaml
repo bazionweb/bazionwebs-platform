@@ -1,3 +1,8 @@
 packages:
   - "apps/*"
   - "packages/*"
+
+# pnpm 12 runs dependency build scripts only when explicitly allowlisted.
+# esbuild is required by the workspace toolchain; no other install scripts are approved.
+allowBuilds:
+  esbuild: true
