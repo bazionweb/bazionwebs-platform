@@ -6,7 +6,10 @@ const nextConfig: NextConfig = {
   // Keep the guest-cart HttpOnly cookie first-party on each client storefront
   // domain. The browser calls /v1 on this origin; Next proxies it to the API.
   async rewrites() {
-    return [{ source: "/v1/:path*", destination: `${apiBaseUrl}/v1/:path*` }];
+    return [
+      { source: "/v1/:path*", destination: `${apiBaseUrl}/v1/:path*` },
+      { source: "/api/auth/:path*", destination: `${apiBaseUrl}/api/auth/:path*` },
+    ];
   },
 };
 

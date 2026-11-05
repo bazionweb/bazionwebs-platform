@@ -1,6 +1,7 @@
 import { loadConfig } from "./config.js";
 import { buildApp } from "./app.js";
 import { pool } from "./lib/database.js";
+import { closeAuthResources } from "@bazion/auth/server";
 
 const config = loadConfig();
 const app = await buildApp(config);
@@ -9,14 +10,14 @@ try {
   await app.listen({ host: "0.0.0.0", port: config.PORT });
 } catch (error) {
   app.log.error(error);
-  await pool.end();
+  await Promise.all([pool.end(), closeAuthResources()]);
   process.exit(1);
 }
 
 for (const signal of ["SIGINT", "SIGTERM"] as const) {
   process.on(signal, async () => {
     await app.close();
-    await pool.end();
+    await Promise.all([pool.end(), closeAuthResources()]);
     process.exit(0);
   });
 }

@@ -32,7 +32,7 @@ An ownership-first, modular platform for building and operating reusable website
    ```
 
 3. Copy `.env.example` to `.env`. The example credentials are for local development only; change them before sharing the environment.
-4. Install dependencies and start PostgreSQL. On the first empty database volume, the init script creates separate `bazion_app` and `bazion_migrator` roles. The API connects as `bazion_app`; migration and seed commands connect as `bazion_migrator`.
+4. Install dependencies and start PostgreSQL. On a fresh database volume, the init script creates separate application, migration, authentication, tenant-resolver and tenant-provisioner roles. Business API queries use `bazion_app`; Better Auth uses `bazion_auth_runtime`; public tenant lookups use `bazion_tenant_resolver`; organization provisioning uses `bazion_tenant_provisioner`; migrations use `bazion_migrator`.
 
    ```powershell
    pnpm install
@@ -45,6 +45,7 @@ An ownership-first, modular platform for building and operating reusable website
 
    ```powershell
    pnpm db:migrate
+   pnpm db:auth:migrate
    pnpm db:seed
    ```
 
@@ -56,7 +57,7 @@ An ownership-first, modular platform for building and operating reusable website
 
    API health: `http://localhost:4000/health`
 
-   Storefront: `http://localhost:3000` (the browser calls the same-origin `/v1/*` path; Next.js rewrites it to the API so the HttpOnly cart cookie stays first-party on each client's custom domain).
+   Storefront: `http://localhost:3000` (the browser calls same-origin `/v1/*` and `/api/auth/*` paths; Next.js rewrites it to the API so the HttpOnly cart cookie stays first-party on each client's custom domain).
 
 The initial archive does not include `pnpm-lock.yaml` because package downloads were unavailable in the build environment. Run `pnpm install` once, commit the generated lockfile, and then change CI to `pnpm install --frozen-lockfile` and enable pnpm caching. The current CI workflow is bootstrap-friendly until that lockfile is committed.
 
@@ -126,10 +127,10 @@ The starter uses a static default tenant only for local development. The API run
 
 ## Important production gates
 
-The API intentionally refuses to start in production while `PAYMENT_PROVIDER=mock` or `TENANT_RESOLUTION_MODE=static`. Before a real client launch, Bazion must implement and test:
+The API intentionally refuses to start in production while `PAYMENT_PROVIDER=mock`, `TENANT_RESOLUTION_MODE=static`, email verification is disabled, or SMTP is not configured. Before a real client launch, Bazion must implement and test:
 
 - A trusted tenant resolver using verified identity claims and/or verified custom-domain mapping.
-- Authentication, authorization, admin roles, and customer identity/session management.
+- Review Better Auth authentication, organization membership, the platform-member bootstrap, tenant mapping and RBAC integration tests before enabling client administration.
 - A real payment adapter (e.g. Safaricom Daraja M-Pesa or Stripe) with signature/authenticity verification and provider-side reconciliation.
 - Persistent webhook idempotency and failure/retry handling.
 - Shipping, tax, discounts, refunds, stock reservation expiry/reconciliation, audit logs, privacy/retention, backups and monitoring.
@@ -141,3 +142,27 @@ See [`docs/`](docs/) for architecture, security, client onboarding, deployment, 
 ## Authentication and tenant architecture
 
 The target identity and access model is documented in [Authentication and tenant isolation](docs/architecture/authentication-and-tenant-isolation.md), with an editable [Mermaid source](docs/architecture/authentication-and-tenant-isolation.mmd) and a rendered [SVG diagram](docs/architecture/authentication-and-tenant-isolation.svg). This is an architecture decision, not a claim that authentication has already been implemented. See [ADR 0005](docs/adr/0005-authentication-and-tenant-identity.md).
+
+
+### Authentication development walkthrough
+
+1. Open `http://localhost:3000/login` and create an account. Verification links are printed in the API console when SMTP is not configured locally.
+2. Verify the email, then sign in. Better Auth stores the session in an HttpOnly cookie; browser JavaScript cannot read the session token.
+3. Read the signed-in identity from `GET /v1/auth/me` (for local API testing: `http://localhost:4000/v1/auth/me`).
+4. Before an account can create a client organization, bootstrap its verified user ID as a Bazion platform member. Follow [Platform owner bootstrap](docs/platform-owner-bootstrap.md). Only active `platform_owner` or `platform_admin` accounts may create client organizations.
+5. Client owners and staff join organizations through invitations. New organizations are created with a tenant `admin` role for the platform operator; assigning the stronger tenant `owner` role is restricted to a verified Bazion platform owner/admin. Tenant roles do not grant platform-wide privileges.
+
+Better Auth tables live in the separate PostgreSQL `auth` schema. Migrate them with `pnpm db:auth:migrate`; the API runtime role has DML-only access. See [Authentication operations](docs/authentication-operations.md) for existing-volume role upgrades, SMTP configuration and production deployment requirements.
+
+**Existing local database volume:** Docker's init scripts only run when PostgreSQL initializes a fresh data volume. Do not run `docker compose down -v` if you need to preserve local data. Follow [Authentication operations](docs/authentication-operations.md) to create the additional roles safely before applying the new migrations.
+
+### Better Auth schema migration version note
+
+The Better Auth core package is pinned to **1.7.17**. The separate npm CLI package currently publishes **1.7.10**, so the migration script checks that an exactly matching `auth@1.7.17` CLI exists before applying the schema. It intentionally refuses to run an older CLI against the newer runtime. Once Better Auth publishes the matching CLI package, `pnpm db:auth:migrate` will run it through `pnpm dlx`. Until then, the auth runtime/schema migration step is pending; do not manually create a guessed schema or bypass the version check.
+
+
+### Tenant hostname forwarding
+
+The Next.js 16 Proxy at `apps/storefront/proxy.ts` replaces incoming forwarded-host metadata for same-origin API rewrites. Fastify trusts it only from the explicitly configured proxy IP/CIDR allowlist. Do not expose the API origin directly to the public internet.
+
+Authentication email currently uses non-blocking SMTP callbacks for development. A durable outbox/worker is a production prerequisite for reliable verification, invitations and password recovery.

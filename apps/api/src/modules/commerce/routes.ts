@@ -6,6 +6,7 @@ import { addCartItemSchema, checkoutSchema, createCartSchema, updateCartItemSche
 import { carts, cartItems, idempotencyRecords, orderItems, orders, paymentAttempts, products, webhookEvents } from "@bazion/database";
 import { withTenantTransaction, type TenantTransaction } from "../../lib/database.js";
 import type { AppConfig } from "../../config.js";
+import { resolveTenantId } from "../../lib/tenant-resolution.js";
 
 interface RouteOptions { config: AppConfig }
 
@@ -55,15 +56,17 @@ function toPublicCart(cart: { id: string; currency: string; status: string; expi
 }
 
 export async function commerceRoutes(app: FastifyInstance, options: RouteOptions) {
-  const tenantId = options.config.DEFAULT_TENANT_ID;
-
-  app.get("/products", async () => withTenantTransaction(tenantId, async (tx) => {
+  app.get("/products", async (request) => {
+    const tenantId = await resolveTenantId(request.hostname, options.config);
+    return withTenantTransaction(tenantId, async (tx) => {
     return tx.select({ id: products.id, sku: products.sku, name: products.name, description: products.description,
       currency: products.currency, priceMinor: products.priceMinor, stockAvailable: sql<number | null>`case when ${products.stockTracked} then ${products.stockOnHand} - ${products.stockReserved} else null end` })
       .from(products).where(and(eq(products.tenantId, tenantId), eq(products.active, true)));
-  }));
+    });
+  });
 
   app.post("/carts", async (request, reply) => {
+    const tenantId = await resolveTenantId(request.hostname, options.config);
     const parsed = createCartSchema.safeParse(request.body ?? {});
     if (!parsed.success) return reply.code(400).send({ error: "INVALID_INPUT", details: parsed.error.flatten() });
     const guestAccessToken = randomBytes(32).toString("base64url");
@@ -78,6 +81,7 @@ export async function commerceRoutes(app: FastifyInstance, options: RouteOptions
   });
 
   app.get<{ Params: { cartId: string } }>("/carts/:cartId", async (request, reply) => {
+    const tenantId = await resolveTenantId(request.hostname, options.config);
     const token = getCartToken(request, request.params.cartId);
     const result = await withTenantTransaction(tenantId, async (tx) => {
       const cart = await authorizeCart(tx, tenantId, request.params.cartId, token);
@@ -91,6 +95,7 @@ export async function commerceRoutes(app: FastifyInstance, options: RouteOptions
   });
 
   app.post<{ Params: { cartId: string } }>("/carts/:cartId/items", async (request, reply) => {
+    const tenantId = await resolveTenantId(request.hostname, options.config);
     const token = getCartToken(request, request.params.cartId);
     const parsed = addCartItemSchema.safeParse(request.body);
     if (!parsed.success) return reply.code(400).send({ error: "INVALID_INPUT", details: parsed.error.flatten() });
@@ -121,6 +126,7 @@ export async function commerceRoutes(app: FastifyInstance, options: RouteOptions
   });
 
   app.patch<{ Params: { cartId: string; itemId: string } }>("/carts/:cartId/items/:itemId", async (request, reply) => {
+    const tenantId = await resolveTenantId(request.hostname, options.config);
     const token = getCartToken(request, request.params.cartId);
     const parsed = updateCartItemSchema.safeParse(request.body);
     if (!parsed.success) return reply.code(400).send({ error: "INVALID_INPUT", details: parsed.error.flatten() });
@@ -143,6 +149,7 @@ export async function commerceRoutes(app: FastifyInstance, options: RouteOptions
   });
 
   app.delete<{ Params: { cartId: string; itemId: string } }>("/carts/:cartId/items/:itemId", async (request, reply) => {
+    const tenantId = await resolveTenantId(request.hostname, options.config);
     const token = getCartToken(request, request.params.cartId);
     const result = await withTenantTransaction(tenantId, async (tx) => {
       const cart = await authorizeCart(tx, tenantId, request.params.cartId, token);
@@ -158,6 +165,7 @@ export async function commerceRoutes(app: FastifyInstance, options: RouteOptions
   });
 
   app.post("/checkout", async (request, reply) => {
+    const tenantId = await resolveTenantId(request.hostname, options.config);
     const keyHeader = request.headers["idempotency-key"];
     if (typeof keyHeader !== "string" || keyHeader.length < 8 || keyHeader.length > 160) {
       return reply.code(400).send({ error: "IDEMPOTENCY_KEY_REQUIRED", message: "Provide an Idempotency-Key header between 8 and 160 characters." });
@@ -254,6 +262,7 @@ export async function commerceRoutes(app: FastifyInstance, options: RouteOptions
 
   if (options.config.NODE_ENV !== "production") {
     app.post<{ Params: { orderId: string } }>("/_dev/orders/:orderId/pay", async (request, reply) => {
+    const tenantId = await resolveTenantId(request.hostname, options.config);
       const secret = request.headers["x-dev-secret"];
       if (typeof secret !== "string" || !secureTextEqual(secret, options.config.DEV_PAYMENT_SECRET)) return reply.code(401).send({ error: "UNAUTHORIZED" });
       const outcome = await withTenantTransaction(tenantId, async (tx) => {

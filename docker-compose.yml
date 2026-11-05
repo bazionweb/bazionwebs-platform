@@ -9,6 +9,9 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_ADMIN_PASSWORD:-bazion_admin_local_only}
       BAZION_APP_PASSWORD: ${BAZION_APP_PASSWORD:-bazion_app_local_only}
       BAZION_MIGRATOR_PASSWORD: ${BAZION_MIGRATOR_PASSWORD:-bazion_migrator_local_only}
+      BAZION_AUTH_PASSWORD: ${BAZION_AUTH_PASSWORD:-bazion_auth_local_only}
+      BAZION_TENANT_RESOLVER_PASSWORD: ${BAZION_TENANT_RESOLVER_PASSWORD:-bazion_tenant_resolver_local_only}
+      BAZION_TENANT_PROVISIONER_PASSWORD: ${BAZION_TENANT_PROVISIONER_PASSWORD:-bazion_tenant_provisioner_local_only}
     ports:
       - "5432:5432"
     volumes:

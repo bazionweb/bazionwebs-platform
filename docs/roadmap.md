@@ -10,7 +10,7 @@ Two-tenant isolation tests, API integration tests, payment state machine, stock 
 
 ## Phase 2 — shared client blocks
 
-Authentication/authorization with self-hosted Better Auth (MIT), trusted tenant/domain resolution and server-side RBAC, customer/user management, file uploads, notifications, booking/reservations, audit log, analytics and admin shell.
+Better Auth runtime, platform-member bootstrap, organization membership, trusted tenant/domain resolution, server-side RBAC and cross-tenant isolation tests, customer/user management, file uploads, notifications, booking/reservations, audit log, analytics and admin shell.
 
 ## Phase 3 — templates and client delivery
 
