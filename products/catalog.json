@@ -1,0 +1,1096 @@
+{
+  "schemaVersion": "1.0.0",
+  "generatedFrom": "Bazion Web advertised service catalogue supplied by the owner; reviewed 5 November 2026",
+  "principle": "Each capability maps to a domain module. It is not a one-package-per-line implementation plan.",
+  "modules": [
+    {
+      "id": "platform-identity",
+      "name": "Identity, authentication and access control",
+      "sourcePath": [
+        "packages/auth"
+      ],
+      "status": "implemented",
+      "scope": "Better Auth sessions, organization membership and roles exist. Extend with permission registry and service identities."
+    },
+    {
+      "id": "tenant-control-plane",
+      "name": "Tenant registry, provisioning, domain ownership and platform administration",
+      "sourcePath": [
+        "packages/auth",
+        "packages/database",
+        "apps/admin"
+      ],
+      "status": "partial",
+      "scope": "Tenant registry, membership mapping and client workspace exist. Add platform-owner administration, recovery UI, domain verification and tenant settings."
+    },
+    {
+      "id": "module-entitlements",
+      "name": "Module registry, plans, feature gates and quotas",
+      "sourcePath": [
+        "packages/module-registry"
+      ],
+      "status": "planned",
+      "scope": "Tenant-level enablement, dependencies, plan entitlements and safe module migrations."
+    },
+    {
+      "id": "design-system",
+      "name": "Shared UI and brand/theme system",
+      "sourcePath": [
+        "packages/ui"
+      ],
+      "status": "partial",
+      "scope": "A Button exists. Add tokens, typography, forms, navigation, tables, accessibility and tenant themes."
+    },
+    {
+      "id": "website-content",
+      "name": "CMS, articles, news and publishing",
+      "sourcePath": [
+        "packages/content"
+      ],
+      "status": "planned",
+      "scope": "Tenant-scoped pages, posts, revisions, publishing, scheduling and editorial roles."
+    },
+    {
+      "id": "page-experience",
+      "name": "Visual page builder, blocks, layouts and templates",
+      "sourcePath": [
+        "packages/page-builder",
+        "templates"
+      ],
+      "status": "planned",
+      "scope": "Approved schema-driven blocks, responsive layouts, preview, versioned templates and safe upgrades."
+    },
+    {
+      "id": "forms-leads",
+      "name": "Forms, lead capture and submissions",
+      "sourcePath": [
+        "packages/forms"
+      ],
+      "status": "planned",
+      "scope": "Schema-based forms, conditional logic, uploads, spam controls, consent and routing."
+    },
+    {
+      "id": "contacts-crm",
+      "name": "People, organizations, subscribers and customer records",
+      "sourcePath": [
+        "packages/contacts"
+      ],
+      "status": "planned",
+      "scope": "Reusable contact records, relationships, notes, communication preferences and imports."
+    },
+    {
+      "id": "search-seo-localization",
+      "name": "Search, SEO, structured data and localized content",
+      "sourcePath": [
+        "packages/search",
+        "packages/seo",
+        "packages/localization"
+      ],
+      "status": "planned",
+      "scope": "Start with PostgreSQL FTS; add external search only when needed. Shared metadata, sitemap, locale and translated content."
+    },
+    {
+      "id": "marketing-communications",
+      "name": "Newsletter, transactional messaging and channel integrations",
+      "sourcePath": [
+        "packages/notifications",
+        "packages/marketing"
+      ],
+      "status": "partial",
+      "scope": "Notification provider interface and encrypted outbox exist. Add adapters, templates, preferences and a supervised worker; campaigns remain planned."
+    },
+    {
+      "id": "media-storage",
+      "name": "Uploads, media library and object storage",
+      "sourcePath": [
+        "packages/storage"
+      ],
+      "status": "partial",
+      "scope": "Storage port exists. Add R2/S3 adapters, signed uploads, variants, metadata, retention and deletion."
+    },
+    {
+      "id": "document-management",
+      "name": "Secure document vault, searchable downloads and generated documents",
+      "sourcePath": [
+        "packages/documents"
+      ],
+      "status": "planned",
+      "scope": "Tenant-safe metadata, permissions, versioning, PDF output, retention and audit."
+    },
+    {
+      "id": "commerce",
+      "name": "Products, variants, carts, checkout and orders",
+      "sourcePath": [
+        "packages/commerce-domain",
+        "apps/api/src/modules/commerce"
+      ],
+      "status": "partial",
+      "scope": "Foundational catalogue/cart/checkout/order flow exists; strengthen editor, variants, order lifecycle and customer portal."
+    },
+    {
+      "id": "payments",
+      "name": "Payment orchestration and provider adapters",
+      "sourcePath": [
+        "packages/payments"
+      ],
+      "status": "partial",
+      "scope": "Provider interface and development mock exist. Add verified M-Pesa, card and PayPal adapters, callbacks, reconciliation and refunds."
+    },
+    {
+      "id": "inventory-pricing",
+      "name": "Stock, price lists, promotions and coupons",
+      "sourcePath": [
+        "packages/inventory",
+        "packages/promotions"
+      ],
+      "status": "partial",
+      "scope": "Basic stock fields and reservations exist. Add adjustment ledger, warehouses, variants, price rules and promotions."
+    },
+    {
+      "id": "fulfilment",
+      "name": "Shipping, courier, delivery and returns",
+      "sourcePath": [
+        "packages/fulfilment"
+      ],
+      "status": "planned",
+      "scope": "Shipping quotes, zones, carrier adapters, tracking, fulfilment workflow, returns and refunds."
+    },
+    {
+      "id": "booking",
+      "name": "Appointments, availability and calendar resources",
+      "sourcePath": [
+        "packages/booking"
+      ],
+      "status": "partial",
+      "scope": "Base booking type and window validation exist. Add resource availability, conflicts, time zones, recurring rules and reminders."
+    },
+    {
+      "id": "client-portals",
+      "name": "Customer and institutional self-service portals",
+      "sourcePath": [
+        "apps/storefront",
+        "apps/admin"
+      ],
+      "status": "partial",
+      "scope": "Login, workspace selection and client workspace administration exist. Add customer portal features and module-driven navigation."
+    },
+    {
+      "id": "subscriptions-billing",
+      "name": "SaaS subscriptions, invoices and commercial entitlements",
+      "sourcePath": [
+        "packages/billing"
+      ],
+      "status": "planned",
+      "scope": "Keep Bazion subscription billing separate from client checkout/payment ledgers."
+    },
+    {
+      "id": "education",
+      "name": "School management and learning management",
+      "sourcePath": [
+        "packages/education"
+      ],
+      "status": "planned",
+      "scope": "Admissions, students/guardians, classes, timetable, attendance, assessment, fees, LMS and certificates."
+    },
+    {
+      "id": "ministry",
+      "name": "Church and ministry management",
+      "sourcePath": [
+        "packages/ministry"
+      ],
+      "status": "planned",
+      "scope": "Members/families, groups, attendance, events, volunteers, giving, communications and reports."
+    },
+    {
+      "id": "healthcare",
+      "name": "Clinic operations and patient administration",
+      "sourcePath": [
+        "packages/healthcare"
+      ],
+      "status": "planned",
+      "scope": "Appointment and operational workflows; sensitive health records require separate security and compliance review."
+    },
+    {
+      "id": "erp-supply-chain",
+      "name": "ERP, finance and supply-chain workflows",
+      "sourcePath": [
+        "packages/erp"
+      ],
+      "status": "planned",
+      "scope": "Composable finance, billing, purchasing, stock, supplier and operational workflows; build only against validated requirements."
+    },
+    {
+      "id": "integration-hub",
+      "name": "Provider adapters, API connections and webhook delivery",
+      "sourcePath": [
+        "packages/integrations"
+      ],
+      "status": "planned",
+      "scope": "Central credentials, scoped connections, signatures, retries, replay protection and health checks."
+    },
+    {
+      "id": "hosting-control-plane",
+      "name": "Hosting plans, compute resources, clusters and resource quotas",
+      "sourcePath": [
+        "packages/hosting"
+      ],
+      "status": "planned",
+      "scope": "Provider-neutral provisioning and metering. Hosting tiers are entitlements, not separate codebases."
+    },
+    {
+      "id": "domains-email",
+      "name": "Domains, DNS, TLS and corporate email services",
+      "sourcePath": [
+        "packages/domains",
+        "packages/email-service"
+      ],
+      "status": "partial",
+      "scope": "Verified-domain lookup exists. Add ownership challenges, TLS lifecycle and mailbox-provider integrations; do not build a mail server prematurely."
+    },
+    {
+      "id": "deployment-environments",
+      "name": "Git deployment, CI/CD, preview and staging environments",
+      "sourcePath": [
+        "packages/deployments"
+      ],
+      "status": "planned",
+      "scope": "Provider adapters, isolated secrets, deployments, rollback, preview and release history."
+    },
+    {
+      "id": "backup-recovery",
+      "name": "Database/object backups, migrations and disaster recovery",
+      "sourcePath": [
+        "packages/backups",
+        "packages/database"
+      ],
+      "status": "partial",
+      "scope": "Migrations exist. Add scheduled off-site backups, restore tests, migration tools and documented recovery objectives."
+    },
+    {
+      "id": "observability-resilience",
+      "name": "Uptime, telemetry, performance, incidents, failover and capacity",
+      "sourcePath": [
+        "packages/observability",
+        "packages/resilience"
+      ],
+      "status": "planned",
+      "scope": "OpenTelemetry instrumentation, health checks, SLOs, alerts, incident response, restore/failover drills."
+    },
+    {
+      "id": "security-operations",
+      "name": "Security scanning, vulnerability response and access reviews",
+      "sourcePath": [
+        "packages/security-ops"
+      ],
+      "status": "planned",
+      "scope": "Dependency and secret scanning, security headers, rate limits, incident records and access reviews."
+    },
+    {
+      "id": "support-maintenance",
+      "name": "Support desk, maintenance plans, updates and SLA handling",
+      "sourcePath": [
+        "packages/support"
+      ],
+      "status": "planned",
+      "scope": "Tickets, service queues, scheduled maintenance, priority handling, incident communication and SLA evidence."
+    },
+    {
+      "id": "sales-project-delivery",
+      "name": "Commercial catalogue, quotes, discovery, project delivery and change requests",
+      "sourcePath": [
+        "packages/sales",
+        "packages/projects"
+      ],
+      "status": "planned",
+      "scope": "Separate sales/service workflows from runtime tenant products; pricing remains in the commercial source of truth."
+    },
+    {
+      "id": "analytics",
+      "name": "Privacy-aware product and website analytics",
+      "sourcePath": [
+        "packages/analytics"
+      ],
+      "status": "partial",
+      "scope": "Event/sink contract exists. Add reports, conversion metrics, exports, retention and tenant dashboards."
+    }
+  ],
+  "capabilities": [
+    {
+      "id": "BW-001",
+      "name": "Website builder and responsive page designer",
+      "group": "Website and content",
+      "moduleId": "page-experience",
+      "recordType": "capability"
+    },
+    {
+      "id": "BW-002",
+      "name": "Reusable website templates and section/block library",
+      "group": "Website and content",
+      "moduleId": "page-experience",
+      "recordType": "capability"
+    },
+    {
+      "id": "BW-003",
+      "name": "Website design system and branding manager",
+      "group": "Website and content",
+      "moduleId": "design-system",
+      "recordType": "capability"
+    },
+    {
+      "id": "BW-004",
+      "name": "Content Management System (CMS)",
+      "group": "Website and content",
+      "moduleId": "website-content",
+      "recordType": "capability"
+    },
+    {
+      "id": "BW-005",
+      "name": "Blog, news and article management",
+      "group": "Website and content",
+      "moduleId": "website-content",
+      "recordType": "capability"
+    },
+    {
+      "id": "BW-006",
+      "name": "Multi-author content and publishing workflow",
+      "group": "Website and content",
+      "moduleId": "website-content",
+      "recordType": "capability"
+    },
+    {
+      "id": "BW-007",
+      "name": "Contact forms and lead-management system",
+      "group": "Website and content",
+      "moduleId": "forms-leads",
+      "recordType": "capability"
+    },
+    {
+      "id": "BW-008",
+      "name": "Advanced multi-step forms with conditional logic and file uploads",
+      "group": "Website and content",
+      "moduleId": "forms-leads",
+      "recordType": "capability"
+    },
+    {
+      "id": "BW-009",
+      "name": "Search and site discovery",
+      "group": "Website and content",
+      "moduleId": "search-seo-localization",
+      "recordType": "capability"
+    },
+    {
+      "id": "BW-010",
+      "name": "SEO management and Schema.org structured data",
+      "group": "Website and content",
+      "moduleId": "search-seo-localization",
+      "recordType": "capability"
+    },
+    {
+      "id": "BW-011",
+      "name": "Website analytics and GA4 integration",
+      "group": "Website and content",
+      "moduleId": "analytics",
+      "recordType": "capability"
+    },
+    {
+      "id": "BW-012",
+      "name": "Newsletter and subscriber management",
+      "group": "Website and content",
+      "moduleId": "marketing-communications",
+      "recordType": "capability"
+    },
+    {
+      "id": "BW-013",
+      "name": "Multilingual website and content management",
+      "group": "Website and content",
+      "moduleId": "search-seo-localization",
+      "recordType": "capability"
+    },
+    {
+      "id": "BW-014",
+      "name": "WhatsApp chat and contact integration",
+      "group": "Website and content",
+      "moduleId": "marketing-communications",
+      "recordType": "provider-adapter"
+    },
+    {
+      "id": "BW-015",
+      "name": "Google Maps and location integration",
+      "group": "Website and content",
+      "moduleId": "integration-hub",
+      "recordType": "provider-adapter"
+    },
+    {
+      "id": "BW-016",
+      "name": "Document download and resource library",
+      "group": "Website and content",
+      "moduleId": "document-management",
+      "recordType": "capability"
+    },
+    {
+      "id": "BW-017",
+      "name": "Product catalogue and category management",
+      "group": "Ecommerce",
+      "moduleId": "commerce",
+      "recordType": "capability"
+    },
+    {
+      "id": "BW-018",
+      "name": "Product variants and attributes",
+      "group": "Ecommerce",
+      "moduleId": "commerce",
+      "recordType": "capability"
+    },
+    {
+      "id": "BW-019",
+      "name": "Product filtering and search",
+      "group": "Ecommerce",
+      "moduleId": "search-seo-localization",
+      "recordType": "capability"
+    },
+    {
+      "id": "BW-020",
+      "name": "Shopping cart",
+      "group": "Ecommerce",
+      "moduleId": "commerce",
+      "recordType": "capability"
+    },
+    {
+      "id": "BW-021",
+      "name": "Mobile-friendly checkout",
+      "group": "Ecommerce",
+      "moduleId": "commerce",
+      "recordType": "capability"
+    },
+    {
+      "id": "BW-022",
+      "name": "Payment gateway integration framework",
+      "group": "Ecommerce",
+      "moduleId": "payments",
+      "recordType": "capability"
+    },
+    {
+      "id": "BW-023",
+      "name": "M-Pesa STK Push integration",
+      "group": "Ecommerce",
+      "moduleId": "payments",
+      "recordType": "provider-adapter"
+    },
+    {
+      "id": "BW-024",
+      "name": "Card payment integration",
+      "group": "Ecommerce",
+      "moduleId": "payments",
+      "recordType": "provider-adapter"
+    },
+    {
+      "id": "BW-025",
+      "name": "PayPal integration",
+      "group": "Ecommerce",
+      "moduleId": "payments",
+      "recordType": "provider-adapter"
+    },
+    {
+      "id": "BW-026",
+      "name": "Order management and notifications",
+      "group": "Ecommerce",
+      "moduleId": "commerce",
+      "recordType": "capability"
+    },
+    {
+      "id": "BW-027",
+      "name": "Inventory management and stock alerts",
+      "group": "Ecommerce",
+      "moduleId": "inventory-pricing",
+      "recordType": "capability"
+    },
+    {
+      "id": "BW-028",
+      "name": "Coupon and discount management",
+      "group": "Ecommerce",
+      "moduleId": "inventory-pricing",
+      "recordType": "capability"
+    },
+    {
+      "id": "BW-029",
+      "name": "Dynamic shipping and delivery calculation",
+      "group": "Ecommerce",
+      "moduleId": "fulfilment",
+      "recordType": "capability"
+    },
+    {
+      "id": "BW-030",
+      "name": "Courier and logistics integration",
+      "group": "Ecommerce",
+      "moduleId": "fulfilment",
+      "recordType": "provider-adapter"
+    },
+    {
+      "id": "BW-031",
+      "name": "Abandoned cart recovery",
+      "group": "Ecommerce",
+      "moduleId": "commerce",
+      "recordType": "capability"
+    },
+    {
+      "id": "BW-032",
+      "name": "Multi-currency commerce",
+      "group": "Ecommerce",
+      "moduleId": "commerce",
+      "recordType": "capability"
+    },
+    {
+      "id": "BW-033",
+      "name": "B2B commerce and marketplace functionality",
+      "group": "Ecommerce",
+      "moduleId": "commerce",
+      "recordType": "capability"
+    },
+    {
+      "id": "BW-034",
+      "name": "Recurring payments and subscription commerce",
+      "group": "Ecommerce",
+      "moduleId": "subscriptions-billing",
+      "recordType": "capability"
+    },
+    {
+      "id": "BW-035",
+      "name": "Accounting and ERP integration",
+      "group": "Ecommerce",
+      "moduleId": "integration-hub",
+      "recordType": "provider-adapter"
+    },
+    {
+      "id": "BW-036",
+      "name": "Client portal and customer self-service dashboard",
+      "group": "Business systems and portals",
+      "moduleId": "client-portals",
+      "recordType": "capability"
+    },
+    {
+      "id": "BW-037",
+      "name": "Booking and appointment management",
+      "group": "Business systems and portals",
+      "moduleId": "booking",
+      "recordType": "capability"
+    },
+    {
+      "id": "BW-038",
+      "name": "Document vault and secure file management",
+      "group": "Business systems and portals",
+      "moduleId": "document-management",
+      "recordType": "capability"
+    },
+    {
+      "id": "BW-039",
+      "name": "Multi-tenant application framework",
+      "group": "Business systems and portals",
+      "moduleId": "tenant-control-plane",
+      "recordType": "platform-foundation"
+    },
+    {
+      "id": "BW-040",
+      "name": "Role-based access control and permissions",
+      "group": "Business systems and portals",
+      "moduleId": "platform-identity",
+      "recordType": "platform-foundation"
+    },
+    {
+      "id": "BW-041",
+      "name": "Subscription and recurring billing management",
+      "group": "Business systems and portals",
+      "moduleId": "subscriptions-billing",
+      "recordType": "capability"
+    },
+    {
+      "id": "BW-042",
+      "name": "API gateway and third-party integration framework",
+      "group": "Business systems and portals",
+      "moduleId": "integration-hub",
+      "recordType": "capability"
+    },
+    {
+      "id": "BW-043",
+      "name": "Webhook management and synchronization",
+      "group": "Business systems and portals",
+      "moduleId": "integration-hub",
+      "recordType": "capability"
+    },
+    {
+      "id": "BW-044",
+      "name": "Institutional management system",
+      "group": "Business systems and portals",
+      "moduleId": "education",
+      "recordType": "solution-capability"
+    },
+    {
+      "id": "BW-045",
+      "name": "Church and ministry management system",
+      "group": "Business systems and portals",
+      "moduleId": "ministry",
+      "recordType": "solution-capability"
+    },
+    {
+      "id": "BW-046",
+      "name": "School management system",
+      "group": "Business systems and portals",
+      "moduleId": "education",
+      "recordType": "solution-capability"
+    },
+    {
+      "id": "BW-047",
+      "name": "Clinic management system",
+      "group": "Business systems and portals",
+      "moduleId": "healthcare",
+      "recordType": "solution-capability"
+    },
+    {
+      "id": "BW-048",
+      "name": "Learning Management System (LMS)",
+      "group": "Business systems and portals",
+      "moduleId": "education",
+      "recordType": "capability"
+    },
+    {
+      "id": "BW-049",
+      "name": "Student admissions and enrolment",
+      "group": "Business systems and portals",
+      "moduleId": "education",
+      "recordType": "capability"
+    },
+    {
+      "id": "BW-050",
+      "name": "Course and lesson management",
+      "group": "Business systems and portals",
+      "moduleId": "education",
+      "recordType": "capability"
+    },
+    {
+      "id": "BW-051",
+      "name": "Grading and assessment management",
+      "group": "Business systems and portals",
+      "moduleId": "education",
+      "recordType": "capability"
+    },
+    {
+      "id": "BW-052",
+      "name": "Online quizzes and examinations",
+      "group": "Business systems and portals",
+      "moduleId": "education",
+      "recordType": "capability"
+    },
+    {
+      "id": "BW-053",
+      "name": "Automated certificate generation",
+      "group": "Business systems and portals",
+      "moduleId": "document-management",
+      "recordType": "capability"
+    },
+    {
+      "id": "BW-054",
+      "name": "Enterprise resource planning (ERP)",
+      "group": "Business systems and portals",
+      "moduleId": "erp-supply-chain",
+      "recordType": "capability"
+    },
+    {
+      "id": "BW-055",
+      "name": "Supply-chain management and portals",
+      "group": "Business systems and portals",
+      "moduleId": "erp-supply-chain",
+      "recordType": "capability"
+    },
+    {
+      "id": "BW-056",
+      "name": "Financial transaction and billing platform",
+      "group": "Business systems and portals",
+      "moduleId": "erp-supply-chain",
+      "recordType": "capability"
+    },
+    {
+      "id": "BW-057",
+      "name": "Managed hosting control panel",
+      "group": "Hosting and infrastructure",
+      "moduleId": "hosting-control-plane",
+      "recordType": "capability"
+    },
+    {
+      "id": "BW-058",
+      "name": "Client hosting and resource provisioning",
+      "group": "Hosting and infrastructure",
+      "moduleId": "hosting-control-plane",
+      "recordType": "capability"
+    },
+    {
+      "id": "BW-059",
+      "name": "Container and server resource management",
+      "group": "Hosting and infrastructure",
+      "moduleId": "hosting-control-plane",
+      "recordType": "capability"
+    },
+    {
+      "id": "BW-060",
+      "name": "Domain and DNS management",
+      "group": "Hosting and infrastructure",
+      "moduleId": "domains-email",
+      "recordType": "capability"
+    },
+    {
+      "id": "BW-061",
+      "name": "SSL certificate management",
+      "group": "Hosting and infrastructure",
+      "moduleId": "domains-email",
+      "recordType": "capability"
+    },
+    {
+      "id": "BW-062",
+      "name": "CDN and performance delivery integration",
+      "group": "Hosting and infrastructure",
+      "moduleId": "hosting-control-plane",
+      "recordType": "capability"
+    },
+    {
+      "id": "BW-063",
+      "name": "Corporate email hosting and forwarding",
+      "group": "Hosting and infrastructure",
+      "moduleId": "domains-email",
+      "recordType": "capability"
+    },
+    {
+      "id": "BW-064",
+      "name": "Database provisioning and management",
+      "group": "Hosting and infrastructure",
+      "moduleId": "backup-recovery",
+      "recordType": "capability"
+    },
+    {
+      "id": "BW-065",
+      "name": "Redis caching management",
+      "group": "Hosting and infrastructure",
+      "moduleId": "hosting-control-plane",
+      "recordType": "capability"
+    },
+    {
+      "id": "BW-066",
+      "name": "Staging and development environments",
+      "group": "Hosting and infrastructure",
+      "moduleId": "deployment-environments",
+      "recordType": "capability"
+    },
+    {
+      "id": "BW-067",
+      "name": "Git-based deployment management",
+      "group": "Hosting and infrastructure",
+      "moduleId": "deployment-environments",
+      "recordType": "capability"
+    },
+    {
+      "id": "BW-068",
+      "name": "Automated CI/CD pipelines",
+      "group": "Hosting and infrastructure",
+      "moduleId": "deployment-environments",
+      "recordType": "capability"
+    },
+    {
+      "id": "BW-069",
+      "name": "Automated backup and restore system",
+      "group": "Hosting and infrastructure",
+      "moduleId": "backup-recovery",
+      "recordType": "capability"
+    },
+    {
+      "id": "BW-070",
+      "name": "Database and file migration tools",
+      "group": "Hosting and infrastructure",
+      "moduleId": "backup-recovery",
+      "recordType": "capability"
+    },
+    {
+      "id": "BW-071",
+      "name": "Hosting usage and resource monitoring",
+      "group": "Hosting and infrastructure",
+      "moduleId": "observability-resilience",
+      "recordType": "capability"
+    },
+    {
+      "id": "BW-072",
+      "name": "Managed cloud cluster management",
+      "group": "Hosting and infrastructure",
+      "moduleId": "hosting-control-plane",
+      "recordType": "capability"
+    },
+    {
+      "id": "BW-073",
+      "name": "Website maintenance and update management",
+      "group": "Care, security and support",
+      "moduleId": "support-maintenance",
+      "recordType": "capability"
+    },
+    {
+      "id": "BW-074",
+      "name": "CMS and plugin update automation",
+      "group": "Care, security and support",
+      "moduleId": "support-maintenance",
+      "recordType": "capability"
+    },
+    {
+      "id": "BW-075",
+      "name": "Backup scheduling and recovery",
+      "group": "Care, security and support",
+      "moduleId": "backup-recovery",
+      "recordType": "capability"
+    },
+    {
+      "id": "BW-076",
+      "name": "Uptime monitoring",
+      "group": "Care, security and support",
+      "moduleId": "observability-resilience",
+      "recordType": "capability"
+    },
+    {
+      "id": "BW-077",
+      "name": "Security scanning and vulnerability monitoring",
+      "group": "Care, security and support",
+      "moduleId": "security-operations",
+      "recordType": "capability"
+    },
+    {
+      "id": "BW-078",
+      "name": "Performance and Core Web Vitals monitoring",
+      "group": "Care, security and support",
+      "moduleId": "observability-resilience",
+      "recordType": "capability"
+    },
+    {
+      "id": "BW-079",
+      "name": "SEO health monitoring",
+      "group": "Care, security and support",
+      "moduleId": "search-seo-localization",
+      "recordType": "capability"
+    },
+    {
+      "id": "BW-080",
+      "name": "Database and application health monitoring",
+      "group": "Care, security and support",
+      "moduleId": "observability-resilience",
+      "recordType": "capability"
+    },
+    {
+      "id": "BW-081",
+      "name": "Incident management and alerting",
+      "group": "Care, security and support",
+      "moduleId": "observability-resilience",
+      "recordType": "capability"
+    },
+    {
+      "id": "BW-082",
+      "name": "Priority support and SLA management",
+      "group": "Care, security and support",
+      "moduleId": "support-maintenance",
+      "recordType": "capability"
+    },
+    {
+      "id": "BW-083",
+      "name": "Failover and disaster-recovery management",
+      "group": "Care, security and support",
+      "moduleId": "observability-resilience",
+      "recordType": "capability"
+    },
+    {
+      "id": "BW-084",
+      "name": "Capacity and high-traffic readiness monitoring",
+      "group": "Care, security and support",
+      "moduleId": "observability-resilience",
+      "recordType": "capability"
+    },
+    {
+      "id": "BW-085",
+      "name": "M-Pesa Daraja integration",
+      "group": "Provider integrations",
+      "moduleId": "payments",
+      "recordType": "provider-adapter"
+    },
+    {
+      "id": "BW-086",
+      "name": "Paystack integration",
+      "group": "Provider integrations",
+      "moduleId": "payments",
+      "recordType": "provider-adapter"
+    },
+    {
+      "id": "BW-087",
+      "name": "Stripe integration",
+      "group": "Provider integrations",
+      "moduleId": "payments",
+      "recordType": "provider-adapter"
+    },
+    {
+      "id": "BW-088",
+      "name": "PayPal integration",
+      "group": "Provider integrations",
+      "moduleId": "payments",
+      "recordType": "provider-adapter"
+    },
+    {
+      "id": "BW-089",
+      "name": "Mailchimp integration",
+      "group": "Provider integrations",
+      "moduleId": "marketing-communications",
+      "recordType": "provider-adapter"
+    },
+    {
+      "id": "BW-090",
+      "name": "Brevo integration",
+      "group": "Provider integrations",
+      "moduleId": "marketing-communications",
+      "recordType": "provider-adapter"
+    },
+    {
+      "id": "BW-091",
+      "name": "QuickBooks integration",
+      "group": "Provider integrations",
+      "moduleId": "integration-hub",
+      "recordType": "provider-adapter"
+    },
+    {
+      "id": "BW-092",
+      "name": "Xero integration",
+      "group": "Provider integrations",
+      "moduleId": "integration-hub",
+      "recordType": "provider-adapter"
+    },
+    {
+      "id": "BW-093",
+      "name": "Courier API integrations",
+      "group": "Provider integrations",
+      "moduleId": "fulfilment",
+      "recordType": "provider-adapter"
+    },
+    {
+      "id": "BW-094",
+      "name": "Custom third-party API connectors",
+      "group": "Provider integrations",
+      "moduleId": "integration-hub",
+      "recordType": "provider-adapter"
+    },
+    {
+      "id": "BW-095",
+      "name": "External CRM and SaaS synchronization",
+      "group": "Provider integrations",
+      "moduleId": "integration-hub",
+      "recordType": "provider-adapter"
+    },
+    {
+      "id": "BW-096",
+      "name": "Service and product catalogue",
+      "group": "Commercial and delivery workflows",
+      "moduleId": "sales-project-delivery",
+      "recordType": "commercial-capability"
+    },
+    {
+      "id": "BW-097",
+      "name": "Pricing and package management",
+      "group": "Commercial and delivery workflows",
+      "moduleId": "sales-project-delivery",
+      "recordType": "commercial-capability"
+    },
+    {
+      "id": "BW-098",
+      "name": "Add-on module catalogue",
+      "group": "Commercial and delivery workflows",
+      "moduleId": "module-entitlements",
+      "recordType": "commercial-capability"
+    },
+    {
+      "id": "BW-099",
+      "name": "Project quotation and estimation system",
+      "group": "Commercial and delivery workflows",
+      "moduleId": "sales-project-delivery",
+      "recordType": "commercial-capability"
+    },
+    {
+      "id": "BW-100",
+      "name": "Discovery and requirements specification workflow",
+      "group": "Commercial and delivery workflows",
+      "moduleId": "sales-project-delivery",
+      "recordType": "commercial-capability"
+    },
+    {
+      "id": "BW-101",
+      "name": "Client project tracking and delivery management",
+      "group": "Commercial and delivery workflows",
+      "moduleId": "sales-project-delivery",
+      "recordType": "commercial-capability"
+    },
+    {
+      "id": "BW-102",
+      "name": "Client revision and change-request management",
+      "group": "Commercial and delivery workflows",
+      "moduleId": "sales-project-delivery",
+      "recordType": "commercial-capability"
+    },
+    {
+      "id": "BW-103",
+      "name": "Technical support request and service management",
+      "group": "Commercial and delivery workflows",
+      "moduleId": "support-maintenance",
+      "recordType": "commercial-capability"
+    },
+    {
+      "id": "BW-104",
+      "name": "SME and business website solution",
+      "group": "Solution packs",
+      "moduleId": "page-experience",
+      "recordType": "solution-pack"
+    },
+    {
+      "id": "BW-105",
+      "name": "Professional services solution",
+      "group": "Solution packs",
+      "moduleId": "booking",
+      "recordType": "solution-pack"
+    },
+    {
+      "id": "BW-106",
+      "name": "Startup website and SaaS solution",
+      "group": "Solution packs",
+      "moduleId": "subscriptions-billing",
+      "recordType": "solution-pack"
+    },
+    {
+      "id": "BW-107",
+      "name": "Church and ministry solution",
+      "group": "Solution packs",
+      "moduleId": "ministry",
+      "recordType": "solution-pack"
+    },
+    {
+      "id": "BW-108",
+      "name": "School and education solution",
+      "group": "Solution packs",
+      "moduleId": "education",
+      "recordType": "solution-pack"
+    },
+    {
+      "id": "BW-109",
+      "name": "NGO and membership solution",
+      "group": "Solution packs",
+      "moduleId": "contacts-crm",
+      "recordType": "solution-pack"
+    },
+    {
+      "id": "BW-110",
+      "name": "Ecommerce solution",
+      "group": "Solution packs",
+      "moduleId": "commerce",
+      "recordType": "solution-pack"
+    },
+    {
+      "id": "BW-111",
+      "name": "Enterprise and ERP solution",
+      "group": "Solution packs",
+      "moduleId": "erp-supply-chain",
+      "recordType": "solution-pack"
+    }
+  ]
+}
