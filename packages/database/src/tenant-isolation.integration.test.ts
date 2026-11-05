@@ -59,8 +59,6 @@ describe.skipIf(!enabled)("PostgreSQL tenant isolation (real roles and RLS)", ()
       hostname: `${label}-${unique.slice(0, 8)}.verified.example.test`,
       pendingHostname: `${label}-${unique.slice(0, 8)}.pending.example.test`,
     };
-    fixtures.push(fixture);
-
     await withTenant(migrationPool, tenantId, async (client) => {
       const product = await client.query<{ id: string }>(
         `INSERT INTO public.products
