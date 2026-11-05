@@ -12,6 +12,8 @@ services:
       BAZION_AUTH_PASSWORD: ${BAZION_AUTH_PASSWORD:-bazion_auth_local_only}
       BAZION_TENANT_RESOLVER_PASSWORD: ${BAZION_TENANT_RESOLVER_PASSWORD:-bazion_tenant_resolver_local_only}
       BAZION_TENANT_PROVISIONER_PASSWORD: ${BAZION_TENANT_PROVISIONER_PASSWORD:-bazion_tenant_provisioner_local_only}
+      BAZION_NOTIFICATION_ENQUEUER_PASSWORD: ${BAZION_NOTIFICATION_ENQUEUER_PASSWORD:-bazion_notification_enqueuer_local_only}
+      BAZION_NOTIFICATION_WORKER_PASSWORD: ${BAZION_NOTIFICATION_WORKER_PASSWORD:-bazion_notification_worker_local_only}
     ports:
       - "5432:5432"
     volumes:
