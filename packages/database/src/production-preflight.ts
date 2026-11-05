@@ -138,8 +138,8 @@ function checkStaticProductionConfig(): Record<string, URL | null> {
   if (Boolean(smtpUser) !== Boolean(smtpPassword)) {
     fail("Configure both NOTIFICATION_SMTP_USER and NOTIFICATION_SMTP_PASSWORD, or neither.");
   }
-  if (process.env.NOTIFICATION_SMTP_REQUIRE_AUTH !== "false" && !smtpUser) {
-    fail("SMTP authentication is required by default. For a trusted private relay, explicitly set NOTIFICATION_SMTP_REQUIRE_AUTH=false and document that exception.");
+  if (!smtpUser || !smtpPassword) {
+    fail("Production SMTP authentication requires both NOTIFICATION_SMTP_USER and NOTIFICATION_SMTP_PASSWORD.");
   }
 
   const batchSize = Number(process.env.NOTIFICATION_WORKER_BATCH_SIZE ?? "5");
