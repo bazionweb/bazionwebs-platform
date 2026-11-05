@@ -250,6 +250,12 @@ async function verifyDatabase(urls: Record<string, URL | null>): Promise<void> {
       enqueuer_insert_tenant: boolean;
       enqueuer_select_id: boolean;
       enqueuer_select_hash: boolean;
+      enqueuer_select_idempotency: boolean;
+      enqueuer_insert_channel: boolean;
+      enqueuer_insert_ciphertext: boolean;
+      enqueuer_insert_hash: boolean;
+      enqueuer_insert_idempotency: boolean;
+      enqueuer_insert_attempts: boolean;
       enqueuer_select_ciphertext: boolean;
       enqueuer_update: boolean;
       enqueuer_delete: boolean;
@@ -260,8 +266,12 @@ async function verifyDatabase(urls: Record<string, URL | null>): Promise<void> {
       provisioner_select: boolean;
       provisioner_insert: boolean;
       provisioner_update: boolean;
+      provisioner_delete: boolean;
       app_outbox_select: boolean;
       app_outbox_insert: boolean;
+      app_outbox_update: boolean;
+      app_outbox_delete: boolean;
+      auth_outbox_select: boolean;
       app_audit_insert: boolean;
       app_audit_select: boolean;
       app_audit_update: boolean;
@@ -271,6 +281,12 @@ async function verifyDatabase(urls: Record<string, URL | null>): Promise<void> {
          has_column_privilege('bazion_notification_enqueuer', 'public.notification_outbox', 'tenant_id', 'INSERT') AS enqueuer_insert_tenant,
          has_column_privilege('bazion_notification_enqueuer', 'public.notification_outbox', 'id', 'SELECT') AS enqueuer_select_id,
          has_column_privilege('bazion_notification_enqueuer', 'public.notification_outbox', 'payload_hash', 'SELECT') AS enqueuer_select_hash,
+         has_column_privilege('bazion_notification_enqueuer', 'public.notification_outbox', 'idempotency_key', 'SELECT') AS enqueuer_select_idempotency,
+         has_column_privilege('bazion_notification_enqueuer', 'public.notification_outbox', 'channel', 'INSERT') AS enqueuer_insert_channel,
+         has_column_privilege('bazion_notification_enqueuer', 'public.notification_outbox', 'payload_ciphertext', 'INSERT') AS enqueuer_insert_ciphertext,
+         has_column_privilege('bazion_notification_enqueuer', 'public.notification_outbox', 'payload_hash', 'INSERT') AS enqueuer_insert_hash,
+         has_column_privilege('bazion_notification_enqueuer', 'public.notification_outbox', 'idempotency_key', 'INSERT') AS enqueuer_insert_idempotency,
+         has_column_privilege('bazion_notification_enqueuer', 'public.notification_outbox', 'max_attempts', 'INSERT') AS enqueuer_insert_attempts,
          has_column_privilege('bazion_notification_enqueuer', 'public.notification_outbox', 'payload_ciphertext', 'SELECT') AS enqueuer_select_ciphertext,
          has_table_privilege('bazion_notification_enqueuer', 'public.notification_outbox', 'UPDATE') AS enqueuer_update,
          has_table_privilege('bazion_notification_enqueuer', 'public.notification_outbox', 'DELETE') AS enqueuer_delete,
@@ -281,8 +297,12 @@ async function verifyDatabase(urls: Record<string, URL | null>): Promise<void> {
          has_table_privilege('bazion_tenant_provisioner', 'public.notification_outbox', 'SELECT') AS provisioner_select,
          has_table_privilege('bazion_tenant_provisioner', 'public.notification_outbox', 'INSERT') AS provisioner_insert,
          has_table_privilege('bazion_tenant_provisioner', 'public.notification_outbox', 'UPDATE') AS provisioner_update,
+         has_table_privilege('bazion_tenant_provisioner', 'public.notification_outbox', 'DELETE') AS provisioner_delete,
          has_table_privilege('bazion_app', 'public.notification_outbox', 'SELECT') AS app_outbox_select,
          has_table_privilege('bazion_app', 'public.notification_outbox', 'INSERT') AS app_outbox_insert,
+         has_table_privilege('bazion_app', 'public.notification_outbox', 'UPDATE') AS app_outbox_update,
+         has_table_privilege('bazion_app', 'public.notification_outbox', 'DELETE') AS app_outbox_delete,
+         has_table_privilege('bazion_auth_runtime', 'public.notification_outbox', 'SELECT') AS auth_outbox_select,
          has_table_privilege('bazion_app', 'public.platform_audit_events', 'INSERT') AS app_audit_insert,
          has_table_privilege('bazion_app', 'public.platform_audit_events', 'SELECT') AS app_audit_select,
          has_table_privilege('bazion_app', 'public.platform_audit_events', 'UPDATE') AS app_audit_update,
@@ -292,17 +312,19 @@ async function verifyDatabase(urls: Record<string, URL | null>): Promise<void> {
     if (!grants) {
       fail("Could not inspect runtime database privileges.");
     } else {
-      if (!grants.enqueuer_insert_tenant || !grants.enqueuer_select_id || !grants.enqueuer_select_hash ||
+      if (!grants.enqueuer_insert_tenant || !grants.enqueuer_insert_channel || !grants.enqueuer_insert_ciphertext ||
+          !grants.enqueuer_insert_hash || !grants.enqueuer_insert_idempotency || !grants.enqueuer_insert_attempts ||
+          !grants.enqueuer_select_id || !grants.enqueuer_select_hash || !grants.enqueuer_select_idempotency ||
           grants.enqueuer_select_ciphertext || grants.enqueuer_update || grants.enqueuer_delete) {
         fail("Notification enqueue role grants do not match the restricted INSERT/idempotency SELECT policy.");
       }
       if (!grants.worker_select || !grants.worker_update || grants.worker_insert || grants.worker_delete) {
         fail("Notification worker role grants do not match the SELECT/UPDATE-only policy.");
       }
-      if (grants.provisioner_select || grants.provisioner_insert || grants.provisioner_update) {
+      if (grants.provisioner_select || grants.provisioner_insert || grants.provisioner_update || grants.provisioner_delete) {
         fail("Tenant provisioner still has notification outbox access.");
       }
-      if (grants.app_outbox_select || grants.app_outbox_insert) fail("The general API role must not access the notification outbox directly; only the dedicated enqueuer may insert.");
+      if (grants.app_outbox_select || grants.app_outbox_insert || grants.app_outbox_update || grants.app_outbox_delete || grants.auth_outbox_select) fail("The general API and Better Auth runtime roles must not access notification outbox payloads; only the dedicated enqueuer/worker may access their granted columns.");
       if (!grants.app_audit_insert || grants.app_audit_select || grants.app_audit_update || grants.app_audit_delete) {
         fail("Audit event grants must permit API INSERT only; SELECT/UPDATE/DELETE must remain denied.");
       }
