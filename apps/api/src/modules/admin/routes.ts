@@ -1,10 +1,10 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { fromNodeHeaders } from "better-auth/node";
 import { count, eq } from "drizzle-orm";
-import { requireActiveTenantPermission, type ActiveTenantContext } from "@bazion/auth";
-import { auth } from "@bazion/auth/server";
+import { requireActiveTenantPermission, requirePlatformRole, type ActiveTenantContext } from "@bazion/auth";
+import { auth, reconcileProvisioningTenants } from "@bazion/auth/server";
 import { orders, products } from "@bazion/database";
-import { invitationInputSchema, memberListQuerySchema, memberRoleInputSchema } from "./policy.js";
+import { invitationInputSchema, memberListQuerySchema, memberRoleInputSchema, provisioningReconciliationInputSchema } from "./policy.js";
 import { withTenantTransaction } from "../../lib/database.js";
 
 function authHeaders(request: FastifyRequest) {
@@ -19,6 +19,24 @@ async function requirePermission(
 }
 
 export async function adminRoutes(app: FastifyInstance): Promise<void> {
+  // Platform-level recovery operation. Client tenant roles cannot invoke it.
+  app.post("/admin/platform/tenants/reconcile-provisioning", async (request, reply) => {
+    const parsed = provisioningReconciliationInputSchema.safeParse(request.body ?? {});
+    if (!parsed.success) {
+      return reply.code(400).send({ error: "INVALID_INPUT", details: parsed.error.flatten() });
+    }
+    const operator = await requirePlatformRole(request.headers, ["platform_owner", "platform_admin"]);
+    const result = await reconcileProvisioningTenants(parsed.data);
+    request.log.info({
+      actorUserId: operator.userId,
+      scanned: result.scanned,
+      activated: result.activated,
+      unmatched: result.unmatched.length,
+      conflicted: result.conflicted.length,
+    }, "Tenant provisioning reconciliation completed");
+    return reply.send(result);
+  });
+
   // Tenant identity is resolved from the signed-in session and active
   // organization. No request parameter can select another tenant.
   app.get("/admin/overview", async (request) => {
