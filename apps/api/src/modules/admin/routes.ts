@@ -133,7 +133,8 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
     if (!result) return reply.code(409).send({ error: "TENANT_STATE_CONFLICT", message: "The tenant does not exist or is not in a state that permits this transition." });
     return reply.send({ tenant: result });
   });
-\n  // Tenant identity is resolved from the signed-in session and active
+
+  // Tenant identity is resolved from the signed-in session and active
   // organization. No request parameter can select another tenant.
   app.get("/admin/overview", async (request) => {
     const context = await requirePermission(request, { analytics: ["read"] });
