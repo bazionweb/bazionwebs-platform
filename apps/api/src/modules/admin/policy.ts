@@ -22,3 +22,8 @@ export const memberListQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(50),
   offset: z.coerce.number().int().min(0).max(10_000).default(0),
 });
+
+export const provisioningReconciliationInputSchema = z.object({
+  staleMinutes: z.coerce.number().int().min(5).max(1_440).default(10),
+  limit: z.coerce.number().int().min(1).max(500).default(100),
+}).strict();
