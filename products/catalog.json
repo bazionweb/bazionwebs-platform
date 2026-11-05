@@ -312,6 +312,24 @@
       ],
       "status": "partial",
       "scope": "Event/sink contract exists. Add reports, conversion metrics, exports, retention and tenant dashboards."
+    },
+    {
+      "id": "contacts-crm",
+      "name": "Contacts, customer directory and CRM",
+      "sourcePath": [
+        "packages/contacts"
+      ],
+      "status": "planned",
+      "scope": "Reusable people, household and organization records, relationships, notes, tags and communication preferences."
+    },
+    {
+      "id": "solution-assembler",
+      "name": "Versioned vertical solution manifests",
+      "sourcePath": [
+        "solutions"
+      ],
+      "status": "planned",
+      "scope": "Compose shared modules, templates, roles, navigation and tenant defaults into client-ready solution packs."
     }
   ],
   "capabilities": [
@@ -1040,56 +1058,56 @@
       "id": "BW-104",
       "name": "SME and business website solution",
       "group": "Solution packs",
-      "moduleId": "page-experience",
+      "moduleId": "solution-assembler",
       "recordType": "solution-pack"
     },
     {
       "id": "BW-105",
       "name": "Professional services solution",
       "group": "Solution packs",
-      "moduleId": "booking",
+      "moduleId": "solution-assembler",
       "recordType": "solution-pack"
     },
     {
       "id": "BW-106",
       "name": "Startup website and SaaS solution",
       "group": "Solution packs",
-      "moduleId": "subscriptions-billing",
+      "moduleId": "solution-assembler",
       "recordType": "solution-pack"
     },
     {
       "id": "BW-107",
       "name": "Church and ministry solution",
       "group": "Solution packs",
-      "moduleId": "ministry",
+      "moduleId": "solution-assembler",
       "recordType": "solution-pack"
     },
     {
       "id": "BW-108",
       "name": "School and education solution",
       "group": "Solution packs",
-      "moduleId": "education",
+      "moduleId": "solution-assembler",
       "recordType": "solution-pack"
     },
     {
       "id": "BW-109",
       "name": "NGO and membership solution",
       "group": "Solution packs",
-      "moduleId": "contacts-crm",
+      "moduleId": "solution-assembler",
       "recordType": "solution-pack"
     },
     {
       "id": "BW-110",
       "name": "Ecommerce solution",
       "group": "Solution packs",
-      "moduleId": "commerce",
+      "moduleId": "solution-assembler",
       "recordType": "solution-pack"
     },
     {
       "id": "BW-111",
       "name": "Enterprise and ERP solution",
       "group": "Solution packs",
-      "moduleId": "erp-supply-chain",
+      "moduleId": "solution-assembler",
       "recordType": "solution-pack"
     }
   ]
