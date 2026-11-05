@@ -13,7 +13,10 @@
     },
     "dev": {
       "cache": false,
-      "persistent": true
+      "persistent": true,
+      "dependsOn": [
+        "^build"
+      ]
     },
     "typecheck": {
       "dependsOn": [
@@ -49,6 +52,24 @@
     "CORS_ORIGINS",
     "PUBLIC_STOREFRONT_URL",
     "PAYMENT_PROVIDER",
-    "DEV_PAYMENT_SECRET"
+    "DEV_PAYMENT_SECRET",
+    "MIGRATION_DATABASE_URL",
+    "AUTH_DATABASE_URL",
+    "AUTH_MIGRATION_DATABASE_URL",
+    "TENANT_RESOLVER_DATABASE_URL",
+    "TENANT_PROVISIONER_DATABASE_URL",
+    "BETTER_AUTH_URL",
+    "BETTER_AUTH_SECRET",
+    "BETTER_AUTH_TRUSTED_ORIGINS",
+    "AUTH_APP_URL",
+    "AUTH_REQUIRE_EMAIL_VERIFICATION",
+    "AUTH_SMTP_HOST",
+    "AUTH_SMTP_PORT",
+    "AUTH_SMTP_SECURE",
+    "AUTH_SMTP_USER",
+    "AUTH_SMTP_PASSWORD",
+    "AUTH_EMAIL_FROM",
+    "DEFAULT_TENANT_CURRENCY",
+    "TRUSTED_PROXY_ADDRESSES"
   ]
 }

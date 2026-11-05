@@ -9,10 +9,12 @@ if (!migrationUrl) {
 // The Better Auth core npm release currently leads its separate CLI package.
 // Require an exact CLI/library version match instead of quietly applying an
 // older schema and hoping it is compatible.
+const isWindows = process.platform === "win32";
+const npmCommand = isWindows ? "npm.cmd" : "npm";
 const registryCheck = spawnSync(
-  "npm",
+  npmCommand,
   ["view", `auth@${betterAuthVersion}`, "version"],
-  { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] },
+  { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], shell: isWindows },
 );
 if (registryCheck.status !== 0 || registryCheck.stdout.trim() !== betterAuthVersion) {
   throw new Error(
@@ -21,7 +23,6 @@ if (registryCheck.status !== 0 || registryCheck.stdout.trim() !== betterAuthVers
   );
 }
 
-const isWindows = process.platform === "win32";
 const command = isWindows ? "pnpm.cmd" : "pnpm";
 const result = spawnSync(
   command,

@@ -26,7 +26,7 @@ const envSchema = z.object({
   AUTH_SMTP_PASSWORD: z.string().optional(),
   AUTH_EMAIL_FROM: z.string().default("Bazion Web <noreply@example.test>"),
   DEFAULT_TENANT_CURRENCY: z.enum(["KES", "USD", "EUR", "GBP"]).default("KES"),
-  TRUST_PROXY: z.enum(["true", "false"]).default("false"),
+  TRUSTED_PROXY_ADDRESSES: z.string().default(""),
 });
 
 export function loadConfig() {
@@ -43,6 +43,10 @@ export function loadConfig() {
   if (config.NODE_ENV === "production" && !config.AUTH_SMTP_HOST) {
     throw new Error("Production startup blocked: configure authenticated email delivery.");
   }
+  const trustedProxyAddresses = config.TRUSTED_PROXY_ADDRESSES.split(",").map((value) => value.trim()).filter(Boolean);
+  if (config.NODE_ENV === "production" && trustedProxyAddresses.length === 0) {
+    throw new Error("Production startup blocked: configure the trusted ingress proxy IPs/CIDRs and block direct public access to the API.");
+  }
   if (config.NODE_ENV === "production" && config.BETTER_AUTH_SECRET.toLowerCase().includes("change-me")) {
     throw new Error("Production startup blocked: replace the development Better Auth secret.");
   }
@@ -52,7 +56,7 @@ export function loadConfig() {
     corsOrigins: config.CORS_ORIGINS.split(",").map((origin) => origin.trim()).filter(Boolean),
     trustedOrigins: config.BETTER_AUTH_TRUSTED_ORIGINS.split(",").map((origin) => origin.trim()).filter(Boolean),
     requireEmailVerification: config.AUTH_REQUIRE_EMAIL_VERIFICATION === "true",
-    trustProxy: config.TRUST_PROXY === "true",
+    trustProxy: trustedProxyAddresses.length ? trustedProxyAddresses : false,
   };
 }
 

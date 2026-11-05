@@ -158,4 +158,11 @@ Better Auth tables live in the separate PostgreSQL `auth` schema. Migrate them w
 
 ### Better Auth schema migration version note
 
-The Better Auth core package is pinned to **1.7.17**. The separate npm CLI package currently publishes **1.7.14**, so the migration script checks that an exactly matching `auth@1.7.17` CLI exists before applying the schema. It intentionally refuses to run an older CLI against the newer runtime. Once Better Auth publishes the matching CLI package, `pnpm db:auth:migrate` will run it through `pnpm dlx`. Until then, the auth runtime/schema migration step is pending; do not manually create a guessed schema or bypass the version check.
+The Better Auth core package is pinned to **1.7.17**. The separate npm CLI package currently publishes **1.7.10**, so the migration script checks that an exactly matching `auth@1.7.17` CLI exists before applying the schema. It intentionally refuses to run an older CLI against the newer runtime. Once Better Auth publishes the matching CLI package, `pnpm db:auth:migrate` will run it through `pnpm dlx`. Until then, the auth runtime/schema migration step is pending; do not manually create a guessed schema or bypass the version check.
+
+
+### Tenant hostname forwarding
+
+The Next.js 16 Proxy at `apps/storefront/proxy.ts` replaces incoming forwarded-host metadata for same-origin API rewrites. Fastify trusts it only from the explicitly configured proxy IP/CIDR allowlist. Do not expose the API origin directly to the public internet.
+
+Authentication email currently uses non-blocking SMTP callbacks for development. A durable outbox/worker is a production prerequisite for reliable verification, invitations and password recovery.

@@ -27,6 +27,8 @@ export async function buildApp(config: AppConfig) {
       const parsed = new URL(origin);
       const local = parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1";
       if (local && config.NODE_ENV !== "production") return true;
+      if (parsed.protocol !== "https:" || (parsed.port !== "" && parsed.port !== "443")) return false;
+      if (parsed.username || parsed.password) return false;
       return await isVerifiedTenantHost(parsed.hostname);
     } catch {
       return false;

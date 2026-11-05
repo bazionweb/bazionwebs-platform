@@ -100,6 +100,7 @@ export const rolePermissionMap = {
   },
 } as const;
 
-export function parseOrganizationRoles(role: string | null | undefined): string[] {
-  return (role ?? "").split(",").map((value) => value.trim()).filter(Boolean);
+export function parseOrganizationRoles(role: string | string[] | null | undefined): string[] {
+  const values = Array.isArray(role) ? role : [role ?? ""];
+  return values.flatMap((value) => value.split(",")).map((value) => value.trim()).filter(Boolean);
 }

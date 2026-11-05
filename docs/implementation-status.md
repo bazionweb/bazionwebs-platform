@@ -58,8 +58,11 @@ The GitHub editing environment cannot run this repository's dependency installat
 - Login/signup screen, same-origin auth proxy, and invitation acceptance page.
 - Platform operators are created through a reviewed SQL bootstrap, not public self-service.
 - Organization creator starts as tenant admin; assigning tenant owner is guarded by a server hook.
-- Better Auth CLI currently lags the 1.7.17 core release at npm 1.7.14. The auth migration script refuses mismatched versions. Do not mark this package ready until the matching CLI is published and the auth schema migration has run.
+- Better Auth CLI currently lags the 1.7.17 core release at npm 1.7.10. The auth migration script refuses mismatched versions. Do not mark this package ready until the matching CLI is published and the auth schema migration has run.
 
 ## Validation still required
 
 No npm install, pnpm lockfile generation, TypeScript typecheck, unit test execution, Docker startup, PostgreSQL migration, login/verification SMTP test, browser test, or cross-tenant RLS integration test was executed by the GitHub editing session. These are required before merging and before using this for client data.
+
+- Added Next.js 16 `proxy.ts` to overwrite forwarded-host/proto headers from the original request URL before Fastify rewrites; Fastify only trusts explicitly configured proxy IP/CIDRs.
+- Authentication SMTP callbacks are non-blocking. A transactional outbox/retry worker is still required before production onboarding depends on email delivery.

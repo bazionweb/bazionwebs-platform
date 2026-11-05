@@ -1,7 +1,21 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { useState } from "react";
+import type { FormEvent } from "react";
 import { authClient } from "@bazion/auth/client";
+
+function getSafeCallbackUrl(): string {
+  const requested = new URLSearchParams(window.location.search).get("callbackURL");
+  if (!requested) return new URL("/workspace", window.location.origin).toString();
+  try {
+    const destination = new URL(requested, window.location.origin);
+    return destination.origin === window.location.origin
+      ? destination.toString()
+      : new URL("/workspace", window.location.origin).toString();
+  } catch {
+    return new URL("/workspace", window.location.origin).toString();
+  }
+}
 
 export function AuthPanel() {
   const [mode, setMode] = useState<"sign-in" | "sign-up">("sign-in");
@@ -17,7 +31,7 @@ export function AuthPanel() {
     setMessage("");
     try {
       if (mode === "sign-up") {
-        const result = await authClient.signUp.email({ name, email, password, callbackURL: new URLSearchParams(window.location.search).get("callbackURL") ?? window.location.origin });
+        const result = await authClient.signUp.email({ name, email, password, callbackURL: getSafeCallbackUrl() });
         if (result.error) throw new Error(result.error.message ?? "Account creation failed.");
         setMessage("Account created. Follow the verification link sent by email or printed in the local API console.");
       } else {

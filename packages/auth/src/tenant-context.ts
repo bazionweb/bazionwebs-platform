@@ -31,8 +31,13 @@ export async function getCurrentIdentity(headers: IncomingHttpHeaders): Promise<
   const session = await auth.api.getSession({ headers: authHeaders });
   if (!session) return null;
 
+  const activeOrganizationId = (session.session as typeof session.session & {
+    activeOrganizationId?: string | null;
+  }).activeOrganizationId;
   const [member, platformMember] = await Promise.all([
-    auth.api.getActiveMember({ headers: authHeaders }),
+    activeOrganizationId
+      ? auth.api.getActiveMember({ headers: authHeaders })
+      : Promise.resolve(null),
     resolvePlatformMemberByUserId(session.user.id),
   ]);
 

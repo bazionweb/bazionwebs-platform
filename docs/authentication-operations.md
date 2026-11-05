@@ -70,5 +70,21 @@ Production startup requires a non-mock payment adapter, verified-domain tenant r
 
 ### Better Auth schema migration version note
 
-The Better Auth core package is pinned to **1.7.17**. The separate npm CLI package currently publishes **1.7.14**, so the migration script checks that an exactly matching `auth@1.7.17` CLI exists before applying the schema. It intentionally refuses to run an older CLI against the newer runtime. Once Better Auth publishes the matching CLI package, `pnpm db:auth:migrate` will run it through `pnpm dlx`. Until then, the auth runtime/schema migration step is pending; do not manually create a guessed schema or bypass the version check.
+The Better Auth core package is pinned to **1.7.17**. The separate npm CLI package currently publishes **1.7.10**, so the migration script checks that an exactly matching `auth@1.7.17` CLI exists before applying the schema. It intentionally refuses to run an older CLI against the newer runtime. Once Better Auth publishes the matching CLI package, `pnpm db:auth:migrate` will run it through `pnpm dlx`. Until then, the auth runtime/schema migration step is pending; do not manually create a guessed schema or bypass the version check.
 
+
+
+## Next.js-to-Fastify tenant host forwarding
+
+The Next.js 16 `apps/storefront/proxy.ts` runs only for the `/v1/*` and `/api/auth/*` proxy paths. It deletes caller-supplied `X-Forwarded-Host` and `X-Forwarded-Proto` headers and sets replacement values from the original incoming Next.js request URL. This preserves the custom client hostname when Next.js rewrites the request to Fastify.
+
+Fastify accepts forwarded metadata only from the exact addresses/CIDRs in `TRUSTED_PROXY_ADDRESSES`. The deployment must restrict direct network access to the Fastify origin so only the trusted ingress/proxy can reach it. If a platform cannot provide stable trusted egress addresses, use an authenticated private service network or signed tenant-routing assertion rather than enabling trust-all proxy mode.
+
+## Authentication email delivery limitation
+
+The current Nodemailer callbacks start SMTP delivery without blocking the Better Auth response, following Better Auth's guidance to avoid timing differences in auth endpoints. Delivery errors are logged. This is not a durable queue: a process termination can lose an in-flight message. Before production onboarding depends on verification, invitations or password recovery, implement a durable transactional outbox plus retrying worker and monitor delivery failures.
+
+
+### Tenant origin validation
+
+Verified client origins must use HTTPS in production and the default HTTPS port. Localhost origins are allowed only in non-production development. Both Fastify CORS and Better Auth's trusted-origin resolver reject user-info components and non-standard ports for tenant origins.

@@ -5,6 +5,7 @@ describe("Bazion organization role policy", () => {
   it("parses Better Auth multi-role values without empty roles", () => {
     expect(parseOrganizationRoles("admin,orderManager")).toEqual(["admin", "orderManager"]);
     expect(parseOrganizationRoles("")).toEqual([]);
+    expect(parseOrganizationRoles(["admin", "orderManager"])).toEqual(["admin", "orderManager"]);
     expect(parseOrganizationRoles(null)).toEqual([]);
   });
 
