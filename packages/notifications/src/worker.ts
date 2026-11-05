@@ -30,6 +30,8 @@ const pool = new Pool({
 const smtpHost = required("NOTIFICATION_SMTP_HOST");
 const smtpPort = Number(process.env.NOTIFICATION_SMTP_PORT ?? "587");
 const smtpSecure = process.env.NOTIFICATION_SMTP_SECURE === "true";
+const smtpRequireTls = process.env.NOTIFICATION_SMTP_REQUIRE_TLS !== "false";
+const smtpRequireAuth = process.env.NOTIFICATION_SMTP_REQUIRE_AUTH !== "false";
 const smtpUser = process.env.NOTIFICATION_SMTP_USER?.trim();
 const smtpPassword = process.env.NOTIFICATION_SMTP_PASSWORD;
 if (!Number.isInteger(smtpPort) || smtpPort < 1 || smtpPort > 65_535) {
@@ -38,10 +40,18 @@ if (!Number.isInteger(smtpPort) || smtpPort < 1 || smtpPort > 65_535) {
 if (Boolean(smtpUser) !== Boolean(smtpPassword)) {
   throw new Error("Configure both NOTIFICATION_SMTP_USER and NOTIFICATION_SMTP_PASSWORD, or neither.");
 }
+if (process.env.NODE_ENV === "production" && smtpRequireAuth && !smtpUser) {
+  throw new Error("Production notification delivery requires SMTP credentials unless NOTIFICATION_SMTP_REQUIRE_AUTH=false is explicitly approved.");
+}
+if (process.env.NODE_ENV === "production" && !smtpSecure && !smtpRequireTls) {
+  throw new Error("Production SMTP must use implicit TLS or require STARTTLS.");
+}
 const transport = nodemailer.createTransport({
   host: smtpHost,
   port: smtpPort,
   secure: smtpSecure,
+  requireTLS: !smtpSecure && smtpRequireTls,
+  tls: { minVersion: "TLSv1.2" },
   connectionTimeout: 10_000,
   greetingTimeout: 10_000,
   socketTimeout: 30_000,
