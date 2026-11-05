@@ -68,6 +68,9 @@ jobs:
       - name: Install workspace dependencies from the committed lockfile
         run: pnpm install --frozen-lockfile
 
+      - name: Validate product and solution catalogue manifests
+        run: pnpm catalog:validate
+
       - name: Start PostgreSQL with least-privilege roles
         run: |
           docker compose up -d db
