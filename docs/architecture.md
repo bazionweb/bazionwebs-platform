@@ -29,18 +29,18 @@ A modular monolith keeps transactions, local development, deployment and debuggi
 
 - `apps/api`: server-side HTTP API and application orchestration.
 - `apps/storefront`: customer-facing Next.js example.
-- `apps/admin`: reserved for the shared client administration app.
+- `apps/admin`: reserved for the Bazion platform-owner control plane; the current client workspace admin is /admin inside apps/storefront.
 - `packages/platform-contracts`: cross-cutting tenant/principal types.
 - `packages/api-contracts`: Zod schemas shared by clients and server.
 - `packages/commerce-domain`: pure cart/order rules; no database or HTTP dependencies.
 - `packages/database`: Drizzle schema, SQL migrations, seed and database helpers.
 - `packages/payments`: payment-provider port and normalized result types.
-- `packages/auth`: authentication/authorization ports; connect a proven identity provider rather than inventing password/session cryptography.
+- `packages/auth`: Better Auth runtime, sessions, organization membership, platform/client role checks and trusted tenant context.
 - `packages/ui`: shared design-system components.
-- `packages/notifications`: email/SMS/push ports.
-- `packages/storage`: object-storage port for uploads and documents.
-- `packages/booking`: future booking-domain module.
-- `packages/analytics`: privacy-aware event contract.
+- `packages/notifications`: email/SMS provider interface and encrypted PostgreSQL outbox foundation; auth callback integration and supervised worker remain to be completed.
+- `packages/storage`: object-storage port and tenant object-key helper; provider adapters and media library remain planned.
+- `packages/booking`: initial booking types and booking-window validation; availability/resources/conflict management remain planned.
+- `packages/analytics`: initial privacy-aware event/sink contract; ingestion and tenant reports remain planned.
 - `mcp`: MCP server design. MCP adapters call the same API/domain capabilities; MCP is not the website's cart implementation.
 - `templates`: per-client configuration examples, not copies of business logic.
 
@@ -143,3 +143,10 @@ The running starter currently implements the cart/order path and a development-o
 The selected self-hosted, open-source authentication design is documented in [Authentication and tenant isolation](architecture/authentication-and-tenant-isolation.md), including the Better Auth organization model, trusted tenant resolution, server-side RBAC, database-role boundaries and PostgreSQL RLS. The architecture source and SVG are maintained beside that document. See [ADR 0005](adr/0005-authentication-and-tenant-identity.md).
 
 This is the target design; runtime authentication and tenant resolution remain implementation work.
+
+
+## Advertised products and delivery plan
+
+The product map now lives in [products/catalog.json](../products/catalog.json), with 111 advertised capabilities mapped to reusable domain modules. [Commercial offerings](../products/commercial-offerings.json) keep service tiers and add-ons separate from implementation packages. Nine initial solution manifests are under solutions/.
+
+See [Product architecture](product-architecture.md) for the target package/app layout and [Implementation roadmap](implementation-roadmap.md) for phase gates and exit criteria.

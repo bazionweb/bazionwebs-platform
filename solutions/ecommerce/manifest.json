@@ -1,0 +1,109 @@
+{
+  "version": "1.0.0",
+  "status": "planned",
+  "id": "ecommerce",
+  "name": "Ecommerce",
+  "description": "Composable online store with product catalogue, checkout, payment, stock, delivery and customer workflows.",
+  "requiredModules": [
+    "commerce",
+    "payments",
+    "inventory-pricing",
+    "fulfilment",
+    "media-storage",
+    "notifications",
+    "domains-email",
+    "platform-identity"
+  ],
+  "optionalModules": [
+    "website-content",
+    "page-experience",
+    "search-seo-localization",
+    "contacts-crm",
+    "subscriptions-billing",
+    "analytics",
+    "integration-hub",
+    "document-management"
+  ],
+  "defaultRoles": [
+    {
+      "id": "store-owner",
+      "label": "Store owner",
+      "permissions": [
+        "commerce.*",
+        "payments.*",
+        "inventory.*",
+        "fulfilment.*",
+        "reports.read"
+      ]
+    },
+    {
+      "id": "catalog-manager",
+      "label": "Catalogue manager",
+      "permissions": [
+        "products.*",
+        "media.*"
+      ]
+    },
+    {
+      "id": "order-manager",
+      "label": "Order manager",
+      "permissions": [
+        "orders.read",
+        "orders.update",
+        "fulfilment.manage"
+      ]
+    },
+    {
+      "id": "customer",
+      "label": "Customer",
+      "permissions": [
+        "cart.self.manage",
+        "orders.self.read"
+      ]
+    }
+  ],
+  "navigation": [
+    {
+      "id": "products",
+      "label": "Products",
+      "module": "commerce",
+      "path": "/admin/products"
+    },
+    {
+      "id": "orders",
+      "label": "Orders",
+      "module": "commerce",
+      "path": "/admin/orders"
+    },
+    {
+      "id": "inventory",
+      "label": "Inventory",
+      "module": "inventory-pricing",
+      "path": "/admin/inventory"
+    },
+    {
+      "id": "fulfilment",
+      "label": "Delivery",
+      "module": "fulfilment",
+      "path": "/admin/fulfilment"
+    }
+  ],
+  "defaults": {
+    "locale": "en-KE",
+    "timezone": "Africa/Nairobi",
+    "currency": "KES",
+    "features": [
+      "catalogue",
+      "cart",
+      "checkout",
+      "orders",
+      "stock",
+      "delivery",
+      "mpesa-adapter"
+    ]
+  },
+  "templateIds": [
+    "ecommerce-starter",
+    "ecommerce-business"
+  ]
+}

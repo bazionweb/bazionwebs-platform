@@ -1,0 +1,91 @@
+{
+  "version": "1.0.0",
+  "status": "planned",
+  "id": "ngo-membership",
+  "name": "NGO and Membership",
+  "description": "People and organization records, memberships, programs, events, contributions and reporting.",
+  "requiredModules": [
+    "platform-identity",
+    "tenant-control-plane",
+    "contacts-crm",
+    "client-portals",
+    "document-management",
+    "forms-leads",
+    "notifications",
+    "analytics"
+  ],
+  "optionalModules": [
+    "website-content",
+    "page-experience",
+    "booking",
+    "payments",
+    "subscriptions-billing",
+    "integration-hub"
+  ],
+  "defaultRoles": [
+    {
+      "id": "ngo-admin",
+      "label": "NGO administrator",
+      "permissions": [
+        "members.*",
+        "programs.*",
+        "events.*",
+        "reports.read"
+      ]
+    },
+    {
+      "id": "coordinator",
+      "label": "Program coordinator",
+      "permissions": [
+        "members.read",
+        "programs.update",
+        "events.manage"
+      ]
+    },
+    {
+      "id": "member",
+      "label": "Member",
+      "permissions": [
+        "profile.self.read",
+        "profile.self.update",
+        "portal.self.read"
+      ]
+    }
+  ],
+  "navigation": [
+    {
+      "id": "members",
+      "label": "Members",
+      "module": "contacts-crm",
+      "path": "/admin/members"
+    },
+    {
+      "id": "programs",
+      "label": "Programs",
+      "module": "client-portals",
+      "path": "/admin/programs"
+    },
+    {
+      "id": "documents",
+      "label": "Documents",
+      "module": "document-management",
+      "path": "/admin/documents"
+    }
+  ],
+  "defaults": {
+    "locale": "en-KE",
+    "timezone": "Africa/Nairobi",
+    "currency": "KES",
+    "features": [
+      "membership",
+      "programs",
+      "events",
+      "contributions",
+      "documents",
+      "reports"
+    ]
+  },
+  "templateIds": [
+    "ngo-membership"
+  ]
+}

@@ -1,0 +1,123 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bazionweb.com/schemas/solution-manifest.schema.json",
+  "title": "Bazion solution pack manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "name",
+    "version",
+    "status",
+    "requiredModules",
+    "optionalModules",
+    "defaultRoles",
+    "navigation",
+    "defaults"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]+$"
+    },
+    "name": {
+      "type": "string"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "status": {
+      "enum": [
+        "planned",
+        "experimental",
+        "available",
+        "deprecated"
+      ]
+    },
+    "description": {
+      "type": "string"
+    },
+    "requiredModules": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "optionalModules": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "defaultRoles": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "permissions"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "permissions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "navigation": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "label",
+          "module"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "module": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "defaults": {
+      "type": "object",
+      "description": "Non-secret tenant defaults such as locale, timezone, currency and enabled features."
+    },
+    "templateIds": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "migrationNotes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

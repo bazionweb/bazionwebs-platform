@@ -1,0 +1,203 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bazionweb.com/schemas/module-manifest.schema.json",
+  "title": "Bazion reusable module manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "name",
+    "version",
+    "owner",
+    "status",
+    "entrypoints",
+    "tenantModel",
+    "permissions",
+    "dependencies",
+    "operations"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]+$"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 2
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "owner": {
+      "type": "string",
+      "minLength": 2
+    },
+    "status": {
+      "enum": [
+        "planned",
+        "experimental",
+        "partial",
+        "stable",
+        "deprecated"
+      ]
+    },
+    "entrypoints": {
+      "type": "object",
+      "properties": {
+        "domain": {
+          "type": "string"
+        },
+        "api": {
+          "type": "string"
+        },
+        "ui": {
+          "type": "string"
+        },
+        "worker": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "tenantModel": {
+      "enum": [
+        "tenant-owned",
+        "platform-owned",
+        "mixed",
+        "not-applicable"
+      ]
+    },
+    "permissions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "resource",
+          "actions"
+        ],
+        "properties": {
+          "resource": {
+            "type": "string"
+          },
+          "actions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "uniqueItems": true
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "tables": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "name",
+          "owner",
+          "tenantScoped",
+          "rls"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "owner": {
+            "type": "string"
+          },
+          "tenantScoped": {
+            "type": "boolean"
+          },
+          "rls": {
+            "enum": [
+              "forced",
+              "not-applicable"
+            ]
+          },
+          "migration": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "events": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "jobs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "providers": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "dependencies": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "entitlements": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "operations": {
+      "type": "object",
+      "required": [
+        "logs",
+        "metrics",
+        "retention",
+        "recovery",
+        "enableDisable"
+      ],
+      "properties": {
+        "logs": {
+          "type": "boolean"
+        },
+        "metrics": {
+          "type": "boolean"
+        },
+        "retention": {
+          "type": "string"
+        },
+        "recovery": {
+          "type": "string"
+        },
+        "enableDisable": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "tests": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "docs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

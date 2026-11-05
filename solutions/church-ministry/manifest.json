@@ -1,0 +1,105 @@
+{
+  "version": "1.0.0",
+  "status": "planned",
+  "id": "church-ministry",
+  "name": "Church and Ministry Management",
+  "description": "Member, ministry, attendance, giving, volunteer and communications solution built on shared platform primitives.",
+  "requiredModules": [
+    "platform-identity",
+    "tenant-control-plane",
+    "contacts-crm",
+    "booking",
+    "notifications",
+    "document-management",
+    "analytics"
+  ],
+  "optionalModules": [
+    "website-content",
+    "page-experience",
+    "forms-leads",
+    "payments",
+    "subscriptions-billing",
+    "integration-hub"
+  ],
+  "defaultRoles": [
+    {
+      "id": "ministry-admin",
+      "label": "Ministry administrator",
+      "permissions": [
+        "members.*",
+        "groups.*",
+        "events.*",
+        "reports.read"
+      ]
+    },
+    {
+      "id": "pastoral-team",
+      "label": "Pastoral team",
+      "permissions": [
+        "members.read",
+        "care.read",
+        "groups.read"
+      ]
+    },
+    {
+      "id": "finance",
+      "label": "Finance team",
+      "permissions": [
+        "giving.read",
+        "giving.reconcile",
+        "reports.finance.read"
+      ]
+    },
+    {
+      "id": "member",
+      "label": "Member",
+      "permissions": [
+        "profile.self.read",
+        "profile.self.update",
+        "events.read"
+      ]
+    }
+  ],
+  "navigation": [
+    {
+      "id": "members",
+      "label": "Members",
+      "module": "contacts-crm",
+      "path": "/admin/members"
+    },
+    {
+      "id": "groups",
+      "label": "Groups",
+      "module": "contacts-crm",
+      "path": "/admin/groups"
+    },
+    {
+      "id": "events",
+      "label": "Services and events",
+      "module": "booking",
+      "path": "/admin/events"
+    },
+    {
+      "id": "reports",
+      "label": "Reports",
+      "module": "analytics",
+      "path": "/admin/reports"
+    }
+  ],
+  "defaults": {
+    "locale": "en-KE",
+    "timezone": "Africa/Nairobi",
+    "currency": "KES",
+    "features": [
+      "member-directory",
+      "groups",
+      "attendance",
+      "events",
+      "volunteers",
+      "giving"
+    ]
+  },
+  "templateIds": [
+    "church-ministry"
+  ]
+}

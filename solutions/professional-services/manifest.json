@@ -1,0 +1,90 @@
+{
+  "version": "1.0.0",
+  "status": "planned",
+  "id": "professional-services",
+  "name": "Professional Services",
+  "description": "Client acquisition and delivery workspace for consultants, agencies and appointment-based professionals.",
+  "requiredModules": [
+    "website-content",
+    "page-experience",
+    "forms-leads",
+    "contacts-crm",
+    "booking",
+    "client-portals",
+    "document-management",
+    "payments",
+    "notifications"
+  ],
+  "optionalModules": [
+    "search-seo-localization",
+    "analytics",
+    "subscriptions-billing",
+    "integration-hub",
+    "support-maintenance"
+  ],
+  "defaultRoles": [
+    {
+      "id": "practice-admin",
+      "label": "Practice administrator",
+      "permissions": [
+        "contacts.*",
+        "booking.*",
+        "documents.*",
+        "billing.read",
+        "settings.*"
+      ]
+    },
+    {
+      "id": "staff",
+      "label": "Staff member",
+      "permissions": [
+        "contacts.read",
+        "booking.read",
+        "booking.update",
+        "documents.read"
+      ]
+    },
+    {
+      "id": "client",
+      "label": "Client",
+      "permissions": [
+        "portal.self.read",
+        "booking.self.manage",
+        "documents.self.read"
+      ]
+    }
+  ],
+  "navigation": [
+    {
+      "id": "clients",
+      "label": "Clients",
+      "module": "contacts-crm",
+      "path": "/admin/clients"
+    },
+    {
+      "id": "appointments",
+      "label": "Appointments",
+      "module": "booking",
+      "path": "/admin/bookings"
+    },
+    {
+      "id": "documents",
+      "label": "Documents",
+      "module": "document-management",
+      "path": "/admin/documents"
+    }
+  ],
+  "defaults": {
+    "locale": "en-KE",
+    "timezone": "Africa/Nairobi",
+    "currency": "KES",
+    "features": [
+      "client-portal",
+      "appointments",
+      "document-vault"
+    ]
+  },
+  "templateIds": [
+    "professional-services"
+  ]
+}

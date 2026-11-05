@@ -16,7 +16,8 @@
     "db:migrate": "dotenv -e .env -- pnpm --filter @bazion/database migrate",
     "db:seed": "dotenv -e .env -- pnpm --filter @bazion/database seed",
     "db:auth:migrate": "dotenv -e .env -- pnpm --filter @bazion/auth migrate",
-    "auth:check": "pnpm --filter @bazion/auth typecheck && pnpm --filter @bazion/auth test"
+    "auth:check": "pnpm --filter @bazion/auth typecheck && pnpm --filter @bazion/auth test",
+    "catalog:validate": "node scripts/validate-product-catalog.mjs"
   },
   "devDependencies": {
     "dotenv-cli": "^10.0.0",
