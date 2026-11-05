@@ -1,0 +1,411 @@
+{
+  "schemaVersion": "1.0.0",
+  "source": "Bazion Web commercial catalogue supplied by the owner (priceBooks.ts and pricingData.ts excerpts).",
+  "pricingPolicy": "Price amounts and market-specific rates stay in the commercial website's canonical price-book source; do not duplicate prices in this platform repository.",
+  "interpretation": "These are sellable service bundles, hosting/care plans, add-ons and rate-card items. They are assembled from products/catalog.json capabilities; they are not separate software packages.",
+  "offerings": [
+    {
+      "id": "website-launch",
+      "name": "Launch Website",
+      "group": "website-package",
+      "kind": "fixed-scope-service-bundle",
+      "moduleIds": [
+        "page-experience",
+        "design-system",
+        "website-content",
+        "forms-leads",
+        "media-storage",
+        "domains-email"
+      ]
+    },
+    {
+      "id": "website-business",
+      "name": "Business Website",
+      "group": "website-package",
+      "kind": "fixed-scope-service-bundle",
+      "moduleIds": [
+        "page-experience",
+        "design-system",
+        "website-content",
+        "forms-leads",
+        "search-seo-localization",
+        "analytics",
+        "media-storage"
+      ]
+    },
+    {
+      "id": "website-professional",
+      "name": "Professional Website",
+      "group": "website-package",
+      "kind": "fixed-scope-service-bundle",
+      "moduleIds": [
+        "page-experience",
+        "design-system",
+        "website-content",
+        "search-seo-localization",
+        "marketing-communications",
+        "analytics",
+        "media-storage"
+      ]
+    },
+    {
+      "id": "website-enterprise",
+      "name": "Enterprise Architecture",
+      "group": "website-package",
+      "kind": "custom-service-bundle",
+      "moduleIds": [
+        "website-content",
+        "page-experience",
+        "document-management",
+        "integration-hub",
+        "security-operations",
+        "observability-resilience"
+      ]
+    },
+    {
+      "id": "ecommerce-starter",
+      "name": "E-Commerce Starter",
+      "group": "ecommerce-package",
+      "kind": "fixed-scope-service-bundle",
+      "moduleIds": [
+        "commerce",
+        "payments",
+        "notifications",
+        "media-storage"
+      ]
+    },
+    {
+      "id": "ecommerce-business",
+      "name": "E-Commerce Business",
+      "group": "ecommerce-package",
+      "kind": "fixed-scope-service-bundle",
+      "moduleIds": [
+        "commerce",
+        "payments",
+        "inventory-pricing",
+        "fulfilment",
+        "notifications",
+        "search-seo-localization"
+      ]
+    },
+    {
+      "id": "ecommerce-enterprise",
+      "name": "E-Commerce Enterprise",
+      "group": "ecommerce-package",
+      "kind": "custom-service-bundle",
+      "moduleIds": [
+        "commerce",
+        "payments",
+        "inventory-pricing",
+        "fulfilment",
+        "subscriptions-billing",
+        "integration-hub"
+      ]
+    },
+    {
+      "id": "discovery-specification",
+      "name": "Discovery and Specification Phase",
+      "group": "custom-systems",
+      "kind": "professional-service",
+      "moduleIds": [
+        "sales-project-delivery",
+        "page-experience",
+        "integration-hub"
+      ]
+    },
+    {
+      "id": "custom-tier-1",
+      "name": "Client Portals and API Gateways",
+      "group": "custom-systems",
+      "kind": "custom-service-bundle",
+      "moduleIds": [
+        "client-portals",
+        "integration-hub",
+        "booking",
+        "document-management"
+      ]
+    },
+    {
+      "id": "custom-tier-2",
+      "name": "SaaS MVP, CRMs and Institutional Management",
+      "group": "custom-systems",
+      "kind": "custom-service-bundle",
+      "moduleIds": [
+        "platform-identity",
+        "tenant-control-plane",
+        "module-entitlements",
+        "contacts-crm",
+        "subscriptions-billing",
+        "education",
+        "ministry",
+        "healthcare"
+      ]
+    },
+    {
+      "id": "school-portals-lms",
+      "name": "School Portals and Learning Management",
+      "group": "custom-systems",
+      "kind": "custom-service-bundle",
+      "moduleIds": [
+        "education",
+        "document-management",
+        "notifications",
+        "payments"
+      ]
+    },
+    {
+      "id": "custom-tier-3",
+      "name": "Enterprise Core Platforms and ERP",
+      "group": "custom-systems",
+      "kind": "custom-service-bundle",
+      "moduleIds": [
+        "erp-supply-chain",
+        "integration-hub",
+        "subscriptions-billing",
+        "observability-resilience",
+        "security-operations"
+      ]
+    },
+    {
+      "id": "host-essential",
+      "name": "Host Essential",
+      "group": "hosting-plan",
+      "kind": "managed-service-plan",
+      "moduleIds": [
+        "hosting-control-plane",
+        "domains-email",
+        "backup-recovery"
+      ]
+    },
+    {
+      "id": "host-business",
+      "name": "Host Business",
+      "group": "hosting-plan",
+      "kind": "managed-service-plan",
+      "moduleIds": [
+        "hosting-control-plane",
+        "domains-email",
+        "backup-recovery",
+        "observability-resilience",
+        "deployment-environments"
+      ]
+    },
+    {
+      "id": "host-pro",
+      "name": "Host Professional",
+      "group": "hosting-plan",
+      "kind": "managed-service-plan",
+      "moduleIds": [
+        "hosting-control-plane",
+        "domains-email",
+        "backup-recovery",
+        "observability-resilience",
+        "deployment-environments"
+      ]
+    },
+    {
+      "id": "host-cloud",
+      "name": "Managed Cloud Cluster",
+      "group": "hosting-plan",
+      "kind": "managed-service-plan",
+      "moduleIds": [
+        "hosting-control-plane",
+        "domains-email",
+        "backup-recovery",
+        "observability-resilience",
+        "deployment-environments",
+        "security-operations"
+      ]
+    },
+    {
+      "id": "care-essential",
+      "name": "Care Essential",
+      "group": "care-plan",
+      "kind": "managed-service-plan",
+      "moduleIds": [
+        "support-maintenance",
+        "backup-recovery",
+        "observability-resilience",
+        "security-operations"
+      ]
+    },
+    {
+      "id": "care-business",
+      "name": "Care Business",
+      "group": "care-plan",
+      "kind": "managed-service-plan",
+      "moduleIds": [
+        "support-maintenance",
+        "backup-recovery",
+        "observability-resilience",
+        "security-operations",
+        "search-seo-localization"
+      ]
+    },
+    {
+      "id": "care-professional",
+      "name": "Care Professional",
+      "group": "care-plan",
+      "kind": "managed-service-plan",
+      "moduleIds": [
+        "support-maintenance",
+        "backup-recovery",
+        "observability-resilience",
+        "security-operations",
+        "search-seo-localization",
+        "integration-hub"
+      ]
+    },
+    {
+      "id": "care-enterprise",
+      "name": "Care Enterprise",
+      "group": "care-plan",
+      "kind": "managed-service-plan",
+      "moduleIds": [
+        "support-maintenance",
+        "backup-recovery",
+        "observability-resilience",
+        "security-operations",
+        "hosting-control-plane"
+      ]
+    },
+    {
+      "id": "addon-mpesa",
+      "name": "M-Pesa STK Push Integration",
+      "group": "add-on",
+      "kind": "provider-adapter",
+      "moduleIds": [
+        "payments"
+      ]
+    },
+    {
+      "id": "addon-payment-gateway",
+      "name": "Card Payment Gateway",
+      "group": "add-on",
+      "kind": "provider-adapter",
+      "moduleIds": [
+        "payments"
+      ]
+    },
+    {
+      "id": "addon-booking",
+      "name": "Online Booking System",
+      "group": "add-on",
+      "kind": "module-add-on",
+      "moduleIds": [
+        "booking"
+      ]
+    },
+    {
+      "id": "addon-blog-news",
+      "name": "Blog and News CMS Engine",
+      "group": "add-on",
+      "kind": "module-add-on",
+      "moduleIds": [
+        "website-content"
+      ]
+    },
+    {
+      "id": "addon-advanced-form",
+      "name": "Advanced Multi-Step Form",
+      "group": "add-on",
+      "kind": "module-add-on",
+      "moduleIds": [
+        "forms-leads"
+      ]
+    },
+    {
+      "id": "addon-newsletter",
+      "name": "Newsletter Integration",
+      "group": "add-on",
+      "kind": "provider-adapter",
+      "moduleIds": [
+        "marketing-communications"
+      ]
+    },
+    {
+      "id": "addon-seo-advanced",
+      "name": "Advanced SEO Foundation",
+      "group": "add-on",
+      "kind": "module-add-on",
+      "moduleIds": [
+        "search-seo-localization"
+      ]
+    },
+    {
+      "id": "addon-multilingual",
+      "name": "Multilingual Support and i18n",
+      "group": "add-on",
+      "kind": "module-add-on",
+      "moduleIds": [
+        "search-seo-localization"
+      ]
+    },
+    {
+      "id": "addon-document-hub",
+      "name": "Document Download Hub",
+      "group": "add-on",
+      "kind": "module-add-on",
+      "moduleIds": [
+        "document-management",
+        "media-storage"
+      ]
+    },
+    {
+      "id": "addon-custom-api",
+      "name": "Custom Third-Party API Integration",
+      "group": "add-on",
+      "kind": "integration-service",
+      "moduleIds": [
+        "integration-hub"
+      ]
+    },
+    {
+      "id": "addon-migration",
+      "name": "Website Migration",
+      "group": "add-on",
+      "kind": "professional-service",
+      "moduleIds": [
+        "backup-recovery",
+        "deployment-environments",
+        "media-storage"
+      ]
+    },
+    {
+      "id": "addon-copywriting",
+      "name": "Professional Copywriting",
+      "group": "add-on",
+      "kind": "professional-service",
+      "moduleIds": [
+        "website-content"
+      ]
+    },
+    {
+      "id": "addon-extra-revision",
+      "name": "Additional Revision Round",
+      "group": "add-on",
+      "kind": "rate-card-item",
+      "moduleIds": [
+        "sales-project-delivery"
+      ]
+    },
+    {
+      "id": "rate-extra-page",
+      "name": "Additional Page Build Unit",
+      "group": "add-on",
+      "kind": "rate-card-item",
+      "moduleIds": [
+        "page-experience"
+      ]
+    },
+    {
+      "id": "rate-technical-support-hour",
+      "name": "Hourly Technical Support",
+      "group": "add-on",
+      "kind": "rate-card-item",
+      "moduleIds": [
+        "support-maintenance"
+      ]
+    }
+  ]
+}
