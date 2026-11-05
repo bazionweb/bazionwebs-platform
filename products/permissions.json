@@ -1,0 +1,242 @@
+{
+  "version": "1.0.0",
+  "roles": [
+    "owner",
+    "admin",
+    "member",
+    "catalogManager",
+    "orderManager",
+    "contentEditor",
+    "viewer"
+  ],
+  "permissions": [
+    {
+      "id": "tenant.organization.update",
+      "moduleId": "platform-identity",
+      "scope": "tenant",
+      "resource": "organization",
+      "action": "update",
+      "roles": [
+        "owner"
+      ],
+      "description": "update organization records and operations within the active client organization."
+    },
+    {
+      "id": "tenant.member.create",
+      "moduleId": "platform-identity",
+      "scope": "tenant",
+      "resource": "member",
+      "action": "create",
+      "roles": [
+        "owner",
+        "admin"
+      ],
+      "description": "create member records and operations within the active client organization."
+    },
+    {
+      "id": "tenant.member.update",
+      "moduleId": "platform-identity",
+      "scope": "tenant",
+      "resource": "member",
+      "action": "update",
+      "roles": [
+        "owner",
+        "admin"
+      ],
+      "description": "update member records and operations within the active client organization."
+    },
+    {
+      "id": "tenant.member.delete",
+      "moduleId": "platform-identity",
+      "scope": "tenant",
+      "resource": "member",
+      "action": "delete",
+      "roles": [
+        "owner",
+        "admin"
+      ],
+      "description": "delete member records and operations within the active client organization."
+    },
+    {
+      "id": "tenant.invitation.create",
+      "moduleId": "platform-identity",
+      "scope": "tenant",
+      "resource": "invitation",
+      "action": "create",
+      "roles": [
+        "owner",
+        "admin"
+      ],
+      "description": "create invitation records and operations within the active client organization."
+    },
+    {
+      "id": "tenant.invitation.cancel",
+      "moduleId": "platform-identity",
+      "scope": "tenant",
+      "resource": "invitation",
+      "action": "cancel",
+      "roles": [
+        "owner",
+        "admin"
+      ],
+      "description": "cancel invitation records and operations within the active client organization."
+    },
+    {
+      "id": "tenant.product.read",
+      "moduleId": "commerce",
+      "scope": "tenant",
+      "resource": "product",
+      "action": "read",
+      "roles": [
+        "owner",
+        "admin",
+        "catalogManager",
+        "viewer"
+      ],
+      "description": "read product records and operations within the active client organization."
+    },
+    {
+      "id": "tenant.product.create",
+      "moduleId": "commerce",
+      "scope": "tenant",
+      "resource": "product",
+      "action": "create",
+      "roles": [
+        "owner",
+        "admin",
+        "catalogManager"
+      ],
+      "description": "create product records and operations within the active client organization."
+    },
+    {
+      "id": "tenant.product.update",
+      "moduleId": "commerce",
+      "scope": "tenant",
+      "resource": "product",
+      "action": "update",
+      "roles": [
+        "owner",
+        "admin",
+        "catalogManager"
+      ],
+      "description": "update product records and operations within the active client organization."
+    },
+    {
+      "id": "tenant.product.delete",
+      "moduleId": "commerce",
+      "scope": "tenant",
+      "resource": "product",
+      "action": "delete",
+      "roles": [
+        "owner",
+        "admin",
+        "catalogManager"
+      ],
+      "description": "delete product records and operations within the active client organization."
+    },
+    {
+      "id": "tenant.order.read",
+      "moduleId": "commerce",
+      "scope": "tenant",
+      "resource": "order",
+      "action": "read",
+      "roles": [
+        "owner",
+        "admin",
+        "orderManager",
+        "viewer"
+      ],
+      "description": "read order records and operations within the active client organization."
+    },
+    {
+      "id": "tenant.order.update",
+      "moduleId": "commerce",
+      "scope": "tenant",
+      "resource": "order",
+      "action": "update",
+      "roles": [
+        "owner",
+        "admin",
+        "orderManager"
+      ],
+      "description": "update order records and operations within the active client organization."
+    },
+    {
+      "id": "tenant.order.refund",
+      "moduleId": "commerce",
+      "scope": "tenant",
+      "resource": "order",
+      "action": "refund",
+      "roles": [
+        "owner"
+      ],
+      "description": "refund order records and operations within the active client organization."
+    },
+    {
+      "id": "tenant.customer.read",
+      "moduleId": "contacts-crm",
+      "scope": "tenant",
+      "resource": "customer",
+      "action": "read",
+      "roles": [
+        "owner",
+        "admin",
+        "orderManager",
+        "viewer"
+      ],
+      "description": "read customer records and operations within the active client organization."
+    },
+    {
+      "id": "tenant.customer.update",
+      "moduleId": "contacts-crm",
+      "scope": "tenant",
+      "resource": "customer",
+      "action": "update",
+      "roles": [
+        "owner",
+        "admin"
+      ],
+      "description": "update customer records and operations within the active client organization."
+    },
+    {
+      "id": "tenant.store.read",
+      "moduleId": "website-content",
+      "scope": "tenant",
+      "resource": "store",
+      "action": "read",
+      "roles": [
+        "owner",
+        "admin",
+        "contentEditor",
+        "viewer"
+      ],
+      "description": "read store records and operations within the active client organization."
+    },
+    {
+      "id": "tenant.store.update",
+      "moduleId": "website-content",
+      "scope": "tenant",
+      "resource": "store",
+      "action": "update",
+      "roles": [
+        "owner",
+        "admin",
+        "contentEditor"
+      ],
+      "description": "update store records and operations within the active client organization."
+    },
+    {
+      "id": "tenant.analytics.read",
+      "moduleId": "analytics",
+      "scope": "tenant",
+      "resource": "analytics",
+      "action": "read",
+      "roles": [
+        "owner",
+        "admin",
+        "viewer"
+      ],
+      "description": "read analytics records and operations within the active client organization."
+    }
+  ]
+}
