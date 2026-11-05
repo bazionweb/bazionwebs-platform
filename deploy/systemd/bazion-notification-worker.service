@@ -1,0 +1,22 @@
+[Unit]
+Description=Bazion Web durable notification delivery worker
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=bazion
+Group=bazion
+WorkingDirectory=/opt/bazionwebs-platform
+EnvironmentFile=/etc/bazionweb/notification-worker.env
+ExecStart=/usr/bin/node /opt/bazionwebs-platform/packages/notifications/dist/worker.js
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=120
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target

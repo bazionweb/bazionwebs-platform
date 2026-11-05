@@ -1,7 +1,8 @@
 import { betterAuth } from "better-auth";
+import { createHash } from "node:crypto";
+import { createOutboxPayloadCodec, PostgresNotificationOutbox } from "@bazion/notifications";
 import { organization } from "better-auth/plugins";
 import { Pool } from "pg";
-import nodemailer from "nodemailer";
 import { reconcileTenantProvisioning } from "./tenant-reconciliation.js";
 import { ac, organizationRoles } from "./permissions.js";
 import {
@@ -18,6 +19,7 @@ function required(name: string): string {
 }
 
 const nodeEnv = process.env.NODE_ENV ?? "development";
+const appBaseUrl = process.env.AUTH_APP_URL ?? "http://localhost:3000";
 const defaultTrustedOrigins = (process.env.BETTER_AUTH_TRUSTED_ORIGINS ?? "http://localhost:3000,http://localhost:4000")
   .split(",").map((value) => value.trim()).filter(Boolean);
 
@@ -43,48 +45,36 @@ const tenantProvisionerPool = new Pool({
   connectionTimeoutMillis: 5_000,
 });
 
-const smtpHost = process.env.AUTH_SMTP_HOST?.trim();
-const smtpTransport = smtpHost
-  ? nodemailer.createTransport({
-      host: smtpHost,
-      port: Number(process.env.AUTH_SMTP_PORT ?? "587"),
-      secure: process.env.AUTH_SMTP_SECURE === "true",
-      ...(process.env.AUTH_SMTP_USER && process.env.AUTH_SMTP_PASSWORD
-        ? { auth: { user: process.env.AUTH_SMTP_USER, pass: process.env.AUTH_SMTP_PASSWORD } }
-        : {}),
-    })
-  : null;
+const notificationEnqueuerPool = new Pool({
+  connectionString: required("NOTIFICATION_ENQUEUER_DATABASE_URL"),
+  max: 4,
+  idleTimeoutMillis: 30_000,
+  connectionTimeoutMillis: 5_000,
+});
 
-const emailFrom = process.env.AUTH_EMAIL_FROM ?? "Bazion Web <noreply@example.test>";
-const appBaseUrl = process.env.AUTH_APP_URL ?? "http://localhost:3000";
+const notificationOutbox = new PostgresNotificationOutbox(
+  notificationEnqueuerPool,
+  createOutboxPayloadCodec(Buffer.from(required("NOTIFICATION_ENCRYPTION_KEY"), "base64")),
+);
 
-function escapeHtml(value: string): string {
-  return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;").replaceAll("'", "&#39;");
-}
-
-async function sendAuthEmail(to: string, subject: string, url: string, intro: string): Promise<void> {
-  if (!smtpTransport) {
-    if (nodeEnv === "production") throw new Error("Authentication email transport is not configured.");
-    console.info("[bazion-auth-email:development]", { to, subject, url });
-    return;
-  }
-  const safeUrl = escapeHtml(url);
-  const safeIntro = escapeHtml(intro);
-  await smtpTransport.sendMail({
-    from: emailFrom,
-    to,
-    subject,
-    text: `${intro}\n\n${url}\n\nIf you did not request this, you can ignore this email.`,
-    html: `<p>${safeIntro}</p><p><a href="${safeUrl}">Continue to Bazion Web</a></p><p>If you did not request this, you can ignore this email.</p>`,
-  });
-}
-
-function fireAuthEmail(to: string, subject: string, url: string, intro: string): void {
-  // SMTP must not block auth responses. Production delivery still needs a durable
-  // outbox/worker; failures are logged without exposing message contents or URLs.
-  void sendAuthEmail(to, subject, url, intro).catch((error: unknown) => {
-    console.error("[bazion-auth-email] delivery failed", error instanceof Error ? error.name : "unknown error");
+async function enqueueAuthEmail(
+  to: string,
+  subject: string,
+  url: string,
+  intro: string,
+  event: "password-reset" | "email-verification" | "organization-invitation",
+  eventId: string,
+): Promise<void> {
+  const eventHash = createHash("sha256").update(eventId).digest("hex");
+  await notificationOutbox.enqueue({
+    idempotencyKey: `auth:${event}:${eventHash}`,
+    channel: "email",
+    payload: {
+      to,
+      subject,
+      template: `auth.${event}`,
+      variables: { url, intro },
+    },
   });
 }
 
@@ -191,7 +181,14 @@ export const auth = betterAuth({
     requireEmailVerification: process.env.AUTH_REQUIRE_EMAIL_VERIFICATION !== "false",
     revokeSessionsOnPasswordReset: true,
     sendResetPassword: async ({ user, url }) => {
-      fireAuthEmail(user.email, "Reset your Bazion Web password", url, "Use the secure link below to reset your password.");
+      await enqueueAuthEmail(
+        user.email,
+        "Reset your Bazion Web password",
+        url,
+        "Use the secure link below to reset your password.",
+        "password-reset",
+        url,
+      );
     },
   },
   emailVerification: {
@@ -199,7 +196,14 @@ export const auth = betterAuth({
     autoSignInAfterVerification: true,
     expiresIn: 60 * 60,
     sendVerificationEmail: async ({ user, url }) => {
-      fireAuthEmail(user.email, "Verify your Bazion Web email", url, "Verify your email address to activate your Bazion Web account.");
+      await enqueueAuthEmail(
+        user.email,
+        "Verify your Bazion Web email",
+        url,
+        "Verify your email address to activate your Bazion Web account.",
+        "email-verification",
+        url,
+      );
     },
   },
   session: {
@@ -252,11 +256,13 @@ export const auth = betterAuth({
           `/accept-invitation?invitationId=${encodeURIComponent(data.id)}`,
           appBaseUrl,
         ).toString();
-        fireAuthEmail(
+        await enqueueAuthEmail(
           data.email,
           `Invitation to join ${data.organization.name} on Bazion Web`,
           invitationUrl,
           `${data.inviter.user.name} invited you to join ${data.organization.name}.`,
+          "organization-invitation",
+          data.id,
         );
       },
     }),
@@ -300,8 +306,7 @@ export async function resolvePublicTenantByHostname(hostname: string) {
 }
 
 export async function closeAuthResources(): Promise<void> {
-  await Promise.all([authPool.end(), tenantResolverPool.end(), tenantProvisionerPool.end()]);
-  smtpTransport?.close();
+  await Promise.all([authPool.end(), tenantResolverPool.end(), tenantProvisionerPool.end(), notificationEnqueuerPool.end()]);
 }
 
 

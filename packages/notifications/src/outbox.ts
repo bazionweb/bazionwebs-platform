@@ -165,16 +165,23 @@ export class PostgresNotificationOutbox {
       throw new Error("Notification maxAttempts must be an integer between 1 and 20.");
     }
 
-    const result = await this.pool.query<InsertedRow>(
+    // Keep enqueue permissions INSERT + narrowly scoped SELECT only. In particular,
+    // the enqueue role must not need UPDATE merely to make retries idempotent.
+    const inserted = await this.pool.query<InsertedRow>(
       `INSERT INTO public.notification_outbox
          (tenant_id, channel, payload_ciphertext, payload_hash, idempotency_key, max_attempts)
        VALUES ($1, $2, $3, $4, $5, $6)
-       ON CONFLICT (idempotency_key)
-       DO UPDATE SET idempotency_key = EXCLUDED.idempotency_key
+       ON CONFLICT (idempotency_key) DO NOTHING
        RETURNING id, payload_hash`,
       [input.tenantId ?? null, input.channel, ciphertext, payloadHash, input.idempotencyKey, maxAttempts],
     );
-    const row = result.rows[0];
+    const row = inserted.rows[0] ?? (await this.pool.query<InsertedRow>(
+      `SELECT id, payload_hash
+         FROM public.notification_outbox
+        WHERE idempotency_key = $1
+        LIMIT 1`,
+      [input.idempotencyKey],
+    )).rows[0];
     if (!row) throw new Error("Notification could not be queued.");
     if (row.payload_hash !== payloadHash) {
       throw new Error("Notification idempotency key was reused with a different payload.");
