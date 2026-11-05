@@ -42,14 +42,17 @@ const transport = nodemailer.createTransport({
   host: smtpHost,
   port: smtpPort,
   secure: smtpSecure,
+  connectionTimeout: 10_000,
+  greetingTimeout: 10_000,
+  socketTimeout: 30_000,
   ...(smtpUser && smtpPassword ? { auth: { user: smtpUser, pass: smtpPassword } } : {}),
 });
 const emailFrom = required("NOTIFICATION_EMAIL_FROM");
 const outbox = new PostgresNotificationOutbox(pool, codec);
-const batchSize = Number(process.env.NOTIFICATION_WORKER_BATCH_SIZE ?? "20");
+const batchSize = Number(process.env.NOTIFICATION_WORKER_BATCH_SIZE ?? "5");
 const idleMilliseconds = Number(process.env.NOTIFICATION_WORKER_IDLE_MS ?? "1000");
-if (!Number.isInteger(batchSize) || batchSize < 1 || batchSize > 100) {
-  throw new Error("NOTIFICATION_WORKER_BATCH_SIZE must be an integer between 1 and 100.");
+if (!Number.isInteger(batchSize) || batchSize < 1 || batchSize > 5) {
+  throw new Error("NOTIFICATION_WORKER_BATCH_SIZE must be an integer between 1 and 5 (the outbox lease is five minutes).");
 }
 if (!Number.isInteger(idleMilliseconds) || idleMilliseconds < 100 || idleMilliseconds > 30_000) {
   throw new Error("NOTIFICATION_WORKER_IDLE_MS must be an integer between 100 and 30000.");

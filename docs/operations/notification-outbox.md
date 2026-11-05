@@ -22,7 +22,7 @@ pnpm --filter @bazion/notifications build
 pnpm --filter @bazion/notifications start:worker
 ```
 
-For local development, use a disposable SMTP sink such as Mailpit and point `NOTIFICATION_SMTP_HOST` and `NOTIFICATION_SMTP_PORT` at it. The worker verifies the SMTP connection before polling. It handles SIGINT/SIGTERM by finishing the current batch and closing its database/SMTP resources. Run it under a real process supervisor (systemd, a container orchestrator or an equivalent) with restart-on-failure enabled; the worker intentionally exits non-zero on fatal startup or polling errors.
+For local development, use a disposable SMTP sink such as Mailpit and point `NOTIFICATION_SMTP_HOST` and `NOTIFICATION_SMTP_PORT` at it. The worker verifies the SMTP connection before polling. It handles SIGINT/SIGTERM by finishing the current batch and closing its database/SMTP resources. Run it under a real process supervisor (systemd, a container orchestrator or an equivalent) with restart-on-failure enabled; the worker intentionally exits non-zero on fatal startup or polling errors. SMTP connection, greeting and socket timeouts are bounded (10/10/30 seconds), and the worker caps each batch at five messages so sequential delivery stays comfortably inside the five-minute outbox lease. Scale throughput with additional supervised workers rather than raising this batch limit without implementing lease heartbeats.
 
 Required worker settings:
 
@@ -42,7 +42,28 @@ The queue is platform infrastructure, not tenant-owned business data, so it deli
 - `bazion_notification_worker`: SELECT and UPDATE on the outbox to decrypt, claim, complete, retry and requeue messages. It cannot insert or delete rows.
 - `bazion_tenant_provisioner`: no outbox privileges.
 
-For a new local PostgreSQL volume, the updated Docker Compose/init script creates these login roles. For an existing persistent volume, init scripts do not rerun: create the two roles and grant database/schema CONNECT/USAGE using the deployment's database administrator, set distinct strong passwords, and update the corresponding connection strings before applying migration 0004. Do not reuse the tenant-provisioner password. Production secret provisioning must happen before the migration.
+For a new local PostgreSQL volume, the updated Docker Compose/init script creates these login roles. For an existing persistent volume, init scripts do not rerun. Before applying migration 0004, connect to the target database as a PostgreSQL administrator (or a role with `CREATEROLE`) and provision the two login roles. The commands below are for a database named `bazion_platform`; use the actual database name if different.
+
+```sql
+CREATE ROLE bazion_notification_enqueuer
+  LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS;
+CREATE ROLE bazion_notification_worker
+  LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS;
+
+GRANT CONNECT ON DATABASE bazion_platform
+  TO bazion_notification_enqueuer, bazion_notification_worker;
+GRANT USAGE ON SCHEMA public
+  TO bazion_notification_enqueuer, bazion_notification_worker;
+```
+
+Set each password interactively in `psql` (so it is not embedded in shell history):
+
+```text
+\\password bazion_notification_enqueuer
+\\password bazion_notification_worker
+```
+
+If either role already exists, use `ALTER ROLE <role> WITH LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS;` and set its password instead of creating it again. Store the passwords in your secret manager and build separate connection strings for the API and worker. Then apply migration 0004, followed by migration 0005 for audit events. Do not reuse the tenant-provisioner password.
 
 ## Encryption key
 
@@ -68,3 +89,45 @@ The queue is **at-least-once**, not exactly-once. A worker can send a message an
 ## Current scope
 
 Authentication password-reset, verification and invitation callbacks now await durable enqueue. This is the transactional notification foundation, not a full messaging product: SMTP is the only active channel, there is no operator UI for dead letters, and queue-age/dead-letter alerting remains an operations deliverable.
+
+## Production worker deployment (systemd example)
+
+The repository contains `deploy/systemd/bazion-notification-worker.service`. It assumes the code is deployed at `/opt/bazionwebs-platform`, with a Unix service account named `bazion`. Adjust these values to the host layout rather than weakening the service sandbox.
+
+1. Build the worker with the locked workspace dependencies:
+
+   ```sh
+   pnpm install --frozen-lockfile
+   pnpm --filter @bazion/notifications build
+   ```
+
+2. Create `/etc/bazionweb/notification-worker.env` as root with mode `0600`. Set `NOTIFICATION_WORKER_DATABASE_URL`, `NOTIFICATION_ENCRYPTION_KEY`, `NOTIFICATION_SMTP_HOST`, `NOTIFICATION_SMTP_PORT`, `NOTIFICATION_SMTP_SECURE`, `NOTIFICATION_EMAIL_FROM`, and optionally both SMTP credential variables. The API deployment separately receives `NOTIFICATION_ENQUEUER_DATABASE_URL` and the identical encryption key. Never put these variables in a public frontend environment.
+
+3. Install and activate the service:
+
+   ```sh
+   sudo install -d -m 0750 -o root -g bazion /etc/bazionweb
+   sudo chown root:bazion /etc/bazionweb/notification-worker.env
+   sudo chmod 0600 /etc/bazionweb/notification-worker.env
+   sudo install -m 0644 deploy/systemd/bazion-notification-worker.service /etc/systemd/system/
+   sudo systemctl daemon-reload
+   sudo systemctl enable --now bazion-notification-worker
+   sudo systemctl status bazion-notification-worker
+   ```
+
+4. Send a controlled test email to a mailbox you own and inspect the worker logs:
+
+   ```sh
+   sudo journalctl -u bazion-notification-worker -f
+   ```
+
+5. Verify the service restarts cleanly:
+
+   ```sh
+   sudo systemctl restart bazion-notification-worker
+   sudo systemctl is-active bazion-notification-worker
+   ```
+
+   This confirms process supervision and graceful restart. It is not, by itself, proof of lease-recovery after an abrupt process death. In staging, interrupt a worker while it holds a test delivery, wait longer than the five-minute lease, start/restart the worker, and confirm the pending item is reclaimed and reaches the controlled test inbox. Check the outbox attempt count and final state using a privileged operational database connection. Because delivery is at-least-once, a message that the SMTP server accepted before the worker died may be delivered again.
+
+Do not declare production readiness until both ordinary delivery and the interrupted-worker recovery test have been evidenced in the target environment. Keep the outbox encryption key backed up with restricted recovery access.
