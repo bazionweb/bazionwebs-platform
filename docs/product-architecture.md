@@ -12,7 +12,7 @@ Keep these three things separate:
 2. Module: a cohesive domain boundary that owns business rules and public interfaces.
 3. Offer/solution: a configuration, entitlement, template and delivery scope composed from modules.
 
-The repository now registers 111 advertised capabilities, 37 reusable module boundaries, 35 commercial offer IDs and nine initial solution manifests. It intentionally does not create one package for each capability.
+The repository now registers 111 advertised capabilities, 36 reusable module boundaries, 35 commercial offer IDs and nine initial solution manifests. It intentionally does not create one package for each capability.
 
 ## 2. Target repository layout
 
