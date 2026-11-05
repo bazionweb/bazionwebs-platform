@@ -115,13 +115,6 @@ async function trustedOriginsForRequest(request?: Request): Promise<string[]> {
   return defaultTrustedOrigins;
 }
 
-function fireAuthEmail(to: string, subject: string, url: string, intro: string): void {
-  // Do not block auth responses on SMTP. In production, use a durable email
-  // outbox/worker before depending on email for onboarding or recovery.
-  void sendAuthEmail(to, subject, url, intro).catch((error: unknown) => {
-    console.error("[bazion-auth-email] delivery failed", error instanceof Error ? error.message : "unknown error");
-  });
-}
 
 export interface PlatformMember {
   userId: string;
