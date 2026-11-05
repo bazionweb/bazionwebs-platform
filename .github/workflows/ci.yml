@@ -7,9 +7,12 @@ on:
     branches:
       - main
       - "feature/**"
+      - "feat/**"
+  workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
+  actions: write
 
 concurrency:
   group: validate-${{ github.workflow }}-${{ github.ref }}
@@ -17,12 +20,38 @@ concurrency:
 
 jobs:
   validate:
-    name: Install, typecheck, test and build
+    name: Install, migrate, typecheck, test and build
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgres://bazion_app:bazion_app_local_only@localhost:5432/bazion_platform
+      TENANT_ISOLATION_TEST_DATABASE_URL: postgres://bazion_app:bazion_app_local_only@localhost:5432/bazion_platform
+      MIGRATION_DATABASE_URL: postgres://bazion_migrator:bazion_migrator_local_only@localhost:5432/bazion_platform
+      AUTH_DATABASE_URL: postgres://bazion_auth_runtime:bazion_auth_local_only@localhost:5432/bazion_platform
+      AUTH_MIGRATION_DATABASE_URL: postgres://bazion_migrator:bazion_migrator_local_only@localhost:5432/bazion_platform
+      TENANT_RESOLVER_DATABASE_URL: postgres://bazion_tenant_resolver:bazion_tenant_resolver_local_only@localhost:5432/bazion_platform
+      TENANT_PROVISIONER_DATABASE_URL: postgres://bazion_tenant_provisioner:bazion_tenant_provisioner_local_only@localhost:5432/bazion_platform
+      BETTER_AUTH_URL: http://localhost:4000
+      BETTER_AUTH_SECRET: ci-only-bazion-auth-secret-that-is-long-enough-2026
+      BETTER_AUTH_TRUSTED_ORIGINS: http://localhost:3000,http://localhost:4000
+      AUTH_APP_URL: http://localhost:3000
+      AUTH_REQUIRE_EMAIL_VERIFICATION: "false"
+      AUTH_INTEGRATION_TESTS: "1"
+      DEFAULT_TENANT_CURRENCY: KES
+      CORS_ORIGINS: http://localhost:3000,http://localhost:4000
+      PUBLIC_STOREFRONT_URL: http://localhost:3000
+      PAYMENT_PROVIDER: mock
+      DEV_PAYMENT_SECRET: ci-only-dev-payment-secret
+      TRUST_PROXY: "false"
+      TRUSTED_PROXY_ADDRESSES: ""
+
     steps:
-      - name: Check out repository
+      - name: Check out pull request head
         uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: true
 
       - name: Set up Node.js
         uses: actions/setup-node@v7
@@ -35,14 +64,56 @@ jobs:
         with:
           version: 12.18.0
 
-      - name: Install workspace dependencies
-        run: pnpm install --no-frozen-lockfile
+      - name: Generate the initial lockfile when bootstrapping
+        run: |
+          if [[ ! -f pnpm-lock.yaml ]]; then
+            pnpm install --lockfile-only --ignore-scripts --no-frozen-lockfile
+          fi
+
+      - name: Install workspace dependencies from the lockfile
+        run: pnpm install --frozen-lockfile
+
+      - name: Start PostgreSQL with least-privilege roles
+        run: |
+          docker compose up -d db
+          for attempt in {1..30}; do
+            if docker compose exec -T db pg_isready -U bazion_admin -d bazion_platform; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker compose logs db
+          exit 1
+
+      - name: Apply application database migrations
+        run: |
+          pnpm --filter @bazion/database migrate
+          pnpm --filter @bazion/database migrate
+
+      - name: Apply matching Better Auth schema
+        run: pnpm --filter @bazion/auth migrate
 
       - name: Typecheck all workspaces
         run: pnpm typecheck
 
-      - name: Run workspace tests
+      - name: Run unit, authentication and tenant-isolation tests
         run: pnpm test
 
       - name: Build all applications and packages
         run: pnpm build
+
+      # The first successful pull-request run commits the generated lockfile and
+      # dispatches a second run on that new commit. Every subsequent run is frozen.
+      - name: Commit bootstrapped lockfile and validate the committed revision
+        if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [[ -n "$(git status --porcelain -- pnpm-lock.yaml)" ]]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add pnpm-lock.yaml
+            git commit -m "chore: lock workspace dependency graph"
+            git push origin "HEAD:refs/heads/${GITHUB_HEAD_REF}"
+            gh workflow run ci.yml --ref "${GITHUB_HEAD_REF}" --repo "${GITHUB_REPOSITORY}"
+          fi

@@ -3,6 +3,12 @@ import { organization } from "better-auth/plugins";
 import { Pool } from "pg";
 import nodemailer from "nodemailer";
 import { ac, organizationRoles } from "./permissions.js";
+import {
+  canCreateClientOrganization,
+  canGrantClientOwner,
+  normalizeTenantHostname,
+  resolveTrustedOriginsForRequest,
+} from "./security-policy.js";
 
 function required(name: string): string {
   const value = process.env[name];
@@ -74,20 +80,15 @@ async function sendAuthEmail(to: string, subject: string, url: string, intro: st
 }
 
 function fireAuthEmail(to: string, subject: string, url: string, intro: string): void {
+  // SMTP must not block auth responses. Production delivery still needs a durable
+  // outbox/worker; failures are logged without exposing message contents or URLs.
   void sendAuthEmail(to, subject, url, intro).catch((error: unknown) => {
     console.error("[bazion-auth-email] delivery failed", error instanceof Error ? error.name : "unknown error");
   });
 }
 
-function normalizeHostname(hostname: string): string | null {
-  const value = hostname.trim().toLowerCase().replace(/\.$/, "");
-  if (!value || value.length > 253 || value.includes("/") || value.includes("@")) return null;
-  if (!/^(?=.{1,253}$)([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)(\.([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?))*$/.test(value)) return null;
-  return value;
-}
-
 export async function isVerifiedTenantHost(hostname: string): Promise<boolean> {
-  const host = normalizeHostname(hostname);
+  const host = normalizeTenantHostname(hostname);
   if (!host) return false;
   const result = await tenantResolverPool.query(
     "SELECT 1 FROM public.tenant_domain_directory WHERE hostname = $1 LIMIT 1",
@@ -97,30 +98,7 @@ export async function isVerifiedTenantHost(hostname: string): Promise<boolean> {
 }
 
 async function trustedOriginsForRequest(request?: Request): Promise<string[]> {
-  if (!request) return defaultTrustedOrigins;
-  const origin = request.headers.get("origin");
-  if (!origin || defaultTrustedOrigins.includes(origin)) return defaultTrustedOrigins;
-
-  try {
-    const parsed = new URL(origin);
-    const host = normalizeHostname(parsed.hostname);
-    const local = host === "localhost" || host === "127.0.0.1";
-    if (!host || parsed.username || parsed.password) return defaultTrustedOrigins;
-    if (local && nodeEnv !== "production") return [...new Set([...defaultTrustedOrigins, origin])];
-    if (parsed.protocol !== "https:" || (parsed.port !== "" && parsed.port !== "443")) return defaultTrustedOrigins;
-    if (await isVerifiedTenantHost(host)) return [...new Set([...defaultTrustedOrigins, origin])];
-  } catch {
-    // An invalid Origin is never added to the trusted set.
-  }
-  return defaultTrustedOrigins;
-}
-
-function fireAuthEmail(to: string, subject: string, url: string, intro: string): void {
-  // Do not block auth responses on SMTP. In production, use a durable email
-  // outbox/worker before depending on email for onboarding or recovery.
-  void sendAuthEmail(to, subject, url, intro).catch((error: unknown) => {
-    console.error("[bazion-auth-email] delivery failed", error instanceof Error ? error.message : "unknown error");
-  });
+  return resolveTrustedOriginsForRequest(request, defaultTrustedOrigins, nodeEnv, isVerifiedTenantHost);
 }
 
 export interface PlatformMember {
@@ -162,10 +140,9 @@ async function beforeCreateOrganization({ organization: org, user }: {
   organization: { slug: string; name: string };
   user: { email: string; emailVerified: boolean };
 }): Promise<void> {
-  if (!user.emailVerified) throw new Error("A verified email is required to create a client organization.");
   const platformMember = await resolvePlatformMemberByEmail(user.email);
-  if (!platformMember || !["platform_owner", "platform_admin"].includes(platformMember.role)) {
-    throw new Error("Only an authorized Bazion platform administrator can create a client organization.");
+  if (!canCreateClientOrganization(platformMember?.role, user.emailVerified)) {
+    throw new Error("Only a verified Bazion platform administrator can create a client organization.");
   }
 
   const result = await tenantProvisionerPool.query(
@@ -238,9 +215,8 @@ export const auth = betterAuth({
       roles: organizationRoles,
       creatorRole: "admin",
       allowUserToCreateOrganization: async (user) => {
-        if (!user.emailVerified) return false;
         const platformMember = await resolvePlatformMemberByEmail(user.email);
-        return platformMember?.role === "platform_owner" || platformMember?.role === "platform_admin";
+        return canCreateClientOrganization(platformMember?.role, user.emailVerified);
       },
       requireEmailVerificationOnInvitation: true,
       disableOrganizationDeletion: true,
@@ -250,21 +226,15 @@ export const auth = betterAuth({
           invitation: { role: string };
           inviter: { user: { id: string } };
         }) => {
-          const requestedRoles = invitation.role.split(",").map((role) => role.trim()).filter(Boolean);
-          if (requestedRoles.includes("owner")) {
-            const platformMember = await resolvePlatformMemberByUserId(inviter.user.id);
-            if (!platformMember || !["platform_owner", "platform_admin"].includes(platformMember.role)) {
-              throw new Error("Only a Bazion platform administrator can invite a new client owner.");
-            }
+          const platformMember = await resolvePlatformMemberByUserId(inviter.user.id);
+          if (!canGrantClientOwner(platformMember?.role, invitation.role)) {
+            throw new Error("Only a Bazion platform administrator can invite a new client owner.");
           }
         },
         beforeUpdateMemberRole: async ({ newRole, user }: { newRole: string; user: { id: string } }) => {
-          const requestedRoles = newRole.split(",").map((role) => role.trim()).filter(Boolean);
-          if (requestedRoles.includes("owner")) {
-            const platformMember = await resolvePlatformMemberByUserId(user.id);
-            if (!platformMember || !["platform_owner", "platform_admin"].includes(platformMember.role)) {
-              throw new Error("Only an authorized Bazion platform administrator can assign the client owner role.");
-            }
+          const platformMember = await resolvePlatformMemberByUserId(user.id);
+          if (!canGrantClientOwner(platformMember?.role, newRole)) {
+            throw new Error("Only an authorized Bazion platform administrator can assign the client owner role.");
           }
         },
         afterCreateOrganization,
@@ -303,7 +273,7 @@ export async function resolveTenantByOrganizationId(organizationId: string) {
 }
 
 export async function resolvePublicTenantByHostname(hostname: string) {
-  const host = normalizeHostname(hostname);
+  const host = normalizeTenantHostname(hostname);
   if (!host) return null;
   const result = await tenantResolverPool.query<{
     id: string;
