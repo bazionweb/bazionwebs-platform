@@ -2,6 +2,7 @@ import { betterAuth } from "better-auth";
 import { organization } from "better-auth/plugins";
 import { Pool } from "pg";
 import nodemailer from "nodemailer";
+import { reconcileTenantProvisioning } from "./tenant-reconciliation.js";
 import { ac, organizationRoles } from "./permissions.js";
 import {
   canCreateClientOrganization,
@@ -301,4 +302,54 @@ export async function resolvePublicTenantByHostname(hostname: string) {
 export async function closeAuthResources(): Promise<void> {
   await Promise.all([authPool.end(), tenantResolverPool.end(), tenantProvisionerPool.end()]);
   smtpTransport?.close();
+}
+
+
+/** Recover stale tenant reservations only when their Better Auth organization exists. */
+export async function reconcileProvisioningTenants(options: {
+  staleMinutes?: number;
+  limit?: number;
+} = {}) {
+  return reconcileTenantProvisioning({
+    async findStaleProvisioningTenants(staleMinutes, limit) {
+      const result = await tenantProvisionerPool.query<{
+        id: string;
+        slug: string;
+        auth_organization_id: string | null;
+      }>(
+        `SELECT id, slug, auth_organization_id
+           FROM public.tenants
+          WHERE status = 'provisioning'
+            AND created_at < now() - ($1::integer * interval '1 minute')
+          ORDER BY created_at ASC
+          LIMIT $2`,
+        [staleMinutes, limit],
+      );
+      return result.rows.map((row) => ({
+        id: row.id,
+        slug: row.slug,
+        authOrganizationId: row.auth_organization_id,
+      }));
+    },
+    async findOrganizationsBySlugs(slugs) {
+      const result = await authPool.query<{ id: string; slug: string; name: string }>(
+        `SELECT id, slug, name
+           FROM organization
+          WHERE slug = ANY($1::text[])`,
+        [slugs],
+      );
+      return result.rows;
+    },
+    async activateTenant({ tenantId, organizationId, organizationName }) {
+      const result = await tenantProvisionerPool.query(
+        `UPDATE public.tenants
+            SET auth_organization_id = $1, name = $2, status = 'active'
+          WHERE id = $3
+            AND status = 'provisioning'
+            AND (auth_organization_id IS NULL OR auth_organization_id = $1)`,
+        [organizationId, organizationName, tenantId],
+      );
+      return result.rowCount === 1;
+    },
+  }, options);
 }
