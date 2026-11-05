@@ -6,6 +6,7 @@ import {
   resolveTenantByOrganizationId,
 } from "./server.js";
 import { parseOrganizationRoles } from "./permissions.js";
+import { canAccessPlatformPermission, type PlatformPermission } from "./security-policy.js";
 
 export interface ActiveTenantContext {
   userId: string;
@@ -35,9 +36,7 @@ export async function getCurrentIdentity(headers: IncomingHttpHeaders): Promise<
     activeOrganizationId?: string | null;
   }).activeOrganizationId;
   const [member, platformMember] = await Promise.all([
-    activeOrganizationId
-      ? auth.api.getActiveMember({ headers: authHeaders })
-      : Promise.resolve(null),
+    activeOrganizationId ? auth.api.getActiveMember({ headers: authHeaders }) : Promise.resolve(null),
     resolvePlatformMemberByUserId(session.user.id),
   ]);
 
@@ -84,38 +83,31 @@ export type TenantPermissionRequest = {
   invitation?: Array<"create" | "cancel">;
 };
 
-export async function hasActiveTenantPermission(
-  headers: IncomingHttpHeaders,
-  permissions: TenantPermissionRequest,
-): Promise<boolean> {
+export async function hasActiveTenantPermission(headers: IncomingHttpHeaders, permissions: TenantPermissionRequest): Promise<boolean> {
   const context = await getActiveTenantContext(headers);
   if (!context) return false;
-  const result = await auth.api.hasPermission({
-    headers: fromNodeHeaders(headers),
-    body: { permissions },
-  });
+  const result = await auth.api.hasPermission({ headers: fromNodeHeaders(headers), body: { permissions } });
   return result.success === true;
 }
 
-export async function requireActiveTenantPermission(
-  headers: IncomingHttpHeaders,
-  permissions: TenantPermissionRequest,
-): Promise<ActiveTenantContext> {
+export async function requireActiveTenantPermission(headers: IncomingHttpHeaders, permissions: TenantPermissionRequest): Promise<ActiveTenantContext> {
   const context = await getActiveTenantContext(headers);
-  if (!context) {
-    throw Object.assign(new Error("An active organization membership is required."), {
-      statusCode: 403,
-      code: "TENANT_MEMBERSHIP_REQUIRED",
-    });
-  }
-  const allowed = await hasActiveTenantPermission(headers, permissions);
-  if (!allowed) {
-    throw Object.assign(new Error("You do not have permission to perform this action."), {
-      statusCode: 403,
-      code: "PERMISSION_DENIED",
-    });
+  if (!context) throw Object.assign(new Error("An active organization membership is required."), { statusCode: 403, code: "TENANT_MEMBERSHIP_REQUIRED" });
+  if (!(await hasActiveTenantPermission(headers, permissions))) {
+    throw Object.assign(new Error("You do not have permission to perform this action."), { statusCode: 403, code: "PERMISSION_DENIED" });
   }
   return context;
+}
+
+export async function requirePlatformPermission(headers: IncomingHttpHeaders, permission: PlatformPermission) {
+  const identity = await getCurrentIdentity(headers);
+  if (!identity?.platformRole || !canAccessPlatformPermission(identity.platformRole, permission)) {
+    throw Object.assign(new Error("You do not have permission to perform this platform operation."), {
+      statusCode: 403,
+      code: "PLATFORM_PERMISSION_DENIED",
+    });
+  }
+  return { userId: identity.user.id, email: identity.user.email, role: identity.platformRole };
 }
 
 export async function requirePlatformRole(
@@ -124,10 +116,7 @@ export async function requirePlatformRole(
 ): Promise<{ userId: string; email: string; role: "platform_owner" | "platform_admin" | "platform_support" }> {
   const identity = await getCurrentIdentity(headers);
   if (!identity?.platformRole || !allowedRoles.includes(identity.platformRole)) {
-    throw Object.assign(new Error("Platform administrator access is required."), {
-      statusCode: 403,
-      code: "PLATFORM_PERMISSION_DENIED",
-    });
+    throw Object.assign(new Error("Platform administrator access is required."), { statusCode: 403, code: "PLATFORM_PERMISSION_DENIED" });
   }
   return { userId: identity.user.id, email: identity.user.email, role: identity.platformRole };
 }
