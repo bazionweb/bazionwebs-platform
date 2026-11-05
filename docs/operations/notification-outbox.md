@@ -110,7 +110,7 @@ pnpm production:preflight
 
 Protect that environment file with mode `0600`. It must contain the production URLs for `DATABASE_URL`, `AUTH_DATABASE_URL`, `AUTH_MIGRATION_DATABASE_URL`, `MIGRATION_DATABASE_URL`, `TENANT_RESOLVER_DATABASE_URL`, `TENANT_PROVISIONER_DATABASE_URL`, `NOTIFICATION_ENQUEUER_DATABASE_URL` and `NOTIFICATION_WORKER_DATABASE_URL`, plus the HTTPS origins, Better Auth secret, notification encryption key, SMTP settings, proxy addresses and `NODE_ENV=production`. The command never prints credentials or encryption keys.
 
-The database preflight connects as each declared role, verifies that the two numbered migrations are applied, verifies role attributes, checks the precise outbox and audit grants, confirms the append-only audit trigger and confirms the Better Auth user/session tables exist. The SMTP preflight verifies the configured SMTP connection, credentials and TLS negotiation.
+The database preflight connects as each declared role, verifies that the two numbered migrations are applied, verifies role attributes, checks the precise outbox and audit grants, confirms the append-only audit trigger and confirms the Better Auth user/session tables exist. A database hosted on the same machine may use loopback; remote database endpoints must declare TLS with `sslmode=require` or stronger verification. The SMTP preflight verifies the configured SMTP connection, credentials and TLS negotiation.
 
 **A green preflight is not a substitute for a test message or a worker-interruption recovery test.** Send a controlled test email and prove the five-minute lease recovery in staging before production.
 
