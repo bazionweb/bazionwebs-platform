@@ -12,8 +12,10 @@ const mocks = vi.hoisted(() => ({
   cancelInvitation: vi.fn(),
   updateMemberRole: vi.fn(),
   removeMember: vi.fn(),
+  appendAuditEvent: vi.fn(),
 }));
 
+vi.mock("@bazion/audit", () => ({ PostgresAuditEventWriter: class { append(event: unknown) { return mocks.appendAuditEvent(event); } } }));
 vi.mock("@bazion/auth", () => ({ requireActiveTenantPermission: mocks.requirePermission, requirePlatformRole: mocks.requirePlatformRole }));
 vi.mock("@bazion/auth/server", () => ({ reconcileProvisioningTenants: mocks.reconcileProvisioningTenants, auth: { api: {
   listMembers: mocks.listMembers,
@@ -23,7 +25,7 @@ vi.mock("@bazion/auth/server", () => ({ reconcileProvisioningTenants: mocks.reco
   updateMemberRole: mocks.updateMemberRole,
   removeMember: mocks.removeMember,
 } } }));
-vi.mock("../../lib/database.js", () => ({ withTenantTransaction: vi.fn() }));
+vi.mock("../../lib/database.js", () => ({ pool: {}, withTenantTransaction: vi.fn() }));
 
 const context = {
   userId: "user-a",
@@ -56,6 +58,7 @@ describe("client administration API", () => {
     mocks.cancelInvitation.mockResolvedValue({ success: true });
     mocks.updateMemberRole.mockResolvedValue({ success: true });
     mocks.removeMember.mockResolvedValue({ success: true });
+    mocks.appendAuditEvent.mockResolvedValue(undefined);
   });
 
   it("requires analytics permission before loading overview data", async () => {
@@ -181,6 +184,20 @@ describe("platform tenant provisioning recovery", () => {
         unmatched: [{ tenantId: "tenant-stuck", slug: "stuck" }],
         conflicted: [],
       });
+      expect(mocks.appendAuditEvent).toHaveBeenCalledTimes(2);
+      expect(mocks.appendAuditEvent).toHaveBeenNthCalledWith(1, expect.objectContaining({
+        actorType: "user",
+        actorId: "platform-admin",
+        actorRole: "platform_admin",
+        action: "tenant.provisioning.reconciliation.requested",
+        outcome: "succeeded",
+        tenantId: null,
+        metadata: { staleMinutes: 15, limit: 25 },
+      }));
+      expect(mocks.appendAuditEvent).toHaveBeenNthCalledWith(2, expect.objectContaining({
+        action: "tenant.provisioning.reconciliation.completed",
+        outcome: "succeeded",
+      }));
     } finally {
       await app.close();
     }
