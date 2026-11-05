@@ -15,7 +15,6 @@ async function main(): Promise<void> {
   const port = Number(process.env.NOTIFICATION_SMTP_PORT ?? "587");
   const secure = process.env.NOTIFICATION_SMTP_SECURE === "true";
   const requireTls = process.env.NOTIFICATION_SMTP_REQUIRE_TLS !== "false";
-  const requireAuth = process.env.NOTIFICATION_SMTP_REQUIRE_AUTH !== "false";
   const user = process.env.NOTIFICATION_SMTP_USER?.trim();
   const password = process.env.NOTIFICATION_SMTP_PASSWORD;
 
@@ -25,8 +24,8 @@ async function main(): Promise<void> {
   if (Boolean(user) !== Boolean(password)) {
     throw new Error("Configure both NOTIFICATION_SMTP_USER and NOTIFICATION_SMTP_PASSWORD, or neither.");
   }
-  if (requireAuth && !user) {
-    throw new Error("SMTP authentication is required. Set both SMTP credential variables, or explicitly approve NOTIFICATION_SMTP_REQUIRE_AUTH=false for a trusted relay.");
+  if (!user || !password) {
+    throw new Error("Production SMTP authentication is required; provide both NOTIFICATION_SMTP_USER and NOTIFICATION_SMTP_PASSWORD.");
   }
   if (!secure && !requireTls) {
     throw new Error("Production SMTP must use implicit TLS or mandatory STARTTLS.");
