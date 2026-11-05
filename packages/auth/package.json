@@ -13,7 +13,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "migrate": "tsx scripts/migrate.ts",
+    "migrate": "pnpm --filter @bazion/notifications build && tsx scripts/migrate.ts",
     "test": "vitest run"
   },
   "dependencies": {
