@@ -136,7 +136,7 @@ export async function resolvePlatformMemberByUserId(userId: string): Promise<Pla
   return row ? { userId: row.user_id, email: row.email, role: row.role, status: row.status } : null;
 }
 
-async function beforeCreateOrganization({ organization: org, user }) {
+async function beforeCreateOrganization({ organization: org, user }: {\n  organization: { slug?: string; name?: string };\n  user: { id: string; email: string; emailVerified: boolean };\n}): Promise<void> {
   const slug = org.slug?.trim();
   const name = org.name?.trim();
   if (!slug || !name) throw new Error("A client organization name and slug are required.");
@@ -154,7 +154,7 @@ async function beforeCreateOrganization({ organization: org, user }) {
   if (result.rowCount !== 1) throw new Error("Could not reserve the client tenant slug.");
 }
 
-async function afterCreateOrganization({ organization: org }) {
+async function afterCreateOrganization({ organization: org }: {\n  organization: { id: string; slug?: string; name?: string };\n}): Promise<void> {
   const organizationId = org.id;
   const slug = org.slug?.trim();
   const name = org.name?.trim();
