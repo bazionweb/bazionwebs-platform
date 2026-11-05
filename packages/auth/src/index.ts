@@ -4,6 +4,7 @@ export {
   hasActiveTenantPermission,
   requireActiveTenantPermission,
   requirePlatformRole,
+  requirePlatformPermission,
   type ActiveTenantContext,
   type CurrentIdentity,
   type TenantPermissionRequest,
