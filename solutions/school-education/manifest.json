@@ -1,0 +1,115 @@
+{
+  "version": "1.0.0",
+  "status": "planned",
+  "id": "school-education",
+  "name": "School and Education Management",
+  "description": "Student lifecycle, guardians, classes, attendance, assessments, school fees and learning tools.",
+  "requiredModules": [
+    "platform-identity",
+    "tenant-control-plane",
+    "contacts-crm",
+    "education",
+    "document-management",
+    "notifications",
+    "payments",
+    "analytics"
+  ],
+  "optionalModules": [
+    "website-content",
+    "page-experience",
+    "forms-leads",
+    "booking",
+    "media-storage",
+    "integration-hub"
+  ],
+  "defaultRoles": [
+    {
+      "id": "school-admin",
+      "label": "School administrator",
+      "permissions": [
+        "students.*",
+        "staff.*",
+        "classes.*",
+        "fees.read",
+        "reports.read"
+      ]
+    },
+    {
+      "id": "teacher",
+      "label": "Teacher",
+      "permissions": [
+        "classes.read",
+        "attendance.manage",
+        "assessments.manage"
+      ]
+    },
+    {
+      "id": "guardian",
+      "label": "Parent or guardian",
+      "permissions": [
+        "student-linked.read",
+        "student-linked.pay"
+      ]
+    },
+    {
+      "id": "student",
+      "label": "Student",
+      "permissions": [
+        "learning.self.read",
+        "assessment.self.read"
+      ]
+    }
+  ],
+  "navigation": [
+    {
+      "id": "students",
+      "label": "Students",
+      "module": "education",
+      "path": "/admin/students"
+    },
+    {
+      "id": "classes",
+      "label": "Classes",
+      "module": "education",
+      "path": "/admin/classes"
+    },
+    {
+      "id": "attendance",
+      "label": "Attendance",
+      "module": "education",
+      "path": "/admin/attendance"
+    },
+    {
+      "id": "assessments",
+      "label": "Assessments",
+      "module": "education",
+      "path": "/admin/assessments"
+    },
+    {
+      "id": "fees",
+      "label": "Fees",
+      "module": "payments",
+      "path": "/admin/fees"
+    }
+  ],
+  "defaults": {
+    "locale": "en-KE",
+    "timezone": "Africa/Nairobi",
+    "currency": "KES",
+    "features": [
+      "admissions",
+      "students",
+      "guardians",
+      "classes",
+      "attendance",
+      "timetable",
+      "assessments",
+      "fees",
+      "lms",
+      "certificates"
+    ]
+  },
+  "templateIds": [
+    "school-portal"
+  ]
+}
