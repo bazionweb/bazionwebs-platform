@@ -7,7 +7,7 @@ const fail = (message) => {
   console.error(`[module-validation] ${message}`);
   process.exitCode = 1;
 };
-const semver = /^\\d+\\.\\d+\\.\\d+$/;
+const semver = /^[0-9]+\\.[0-9]+\\.[0-9]+$/;
 const catalog = readJson("products/catalog.json");
 const schema = readJson("products/module-manifest.schema.json");
 const registry = readJson("products/permissions.json");
