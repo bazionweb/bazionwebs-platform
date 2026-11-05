@@ -8,15 +8,15 @@ const workerUrl = process.env.NOTIFICATION_WORKER_DATABASE_URL;
 const integrationEnabled = Boolean(enqueuerUrl && workerUrl);
 
 describe.skipIf(!integrationEnabled)("Postgres notification outbox roles and recovery", () => {
-  const codec = createOutboxPayloadCodec(
-    Buffer.from(process.env.NOTIFICATION_ENCRYPTION_KEY ?? "", "base64"),
-  );
-  let enqueuerPool: Pool;
-  let workerPool: Pool;
+  let enqueuerPool: Pool | undefined;
+  let workerPool: Pool | undefined;
   let enqueuer: PostgresNotificationOutbox;
   let worker: PostgresNotificationOutbox;
 
   beforeAll(() => {
+    const codec = createOutboxPayloadCodec(
+      Buffer.from(process.env.NOTIFICATION_ENCRYPTION_KEY ?? "", "base64"),
+    );
     enqueuerPool = new Pool({ connectionString: enqueuerUrl, max: 2 });
     workerPool = new Pool({ connectionString: workerUrl, max: 4 });
     enqueuer = new PostgresNotificationOutbox(enqueuerPool, codec);
@@ -28,7 +28,7 @@ describe.skipIf(!integrationEnabled)("Postgres notification outbox roles and rec
   });
 
   it("uses narrow enqueue privileges and rejects idempotency-key payload changes", async () => {
-    const privileges = await enqueuerPool.query<{
+    const privileges = await enqueuerPool!.query<{
       can_read_ciphertext: boolean;
       can_delete: boolean;
     }>(
@@ -76,13 +76,13 @@ describe.skipIf(!integrationEnabled)("Postgres notification outbox roles and rec
     expect(matching).toHaveLength(1);
     expect(matching[0]?.attempts).toBe(1);
 
-    const ciphertext = await workerPool.query<{ payload_ciphertext: string }>(
+    const ciphertext = await workerPool!.query<{ payload_ciphertext: string }>(
       "SELECT payload_ciphertext FROM public.notification_outbox WHERE id = $1",
       [id],
     );
     expect(ciphertext.rows[0]?.payload_ciphertext).not.toContain("worker-recovery@example.test");
 
-    await workerPool.query(
+    await workerPool!.query(
       "UPDATE public.notification_outbox SET locked_at = now() - interval '10 minutes' WHERE id = $1",
       [id],
     );
