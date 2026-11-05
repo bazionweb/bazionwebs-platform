@@ -2,10 +2,10 @@ import type { FastifyInstance, FastifyRequest } from "fastify";
 import { PostgresAuditEventWriter, type AuditEvent } from "@bazion/audit";
 import { fromNodeHeaders } from "better-auth/node";
 import { count, eq } from "drizzle-orm";
-import { requireActiveTenantPermission, requirePlatformRole, type ActiveTenantContext } from "@bazion/auth";
-import { auth, reconcileProvisioningTenants } from "@bazion/auth/server";
+import { requireActiveTenantPermission, requirePlatformRole, requirePlatformPermission, type ActiveTenantContext } from "@bazion/auth";
+import { auth, reconcileProvisioningTenants, listPlatformTenants, transitionPlatformTenant } from "@bazion/auth/server";
 import { orders, products } from "@bazion/database";
-import { invitationInputSchema, memberListQuerySchema, memberRoleInputSchema, provisioningReconciliationInputSchema } from "./policy.js";
+import { invitationInputSchema, memberListQuerySchema, memberRoleInputSchema, provisioningReconciliationInputSchema, platformTenantListQuerySchema, platformTenantLifecycleInputSchema } from "./policy.js";
 import { pool, withTenantTransaction } from "../../lib/database.js";
 
 const auditWriter = new PostgresAuditEventWriter(pool);
@@ -99,7 +99,41 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
     return reply.send(result);
   });
 
-  // Tenant identity is resolved from the signed-in session and active
+
+  // Platform tenant directory. Query filters are validated and tenant IDs are
+  // never accepted as authority; every operation is guarded by a platform permission.
+  app.get("/admin/platform/tenants", async (request, reply) => {
+    const parsed = platformTenantListQuerySchema.safeParse(request.query);
+    if (!parsed.success) return reply.code(400).send({ error: "INVALID_INPUT", details: parsed.error.flatten() });
+    await requirePlatformPermission(request.headers, "tenant.list");
+    return reply.send(await listPlatformTenants(parsed.data));
+  });
+
+  app.patch<{ Params: { tenantId: string } }>("/admin/platform/tenants/:tenantId/lifecycle", async (request, reply) => {
+    const tenantId = request.params.tenantId.trim();
+    const parsed = platformTenantLifecycleInputSchema.safeParse(request.body);
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(tenantId) || !parsed.success) {
+      return reply.code(400).send({ error: "INVALID_INPUT", ...(parsed.success ? {} : { details: parsed.error.flatten() }) });
+    }
+    const permission = parsed.data.action === "suspend"
+      ? "tenant.suspend"
+      : parsed.data.action === "restore"
+        ? "tenant.restore"
+        : "tenant.close";
+    const operator = await requirePlatformPermission(request.headers, permission);
+    const result = await withAudit(
+      request,
+      {
+        ...userAuditEvent(request, operator, "tenant", tenantId, { lifecycleAction: parsed.data.action }),
+        action: `tenant.${parsed.data.action}`,
+        tenantId,
+      },
+      () => transitionPlatformTenant({ tenantId, action: parsed.data.action }),
+    );
+    if (!result) return reply.code(409).send({ error: "TENANT_STATE_CONFLICT", message: "The tenant does not exist or is not in a state that permits this transition." });
+    return reply.send({ tenant: result });
+  });
+\n  // Tenant identity is resolved from the signed-in session and active
   // organization. No request parameter can select another tenant.
   app.get("/admin/overview", async (request) => {
     const context = await requirePermission(request, { analytics: ["read"] });
