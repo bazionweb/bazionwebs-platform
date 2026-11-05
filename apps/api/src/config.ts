@@ -14,17 +14,13 @@ const envSchema = z.object({
   AUTH_DATABASE_URL: z.string().min(1),
   TENANT_RESOLVER_DATABASE_URL: z.string().min(1),
   TENANT_PROVISIONER_DATABASE_URL: z.string().min(1),
+  NOTIFICATION_ENQUEUER_DATABASE_URL: z.string().min(1),
+  NOTIFICATION_ENCRYPTION_KEY: z.string().min(1),
   BETTER_AUTH_URL: z.string().url(),
   BETTER_AUTH_SECRET: z.string().min(32),
   BETTER_AUTH_TRUSTED_ORIGINS: z.string().default("http://localhost:3000,http://localhost:4000"),
   AUTH_APP_URL: z.string().url().default("http://localhost:3000"),
   AUTH_REQUIRE_EMAIL_VERIFICATION: z.enum(["true", "false"]).default("true"),
-  AUTH_SMTP_HOST: z.string().optional(),
-  AUTH_SMTP_PORT: z.coerce.number().int().min(1).max(65535).default(587),
-  AUTH_SMTP_SECURE: z.enum(["true", "false"]).default("false"),
-  AUTH_SMTP_USER: z.string().optional(),
-  AUTH_SMTP_PASSWORD: z.string().optional(),
-  AUTH_EMAIL_FROM: z.string().default("Bazion Web <noreply@example.test>"),
   DEFAULT_TENANT_CURRENCY: z.enum(["KES", "USD", "EUR", "GBP"]).default("KES"),
   TRUSTED_PROXY_ADDRESSES: z.string().default(""),
 });
@@ -40,8 +36,8 @@ export function loadConfig() {
   if (config.NODE_ENV === "production" && config.AUTH_REQUIRE_EMAIL_VERIFICATION !== "true") {
     throw new Error("Production startup blocked: require verified email accounts.");
   }
-  if (config.NODE_ENV === "production" && !config.AUTH_SMTP_HOST) {
-    throw new Error("Production startup blocked: configure authenticated email delivery.");
+  if (Buffer.from(config.NOTIFICATION_ENCRYPTION_KEY, "base64").byteLength !== 32) {
+    throw new Error("NOTIFICATION_ENCRYPTION_KEY must be a Base64-encoded 32-byte key.");
   }
   const trustedProxyAddresses = config.TRUSTED_PROXY_ADDRESSES.split(",").map((value) => value.trim()).filter(Boolean);
   if (config.NODE_ENV === "production" && trustedProxyAddresses.length === 0) {
