@@ -30,7 +30,7 @@ Required worker settings:
 - `NOTIFICATION_ENCRYPTION_KEY`: Base64 encoding of the same 32-byte key used by the API enqueuer.
 - `NOTIFICATION_SMTP_HOST`, `NOTIFICATION_SMTP_PORT`, `NOTIFICATION_SMTP_SECURE`, `NOTIFICATION_SMTP_REQUIRE_TLS`.
 - `NOTIFICATION_EMAIL_FROM`: verified sender address.
-- `NOTIFICATION_SMTP_REQUIRE_AUTH` defaults to `true` in production. Configure both `NOTIFICATION_SMTP_USER` and `NOTIFICATION_SMTP_PASSWORD`; configure neither only for an approved trusted private relay with `NOTIFICATION_SMTP_REQUIRE_AUTH=false`.
+- Production requires both `NOTIFICATION_SMTP_USER` and `NOTIFICATION_SMTP_PASSWORD`. Unauthenticated SMTP relays are not permitted by the current production worker/preflight.
 - Production SMTP uses implicit TLS or required STARTTLS with TLS 1.2 or newer; plaintext SMTP is rejected.
 
 The API additionally requires `NOTIFICATION_ENQUEUER_DATABASE_URL` and the same `NOTIFICATION_ENCRYPTION_KEY`. The local `.env.example` key is deliberately rejected by production API configuration and preflight. Never put the worker database URL or SMTP credentials in the browser bundle.
@@ -127,7 +127,7 @@ The repository contains `deploy/systemd/bazion-notification-worker.service`. It 
    pnpm --filter @bazion/notifications build
    ```
 
-2. Create `/etc/bazionweb/notification-worker.env` as root with mode `0600`. Include `NODE_ENV=production` and `NOTIFICATION_SMTP_REQUIRE_TLS=true`. Keep `NOTIFICATION_SMTP_REQUIRE_AUTH=true` (the default) and set both SMTP credential variables unless an approved private-relay exception is documented. Set `NOTIFICATION_WORKER_DATABASE_URL`, `NOTIFICATION_ENCRYPTION_KEY`, `NOTIFICATION_SMTP_HOST`, `NOTIFICATION_SMTP_PORT`, `NOTIFICATION_SMTP_SECURE`, `NOTIFICATION_EMAIL_FROM`, and optionally both SMTP credential variables. The API deployment separately receives `NOTIFICATION_ENQUEUER_DATABASE_URL` and the identical encryption key. Never put these variables in a public frontend environment.
+2. Create `/etc/bazionweb/notification-worker.env` as root with mode `0600`. Include `NODE_ENV=production` and `NOTIFICATION_SMTP_REQUIRE_TLS=true`. Keep `NOTIFICATION_SMTP_REQUIRE_AUTH=true` (the default) and set both SMTP credential variables unless an approved private-relay exception is documented. Set `NOTIFICATION_WORKER_DATABASE_URL`, `NOTIFICATION_ENCRYPTION_KEY`, `NOTIFICATION_SMTP_HOST`, `NOTIFICATION_SMTP_PORT`, `NOTIFICATION_SMTP_SECURE`, `NOTIFICATION_EMAIL_FROM`, and both SMTP credential variables. The API deployment separately receives `NOTIFICATION_ENQUEUER_DATABASE_URL` and the identical encryption key. Never put these variables in a public frontend environment.
 
 3. Install and activate the service:
 
