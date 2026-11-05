@@ -197,3 +197,34 @@ export const platformMembers = pgTable("platform_members", {
   check("platform_members_status_ck", sql`${table.status} in ('active', 'suspended')`),
   uniqueIndex("platform_members_email_uq").on(sql`lower(${table.email})`),
 ]);
+
+/**
+ * Platform infrastructure queue, not tenant-owned business data.
+ * Message contents are encrypted by @bazion/notifications before insertion.
+ */
+export const notificationOutbox = pgTable("notification_outbox", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  tenantId: uuid("tenant_id"),
+  channel: varchar("channel", { length: 8 }).notNull(),
+  payloadCiphertext: text("payload_ciphertext").notNull(),
+  payloadHash: varchar("payload_hash", { length: 64 }).notNull(),
+  idempotencyKey: varchar("idempotency_key", { length: 200 }).notNull(),
+  status: varchar("status", { length: 16 }).notNull().default("pending"),
+  attempts: integer("attempts").notNull().default(0),
+  maxAttempts: integer("max_attempts").notNull().default(8),
+  availableAt: timestamp("available_at", { withTimezone: true }).notNull().defaultNow(),
+  lockedAt: timestamp("locked_at", { withTimezone: true }),
+  sentAt: timestamp("sent_at", { withTimezone: true }),
+  lastErrorCode: varchar("last_error_code", { length: 64 }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  check("notification_outbox_channel_ck", sql`${table.channel} in ('email', 'sms')`),
+  check("notification_outbox_status_ck", sql`${table.status} in ('pending', 'processing', 'sent', 'dead')`),
+  check("notification_outbox_attempts_ck", sql`${table.attempts} >= 0 and ${table.maxAttempts} between 1 and 20`),
+  uniqueIndex("notification_outbox_idempotency_uq").on(table.idempotencyKey),
+  index("notification_outbox_pending_idx").on(table.availableAt, table.createdAt)
+    .where(sql`${table.status} = 'pending'`),
+  index("notification_outbox_processing_lease_idx").on(table.lockedAt)
+    .where(sql`${table.status} = 'processing'`),
+]);
