@@ -93,11 +93,10 @@
       "id": "marketing-communications",
       "name": "Newsletter, transactional messaging and channel integrations",
       "sourcePath": [
-        "packages/notifications",
         "packages/marketing"
       ],
       "status": "partial",
-      "scope": "Notification provider interface and encrypted outbox exist. Add adapters, templates, preferences and a supervised worker; campaigns remain planned."
+      "scope": "Newsletter campaigns, subscriber segmentation and provider-specific campaign connectors; transactional delivery lives in notifications."
     },
     {
       "id": "media-storage",
@@ -330,6 +329,24 @@
       ],
       "status": "planned",
       "scope": "Compose shared modules, templates, roles, navigation and tenant defaults into client-ready solution packs."
+    },
+    {
+      "id": "notifications",
+      "name": "Transactional email, SMS and delivery outbox",
+      "sourcePath": [
+        "packages/notifications"
+      ],
+      "status": "partial",
+      "scope": "Email/SMS provider interface and encrypted PostgreSQL outbox exist; worker and auth callback integration remain."
+    },
+    {
+      "id": "audit",
+      "name": "Append-only security and business audit trail",
+      "sourcePath": [
+        "packages/audit"
+      ],
+      "status": "planned",
+      "scope": "Tenant/platform actor, action, object, timestamp, correlation and redacted change metadata."
     }
   ],
   "capabilities": [
