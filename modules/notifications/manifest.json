@@ -1,0 +1,29 @@
+{
+  "id": "notifications",
+  "name": "Transactional email, SMS and delivery outbox",
+  "version": "0.1.0",
+  "owner": "platform",
+  "status": "partial",
+  "entrypoints": {
+    "domain": "packages/notifications",
+    "worker": "packages/notifications/src/worker.ts"
+  },
+  "tenantModel": "mixed",
+  "permissions": [],
+  "dependencies": [
+    "platform-identity"
+  ],
+  "operations": {
+    "logs": true,
+    "metrics": false,
+    "retention": "Encrypted message payloads remain only as long as queue operations require; define sent/dead row retention and secure deletion before production.",
+    "recovery": "Restore PostgreSQL outbox and the matching AES-256-GCM key; reclaim expired worker leases and inspect dead letters before requeue.",
+    "enableDisable": "Disable delivery only via an operations change; retain durable enqueue or fail authentication email callbacks rather than dropping messages."
+  },
+  "tests": [
+    "packages/notifications/src/outbox.integration.test.ts"
+  ],
+  "docs": [
+    "docs/operations/notification-outbox.md"
+  ]
+}
