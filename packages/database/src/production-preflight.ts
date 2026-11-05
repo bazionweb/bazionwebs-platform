@@ -160,8 +160,9 @@ function checkStaticProductionConfig(): Record<string, URL | null> {
 }
 
 async function verifyDatabase(urls: Record<string, URL | null>): Promise<void> {
-  if (problems.length > 0) {
-    warn("Database checks are skipped until the static environment blockers above are corrected.");
+  const connectionNames = Object.keys(urls);
+  if (connectionNames.some((name) => !urls[name] || !requiredValues[name])) {
+    warn("Database checks are skipped until all required PostgreSQL connection URLs are present and valid.");
     return;
   }
 
@@ -246,7 +247,7 @@ async function verifyDatabase(urls: Record<string, URL | null>): Promise<void> {
     }
 
     const privilegeResult = await migrationPool.query<{
-      enqueuer_insert_id: boolean;
+      enqueuer_insert_tenant: boolean;
       enqueuer_select_id: boolean;
       enqueuer_select_hash: boolean;
       enqueuer_select_ciphertext: boolean;
@@ -260,13 +261,14 @@ async function verifyDatabase(urls: Record<string, URL | null>): Promise<void> {
       provisioner_insert: boolean;
       provisioner_update: boolean;
       app_outbox_select: boolean;
+      app_outbox_insert: boolean;
       app_audit_insert: boolean;
       app_audit_select: boolean;
       app_audit_update: boolean;
       app_audit_delete: boolean;
     }>(
       `SELECT
-         has_column_privilege('bazion_notification_enqueuer', 'public.notification_outbox', 'id', 'INSERT') AS enqueuer_insert_id,
+         has_column_privilege('bazion_notification_enqueuer', 'public.notification_outbox', 'tenant_id', 'INSERT') AS enqueuer_insert_tenant,
          has_column_privilege('bazion_notification_enqueuer', 'public.notification_outbox', 'id', 'SELECT') AS enqueuer_select_id,
          has_column_privilege('bazion_notification_enqueuer', 'public.notification_outbox', 'payload_hash', 'SELECT') AS enqueuer_select_hash,
          has_column_privilege('bazion_notification_enqueuer', 'public.notification_outbox', 'payload_ciphertext', 'SELECT') AS enqueuer_select_ciphertext,
@@ -280,6 +282,7 @@ async function verifyDatabase(urls: Record<string, URL | null>): Promise<void> {
          has_table_privilege('bazion_tenant_provisioner', 'public.notification_outbox', 'INSERT') AS provisioner_insert,
          has_table_privilege('bazion_tenant_provisioner', 'public.notification_outbox', 'UPDATE') AS provisioner_update,
          has_table_privilege('bazion_app', 'public.notification_outbox', 'SELECT') AS app_outbox_select,
+         has_table_privilege('bazion_app', 'public.notification_outbox', 'INSERT') AS app_outbox_insert,
          has_table_privilege('bazion_app', 'public.platform_audit_events', 'INSERT') AS app_audit_insert,
          has_table_privilege('bazion_app', 'public.platform_audit_events', 'SELECT') AS app_audit_select,
          has_table_privilege('bazion_app', 'public.platform_audit_events', 'UPDATE') AS app_audit_update,
@@ -289,7 +292,7 @@ async function verifyDatabase(urls: Record<string, URL | null>): Promise<void> {
     if (!grants) {
       fail("Could not inspect runtime database privileges.");
     } else {
-      if (!grants.enqueuer_insert_id || !grants.enqueuer_select_id || !grants.enqueuer_select_hash ||
+      if (!grants.enqueuer_insert_tenant || !grants.enqueuer_select_id || !grants.enqueuer_select_hash ||
           grants.enqueuer_select_ciphertext || grants.enqueuer_update || grants.enqueuer_delete) {
         fail("Notification enqueue role grants do not match the restricted INSERT/idempotency SELECT policy.");
       }
@@ -299,7 +302,7 @@ async function verifyDatabase(urls: Record<string, URL | null>): Promise<void> {
       if (grants.provisioner_select || grants.provisioner_insert || grants.provisioner_update) {
         fail("Tenant provisioner still has notification outbox access.");
       }
-      if (grants.app_outbox_select) fail("The general API role must not read notification outbox ciphertext.");
+      if (grants.app_outbox_select || grants.app_outbox_insert) fail("The general API role must not access the notification outbox directly; only the dedicated enqueuer may insert.");
       if (!grants.app_audit_insert || grants.app_audit_select || grants.app_audit_update || grants.app_audit_delete) {
         fail("Audit event grants must permit API INSERT only; SELECT/UPDATE/DELETE must remain denied.");
       }
@@ -362,9 +365,7 @@ async function verifyDatabase(urls: Record<string, URL | null>): Promise<void> {
 
 async function main(): Promise<void> {
   const urls = checkStaticProductionConfig();
-  if (problems.length === 0) {
-    await verifyDatabase(urls);
-  }
+  await verifyDatabase(urls);
 
   for (const warning of warnings) process.stdout.write(`WARN: ${warning}\n`);
   for (const problem of problems) process.stderr.write(`BLOCKER: ${problem}\n`);
