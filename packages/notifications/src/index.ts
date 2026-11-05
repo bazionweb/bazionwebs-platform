@@ -10,3 +10,5 @@ export interface NotificationProvider {
   sendEmail(message: NotificationMessage): Promise<{ providerMessageId: string }>;
   sendSms(message: NotificationMessage): Promise<{ providerMessageId: string }>;
 }
+
+export * from "./outbox.js";
