@@ -336,8 +336,8 @@
       "sourcePath": [
         "packages/audit"
       ],
-      "status": "planned",
-      "scope": "Tenant/platform actor, action, object, timestamp, correlation and redacted change metadata."
+      "status": "partial",
+      "scope": "Append-only actor/action/resource audit event contract and PostgreSQL writer are implemented; add permissioned audit reading, retention policy and wider application coverage."
     }
   ],
   "capabilities": [
