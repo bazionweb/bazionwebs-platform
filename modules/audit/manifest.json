@@ -1,0 +1,28 @@
+{
+  "id": "audit",
+  "name": "Append-only platform and tenant audit trail",
+  "version": "0.1.0",
+  "owner": "platform",
+  "status": "partial",
+  "entrypoints": {
+    "domain": "packages/audit"
+  },
+  "tenantModel": "mixed",
+  "permissions": [],
+  "dependencies": [
+    "platform-identity"
+  ],
+  "operations": {
+    "logs": true,
+    "metrics": false,
+    "retention": "Retention period and archive policy must be approved before production use; audit events avoid personal contact data and secrets.",
+    "recovery": "Restore audit rows from immutable/off-site backups; preserve append-only protections and verify sequence continuity.",
+    "enableDisable": "Keep audit recording enabled for privileged operations; do not disable without a documented security exception."
+  },
+  "tests": [
+    "packages/audit/src/index.test.ts"
+  ],
+  "docs": [
+    "docs/architecture/permissions-audit-and-module-manifests.md"
+  ]
+}
