@@ -136,10 +136,11 @@ export async function resolvePlatformMemberByUserId(userId: string): Promise<Pla
   return row ? { userId: row.user_id, email: row.email, role: row.role, status: row.status } : null;
 }
 
-async function beforeCreateOrganization({ organization: org, user }: {
-  organization: { slug: string; name: string };
-  user: { email: string; emailVerified: boolean };
-}): Promise<void> {
+async function beforeCreateOrganization({ organization: org, user }) {
+  const slug = org.slug?.trim();
+  const name = org.name?.trim();
+  if (!slug || !name) throw new Error("A client organization name and slug are required.");
+
   const platformMember = await resolvePlatformMemberByEmail(user.email);
   if (!canCreateClientOrganization(platformMember?.role, user.emailVerified)) {
     throw new Error("Only a verified Bazion platform administrator can create a client organization.");
@@ -148,19 +149,23 @@ async function beforeCreateOrganization({ organization: org, user }: {
   const result = await tenantProvisionerPool.query(
     `INSERT INTO public.tenants (slug, name, default_currency, status)
      VALUES ($1, $2, $3, 'provisioning')`,
-    [org.slug, org.name, process.env.DEFAULT_TENANT_CURRENCY ?? "KES"],
+    [slug, name, process.env.DEFAULT_TENANT_CURRENCY ?? "KES"],
   );
   if (result.rowCount !== 1) throw new Error("Could not reserve the client tenant slug.");
 }
 
-async function afterCreateOrganization({ organization: org }: {
-  organization: { id: string; slug: string; name: string };
-}): Promise<void> {
+async function afterCreateOrganization({ organization: org }) {
+  const organizationId = org.id;
+  const slug = org.slug?.trim();
+  const name = org.name?.trim();
+  if (!organizationId || !slug || !name) {
+    throw new Error("Organization was created without the required Bazion tenant mapping fields.");
+  }
   const result = await tenantProvisionerPool.query(
     `UPDATE public.tenants
         SET auth_organization_id = $1, name = $2, status = 'active'
       WHERE slug = $3 AND status = 'provisioning'`,
-    [org.id, org.name, org.slug],
+    [organizationId, name, slug],
   );
   if (result.rowCount !== 1) {
     throw new Error("Organization was created but its Bazion tenant mapping needs reconciliation.");
@@ -222,16 +227,13 @@ export const auth = betterAuth({
       disableOrganizationDeletion: true,
       organizationHooks: {
         beforeCreateOrganization,
-        beforeCreateInvitation: async ({ invitation, inviter }: {
-          invitation: { role: string };
-          inviter: { user: { id: string } };
-        }) => {
-          const platformMember = await resolvePlatformMemberByUserId(inviter.user.id);
+        beforeCreateInvitation: async ({ invitation, inviter }) => {
+          const platformMember = await resolvePlatformMemberByUserId(inviter.id);
           if (!canGrantClientOwner(platformMember?.role, invitation.role)) {
             throw new Error("Only a Bazion platform administrator can invite a new client owner.");
           }
         },
-        beforeUpdateMemberRole: async ({ newRole, user }: { newRole: string; user: { id: string } }) => {
+        beforeUpdateMemberRole: async ({ newRole, user }) => {
           const platformMember = await resolvePlatformMemberByUserId(user.id);
           if (!canGrantClientOwner(platformMember?.role, newRole)) {
             throw new Error("Only an authorized Bazion platform administrator can assign the client owner role.");
