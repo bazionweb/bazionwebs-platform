@@ -1,11 +1,65 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
+import { PostgresAuditEventWriter, type AuditEvent } from "@bazion/audit";
 import { fromNodeHeaders } from "better-auth/node";
 import { count, eq } from "drizzle-orm";
 import { requireActiveTenantPermission, requirePlatformRole, type ActiveTenantContext } from "@bazion/auth";
 import { auth, reconcileProvisioningTenants } from "@bazion/auth/server";
 import { orders, products } from "@bazion/database";
 import { invitationInputSchema, memberListQuerySchema, memberRoleInputSchema, provisioningReconciliationInputSchema } from "./policy.js";
-import { withTenantTransaction } from "../../lib/database.js";
+import { pool, withTenantTransaction } from "../../lib/database.js";
+
+const auditWriter = new PostgresAuditEventWriter(pool);
+
+async function withAudit<T>(
+  request: FastifyRequest,
+  event: Omit<AuditEvent, "action" | "outcome"> & { action: string },
+  operation: () => Promise<T>,
+): Promise<T> {
+  // Fail closed before the protected operation if the audit store cannot accept
+  // the intent record. Never place contact details, credentials or one-time URLs
+  // in audit metadata.
+  await auditWriter.append({ ...event, action: `${event.action}.requested`, outcome: "succeeded" });
+  try {
+    const result = await operation();
+    try {
+      await auditWriter.append({ ...event, action: `${event.action}.completed`, outcome: "succeeded" });
+    } catch (auditError) {
+      request.log.error({
+        auditAction: event.action,
+        errorType: auditError instanceof Error ? auditError.name : "UnknownError",
+      }, "Audit completion event could not be persisted");
+    }
+    return result;
+  } catch (error) {
+    try {
+      await auditWriter.append({ ...event, action: `${event.action}.failed`, outcome: "failed" });
+    } catch (auditError) {
+      request.log.error({
+        auditAction: event.action,
+        errorType: auditError instanceof Error ? auditError.name : "UnknownError",
+      }, "Audit failure event could not be persisted");
+    }
+    throw error;
+  }
+}
+
+function userAuditEvent(
+  request: FastifyRequest,
+  actor: { userId: string; role: string },
+  resourceType: string,
+  resourceId?: string | null,
+  metadata?: Record<string, string | number | boolean | null>,
+) {
+  return {
+    actorType: "user" as const,
+    actorId: actor.userId,
+    actorRole: actor.role,
+    resourceType,
+    ...(resourceId === undefined ? {} : { resourceId }),
+    requestId: request.id,
+    ...(metadata ? { metadata } : {}),
+  };
+}
 
 function authHeaders(request: FastifyRequest) {
   return fromNodeHeaders(request.headers);
@@ -26,7 +80,15 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
       return reply.code(400).send({ error: "INVALID_INPUT", details: parsed.error.flatten() });
     }
     const operator = await requirePlatformRole(request.headers, ["platform_owner", "platform_admin"]);
-    const result = await reconcileProvisioningTenants(parsed.data);
+    const result = await withAudit(
+      request,
+      {
+        ...userAuditEvent(request, operator, "tenant_registry", null, parsed.data),
+        action: "tenant.provisioning.reconciliation",
+        tenantId: null,
+      },
+      () => reconcileProvisioningTenants(parsed.data),
+    );
     request.log.info({
       actorUserId: operator.userId,
       scanned: result.scanned,
@@ -105,14 +167,22 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
       return reply.code(400).send({ error: "INVALID_INPUT", details: parsed.error.flatten() });
     }
     const context = await requirePermission(request, { invitation: ["create"] });
-    const invitation = await auth.api.createInvitation({
-      body: {
-        email: parsed.data.email,
-        role: parsed.data.role,
-        organizationId: context.organizationId,
+    const invitation = await withAudit(
+      request,
+      {
+        ...userAuditEvent(request, { userId: context.userId, role: context.roles.join(",") }, "invitation", null, { role: parsed.data.role }),
+        action: "tenant.invitation.created",
+        tenantId: context.tenantId,
       },
-      headers: authHeaders(request),
-    });
+      () => auth.api.createInvitation({
+        body: {
+          email: parsed.data.email,
+          role: parsed.data.role,
+          organizationId: context.organizationId,
+        },
+        headers: authHeaders(request),
+      }),
+    );
     return reply.code(201).send(invitation);
   });
 
@@ -122,10 +192,18 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
       return reply.code(400).send({ error: "INVALID_INPUT" });
     }
     const context = await requirePermission(request, { invitation: ["cancel"] });
-    const result = await auth.api.cancelInvitation({
-      body: { invitationId },
-      headers: authHeaders(request),
-    });
+    const result = await withAudit(
+      request,
+      {
+        ...userAuditEvent(request, { userId: context.userId, role: context.roles.join(",") }, "invitation", invitationId),
+        action: "tenant.invitation.cancelled",
+        tenantId: context.tenantId,
+      },
+      () => auth.api.cancelInvitation({
+        body: { invitationId },
+        headers: authHeaders(request),
+      }),
+    );
     return reply.send(result);
   });
 
@@ -139,14 +217,22 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
       });
     }
     const context = await requirePermission(request, { member: ["update"] });
-    const result = await auth.api.updateMemberRole({
-      body: {
-        memberId,
-        role: parsed.data.role,
-        organizationId: context.organizationId,
+    const result = await withAudit(
+      request,
+      {
+        ...userAuditEvent(request, { userId: context.userId, role: context.roles.join(",") }, "member", memberId, { assignedRole: parsed.data.role }),
+        action: "tenant.member.role.updated",
+        tenantId: context.tenantId,
       },
-      headers: authHeaders(request),
-    });
+      () => auth.api.updateMemberRole({
+        body: {
+          memberId,
+          role: parsed.data.role,
+          organizationId: context.organizationId,
+        },
+        headers: authHeaders(request),
+      }),
+    );
     return reply.send(result);
   });
 
@@ -156,13 +242,21 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
       return reply.code(400).send({ error: "INVALID_INPUT" });
     }
     const context = await requirePermission(request, { member: ["delete"] });
-    const result = await auth.api.removeMember({
-      body: {
-        memberIdOrEmail: userId,
-        organizationId: context.organizationId,
+    const result = await withAudit(
+      request,
+      {
+        ...userAuditEvent(request, { userId: context.userId, role: context.roles.join(",") }, "member", userId),
+        action: "tenant.member.removed",
+        tenantId: context.tenantId,
       },
-      headers: authHeaders(request),
-    });
+      () => auth.api.removeMember({
+        body: {
+          memberIdOrEmail: userId,
+          organizationId: context.organizationId,
+        },
+        headers: authHeaders(request),
+      }),
+    );
     return reply.send(result);
   });
 }
