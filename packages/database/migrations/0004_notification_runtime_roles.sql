@@ -16,3 +16,6 @@ GRANT SELECT (id, payload_hash, idempotency_key)
 
 -- Only the worker can inspect ciphertext or change delivery state.
 GRANT SELECT, UPDATE ON TABLE public.notification_outbox TO bazion_notification_worker;
+
+COMMENT ON TABLE public.notification_outbox IS
+  'Encrypted platform delivery queue. Runtime access is split between the enqueue-only and delivery-worker roles.';
