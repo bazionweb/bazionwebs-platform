@@ -18,6 +18,10 @@
   },
   "devDependencies": {
     "typescript": "^5.9.3",
-    "vitest": "^5.1.0"
+    "vitest": "^5.1.0",
+    "@types/pg": "^8.15.5"
+  },
+  "dependencies": {
+    "pg": "^8.23.1"
   }
 }
