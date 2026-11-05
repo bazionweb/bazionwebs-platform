@@ -1,0 +1,28 @@
+{
+  "id": "contacts-crm",
+  "name": "Contacts and customer directory",
+  "version": "1.0.0",
+  "owner": "contacts",
+  "status": "planned",
+  "entrypoints": {},
+  "tenantModel": "tenant-owned",
+  "permissions": [
+    {
+      "resource": "customer",
+      "actions": [
+        "read",
+        "update"
+      ]
+    }
+  ],
+  "dependencies": [
+    "platform-identity"
+  ],
+  "operations": {
+    "logs": false,
+    "metrics": false,
+    "retention": "Define tenant-level retention, consent and deletion policy before release.",
+    "recovery": "Restore tenant data from verified backups and validate tenant relationship constraints.",
+    "enableDisable": "Planned; do not enable until API, consent controls and tenant isolation tests exist."
+  }
+}
