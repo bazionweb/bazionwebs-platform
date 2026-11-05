@@ -1,5 +1,5 @@
 export interface NotificationMessage {
-  tenantId: string;
+  tenantId: string | null;
   to: string;
   subject: string;
   template: string;
