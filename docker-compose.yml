@@ -15,7 +15,7 @@ services:
       BAZION_NOTIFICATION_ENQUEUER_PASSWORD: ${BAZION_NOTIFICATION_ENQUEUER_PASSWORD:-bazion_notification_enqueuer_local_only}
       BAZION_NOTIFICATION_WORKER_PASSWORD: ${BAZION_NOTIFICATION_WORKER_PASSWORD:-bazion_notification_worker_local_only}
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - bazion_pgdata:/var/lib/postgresql
       - ./packages/database/init:/docker-entrypoint-initdb.d:ro
