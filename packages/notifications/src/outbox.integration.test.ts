@@ -5,7 +5,7 @@ import { createOutboxPayloadCodec, PostgresNotificationOutbox } from "./outbox.j
 
 const enqueuerUrl = process.env.NOTIFICATION_ENQUEUER_DATABASE_URL;
 const workerUrl = process.env.NOTIFICATION_WORKER_DATABASE_URL;
-const integrationEnabled = Boolean(enqueuerUrl && workerUrl);
+const integrationEnabled = Boolean(enqueuerUrl && workerUrl && process.env.NOTIFICATION_ENCRYPTION_KEY);
 
 describe.skipIf(!integrationEnabled)("Postgres notification outbox roles and recovery", () => {
   let enqueuerPool: Pool | undefined;
@@ -47,7 +47,7 @@ describe.skipIf(!integrationEnabled)("Postgres notification outbox roles and rec
       variables: { intro: "This is a test.", url: "https://example.test/one-time-link" },
     };
     const firstId = await enqueuer!.enqueue({ idempotencyKey, channel: "email", payload });
-    const duplicateId = await enqueuer.enqueue({ idempotencyKey, channel: "email", payload });
+    const duplicateId = await enqueuer!.enqueue({ idempotencyKey, channel: "email", payload });
     expect(duplicateId).toBe(firstId);
 
     await expect(enqueuer.enqueue({
@@ -71,7 +71,7 @@ describe.skipIf(!integrationEnabled)("Postgres notification outbox roles and rec
       },
     });
 
-    const [left, right] = await Promise.all([worker.claimBatch(100), worker.claimBatch(100)]);
+    const [left, right] = await Promise.all([worker!.claimBatch(100), worker.claimBatch(100)]);
     const matching = [...left, ...right].filter((delivery) => delivery.id === id);
     expect(matching).toHaveLength(1);
     expect(matching[0]?.attempts).toBe(1);
@@ -91,6 +91,6 @@ describe.skipIf(!integrationEnabled)("Postgres notification outbox roles and rec
     expect(recovered?.attempts).toBe(2);
     expect(recovered?.payload.to).toBe("worker-recovery@example.test");
     expect(await worker!.markSent(id)).toBe(true);
-    expect(await worker.markSent(id)).toBe(false);
+    expect(await worker!.markSent(id)).toBe(false);
   });
 });
