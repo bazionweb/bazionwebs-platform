@@ -1,0 +1,56 @@
+{
+  "id": "commerce",
+  "name": "Commerce authorization surface",
+  "version": "1.0.0",
+  "owner": "commerce",
+  "status": "partial",
+  "entrypoints": {
+    "domain": "packages/commerce-domain",
+    "api": "apps/api/src/modules/commerce"
+  },
+  "tenantModel": "tenant-owned",
+  "permissions": [
+    {
+      "resource": "product",
+      "actions": [
+        "read",
+        "create",
+        "update",
+        "delete"
+      ]
+    },
+    {
+      "resource": "order",
+      "actions": [
+        "read",
+        "update",
+        "refund"
+      ]
+    }
+  ],
+  "dependencies": [
+    "platform-identity"
+  ],
+  "operations": {
+    "logs": true,
+    "metrics": true,
+    "retention": "Business record retention is tenant-configurable and subject to applicable accounting requirements.",
+    "recovery": "Restore tenant-scoped database backups and verify foreign-key/RLS constraints before reopening commerce operations.",
+    "enableDisable": "Disable checkout before disabling commerce routes; retain export and data-retention controls."
+  },
+  "events": [
+    "commerce.order.created",
+    "commerce.order.paid"
+  ],
+  "jobs": [],
+  "providers": [
+    "Mock payment provider"
+  ],
+  "tests": [
+    "apps/api/src/modules/commerce",
+    "packages/commerce-domain"
+  ],
+  "docs": [
+    "docs/product-architecture.md"
+  ]
+}
