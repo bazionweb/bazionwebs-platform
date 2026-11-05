@@ -36,8 +36,13 @@ function parseUrl(name: string, expectedUser: string): URL | null {
     if (decodeURIComponent(url.username) !== expectedUser) {
       fail(`${name} must connect as ${expectedUser}; received a different role name.`);
     }
-    if (!url.hostname || ["localhost", "127.0.0.1", "::1"].includes(url.hostname.toLowerCase())) {
-      fail(`${name} points to a loopback database host; configure the production database endpoint.`);
+    const hostname = url.hostname.toLowerCase().replace(/^\\[|\\]$/g, "");
+    const isLoopback = ["localhost", "127.0.0.1", "::1"].includes(hostname);
+    const sslMode = (url.searchParams.get("sslmode") ?? "").toLowerCase();
+    const sslEnabled = url.searchParams.get("ssl") === "true" ||
+      ["require", "verify-ca", "verify-full"].includes(sslMode);
+    if (!isLoopback && !sslEnabled) {
+      fail(`${name} uses a remote database endpoint without an explicit TLS mode; configure sslmode=require or stronger verification.`);
     }
     if (!url.password || /local_only|change-me|replace-with|password123/i.test(decodeURIComponent(url.password))) {
       fail(`${name} has an empty or development-looking database password.`);
