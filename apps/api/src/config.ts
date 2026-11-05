@@ -63,6 +63,15 @@ export function loadConfig() {
       }
     }
   }
+  if (config.NODE_ENV === "production") {
+    const configuredOrigins = [
+      ...config.CORS_ORIGINS.split(",").map((origin) => origin.trim()).filter(Boolean),
+      ...config.BETTER_AUTH_TRUSTED_ORIGINS.split(",").map((origin) => origin.trim()).filter(Boolean),
+    ];
+    if (configuredOrigins.some((origin) => !origin.startsWith("https://"))) {
+      throw new Error("Production startup blocked: every CORS and Better Auth trusted origin must use HTTPS.");
+    }
+  }
 
   return {
     ...config,
