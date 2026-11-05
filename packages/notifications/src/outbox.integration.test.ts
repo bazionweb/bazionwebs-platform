@@ -50,7 +50,7 @@ describe.skipIf(!integrationEnabled)("Postgres notification outbox roles and rec
     const duplicateId = await enqueuer!.enqueue({ idempotencyKey, channel: "email", payload });
     expect(duplicateId).toBe(firstId);
 
-    await expect(enqueuer.enqueue({
+    await expect(enqueuer!.enqueue({
       idempotencyKey,
       channel: "email",
       payload: { ...payload, to: "different@example.test" },
@@ -71,7 +71,7 @@ describe.skipIf(!integrationEnabled)("Postgres notification outbox roles and rec
       },
     });
 
-    const [left, right] = await Promise.all([worker!.claimBatch(100), worker.claimBatch(100)]);
+    const [left, right] = await Promise.all([worker!.claimBatch(100), worker!.claimBatch(100)]);
     const matching = [...left, ...right].filter((delivery) => delivery.id === id);
     expect(matching).toHaveLength(1);
     expect(matching[0]?.attempts).toBe(1);
