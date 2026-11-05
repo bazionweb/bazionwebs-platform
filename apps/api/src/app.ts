@@ -7,6 +7,7 @@ import { auth, isVerifiedTenantHost } from "@bazion/auth/server";
 import type { AppConfig } from "./config.js";
 import { commerceRoutes } from "./modules/commerce/routes.js";
 import { authRoutes } from "./modules/auth/routes.js";
+import { adminRoutes } from "./modules/admin/routes.js";
 
 export async function buildApp(config: AppConfig) {
   const app = Fastify({
@@ -87,6 +88,7 @@ export async function buildApp(config: AppConfig) {
 
   app.get("/health", async () => ({ status: "ok", service: "bazion-api", environment: config.NODE_ENV }));
   await app.register(authRoutes, { prefix: "/v1" });
+  await app.register(adminRoutes, { prefix: "/v1" });
   await app.register(commerceRoutes, { prefix: "/v1", config });
 
   app.setErrorHandler((error, request, reply) => {

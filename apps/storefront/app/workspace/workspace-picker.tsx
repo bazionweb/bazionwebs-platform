@@ -101,6 +101,9 @@ export function WorkspacePicker() {
       )}
 
       {message && <p className="notice" role="status">{message}</p>}
+      {activeOrganization.data && (
+        <a className="workspace-admin-link" href="/admin">Open client administration →</a>
+      )}
       {identity?.tenant && (
         <div className="workspace-context">
           <p className="eyebrow">VERIFIED TENANT CONTEXT</p>
