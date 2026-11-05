@@ -1,0 +1,80 @@
+{
+  "version": "1.0.0",
+  "status": "planned",
+  "id": "sme-website",
+  "name": "SME and Business Website",
+  "description": "Reusable company website composed from the common content, design, lead-capture and discovery modules.",
+  "requiredModules": [
+    "website-content",
+    "page-experience",
+    "design-system",
+    "forms-leads",
+    "media-storage",
+    "domains-email",
+    "search-seo-localization"
+  ],
+  "optionalModules": [
+    "contacts-crm",
+    "marketing-communications",
+    "analytics",
+    "document-management",
+    "integration-hub"
+  ],
+  "defaultRoles": [
+    {
+      "id": "site-admin",
+      "label": "Site administrator",
+      "permissions": [
+        "content.*",
+        "forms.*",
+        "media.*",
+        "seo.*",
+        "settings.*"
+      ]
+    },
+    {
+      "id": "editor",
+      "label": "Content editor",
+      "permissions": [
+        "content.read",
+        "content.create",
+        "content.update",
+        "media.read"
+      ]
+    }
+  ],
+  "navigation": [
+    {
+      "id": "overview",
+      "label": "Overview",
+      "module": "analytics",
+      "path": "/admin"
+    },
+    {
+      "id": "pages",
+      "label": "Pages",
+      "module": "website-content",
+      "path": "/admin/content/pages"
+    },
+    {
+      "id": "forms",
+      "label": "Enquiries",
+      "module": "forms-leads",
+      "path": "/admin/forms"
+    }
+  ],
+  "defaults": {
+    "locale": "en-KE",
+    "timezone": "Africa/Nairobi",
+    "currency": "KES",
+    "features": [
+      "responsive-pages",
+      "contact-form",
+      "basic-seo"
+    ]
+  },
+  "templateIds": [
+    "corporate-modern",
+    "professional-services"
+  ]
+}
