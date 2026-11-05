@@ -4,7 +4,7 @@ This directory is the commercial-to-engineering map for the capabilities adverti
 
 ## Source-of-truth files
 
-- `catalog.json`: 111 advertised capabilities mapped to 37 reusable domain/platform modules.
+- `catalog.json`: 111 advertised capabilities mapped to 36 reusable domain/platform modules.
 - `commercial-offerings.json`: 35 website/ecommerce/custom-system/hosting/care packages, add-ons and rate-card items mapped to those modules.
 - `module-manifest.schema.json`: required structure for a reusable module manifest.
 - `solution-manifest.schema.json`: required structure for a client solution pack.
