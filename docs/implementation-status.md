@@ -1,68 +1,53 @@
-# Implementation status
+# Bazion Web implementation status
 
-## Included in this starter
+Reviewed 5 November 2026 against the current main branch after PR #7 was merged.
 
-- TypeScript pnpm/Turborepo workspace and a shared package layout.
-- Platform contracts for tenant and principal context.
-- Basic ports/interfaces for auth, payment providers, storage, notifications, booking and analytics.
-- Shared UI button and client configuration example.
-- PostgreSQL schema and initial migration for tenants, products, carts, orders, item snapshots, stock reservations, payment attempts, webhook events and idempotency.
-- Explicit local PostgreSQL admin, migration and application roles; tenant-table RLS policies; restricted application table grants.
-- Fastify routes for product listing, guest cart creation, cart read/update/delete, order checkout and a non-production mock-payment action.
-- Next.js demo storefront with product catalogue, interactive cart, checkout form and a development-only payment simulation page.
-- Architecture, security, onboarding, deployment, research-source, GitHub setup and ADR documentation.
-- Initial CI and Dependabot configuration.
+## Implemented foundations
 
-## Verified in the build environment
+- pnpm/Turborepo monorepo with frozen lockfile and GitHub Actions CI.
+- Better Auth 1.7.17 email/password authentication, sessions, email verification and password reset flows.
+- Organization membership, invitations, tenant roles and separately stored platform roles.
+- Tenant registry and mapping from verified Better Auth organization IDs to Bazion tenant IDs.
+- Trusted server-side tenant context and verified custom-host lookup.
+- PostgreSQL forced RLS, tenant-aware foreign keys, least-privilege roles and integration tests for tenant isolation.
+- Client workspace administration in the storefront: tenant-scoped metrics, member listing, invitations, role updates and removal.
+- Commerce starter: product listing, guest cart, cart items, checkout order creation and development-only mock payments.
+- Notification provider interface plus encrypted PostgreSQL outbox foundation merged in PR #7.
+- Basic ports/interfaces for payments, storage, booking and analytics.
 
-- 30 JSON files parsed successfully.
-- 28 TypeScript/TSX files parsed without syntax errors.
-- PostgreSQL role-init shell script passed `bash -n`.
-- `@bazion/commerce-domain` compiled with the installed TypeScript compiler and passed a Node smoke test for money totals and empty-cart rejection.
+## Partial modules
 
-## Not verified in this environment
+| Module | Existing foundation | Still required |
+|---|---|---|
+| Auth and tenant platform | Better Auth, organizations, memberships, tenant registry, roles and RLS | Platform-owner dashboard, permission registry, audit log, service identities and full tenant lifecycle |
+| Client provisioning | Tenant reservation and organization mapping hooks | Reconciliation PR #8 is open for review; onboarding/configuration and custom-domain proof workflow remain |
+| Notifications | Provider interface and encrypted outbox with idempotency, leases, retry and dead-letter handling | Auth callback integration, supervised worker, provider adapters, separate enqueue/worker roles and database-backed end-to-end tests |
+| Commerce | Product/cart/order foundation and mock payment flow | Product editor/variants, inventory ledger, real payments/webhooks, taxes, shipping, promotions, returns/refunds and customer portal |
+| Payments | Provider contract and mock implementation | Real Safaricom Daraja, card and optional PayPal/Paystack adapters; signature verification, reconciliation and refunds |
+| Storage | Provider-neutral storage interface and tenant object-key helper | R2/S3 adapter, media metadata, signed uploads, validation, transformations and retention |
+| Booking | Basic type and booking-window validation | Availability, resources, time zones, conflict prevention, recurring rules, reminders and cancellation |
+| Analytics | Event/sink contract | Privacy controls, event ingestion, dashboards, conversion reporting, exports and retention |
+| UI | Shared Button component | Design tokens, complete component system, forms, tables, navigation, admin shell and tenant theming |
 
-The execution environment did not have the repository's npm dependencies installed, PostgreSQL/`psql`, Docker or network access to download dependencies. Therefore a full workspace typecheck/build, Vitest run, SQL migration execution, RLS integration test and browser end-to-end test were not performed. The repository must pass those checks after dependency installation and database startup on the developer machine or CI.
+## Not yet implemented
 
-## Not production-ready yet
+- Platform-owner admin application and complete tenant control plane.
+- Tenant module registry, dependencies, per-tenant entitlements, quotas and feature flags.
+- DNS ownership challenge, full TLS/custom-domain lifecycle and domain settings UI.
+- CMS, page builder, block library, versioned templates and visual editor.
+- Forms/lead management, contacts/CRM, newsletter campaigns and customer support desk.
+- Document vault/generation, search, SEO automation and localization.
+- Complete school, church, clinic, NGO, professional-services and ERP solution packs.
+- Production hosting/deployment provisioning, backup orchestration, restore drills and operational monitoring.
+- Commercial quote/project delivery workflows and platform subscription billing.
+- Permission-checked MCP/AI integration.
 
-- Static tenant selection remains in place for the demo; add a trusted host/domain and/or identity-claim tenant resolver.
-- No real authentication provider or admin authorization implementation is configured.
-- Mock payments only. No real Safaricom Daraja or Stripe adapter, signature verification, webhook inbox/retry worker or reconciliation is implemented.
-- Payment failure, cancellation, refund and expired-reservation state transitions need implementation and tests.
-- Shipping quotes, taxes, promotions/discounts, product variants and currency metadata are deferred.
-- Product/order admin UI and customer accounts are deferred.
-- The initial `pnpm-lock.yaml` has not been generated; create it on the first successful install and switch CI to frozen installs.
-- No remote GitHub repository has been created or pushed from this environment.
+## CI verification
 
-Do not use the mock payment route or static tenant resolution for real customers or real money. The production startup guards are intentional.
+- The merged notification outbox PR #7 passed frozen install, PostgreSQL role setup, migrations, typecheck, unit/authentication/tenant-isolation tests and build.
+- Tenant reconciliation PR #8 has also passed its PR validation run, but remains unmerged as of this review.
+- The CI concurrency/read-only improvement is proposed in the product roadmap PR. Earlier cancelled push runs were caused by the workflow cancel-in-progress setting during rapid commits, not by failing test assertions.
 
+## Production release rule
 
-## Authentication and tenant implementation branch
-
-The `feature/bazion-auth-tenant-rbac` branch introduces the first runtime authentication slice:
-- Better Auth 1.7.17 (MIT) with email/password, email verification, reset-password and organization membership.
-- Self-hosted PostgreSQL auth schema using a separate DML-only auth runtime role.
-- Tenant registry mapping from Better Auth organization IDs to Bazion tenant UUIDs.
-- Platform-member registry so only Bazion platform owners/admins can provision client organizations.
-- Organization-scoped roles and server-side permission helpers.
-- Verified-domain resolver for public storefront requests; static tenant ID remains development-only.
-- Fastify Better Auth handler and `GET /v1/auth/me`.
-- Next.js login/signup starter page and same-origin auth rewrite.
-- Additional role/registry SQL migration and a one-time platform-owner bootstrap procedure.
-
-## Validation caveat
-
-The GitHub editing environment cannot run this repository's dependency installation, Docker, PostgreSQL, SMTP or browser tests. The branch must pass workspace installation, typecheck/build, both database migrations, authentication integration tests and cross-tenant isolation tests before production use. No lockfile is generated by this remote GitHub edit.
-
-- Login/signup screen, same-origin auth proxy, and invitation acceptance page.
-- Platform operators are created through a reviewed SQL bootstrap, not public self-service.
-- Organization creator starts as tenant admin; assigning tenant owner is guarded by a server hook.
-- Better Auth CLI currently lags the 1.7.17 core release at npm 1.7.10. The auth migration script refuses mismatched versions. Do not mark this package ready until the matching CLI is published and the auth schema migration has run.
-
-## Validation still required
-
-No npm install, pnpm lockfile generation, TypeScript typecheck, unit test execution, Docker startup, PostgreSQL migration, login/verification SMTP test, browser test, or cross-tenant RLS integration test was executed by the GitHub editing session. These are required before merging and before using this for client data.
-
-- Added Next.js 16 `proxy.ts` to overwrite forwarded-host/proto headers from the original request URL before Fastify rewrites; Fastify only trusts explicitly configured proxy IP/CIDRs.
-- Authentication SMTP callbacks are non-blocking. A transactional outbox/retry worker is still required before production onboarding depends on email delivery.
+A module is not production-ready because its types or interface exist. Require implementation, API/UI as appropriate, tenant/RLS proof, permission tests, operational monitoring, retention/recovery, provider failure handling and documentation. Never use the development mock payment route or development credentials for live customers.
