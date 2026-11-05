@@ -20,15 +20,14 @@ describe("central permission registry adapter", () => {
 
   it("keeps every role grant aligned with the central registry", () => {
     for (const role of permissionRegistry.roles) {
-      const expected = Object.fromEntries(
-        Object.entries(
-          Object.groupBy(permissionRegistry.permissions.filter((permission) => permission.roles.includes(role)),
-            (permission) => permission.resource),
-        ).map(([resource, permissions]) => [
-          resource!,
-          permissions!.map((permission) => permission.action).sort(),
-        ]),
-      );
+      const expected: Record<string, string[]> = {};
+      for (const permission of permissionRegistry.permissions) {
+        if (!permission.roles.includes(role)) continue;
+        expected[permission.resource] ??= [];
+        expected[permission.resource]!.push(permission.action);
+      }
+      for (const actions of Object.values(expected)) actions.sort();
+
       const actual = Object.fromEntries(
         Object.entries(rolePermissionMap[role as keyof typeof rolePermissionMap])
           .map(([resource, actions]) => [resource, [...actions].sort()]),
