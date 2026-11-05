@@ -28,11 +28,12 @@ Required worker settings:
 
 - `NOTIFICATION_WORKER_DATABASE_URL`: connects as `bazion_notification_worker`.
 - `NOTIFICATION_ENCRYPTION_KEY`: Base64 encoding of the same 32-byte key used by the API enqueuer.
-- `NOTIFICATION_SMTP_HOST`, `NOTIFICATION_SMTP_PORT`, `NOTIFICATION_SMTP_SECURE`.
+- `NOTIFICATION_SMTP_HOST`, `NOTIFICATION_SMTP_PORT`, `NOTIFICATION_SMTP_SECURE`, `NOTIFICATION_SMTP_REQUIRE_TLS`.
 - `NOTIFICATION_EMAIL_FROM`: verified sender address.
-- Optional `NOTIFICATION_SMTP_USER` and `NOTIFICATION_SMTP_PASSWORD`; configure both or neither.
+- `NOTIFICATION_SMTP_REQUIRE_AUTH` defaults to `true` in production. Configure both `NOTIFICATION_SMTP_USER` and `NOTIFICATION_SMTP_PASSWORD`; configure neither only for an approved trusted private relay with `NOTIFICATION_SMTP_REQUIRE_AUTH=false`.
+- Production SMTP uses implicit TLS or required STARTTLS with TLS 1.2 or newer; plaintext SMTP is rejected.
 
-The API additionally requires `NOTIFICATION_ENQUEUER_DATABASE_URL` and the same `NOTIFICATION_ENCRYPTION_KEY`. Never put the worker database URL or SMTP credentials in the browser bundle.
+The API additionally requires `NOTIFICATION_ENQUEUER_DATABASE_URL` and the same `NOTIFICATION_ENCRYPTION_KEY`. The local `.env.example` key is deliberately rejected by production API configuration and preflight. Never put the worker database URL or SMTP credentials in the browser bundle.
 
 ## Database access and rollout
 
@@ -90,6 +91,31 @@ The queue is **at-least-once**, not exactly-once. A worker can send a message an
 
 Authentication password-reset, verification and invitation callbacks now await durable enqueue. This is the transactional notification foundation, not a full messaging product: SMTP is the only active channel, there is no operator UI for dead letters, and queue-age/dead-letter alerting remains an operations deliverable.
 
+## Production preflight
+
+The repository now exposes one command that runs both the PostgreSQL/security checks and SMTP connectivity verification:
+
+```sh
+pnpm production:preflight
+```
+
+Run it in an environment where the production variables are exported. For Linux, a root-managed environment file can be loaded without printing the values:
+
+```sh
+set -a
+. /etc/bazionweb/production-preflight.env
+set +a
+pnpm production:preflight
+```
+
+Protect that environment file with mode `0600`. It must contain the production URLs for `DATABASE_URL`, `AUTH_DATABASE_URL`, `AUTH_MIGRATION_DATABASE_URL`, `MIGRATION_DATABASE_URL`, `TENANT_RESOLVER_DATABASE_URL`, `TENANT_PROVISIONER_DATABASE_URL`, `NOTIFICATION_ENQUEUER_DATABASE_URL` and `NOTIFICATION_WORKER_DATABASE_URL`, plus the HTTPS origins, Better Auth secret, notification encryption key, SMTP settings, proxy addresses and `NODE_ENV=production`. The command never prints credentials or encryption keys.
+
+The database preflight connects as each declared role, verifies that the two numbered migrations are applied, verifies role attributes, checks the precise outbox and audit grants, confirms the append-only audit trigger and confirms the Better Auth user/session tables exist. The SMTP preflight verifies the configured SMTP connection, credentials and TLS negotiation.
+
+**A green preflight is not a substitute for a test message or a worker-interruption recovery test.** Send a controlled test email and prove the five-minute lease recovery in staging before production.
+
+The preflight also intentionally reports a blocker for the current API: only the mock payment provider is implemented, and the API rejects mock payments in production. A real payment adapter and authenticated webhook/reconciliation tests must be merged before the full production API can pass its production gate. Do not weaken that safeguard or claim production sign-off while it is reported as a blocker.
+
 ## Production worker deployment (systemd example)
 
 The repository contains `deploy/systemd/bazion-notification-worker.service`. It assumes the code is deployed at `/opt/bazionwebs-platform`, with a Unix service account named `bazion`. Adjust these values to the host layout rather than weakening the service sandbox.
@@ -101,7 +127,7 @@ The repository contains `deploy/systemd/bazion-notification-worker.service`. It 
    pnpm --filter @bazion/notifications build
    ```
 
-2. Create `/etc/bazionweb/notification-worker.env` as root with mode `0600`. Set `NOTIFICATION_WORKER_DATABASE_URL`, `NOTIFICATION_ENCRYPTION_KEY`, `NOTIFICATION_SMTP_HOST`, `NOTIFICATION_SMTP_PORT`, `NOTIFICATION_SMTP_SECURE`, `NOTIFICATION_EMAIL_FROM`, and optionally both SMTP credential variables. The API deployment separately receives `NOTIFICATION_ENQUEUER_DATABASE_URL` and the identical encryption key. Never put these variables in a public frontend environment.
+2. Create `/etc/bazionweb/notification-worker.env` as root with mode `0600`. Include `NODE_ENV=production` and `NOTIFICATION_SMTP_REQUIRE_TLS=true`. Keep `NOTIFICATION_SMTP_REQUIRE_AUTH=true` (the default) and set both SMTP credential variables unless an approved private-relay exception is documented. Set `NOTIFICATION_WORKER_DATABASE_URL`, `NOTIFICATION_ENCRYPTION_KEY`, `NOTIFICATION_SMTP_HOST`, `NOTIFICATION_SMTP_PORT`, `NOTIFICATION_SMTP_SECURE`, `NOTIFICATION_EMAIL_FROM`, and optionally both SMTP credential variables. The API deployment separately receives `NOTIFICATION_ENQUEUER_DATABASE_URL` and the identical encryption key. Never put these variables in a public frontend environment.
 
 3. Install and activate the service:
 

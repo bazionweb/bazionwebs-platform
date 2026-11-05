@@ -18,7 +18,8 @@
     "db:auth:migrate": "dotenv -e .env -- pnpm --filter @bazion/auth migrate",
     "auth:check": "pnpm --filter @bazion/auth typecheck && pnpm --filter @bazion/auth test",
     "catalog:validate": "node scripts/validate-product-catalog.mjs && node scripts/validate-module-manifests.mjs",
-    "modules:validate": "node scripts/validate-module-manifests.mjs"
+    "modules:validate": "node scripts/validate-module-manifests.mjs",
+    "production:preflight": "node scripts/production-preflight.mjs"
   },
   "devDependencies": {
     "dotenv-cli": "^10.0.0",

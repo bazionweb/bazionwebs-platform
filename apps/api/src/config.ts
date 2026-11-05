@@ -36,15 +36,41 @@ export function loadConfig() {
   if (config.NODE_ENV === "production" && config.AUTH_REQUIRE_EMAIL_VERIFICATION !== "true") {
     throw new Error("Production startup blocked: require verified email accounts.");
   }
-  if (Buffer.from(config.NOTIFICATION_ENCRYPTION_KEY, "base64").byteLength !== 32) {
-    throw new Error("NOTIFICATION_ENCRYPTION_KEY must be a Base64-encoded 32-byte key.");
+  const notificationKey = Buffer.from(config.NOTIFICATION_ENCRYPTION_KEY, "base64");
+  const canonicalNotificationKey = notificationKey.toString("base64") === config.NOTIFICATION_ENCRYPTION_KEY;
+  const exampleNotificationKey = Buffer.from("0123456789abcdef0123456789abcdef", "utf8").toString("base64");
+  if (notificationKey.byteLength !== 32 || !canonicalNotificationKey) {
+    throw new Error("NOTIFICATION_ENCRYPTION_KEY must be a canonical Base64-encoded 32-byte key.");
+  }
+  if (config.NODE_ENV === "production" && config.NOTIFICATION_ENCRYPTION_KEY === exampleNotificationKey) {
+    throw new Error("Production startup blocked: replace the repository's development notification key with a fresh random key.");
   }
   const trustedProxyAddresses = config.TRUSTED_PROXY_ADDRESSES.split(",").map((value) => value.trim()).filter(Boolean);
   if (config.NODE_ENV === "production" && trustedProxyAddresses.length === 0) {
     throw new Error("Production startup blocked: configure the trusted ingress proxy IPs/CIDRs and block direct public access to the API.");
   }
-  if (config.NODE_ENV === "production" && config.BETTER_AUTH_SECRET.toLowerCase().includes("change-me")) {
-    throw new Error("Production startup blocked: replace the development Better Auth secret.");
+  if (config.NODE_ENV === "production" && /dev-only|ci-only|change-me|replace-with|local-dev/i.test(config.BETTER_AUTH_SECRET)) {
+    throw new Error("Production startup blocked: replace the development or example Better Auth secret.");
+  }
+  if (config.NODE_ENV === "production") {
+    for (const [name, value] of [
+      ["BETTER_AUTH_URL", config.BETTER_AUTH_URL],
+      ["AUTH_APP_URL", config.AUTH_APP_URL],
+      ["PUBLIC_STOREFRONT_URL", config.PUBLIC_STOREFRONT_URL],
+    ] as const) {
+      if (!value.startsWith("https://")) {
+        throw new Error(`Production startup blocked: ${name} must use HTTPS.`);
+      }
+    }
+  }
+  if (config.NODE_ENV === "production") {
+    const configuredOrigins = [
+      ...config.CORS_ORIGINS.split(",").map((origin) => origin.trim()).filter(Boolean),
+      ...config.BETTER_AUTH_TRUSTED_ORIGINS.split(",").map((origin) => origin.trim()).filter(Boolean),
+    ];
+    if (configuredOrigins.some((origin) => !origin.startsWith("https://"))) {
+      throw new Error("Production startup blocked: every CORS and Better Auth trusted origin must use HTTPS.");
+    }
   }
 
   return {

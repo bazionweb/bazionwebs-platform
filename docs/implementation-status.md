@@ -1,6 +1,6 @@
 # Bazion Web implementation status
 
-Reviewed 5 November 2026 against `main` after PRs #7–#11 were merged. Phase 0 repository foundations are implemented and CI-validated; deployment of the notification worker and production operational verification remain outstanding.
+Reviewed 6 November 2026 against `main` after PRs #7–#12 were merged. Phase 0 repository foundations are implemented and CI-validated; production infrastructure verification and the real payment adapter remain outstanding.
 
 ## Implemented foundations
 
@@ -14,6 +14,7 @@ Reviewed 5 November 2026 against `main` after PRs #7–#11 were merged. Phase 0 
 - Client workspace administration in the storefront: tenant-scoped metrics, member listing, invitations, role updates and removal.
 - Commerce starter: product listing, guest cart, cart items, checkout order creation and development-only mock payments.
 - Durable auth notifications: awaited Better Auth password-reset, verification and invitation enqueue; AES-256-GCM PostgreSQL outbox; separate enqueue/worker roles; standalone SMTP worker with lease recovery, retry/backoff and dead letters (PR #10).
+- Production preflight command validates PostgreSQL migration/role grants, audit protections, Better Auth schema, production environment values and SMTP TLS/authentication. Production API configuration rejects the example encryption key; local PostgreSQL binds to loopback only.
 - Basic ports/interfaces for payments, storage, booking and analytics.
 - Product/solution capability catalogue, nine initial solution manifests and strict CI catalogue validation.
 - Append-only audit-event contract/writer with database mutation protection and initial audit coverage for platform provisioning reconciliation and sensitive client team administration (PR #11).
@@ -48,7 +49,7 @@ Reviewed 5 November 2026 against `main` after PRs #7–#11 were merged. Phase 0 
 
 ## Phase 0 status
 
-**Repository implementation is complete; the operational exit gate remains open.** PR #10 delivered durable authentication notification enqueue and the separately supervised worker; PR #11 delivered append-only audit storage, initial privileged-action audit coverage, the permission registry and manifest validation. PR #11's full CI run passed install, catalogue/module validation, PostgreSQL and Better Auth migrations, workspace typecheck, all unit/auth/tenant tests and full build. Before closing Phase 0 operationally, provision the two notification roles on the target persistent database, apply migrations, provision a unique production encryption key, configure verified SMTP, deploy the worker under systemd or an equivalent supervisor, and demonstrate delivery plus expired-lease recovery after a worker interruption. Review audit event coverage and approve retention/monitoring policy. The repository CI result does not prove production delivery or disaster recovery.
+**Repository Phase 0 implementation is complete; production sign-off remains blocked.** PR #10 delivered durable authentication notification enqueue and the separately supervised worker; PR #11 delivered append-only audit storage, initial privileged-action audit coverage, the permission registry and manifest validation. PR #11's full CI run passed install, catalogue/module validation, PostgreSQL and Better Auth migrations, workspace typecheck, all unit/auth/tenant tests and full build. Before production sign-off, provision the two notification roles on the target persistent database, apply migrations 0004/0005, provide unique production secrets, configure SMTP with authentication and TLS, deploy the worker under systemd or an equivalent supervisor, and demonstrate delivery plus expired-lease recovery after a worker interruption. Review audit event coverage and approve retention/monitoring policy. Additionally, the current API contains only the mock payment adapter and intentionally refuses production startup with it; a real payment provider and verified webhook/reconciliation flow must be implemented before the full API can be released. Run `pnpm production:preflight` to verify the configured database roles/migrations and SMTP settings; it will report any remaining blockers. A green CI result does not prove production delivery or disaster recovery.
 
 ## CI verification
 
@@ -57,6 +58,7 @@ Reviewed 5 November 2026 against `main` after PRs #7–#11 were merged. Phase 0 
 - PR #9 merged the product/solution catalogue, roadmap and read-only/non-cancelling CI hardening.
 - PR #10 merged durable authentication notifications; the final PR revision passed all CI steps including PostgreSQL migrations, Better Auth migration, typecheck, tests and full build.
 - PR #11 merged append-only audit tests, module manifest validation and role-registry consistency tests. Full CI run 42111950897 passed all 12 validation steps, including the full build.
+- PR #12 merged the release runbook/status refresh and worker timeout/batch hardening; full CI run 42112889945 passed all validation stages.
 - PR #10 adds a PostgreSQL integration suite for enqueue-role restrictions, idempotency, encrypted-at-rest payloads, concurrent claims and expired-lease recovery.
 - PR #11 tests audit serialization/redaction and verifies Better Auth role maps against module-owned permission definitions.
 
