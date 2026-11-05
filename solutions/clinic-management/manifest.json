@@ -1,0 +1,97 @@
+{
+  "version": "1.0.0",
+  "status": "planned",
+  "id": "clinic-management",
+  "name": "Clinic Management",
+  "description": "Clinic operations focused on scheduling, patient administration, billing and controlled records access.",
+  "requiredModules": [
+    "platform-identity",
+    "tenant-control-plane",
+    "healthcare",
+    "booking",
+    "contacts-crm",
+    "document-management",
+    "payments",
+    "notifications",
+    "audit",
+    "security-operations"
+  ],
+  "optionalModules": [
+    "website-content",
+    "page-experience",
+    "forms-leads",
+    "analytics",
+    "integration-hub"
+  ],
+  "defaultRoles": [
+    {
+      "id": "clinic-admin",
+      "label": "Clinic administrator",
+      "permissions": [
+        "patients.read",
+        "staff.manage",
+        "appointments.manage",
+        "billing.read"
+      ]
+    },
+    {
+      "id": "clinician",
+      "label": "Clinician",
+      "permissions": [
+        "patient-records.authorized.read",
+        "patient-records.authorized.update",
+        "appointments.read"
+      ]
+    },
+    {
+      "id": "reception",
+      "label": "Reception",
+      "permissions": [
+        "patients.demographics.read",
+        "appointments.manage"
+      ]
+    },
+    {
+      "id": "patient",
+      "label": "Patient",
+      "permissions": [
+        "portal.self.read",
+        "appointments.self.manage"
+      ]
+    }
+  ],
+  "navigation": [
+    {
+      "id": "patients",
+      "label": "Patients",
+      "module": "healthcare",
+      "path": "/admin/patients"
+    },
+    {
+      "id": "appointments",
+      "label": "Appointments",
+      "module": "booking",
+      "path": "/admin/appointments"
+    },
+    {
+      "id": "billing",
+      "label": "Billing",
+      "module": "payments",
+      "path": "/admin/billing"
+    }
+  ],
+  "defaults": {
+    "locale": "en-KE",
+    "timezone": "Africa/Nairobi",
+    "currency": "KES",
+    "features": [
+      "patient-administration",
+      "appointments",
+      "billing",
+      "controlled-records-access"
+    ]
+  },
+  "templateIds": [
+    "clinic"
+  ]
+}
