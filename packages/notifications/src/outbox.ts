@@ -152,7 +152,13 @@ export class PostgresNotificationOutbox {
       throw new Error("A notification idempotency key of 1–200 characters is required.");
     }
     const serialized = serializePayload(input.payload);
-    const payloadHash = createHash("sha256").update(serialized).digest("hex");
+    const payloadHash = createHash("sha256")
+      .update(JSON.stringify({
+        tenantId: input.tenantId ?? null,
+        channel: input.channel,
+        payload: JSON.parse(serialized) as unknown,
+      }))
+      .digest("hex");
     const ciphertext = this.codec.encrypt(serialized);
     const maxAttempts = input.maxAttempts ?? 8;
     if (!Number.isInteger(maxAttempts) || maxAttempts < 1 || maxAttempts > 20) {
