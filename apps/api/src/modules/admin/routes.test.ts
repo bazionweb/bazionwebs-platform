@@ -4,7 +4,10 @@ import { adminRoutes } from "./routes.js";
 
 const mocks = vi.hoisted(() => ({
   requirePermission: vi.fn(),
-  requirePlatformRole: vi.fn(),\n  requirePlatformPermission: vi.fn(),\n  listPlatformTenants: vi.fn(),\n  transitionPlatformTenant: vi.fn(),
+  requirePlatformRole: vi.fn(),
+  requirePlatformPermission: vi.fn(),
+  listPlatformTenants: vi.fn(),
+  transitionPlatformTenant: vi.fn(),
   reconcileProvisioningTenants: vi.fn(),
   listMembers: vi.fn(),
   listInvitations: vi.fn(),
@@ -50,7 +53,10 @@ describe("client administration API", () => {
   beforeEach(() => {
     Object.values(mocks).forEach((mock) => mock.mockReset());
     mocks.requirePermission.mockResolvedValue(context);
-    mocks.requirePlatformRole.mockResolvedValue({ userId: "platform-admin", email: "admin@bazion.test", role: "platform_admin" });\n    mocks.requirePlatformPermission.mockResolvedValue({ userId: "platform-admin", email: "admin@bazion.test", role: "platform_admin" });\n    mocks.listPlatformTenants.mockResolvedValue({ items: [], total: 0, limit: 50, offset: 0 });\n    mocks.transitionPlatformTenant.mockResolvedValue({ id: "tenant-alpha", slug: "alpha", status: "suspended" });
+    mocks.requirePlatformRole.mockResolvedValue({ userId: "platform-admin", email: "admin@bazion.test", role: "platform_admin" });
+    mocks.requirePlatformPermission.mockResolvedValue({ userId: "platform-admin", email: "admin@bazion.test", role: "platform_admin" });
+    mocks.listPlatformTenants.mockResolvedValue({ items: [], total: 0, limit: 50, offset: 0 });
+    mocks.transitionPlatformTenant.mockResolvedValue({ id: "tenant-alpha", slug: "alpha", status: "suspended" });
     mocks.reconcileProvisioningTenants.mockResolvedValue({ scanned: 2, activated: 1, unmatched: [{ tenantId: "tenant-stuck", slug: "stuck" }], conflicted: [] });
     mocks.listMembers.mockResolvedValue({ members: [], total: 0 });
     mocks.listInvitations.mockResolvedValue([]);
