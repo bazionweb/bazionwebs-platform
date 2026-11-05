@@ -358,3 +358,62 @@ export async function reconcileProvisioningTenants(options: {
     },
   }, options);
 }
+
+
+export interface PlatformTenantRecord {
+  id: string;
+  slug: string;
+  name: string;
+  default_currency: string;
+  status: "provisioning" | "active" | "suspended" | "closed";
+  created_at: string;
+  suspended_at: string | null;
+  closed_at: string | null;
+}
+
+/** Read-only platform directory; caller must enforce tenant.list permission. */
+export async function listPlatformTenants(input: { limit: number; offset: number; status?: string }) {
+  const values: unknown[] = [];
+  const where = input.status ? (values.push(input.status), "WHERE status = $1") : "";
+  values.push(input.limit, input.offset);
+  const result = await tenantResolverPool.query<PlatformTenantRecord>(
+    `SELECT id, slug, name, default_currency, status, created_at, suspended_at, closed_at
+       FROM public.tenants ${where}
+      ORDER BY created_at DESC, id ASC
+      LIMIT $${values.length - 1} OFFSET $${values.length}`,
+    values,
+  );
+  const countValues = input.status ? [input.status] : [];
+  const countResult = await tenantResolverPool.query<{ total: string }>(
+    `SELECT count(*)::text AS total FROM public.tenants ${where}`,
+    countValues,
+  );
+  return { items: result.rows, total: Number(countResult.rows[0]?.total ?? 0), limit: input.limit, offset: input.offset };
+}
+
+/**
+ * Compare-and-set lifecycle transition. Closed tenants are terminal; no data is
+ * deleted. A transition succeeds only from the expected current state.
+ */
+export async function transitionPlatformTenant(input: {
+  tenantId: string;
+  action: "suspend" | "restore" | "close";
+}): Promise<PlatformTenantRecord | null> {
+  const transition = {
+    suspend: { from: "active", to: "suspended" },
+    restore: { from: "suspended", to: "active" },
+    close: { from: "suspended", to: "closed" },
+  } as const;
+  const selected = transition[input.action];
+  const result = await tenantProvisionerPool.query<PlatformTenantRecord>(
+    `UPDATE public.tenants
+        SET status = $1,
+            suspended_at = CASE WHEN $1 = 'suspended' THEN now() ELSE NULL END,
+            closed_at = CASE WHEN $1 = 'closed' THEN now() ELSE closed_at END,
+            updated_at = now()
+      WHERE id = $2 AND status = $3
+      RETURNING id, slug, name, default_currency, status, created_at, suspended_at, closed_at`,
+    [selected.to, input.tenantId, selected.from],
+  );
+  return result.rows[0] ?? null;
+}
