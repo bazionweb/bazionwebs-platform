@@ -7,7 +7,7 @@ An ownership-first, modular platform for building and operating reusable website
 ## Product catalogue and roadmap
 
 - [Product architecture](docs/product-architecture.md): module boundaries and intended project structure.
-- [Product catalogue](products/catalog.json): 111 advertised capabilities mapped to 37 reusable modules.
+- [Product catalogue](products/catalog.json): 111 advertised capabilities mapped to 36 reusable modules.
 - [Commercial offerings](products/commercial-offerings.json): website/ecommerce/custom-system/hosting/care packages and add-ons mapped to their modules.
 - [Solution packs](solutions/): nine initial tenant solution manifests.
 - [Implementation roadmap](docs/implementation-roadmap.md): phase-gated delivery sequence and acceptance criteria.
