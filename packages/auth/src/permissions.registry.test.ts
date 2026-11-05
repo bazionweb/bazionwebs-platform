@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import permissionRegistry from "../../../products/permissions.json";
+import permissionRegistry from "../../../products/permissions.json" with { type: "json" };
 import { rolePermissionMap, statement } from "./permissions.js";
 
 describe("central permission registry adapter", () => {
