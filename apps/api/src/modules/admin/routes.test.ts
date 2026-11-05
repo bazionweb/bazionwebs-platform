@@ -27,7 +27,7 @@ vi.mock("@bazion/auth/server", () => ({ reconcileProvisioningTenants: mocks.reco
   cancelInvitation: mocks.cancelInvitation,
   updateMemberRole: mocks.updateMemberRole,
   removeMember: mocks.removeMember,
-} } }));
+} }));
 vi.mock("../../lib/database.js", () => ({ pool: {}, withTenantTransaction: vi.fn() }));
 
 const context = {
