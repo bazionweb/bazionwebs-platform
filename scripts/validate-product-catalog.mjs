@@ -30,6 +30,10 @@ for (const module of catalog.modules) {
   }
 }
 
+if (catalog.modules.length !== 36) {
+  fail(`Expected 36 unique module records, found ${catalog.modules.length}`);
+}
+
 const capabilityIds = new Set();
 for (const capability of catalog.capabilities) {
   if (!capability.id || !capability.name || !capability.group || !capability.moduleId || !capability.recordType) {
