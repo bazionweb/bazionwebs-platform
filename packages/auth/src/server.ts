@@ -136,7 +136,8 @@ export async function resolvePlatformMemberByUserId(userId: string): Promise<Pla
   return row ? { userId: row.user_id, email: row.email, role: row.role, status: row.status } : null;
 }
 
-async function beforeCreateOrganization({ organization: org, user }: {\n  organization: { slug?: string; name?: string };\n  user: { id: string; email: string; emailVerified: boolean };\n}): Promise<void> {
+async function beforeCreateOrganization({ organization: org, user }: {
+  organization: { slug?: string; name?: string };\n  user: { id: string; email: string; emailVerified: boolean };\n}): Promise<void> {
   const slug = org.slug?.trim();
   const name = org.name?.trim();
   if (!slug || !name) throw new Error("A client organization name and slug are required.");
