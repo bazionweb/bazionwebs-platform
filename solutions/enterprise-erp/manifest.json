@@ -1,0 +1,91 @@
+{
+  "version": "1.0.0",
+  "status": "planned",
+  "id": "enterprise-erp",
+  "name": "Enterprise ERP",
+  "description": "Composable enterprise workflow suite; individual domains are enabled only when required and separately security-reviewed.",
+  "requiredModules": [
+    "platform-identity",
+    "tenant-control-plane",
+    "module-entitlements",
+    "erp-supply-chain",
+    "subscriptions-billing",
+    "audit",
+    "integration-hub",
+    "observability-resilience",
+    "security-operations"
+  ],
+  "optionalModules": [
+    "commerce",
+    "payments",
+    "inventory-pricing",
+    "fulfilment",
+    "contacts-crm",
+    "document-management",
+    "analytics",
+    "client-portals"
+  ],
+  "defaultRoles": [
+    {
+      "id": "enterprise-admin",
+      "label": "Enterprise administrator",
+      "permissions": [
+        "platform-tenant.config",
+        "modules.manage",
+        "users.manage"
+      ]
+    },
+    {
+      "id": "finance-manager",
+      "label": "Finance manager",
+      "permissions": [
+        "finance.*",
+        "billing.*"
+      ]
+    },
+    {
+      "id": "operations-manager",
+      "label": "Operations manager",
+      "permissions": [
+        "procurement.*",
+        "inventory.*",
+        "supply-chain.*"
+      ]
+    }
+  ],
+  "navigation": [
+    {
+      "id": "finance",
+      "label": "Finance",
+      "module": "erp-supply-chain",
+      "path": "/admin/finance"
+    },
+    {
+      "id": "procurement",
+      "label": "Procurement",
+      "module": "erp-supply-chain",
+      "path": "/admin/procurement"
+    },
+    {
+      "id": "inventory",
+      "label": "Inventory",
+      "module": "inventory-pricing",
+      "path": "/admin/inventory"
+    }
+  ],
+  "defaults": {
+    "locale": "en-KE",
+    "timezone": "Africa/Nairobi",
+    "currency": "KES",
+    "features": [
+      "finance",
+      "procurement",
+      "supply-chain",
+      "inventory",
+      "reporting"
+    ]
+  },
+  "templateIds": [
+    "enterprise-operations"
+  ]
+}
