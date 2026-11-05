@@ -27,6 +27,10 @@ Deliver:
 
 **Exit gate:** CI install/migrate/typecheck/test/build is stable; tenant recovery is permission-gated and tested; sensitive notifications survive worker restarts; no production onboarding relies on fire-and-forget email.
 
+**Repository delivery status — 5 November 2026:** PR #8 (tenant reconciliation), PR #9 (catalogue/CI), PR #10 (durable authentication notifications) and PR #11 (append-only audit and module permission registry) are merged. PR #10 and PR #11 each passed their full GitHub Actions PR validation (install, migrations, typecheck, tests and build). The code-side Phase 0 deliverables are therefore implemented.
+
+**Operational exit gate still outstanding:** on the target environment, provision the notification enqueue/worker roles if the PostgreSQL volume predates migration 0004; apply migrations 0004 and 0005; set a unique protected 32-byte notification encryption key; configure verified SMTP; deploy the notification worker under a supervisor; and demonstrate normal delivery plus lease recovery after an interrupted worker. Confirm queue-age/dead-letter monitoring and document the approved audit retention policy. Do not call Phase 0 production-complete until these environment checks have been evidenced.
+
 ## Phase 1 — Platform control plane
 
 **Goal:** make Bazion able to create, configure, enable, suspend and support client workspaces.
