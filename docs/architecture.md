@@ -137,3 +137,9 @@ sequenceDiagram
 ```
 
 The running starter currently implements the cart/order path and a development-only mock payment. The real provider callback, webhook signature verification, reconciliation and reservation expiry steps are production milestones, not yet complete.
+
+## Authentication and tenant identity
+
+The selected self-hosted, open-source authentication design is documented in [Authentication and tenant isolation](architecture/authentication-and-tenant-isolation.md), including the Better Auth organization model, trusted tenant resolution, server-side RBAC, database-role boundaries and PostgreSQL RLS. The architecture source and SVG are maintained beside that document. See [ADR 0005](adr/0005-authentication-and-tenant-identity.md).
+
+This is the target design; runtime authentication and tenant resolution remain implementation work.

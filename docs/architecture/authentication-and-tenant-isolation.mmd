@@ -1,0 +1,76 @@
+flowchart LR
+  %% Bazion Web authentication, organization membership and tenant isolation
+
+  subgraph People["People and access scopes"]
+    CUSTOMER["Store customers"]
+    TENANT_ADMIN["Client owner / admin"]
+    STAFF["Client staff"]
+    PLATFORM["Bazion platform operators"]
+  end
+
+  subgraph Frontends["Client applications · Next.js"]
+    STOREFRONT["Client storefronts"]
+    DASHBOARD["Client administration dashboard\nProducts · Orders · Users · Settings"]
+    OTHER_APP["Other client portals and apps"]
+  end
+
+  subgraph Identity["Identity service · Better Auth (MIT)"]
+    SESSION["Secure session validation\nHttpOnly · Secure · SameSite cookie"]
+    USER["Global user / account"]
+    ORG["Organization plugin\nOrganizations · Members · Invitations"]
+    ROLES["Organization roles and permissions\nOwner · Admin · Member · Custom roles"]
+  end
+
+  subgraph Context["Trusted tenant and access context"]
+    RESOLVER["Tenant resolver\nDashboard: session + current membership\nStorefront: verified custom host"]
+    MAP["Organization ID → Bazion tenant UUID"]
+    POLICY["Server-side RBAC policy\nPrincipal + tenant + resource + action\nDeny by default"]
+  end
+
+  subgraph API["Application layer · Fastify"]
+    AUTH_HOOK["Authentication hook"]
+    ROUTES["Protected API routes"]
+    SERVICES["Business services and repositories"]
+  end
+
+  subgraph DATA["PostgreSQL · separate schemas and roles"]
+    AUTH_DB[("auth schema\nUsers · Sessions · Accounts\nOrganizations · Members")]
+    APP_DB[("application schema\nTenant-owned products, carts, orders\nand client configuration")]
+    RLS["Row-Level Security (RLS)\ntransaction-local app.tenant_id\nFORCE RLS · least-privilege role"]
+  end
+
+  CUSTOMER --> STOREFRONT
+  TENANT_ADMIN --> DASHBOARD
+  STAFF --> DASHBOARD
+  PLATFORM --> DASHBOARD
+  STOREFRONT --> SESSION
+  DASHBOARD --> SESSION
+  OTHER_APP --> SESSION
+  SESSION --> USER
+  SESSION --> ORG
+  ORG --> ROLES
+  USER --> RESOLVER
+  ORG --> RESOLVER
+  ROLES --> POLICY
+  RESOLVER --> MAP
+  MAP --> POLICY
+  POLICY --> AUTH_HOOK
+  AUTH_HOOK --> ROUTES
+  ROUTES --> SERVICES
+  SESSION <--> AUTH_DB
+  SERVICES --> APP_DB
+  APP_DB --- RLS
+  RLS --- SERVICES
+
+  classDef people fill:#eef4ff,stroke:#6b8fd6,color:#10244d
+  classDef frontend fill:#e9f7f4,stroke:#35a88e,color:#073b34
+  classDef identity fill:#f1edff,stroke:#8e78da,color:#2f1c66
+  classDef context fill:#fff5e6,stroke:#d69a39,color:#5c3a0a
+  classDef api fill:#eaf2ff,stroke:#4b76bd,color:#112d58
+  classDef data fill:#e8f5ef,stroke:#398c66,color:#123d2a
+  class CUSTOMER,TENANT_ADMIN,STAFF,PLATFORM people
+  class STOREFRONT,DASHBOARD,OTHER_APP frontend
+  class SESSION,USER,ORG,ROLES identity
+  class RESOLVER,MAP,POLICY context
+  class AUTH_HOOK,ROUTES,SERVICES api
+  class AUTH_DB,APP_DB,RLS data
