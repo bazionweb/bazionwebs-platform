@@ -10,8 +10,8 @@ const integrationEnabled = Boolean(enqueuerUrl && workerUrl);
 describe.skipIf(!integrationEnabled)("Postgres notification outbox roles and recovery", () => {
   let enqueuerPool: Pool | undefined;
   let workerPool: Pool | undefined;
-  let enqueuer: PostgresNotificationOutbox;
-  let worker: PostgresNotificationOutbox;
+  let enqueuer: PostgresNotificationOutbox | undefined;
+  let worker: PostgresNotificationOutbox | undefined;
 
   beforeAll(() => {
     const codec = createOutboxPayloadCodec(
@@ -46,7 +46,7 @@ describe.skipIf(!integrationEnabled)("Postgres notification outbox roles and rec
       template: "test.integration",
       variables: { intro: "This is a test.", url: "https://example.test/one-time-link" },
     };
-    const firstId = await enqueuer.enqueue({ idempotencyKey, channel: "email", payload });
+    const firstId = await enqueuer!.enqueue({ idempotencyKey, channel: "email", payload });
     const duplicateId = await enqueuer.enqueue({ idempotencyKey, channel: "email", payload });
     expect(duplicateId).toBe(firstId);
 
@@ -86,11 +86,11 @@ describe.skipIf(!integrationEnabled)("Postgres notification outbox roles and rec
       "UPDATE public.notification_outbox SET locked_at = now() - interval '10 minutes' WHERE id = $1",
       [id],
     );
-    const recoveredBatch = await worker.claimBatch(100);
+    const recoveredBatch = await worker!.claimBatch(100);
     const recovered = recoveredBatch.find((delivery) => delivery.id === id);
     expect(recovered?.attempts).toBe(2);
     expect(recovered?.payload.to).toBe("worker-recovery@example.test");
-    expect(await worker.markSent(id)).toBe(true);
+    expect(await worker!.markSent(id)).toBe(true);
     expect(await worker.markSent(id)).toBe(false);
   });
 });
