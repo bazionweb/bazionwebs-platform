@@ -8,6 +8,8 @@ export const tenants = pgTable("tenants", {
   slug: varchar("slug", { length: 80 }).notNull().unique(),
   name: varchar("name", { length: 160 }).notNull(),
   defaultCurrency: varchar("default_currency", { length: 3 }).notNull().default("KES"),
+  authOrganizationId: varchar("auth_organization_id", { length: 128 }),
+  status: varchar("status", { length: 24 }).notNull().default("active"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -164,4 +166,34 @@ export const idempotencyRecords = pgTable("idempotency_records", {
 }, (table) => [
   uniqueIndex("idempotency_tenant_key_uq").on(table.tenantId, table.key),
   foreignKey({ columns: [table.resourceId, table.tenantId], foreignColumns: [orders.id, orders.tenantId], name: "idempotency_resource_fk" }),
+]);
+
+
+export const tenantDomains = pgTable("tenant_domains", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
+  hostname: varchar("hostname", { length: 253 }).notNull(),
+  verificationTokenHash: varchar("verification_token_hash", { length: 64 }),
+  status: varchar("status", { length: 24 }).notNull().default("pending"),
+  verifiedAt: timestamp("verified_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  check("tenant_domains_hostname_lower_ck", sql`${table.hostname} = lower(${table.hostname})`),
+  check("tenant_domains_status_ck", sql`${table.status} in ('pending', 'active', 'disabled')`),
+  uniqueIndex("tenant_domains_hostname_uq").on(table.hostname),
+  index("tenant_domains_tenant_idx").on(table.tenantId),
+]);
+
+export const platformMembers = pgTable("platform_members", {
+  userId: varchar("user_id", { length: 128 }).primaryKey(),
+  email: varchar("email", { length: 254 }).notNull(),
+  role: varchar("role", { length: 32 }).notNull(),
+  status: varchar("status", { length: 24 }).notNull().default("active"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  check("platform_members_role_ck", sql`${table.role} in ('platform_owner', 'platform_admin', 'platform_support')`),
+  check("platform_members_status_ck", sql`${table.status} in ('active', 'suspended')`),
+  uniqueIndex("platform_members_email_uq").on(sql`lower(${table.email})`),
 ]);

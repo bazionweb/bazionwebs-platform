@@ -2,8 +2,11 @@ import Fastify from "fastify";
 import cors from "@fastify/cors";
 import helmet from "@fastify/helmet";
 import rateLimit from "@fastify/rate-limit";
+import { fromNodeHeaders } from "better-auth/node";
+import { auth, isVerifiedTenantHost } from "@bazion/auth/server";
 import type { AppConfig } from "./config.js";
 import { commerceRoutes } from "./modules/commerce/routes.js";
+import { authRoutes } from "./modules/auth/routes.js";
 
 export async function buildApp(config: AppConfig) {
   const app = Fastify({
@@ -12,33 +15,88 @@ export async function buildApp(config: AppConfig) {
       redact: ["req.headers.authorization", "req.headers.cookie", "req.headers.x-cart-token", "req.headers.x-dev-secret", "req.headers['set-cookie']"],
     },
     bodyLimit: 1_048_576,
-    trustProxy: false,
+    // Enable only when the API is reachable exclusively through a trusted
+    // reverse proxy that strips client-supplied forwarded headers.
+    trustProxy: config.trustProxy,
   });
 
+  const configuredOrigins = new Set(config.corsOrigins);
+  const originIsAllowed = async (origin: string): Promise<boolean> => {
+    if (configuredOrigins.has(origin)) return true;
+    try {
+      const parsed = new URL(origin);
+      const local = parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1";
+      if (local && config.NODE_ENV !== "production") return true;
+      return await isVerifiedTenantHost(parsed.hostname);
+    } catch {
+      return false;
+    }
+  };
+
   await app.register(helmet);
-  await app.register(cors, { origin: config.corsOrigins, credentials: true, methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"] });
+  await app.register(cors, {
+    origin: (origin, callback) => {
+      if (!origin) return callback(null, true);
+      void originIsAllowed(origin)
+        .then((allowed) => callback(null, allowed ? origin : false))
+        .catch((error: Error) => callback(error, false));
+    },
+    credentials: true,
+    methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "Idempotency-Key", "X-Requested-With"],
+  });
   await app.register(rateLimit, { max: 120, timeWindow: "1 minute" });
 
-  const allowedOrigins = new Set(config.corsOrigins);
   app.addHook("onRequest", async (request, reply) => {
-    if (["POST", "PATCH", "DELETE"].includes(request.method)) {
+    if (["POST", "PATCH", "DELETE", "PUT"].includes(request.method)) {
       const origin = request.headers.origin;
-      if (origin && !allowedOrigins.has(origin)) {
-        return reply.code(403).send({ error: "ORIGIN_NOT_ALLOWED" });
-      }
+      if (origin && !(await originIsAllowed(origin))) return reply.code(403).send({ error: "ORIGIN_NOT_ALLOWED" });
     }
   });
 
+  const authHandler = async (request: import("fastify").FastifyRequest, reply: import("fastify").FastifyReply) => {
+    try {
+      const url = new URL(request.url, config.BETTER_AUTH_URL);
+      const headers = fromNodeHeaders(request.headers);
+      headers.delete("host");
+      headers.delete("content-length");
+      const body = request.body === undefined ? undefined : JSON.stringify(request.body);
+      const authRequest = new Request(url.toString(), {
+        method: request.method,
+        headers,
+        ...(body === undefined ? {} : { body }),
+      });
+      const response = await auth.handler(authRequest);
+      response.headers.forEach((value, key) => {
+        if (key.toLowerCase() !== "set-cookie") reply.header(key, value);
+      });
+      const setCookies = response.headers.getSetCookie?.() ?? [];
+      if (setCookies.length) reply.header("Set-Cookie", setCookies);
+      const responseBody = await response.text();
+      return reply.code(response.status).send(responseBody.length ? responseBody : null);
+    } catch (error) {
+      request.log.error({ errorName: error instanceof Error ? error.name : "UnknownError" }, "Authentication handler failed");
+      return reply.code(500).send({ error: "AUTHENTICATION_FAILURE" });
+    }
+  };
+
+  app.route({ method: ["GET", "POST"], url: "/api/auth/*", handler: authHandler });
+  app.route({ method: ["GET", "POST"], url: "/api/auth", handler: authHandler });
+
   app.get("/health", async () => ({ status: "ok", service: "bazion-api", environment: config.NODE_ENV }));
+  await app.register(authRoutes, { prefix: "/v1" });
   await app.register(commerceRoutes, { prefix: "/v1", config });
 
   app.setErrorHandler((error, request, reply) => {
-    const statusCode = typeof (error as { statusCode?: number }).statusCode === "number" ? (error as { statusCode: number }).statusCode : 500;
+    const statusCode = typeof (error as { statusCode?: number }).statusCode === "number"
+      ? (error as { statusCode: number }).statusCode
+      : 500;
     const code = (error as { code?: string }).code ?? "INTERNAL_ERROR";
-    if (statusCode >= 500) {
-      request.log.error({ errorName: error.name, errorCode: code }, "Unhandled API error");
-    }
-    return reply.code(statusCode).send({ error: code, message: statusCode >= 500 ? "An unexpected error occurred." : error.message });
+    if (statusCode >= 500) request.log.error({ errorName: error.name, errorCode: code }, "Unhandled API error");
+    return reply.code(statusCode).send({
+      error: code,
+      message: statusCode >= 500 ? "An unexpected error occurred." : error.message,
+    });
   });
 
   return app;

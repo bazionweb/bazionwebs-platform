@@ -6,6 +6,7 @@ import { addCartItemSchema, checkoutSchema, createCartSchema, updateCartItemSche
 import { carts, cartItems, idempotencyRecords, orderItems, orders, paymentAttempts, products, webhookEvents } from "@bazion/database";
 import { withTenantTransaction, type TenantTransaction } from "../../lib/database.js";
 import type { AppConfig } from "../../config.js";
+import { resolveTenantId } from "../../lib/tenant-resolution.js";
 
 interface RouteOptions { config: AppConfig }
 
@@ -55,15 +56,17 @@ function toPublicCart(cart: { id: string; currency: string; status: string; expi
 }
 
 export async function commerceRoutes(app: FastifyInstance, options: RouteOptions) {
-  const tenantId = options.config.DEFAULT_TENANT_ID;
-
-  app.get("/products", async () => withTenantTransaction(tenantId, async (tx) => {
+  app.get("/products", async (request) => {
+    const tenantId = await resolveTenantId(request.hostname, options.config);
+    return withTenantTransaction(tenantId, async (tx) => {
     return tx.select({ id: products.id, sku: products.sku, name: products.name, description: products.description,
       currency: products.currency, priceMinor: products.priceMinor, stockAvailable: sql<number | null>`case when ${products.stockTracked} then ${products.stockOnHand} - ${products.stockReserved} else null end` })
       .from(products).where(and(eq(products.tenantId, tenantId), eq(products.active, true)));
-  }));
+    });
+  });
 
   app.post("/carts", async (request, reply) => {
+    const tenantId = await resolveTenantId(request.hostname, options.config);
     const parsed = createCartSchema.safeParse(request.body ?? {});
     if (!parsed.success) return reply.code(400).send({ error: "INVALID_INPUT", details: parsed.error.flatten() });
     const guestAccessToken = randomBytes(32).toString("base64url");

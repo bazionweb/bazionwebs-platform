@@ -14,7 +14,7 @@ export default async function HomePage() {
   const products = await getProducts();
   return (
     <main className="shell">
-      <nav className="nav"><a className="brand" href="/">BAZION<span>WEB</span></a><span className="nav-tag">PLATFORM DEMO</span><a className="cart-nav" href="#cart">Cart ↓</a></nav>
+      <nav className="nav"><a className="brand" href="/">BAZION<span>WEB</span></a><span className="nav-tag">PLATFORM DEMO</span><a className="cart-nav" href="/login">Sign in ↗</a><a className="cart-nav" href="#cart">Cart ↓</a></nav>
       <section className="hero">
         <p className="eyebrow">BUILD · HOST · GROW</p>
         <h1>Reusable commerce.<br /><em>Ready for your brand.</em></h1>
