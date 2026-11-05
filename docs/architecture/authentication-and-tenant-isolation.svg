@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1680" height="1120" viewBox="0 0 1680 1120" role="img" aria-labelledby="title desc">
+  <title id="title">Bazion Web authentication and tenant architecture</title>
+  <desc id="desc">A secure multi-tenant architecture showing client users and operators, Next.js storefront and administration applications, Better Auth sessions and organizations, server-side tenant resolution and role-based authorization, Fastify APIs, and PostgreSQL authentication and application schemas with row-level security.</desc>
+  <defs>
+    <linearGradient id="header" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#142c55"/><stop offset="1" stop-color="#3155a4"/></linearGradient>
+    <linearGradient id="identity" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f2efff"/><stop offset="1" stop-color="#e4ddff"/></linearGradient>
+    <linearGradient id="teal" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e9faf5"/><stop offset="1" stop-color="#d9f3eb"/></linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="150%"><feDropShadow dx="0" dy="5" stdDeviation="8" flood-color="#142c55" flood-opacity=".12"/></filter>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#4768a7"/></marker>
+    <style>
+      .heading{font:700 34px Inter,Arial,sans-serif;fill:#14284b}.sub{font:400 16px Inter,Arial,sans-serif;fill:#5d6c83}
+      .cardtitle{font:700 19px Inter,Arial,sans-serif;fill:#172d54}.label{font:700 14px Inter,Arial,sans-serif;fill:#233c69}
+      .body{font:400 14px Inter,Arial,sans-serif;fill:#43536d}.small{font:400 12px Inter,Arial,sans-serif;fill:#607089}
+      .mono{font:600 11px ui-monospace,Consolas,monospace;fill:#53647d;letter-spacing:.6px}
+      .line{stroke:#4768a7;stroke-width:2.6;fill:none;marker-end:url(#arrow)}
+      .check{fill:#159b78}.checkmark{font:700 12px Arial,sans-serif;fill:#fff}
+    </style>
+  </defs>
+  <rect width="1680" height="1120" fill="#f7f9fc"/>
+  <rect x="0" y="0" width="1680" height="122" fill="url(#header)"/>
+  <text x="58" y="55" font-family="Inter,Arial,sans-serif" font-size="31" font-weight="800" fill="#fff">BAZION WEB</text>
+  <text x="60" y="83" font-family="Inter,Arial,sans-serif" font-size="13" fill="#dce7ff">BUILD ONCE. REUSE EVERYWHERE.</text>
+  <path d="M420 28 V94" stroke="#7c95c7" stroke-width="1.5"/>
+  <text x="462" y="56" font-family="Inter,Arial,sans-serif" font-size="27" font-weight="700" fill="#fff">Authentication &amp; Tenant Architecture</text>
+  <text x="464" y="84" font-family="Inter,Arial,sans-serif" font-size="14" fill="#dce7ff">Open source · Self-hostable · Multi-tenant · Secure by design</text>
+  <rect x="1370" y="37" width="250" height="45" rx="22" fill="#ffffff" opacity=".13"/>
+  <text x="1495" y="64" text-anchor="middle" font-family="Inter,Arial,sans-serif" font-size="12" font-weight="700" fill="#fff">ARCHITECTURE v1.0</text>
+
+  <!-- Personas -->
+  <text x="46" y="157" class="mono">01 / USERS AND ACCESS SCOPES</text>
+  <g filter="url(#shadow)">
+    <rect x="46" y="174" width="382" height="100" rx="16" fill="#edf4ff" stroke="#a9c4f4"/>
+    <rect x="449" y="174" width="382" height="100" rx="16" fill="#edf4ff" stroke="#a9c4f4"/>
+    <rect x="852" y="174" width="382" height="100" rx="16" fill="#edf4ff" stroke="#a9c4f4"/>
+    <rect x="1255" y="174" width="379" height="100" rx="16" fill="#f2edff" stroke="#c6b5ff"/>
+  </g>
+  <g fill="#3264b4">
+    <circle cx="92" cy="214" r="13"/><circle cx="123" cy="214" r="13"/><path d="M69 250 Q72 226 92 226 Q112 226 115 250 Z M101 250 Q105 229 124 229 Q143 229 147 250 Z"/>
+    <circle cx="493" cy="212" r="13"/><path d="M468 250 Q470 226 493 226 Q516 226 519 250 Z"/><path d="M522 224 l8 -8 8 8 -8 8z" fill="#6f55c9"/>
+    <circle cx="897" cy="211" r="13"/><path d="M871 250 Q874 226 897 226 Q920 226 923 250 Z"/>
+  </g>
+  <path d="M1304 197 l28 -10 28 10 v24 q-5 25 -28 35 q-23 -10 -28 -35z" fill="#3f55a6"/><path d="M1318 220 l10 9 18 -21" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="165" y="214" class="cardtitle">Customers</text><text x="165" y="239" class="body">Shop, book and use client services</text>
+  <text x="548" y="214" class="cardtitle">Client administrators</text><text x="548" y="239" class="body">Manage their own organisation</text>
+  <text x="951" y="214" class="cardtitle">Client staff</text><text x="951" y="239" class="body">Work within assigned permissions</text>
+  <text x="1371" y="214" class="cardtitle">Platform operators</text><text x="1371" y="239" class="body">Platform-wide operations, audited</text>
+
+  <!-- App clients -->
+  <g filter="url(#shadow)">
+    <rect x="46" y="324" width="330" height="422" rx="18" fill="#fff" stroke="#9bb8ed" stroke-width="1.6"/>
+    <rect x="399" y="324" width="350" height="422" rx="18" fill="url(#identity)" stroke="#9a82e2" stroke-width="1.6"/>
+    <rect x="772" y="324" width="358" height="422" rx="18" fill="#fff6e8" stroke="#e4b45f" stroke-width="1.6"/>
+    <rect x="1153" y="324" width="481" height="422" rx="18" fill="url(#teal)" stroke="#66c3a7" stroke-width="1.6"/>
+  </g>
+
+  <!-- Frontend -->
+  <rect x="46" y="324" width="330" height="58" rx="18" fill="#dceaff"/><path d="M46 364 V382 H376 V364" fill="#dceaff"/>
+  <text x="211" y="360" text-anchor="middle" class="cardtitle">Client applications · Next.js</text>
+  <rect x="69" y="405" width="284" height="82" rx="12" fill="#f6f9ff" stroke="#c6d7f5"/>
+  <text x="91" y="435" class="label">Storefronts</text><text x="91" y="459" class="body">Public catalogue · Guest cart · Checkout</text>
+  <rect x="69" y="501" width="284" height="103" rx="12" fill="#f6f9ff" stroke="#c6d7f5"/>
+  <text x="91" y="531" class="label">Client administration dashboard</text>
+  <text x="91" y="555" class="body">Products · Orders · Users · Store settings</text>
+  <text x="91" y="578" class="body">Analytics · Roles · Client configuration</text>
+  <rect x="69" y="620" width="284" height="92" rx="12" fill="#fff" stroke="#d9e2ef"/>
+  <text x="91" y="650" class="label">Other reusable client apps</text>
+  <text x="91" y="674" class="body">School · Church · Booking · Business portals</text>
+  <text x="91" y="695" class="small">Same identity and API boundaries</text>
+
+  <!-- Better Auth -->
+  <rect x="399" y="324" width="350" height="58" rx="18" fill="#ded5ff"/><path d="M399 364 V382 H749 V364" fill="#ded5ff"/>
+  <text x="574" y="360" text-anchor="middle" class="cardtitle">Authentication · Better Auth</text>
+  <text x="430" y="420" class="mono">MIT LICENSE · SELF-HOSTED LIBRARY</text>
+  <text x="430" y="459" font-family="Inter,Arial,sans-serif" font-size="26" font-weight="800" fill="#392a85">Better Auth</text>
+  <text x="430" y="491" class="body">Server-side session validation</text>
+  <text x="430" y="516" class="body">User · Account · Session · Verification</text>
+  <text x="430" y="541" class="body">Organization · Member · Invitation</text>
+  <text x="430" y="566" class="body">Email/password · Optional passkeys / 2FA</text>
+  <rect x="424" y="597" width="300" height="112" rx="12" fill="#fff" stroke="#c9bdf5"/>
+  <text x="445" y="626" class="label">Browser session</text>
+  <text x="445" y="650" class="body">Secure · HttpOnly · SameSite cookie</text>
+  <text x="445" y="675" class="body">Never store session tokens in localStorage</text>
+  <text x="445" y="696" class="small">Validate session and revocation on the server</text>
+
+  <!-- Tenant and RBAC -->
+  <rect x="772" y="324" width="358" height="58" rx="18" fill="#ffebc8"/><path d="M772 364 V382 H1130 V364" fill="#ffebc8"/>
+  <text x="951" y="360" text-anchor="middle" class="cardtitle">Tenant resolution &amp; RBAC</text>
+  <text x="801" y="420" class="mono">TRUSTED SERVER-SIDE CONTEXT</text>
+  <text x="801" y="456" class="label">1. Resolve tenant</text>
+  <text x="801" y="479" class="body">Session + current organisation membership</text>
+  <text x="801" y="500" class="body">or verified active custom-domain mapping</text>
+  <text x="801" y="535" class="label">2. Map identity to tenant</text>
+  <text x="801" y="558" class="body">Auth organization ID → Bazion tenant UUID</text>
+  <text x="801" y="593" class="label">3. Authorize each action</text>
+  <text x="801" y="616" class="body">Principal + tenant + role + resource + action</text>
+  <rect x="798" y="641" width="306" height="68" rx="12" fill="#fff" stroke="#e7c98e"/>
+  <text x="951" y="668" text-anchor="middle" class="label">Deny by default</text>
+  <text x="951" y="691" text-anchor="middle" class="small">Never trust browser-supplied tenant / role</text>
+
+  <!-- API -->
+  <rect x="1153" y="324" width="481" height="58" rx="18" fill="#d1f2e8"/><path d="M1153 364 V382 H1634 V364" fill="#d1f2e8"/>
+  <text x="1393" y="360" text-anchor="middle" class="cardtitle">Application API · Fastify</text>
+  <text x="1185" y="420" class="mono">ONE MODULAR API · CLEAR MODULE BOUNDARIES</text>
+  <rect x="1185" y="442" width="417" height="64" rx="12" fill="#fff" stroke="#b4e2d4"/>
+  <text x="1208" y="470" class="label">Authentication hook</text><text x="1208" y="491" class="small">Validate Better Auth session on protected routes</text>
+  <rect x="1185" y="520" width="417" height="64" rx="12" fill="#fff" stroke="#b4e2d4"/>
+  <text x="1208" y="548" class="label">RBAC policy enforcement</text><text x="1208" y="569" class="small">Check organisation membership and domain permissions</text>
+  <rect x="1185" y="598" width="417" height="64" rx="12" fill="#fff" stroke="#b4e2d4"/>
+  <text x="1208" y="626" class="label">Business services and repositories</text><text x="1208" y="647" class="small">Tenant-scoped queries · Transactions · Audit events</text>
+  <text x="1185" y="701" class="small">Storefront and dashboard never access PostgreSQL directly</text>
+
+  <!-- Arrows between layers -->
+  <path d="M376 540 H392" class="line"/>
+  <path d="M749 535 H765" class="line"/>
+  <path d="M1130 535 H1146" class="line"/>
+  <path d="M210 274 V304" class="line"/>
+  <path d="M612 274 V304" class="line"/>
+  <path d="M1015 274 V304" class="line"/>
+  <path d="M1444 274 V304" class="line"/>
+
+  <!-- Database layer -->
+  <text x="46" y="790" class="mono">02 / DATA LAYER · SEPARATE SCHEMAS AND LEAST-PRIVILEGE DATABASE ROLES</text>
+  <g filter="url(#shadow)">
+    <rect x="46" y="810" width="1588" height="218" rx="18" fill="#edf3fb" stroke="#9db3d4" stroke-width="1.5"/>
+    <rect x="72" y="838" width="520" height="157" rx="14" fill="#eeeaff" stroke="#9f91d9"/>
+    <rect x="612" y="838" width="996" height="157" rx="14" fill="#e5f6ef" stroke="#79bda1"/>
+  </g>
+  <text x="96" y="873" class="cardtitle">PostgreSQL · auth schema</text>
+  <text x="96" y="902" class="body">Better Auth identity and organisation records</text>
+  <text x="96" y="928" class="body">Users · Sessions · Accounts · Organisations · Members</text>
+  <rect x="96" y="951" width="245" height="27" rx="13" fill="#d8d0ff"/><text x="218" y="969" text-anchor="middle" class="small">bazion_auth_runtime</text>
+  <text x="642" y="873" class="cardtitle">PostgreSQL · application schema</text>
+  <text x="642" y="902" class="body">Tenant-owned products · Carts · Orders · Inventory · Client settings</text>
+  <rect x="642" y="925" width="434" height="49" rx="10" fill="#fff" stroke="#acd9c7"/>
+  <text x="660" y="946" class="label">Row-Level Security (RLS)</text><text x="660" y="964" class="small">FORCE RLS · fail closed · tenant_id policy</text>
+  <rect x="1090" y="925" width="227" height="49" rx="10" fill="#fff" stroke="#acd9c7"/>
+  <text x="1108" y="946" class="label">bazion_app</text><text x="1108" y="964" class="small">Tenant-scoped runtime role</text>
+  <rect x="1330" y="925" width="246" height="49" rx="10" fill="#fff" stroke="#acd9c7"/>
+  <text x="1348" y="946" class="label">bazion_migrator</text><text x="1348" y="964" class="small">DDL / migrations only</text>
+  <text x="840" y="1014" class="small">Fastify sets transaction-local app.tenant_id; explicit tenant filters and composite foreign keys remain mandatory.</text>
+  <path d="M1393 746 V802" class="line"/>
+  <path d="M574 746 V802" class="line"/>
+
+  <!-- Bottom security strip -->
+  <rect x="46" y="1050" width="1588" height="48" rx="12" fill="#142c55"/>
+  <text x="840" y="1080" text-anchor="middle" font-family="Inter,Arial,sans-serif" font-size="14" font-weight="700" fill="#fff">Secure sessions  ·  Verified membership  ·  Server-side RBAC  ·  Tenant-aware queries  ·  PostgreSQL RLS  ·  Audited platform access</text>
+</svg>

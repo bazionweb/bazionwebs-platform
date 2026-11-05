@@ -137,3 +137,7 @@ The API intentionally refuses to start in production while `PAYMENT_PROVIDER=moc
 - HTTPS, secrets management, rate limits, alerting, and tested restore procedures.
 
 See [`docs/`](docs/) for architecture, security, client onboarding, deployment, research sources, GitHub setup, implementation status and the commerce roadmap.
+
+## Authentication and tenant architecture
+
+The target identity and access model is documented in [Authentication and tenant isolation](docs/architecture/authentication-and-tenant-isolation.md), with an editable [Mermaid source](docs/architecture/authentication-and-tenant-isolation.mmd) and a rendered [SVG diagram](docs/architecture/authentication-and-tenant-isolation.svg). This is an architecture decision, not a claim that authentication has already been implemented. See [ADR 0005](docs/adr/0005-authentication-and-tenant-identity.md).
