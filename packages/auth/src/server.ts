@@ -19,6 +19,7 @@ function required(name: string): string {
 }
 
 const nodeEnv = process.env.NODE_ENV ?? "development";
+const appBaseUrl = process.env.AUTH_APP_URL ?? "http://localhost:3000";
 const defaultTrustedOrigins = (process.env.BETTER_AUTH_TRUSTED_ORIGINS ?? "http://localhost:3000,http://localhost:4000")
   .split(",").map((value) => value.trim()).filter(Boolean);
 
