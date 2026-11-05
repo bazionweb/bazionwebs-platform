@@ -12,8 +12,10 @@ const mocks = vi.hoisted(() => ({
   cancelInvitation: vi.fn(),
   updateMemberRole: vi.fn(),
   removeMember: vi.fn(),
+  appendAuditEvent: vi.fn(),
 }));
 
+vi.mock("@bazion/audit", () => ({ PostgresAuditEventWriter: class { append(event: unknown) { return mocks.appendAuditEvent(event); } } }));
 vi.mock("@bazion/auth", () => ({ requireActiveTenantPermission: mocks.requirePermission, requirePlatformRole: mocks.requirePlatformRole }));
 vi.mock("@bazion/auth/server", () => ({ reconcileProvisioningTenants: mocks.reconcileProvisioningTenants, auth: { api: {
   listMembers: mocks.listMembers,
@@ -23,7 +25,7 @@ vi.mock("@bazion/auth/server", () => ({ reconcileProvisioningTenants: mocks.reco
   updateMemberRole: mocks.updateMemberRole,
   removeMember: mocks.removeMember,
 } } }));
-vi.mock("../../lib/database.js", () => ({ withTenantTransaction: vi.fn() }));
+vi.mock("../../lib/database.js", () => ({ pool: {}, withTenantTransaction: vi.fn() }));
 
 const context = {
   userId: "user-a",
@@ -56,6 +58,7 @@ describe("client administration API", () => {
     mocks.cancelInvitation.mockResolvedValue({ success: true });
     mocks.updateMemberRole.mockResolvedValue({ success: true });
     mocks.removeMember.mockResolvedValue({ success: true });
+    mocks.appendAuditEvent.mockResolvedValue(undefined);
   });
 
   it("requires analytics permission before loading overview data", async () => {
@@ -116,6 +119,12 @@ describe("client administration API", () => {
       expect(mocks.createInvitation).toHaveBeenCalledWith(expect.objectContaining({
         body: { email: "staff@example.test", role: "catalogManager", organizationId: "org-alpha" },
       }));
+      expect(mocks.appendAuditEvent).toHaveBeenCalledWith(expect.objectContaining({
+        action: "tenant.invitation.created.requested",
+        tenantId: "tenant-alpha",
+        metadata: { role: "catalogManager" },
+      }));
+      expect(JSON.stringify(mocks.appendAuditEvent.mock.calls)).not.toContain("staff@example.test");
     } finally {
       await app.close();
     }
@@ -141,6 +150,16 @@ describe("client administration API", () => {
       expect(mocks.removeMember).toHaveBeenCalledWith(expect.objectContaining({
         body: { memberIdOrEmail: "user-alpha", organizationId: "org-alpha" },
       }));
+      expect(mocks.appendAuditEvent).toHaveBeenCalledWith(expect.objectContaining({
+        action: "tenant.member.role.updated.completed",
+        tenantId: "tenant-alpha",
+        resourceId: "member-row-alpha",
+      }));
+      expect(mocks.appendAuditEvent).toHaveBeenCalledWith(expect.objectContaining({
+        action: "tenant.member.removed.completed",
+        tenantId: "tenant-alpha",
+        resourceId: "user-alpha",
+      }));
     } finally {
       await app.close();
     }
@@ -159,6 +178,7 @@ describe("platform tenant provisioning recovery", () => {
       unmatched: [{ tenantId: "tenant-stuck", slug: "stuck" }],
       conflicted: [],
     });
+    mocks.appendAuditEvent.mockReset().mockResolvedValue(undefined);
   });
 
   it("allows only a platform owner or administrator to reconcile stale provisioning rows", async () => {
@@ -181,6 +201,40 @@ describe("platform tenant provisioning recovery", () => {
         unmatched: [{ tenantId: "tenant-stuck", slug: "stuck" }],
         conflicted: [],
       });
+      expect(mocks.appendAuditEvent).toHaveBeenCalledTimes(2);
+      expect(mocks.appendAuditEvent).toHaveBeenNthCalledWith(1, expect.objectContaining({
+        actorType: "user",
+        actorId: "platform-admin",
+        actorRole: "platform_admin",
+        action: "tenant.provisioning.reconciliation.requested",
+        outcome: "succeeded",
+        tenantId: null,
+        metadata: { staleMinutes: 15, limit: 25 },
+      }));
+      expect(mocks.appendAuditEvent).toHaveBeenNthCalledWith(2, expect.objectContaining({
+        action: "tenant.provisioning.reconciliation.completed",
+        outcome: "succeeded",
+      }));
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("records failed reconciliation outcomes without logging the underlying error", async () => {
+    const app = await makeApp();
+    try {
+      mocks.reconcileProvisioningTenants.mockRejectedValue(new Error("database connection detail"));
+      const response = await app.inject({
+        method: "POST",
+        url: "/v1/admin/platform/tenants/reconcile-provisioning",
+        payload: {},
+      });
+      expect(response.statusCode).toBe(500);
+      expect(mocks.appendAuditEvent).toHaveBeenCalledWith(expect.objectContaining({
+        action: "tenant.provisioning.reconciliation.failed",
+        outcome: "failed",
+      }));
+      expect(JSON.stringify(mocks.appendAuditEvent.mock.calls)).not.toContain("database connection detail");
     } finally {
       await app.close();
     }

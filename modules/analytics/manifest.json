@@ -1,0 +1,32 @@
+{
+  "id": "analytics",
+  "name": "Analytics authorization surface",
+  "version": "1.0.0",
+  "owner": "analytics",
+  "status": "partial",
+  "entrypoints": {
+    "domain": "packages/analytics"
+  },
+  "tenantModel": "tenant-owned",
+  "permissions": [
+    {
+      "resource": "analytics",
+      "actions": [
+        "read"
+      ]
+    }
+  ],
+  "dependencies": [
+    "platform-identity"
+  ],
+  "operations": {
+    "logs": true,
+    "metrics": true,
+    "retention": "Use documented event retention and tenant export/delete controls.",
+    "recovery": "Rebuild derived aggregates from retained events where available; restore durable event data from backup.",
+    "enableDisable": "Can be disabled per tenant without affecting commerce or identity."
+  },
+  "tests": [
+    "packages/analytics/src"
+  ]
+}

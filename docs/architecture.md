@@ -37,7 +37,8 @@ A modular monolith keeps transactions, local development, deployment and debuggi
 - `packages/payments`: payment-provider port and normalized result types.
 - `packages/auth`: Better Auth runtime, sessions, organization membership, platform/client role checks and trusted tenant context.
 - `packages/ui`: shared design-system components.
-- `packages/notifications`: email/SMS provider interface and encrypted PostgreSQL outbox foundation; auth callback integration and supervised worker remain to be completed.
+- `packages/notifications`: durable authentication email outbox, enqueue-only and delivery-worker database roles, and a separately supervised SMTP worker; SMS and operator-facing dead-letter tooling remain planned.
+- `packages/audit`: append-only audit-event contract and PostgreSQL writer for privileged platform and tenant administration actions.
 - `packages/storage`: object-storage port and tenant object-key helper; provider adapters and media library remain planned.
 - `packages/booking`: initial booking types and booking-window validation; availability/resources/conflict management remain planned.
 - `packages/analytics`: initial privacy-aware event/sink contract; ingestion and tenant reports remain planned.
@@ -147,6 +148,6 @@ This is the target design; runtime authentication and tenant resolution remain i
 
 ## Advertised products and delivery plan
 
-The product map now lives in [products/catalog.json](../products/catalog.json), with 111 advertised capabilities mapped to reusable domain modules. [Commercial offerings](../products/commercial-offerings.json) keep service tiers and add-ons separate from implementation packages. Nine initial solution manifests are under solutions/.
+The product map now lives in [products/catalog.json](../products/catalog.json), with 111 advertised capabilities mapped to reusable domain modules. Versioned module contracts live under `modules/`, and the module-owned permission registry is `products/permissions.json`. [Commercial offerings](../products/commercial-offerings.json) keep service tiers and add-ons separate from implementation packages. Nine initial solution manifests are under solutions/.
 
 See [Product architecture](product-architecture.md) for the target package/app layout and [Implementation roadmap](implementation-roadmap.md) for phase gates and exit criteria.

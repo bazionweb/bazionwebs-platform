@@ -1,0 +1,28 @@
+{
+  "id": "website-content",
+  "name": "Website content authorization surface",
+  "version": "1.0.0",
+  "owner": "content",
+  "status": "planned",
+  "entrypoints": {},
+  "tenantModel": "tenant-owned",
+  "permissions": [
+    {
+      "resource": "store",
+      "actions": [
+        "read",
+        "update"
+      ]
+    }
+  ],
+  "dependencies": [
+    "platform-identity"
+  ],
+  "operations": {
+    "logs": false,
+    "metrics": false,
+    "retention": "Define revision and publication retention before release.",
+    "recovery": "Restore content and revision records from tenant-scoped backups.",
+    "enableDisable": "Planned; do not enable until the CMS API and publishing workflow exist."
+  }
+}
