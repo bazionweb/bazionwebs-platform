@@ -1,0 +1,85 @@
+{
+  "version": "1.0.0",
+  "status": "planned",
+  "id": "startup-saas",
+  "name": "Startup SaaS",
+  "description": "Multi-tenant SaaS starter with plans, entitlements, customer accounts and operational controls.",
+  "requiredModules": [
+    "platform-identity",
+    "tenant-control-plane",
+    "module-entitlements",
+    "client-portals",
+    "subscriptions-billing",
+    "payments",
+    "audit",
+    "observability-resilience"
+  ],
+  "optionalModules": [
+    "website-content",
+    "page-experience",
+    "forms-leads",
+    "contacts-crm",
+    "analytics",
+    "integration-hub",
+    "notifications"
+  ],
+  "defaultRoles": [
+    {
+      "id": "platform-owner",
+      "label": "Platform owner",
+      "permissions": [
+        "platform.*"
+      ]
+    },
+    {
+      "id": "tenant-admin",
+      "label": "Tenant administrator",
+      "permissions": [
+        "tenant.*",
+        "members.*",
+        "billing.read"
+      ]
+    },
+    {
+      "id": "member",
+      "label": "Member",
+      "permissions": [
+        "tenant.self.read",
+        "profile.self.update"
+      ]
+    }
+  ],
+  "navigation": [
+    {
+      "id": "workspace",
+      "label": "Workspace",
+      "module": "client-portals",
+      "path": "/workspace"
+    },
+    {
+      "id": "members",
+      "label": "Members",
+      "module": "platform-identity",
+      "path": "/admin/members"
+    },
+    {
+      "id": "billing",
+      "label": "Billing",
+      "module": "subscriptions-billing",
+      "path": "/admin/billing"
+    }
+  ],
+  "defaults": {
+    "locale": "en-KE",
+    "timezone": "Africa/Nairobi",
+    "currency": "KES",
+    "features": [
+      "tenant-workspaces",
+      "module-entitlements",
+      "subscription-plans"
+    ]
+  },
+  "templateIds": [
+    "saas-dashboard"
+  ]
+}
