@@ -10,7 +10,7 @@
         "packages/auth"
       ],
       "status": "implemented",
-      "scope": "Better Auth sessions, organization membership and roles exist. Extend with permission registry and service identities."
+      "scope": "Better Auth sessions, organization membership and tenant roles are implemented. Versioned module-owned permission declarations are checked against the static Better Auth adapter; service identities remain planned."
     },
     {
       "id": "tenant-control-plane",
@@ -328,7 +328,7 @@
         "packages/notifications"
       ],
       "status": "partial",
-      "scope": "Email/SMS provider interface and encrypted PostgreSQL outbox exist; worker and auth callback integration remain."
+      "scope": "Encrypted PostgreSQL outbox, durable auth callback enqueue, separate enqueue/worker roles and standalone SMTP delivery worker are implemented; SMS adapter, dead-letter operator UI and alerting remain planned."
     },
     {
       "id": "audit",
