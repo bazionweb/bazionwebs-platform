@@ -55,7 +55,7 @@ Build capabilities once and assemble client products with tenant configuration, 
 | [ ] | Localization of content | Translated records/pages, fallback language, localized slugs and translated SEO metadata. |
 | [ ] | Document generation | Tenant-branded PDFs/print templates for invoices, receipts, certificates, statements, reports and letters. |
 | [ ] | Customer/contact directory | People, companies/households, tags, consent, notes, communication preferences, import/export and relationships to orders/bookings/members. |
-| [~] | Notifications | Email/SMS provider interface exists. Add durable outbox, worker, templates, preferences, delivery status and retry handling. |
+| [~] | Notifications | Email/SMS provider interface plus encrypted PostgreSQL outbox, atomic claims, leases, retries and dead-letter controls now exist on the feature branch. Auth callback integration, supervised worker startup, provider adapters and integration tests remain before production completion. |
 | [ ] | Workflow and background jobs | Durable jobs, schedules, retry/backoff, dead letters, idempotent handlers and tenant-aware payloads. |
 | [~] | Booking and calendar | Basic booking types/window validation exist. Add availability, resources, recurring rules, timezone correctness, conflict detection, blackout dates and reminders. |
 | [~] | Analytics | Basic tenant event/sink interface exists. Add privacy rules, tenant dashboards, conversions, reports, export and retention. Do not use it as an audit log. |
