@@ -19,3 +19,11 @@ export {
   type PermissionAction,
   type PermissionResource,
 } from "./permissions.js";
+
+export {
+  canAccessPlatformPermission,
+  getPlatformPermissions,
+  platformPermissions,
+  type PlatformPermission,
+  type PlatformRole,
+} from "./security-policy.js";

@@ -1,7 +1,70 @@
 export type PlatformRole = "platform_owner" | "platform_admin" | "platform_support";
 
+export const platformPermissions = [
+  "platform.overview.read",
+  "tenant.list",
+  "tenant.read",
+  "tenant.create",
+  "tenant.update",
+  "tenant.suspend",
+  "tenant.restore",
+  "tenant.close",
+  "tenant.owner.assign",
+  "module.catalog.read",
+  "tenant.modules.update",
+  "tenant.settings.read",
+  "tenant.settings.update",
+  "tenant.domain.verify",
+  "audit.read",
+  "usage.read",
+] as const;
+
+export type PlatformPermission = (typeof platformPermissions)[number];
+
+const platformRolePermissions: Readonly<Record<PlatformRole, readonly PlatformPermission[]>> = {
+  platform_owner: platformPermissions,
+  platform_admin: [
+    "platform.overview.read",
+    "tenant.list",
+    "tenant.read",
+    "tenant.create",
+    "tenant.update",
+    "tenant.suspend",
+    "tenant.restore",
+    "module.catalog.read",
+    "tenant.modules.update",
+    "tenant.settings.read",
+    "tenant.settings.update",
+    "tenant.domain.verify",
+    "audit.read",
+    "usage.read",
+  ],
+  platform_support: [
+    "platform.overview.read",
+    "tenant.list",
+    "tenant.read",
+    "tenant.settings.read",
+    "audit.read",
+    "usage.read",
+  ],
+};
+
 export function isPlatformOrganizationCreator(role: string | null | undefined): role is "platform_owner" | "platform_admin" {
   return role === "platform_owner" || role === "platform_admin";
+}
+
+/** Platform permissions are independent of Better Auth organization roles. */
+export function canAccessPlatformPermission(
+  role: string | null | undefined,
+  permission: string,
+): permission is PlatformPermission {
+  if (role !== "platform_owner" && role !== "platform_admin" && role !== "platform_support") return false;
+  return (platformRolePermissions[role] as readonly string[]).includes(permission);
+}
+
+export function getPlatformPermissions(role: string | null | undefined): readonly PlatformPermission[] {
+  if (role !== "platform_owner" && role !== "platform_admin" && role !== "platform_support") return [];
+  return platformRolePermissions[role];
 }
 
 export function canCreateClientOrganization(
