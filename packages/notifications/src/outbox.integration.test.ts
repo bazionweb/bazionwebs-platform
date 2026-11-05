@@ -59,7 +59,7 @@ describe.skipIf(!integrationEnabled)("Postgres notification outbox roles and rec
 
   it("atomically claims, recovers an expired lease after worker restart, and completes delivery", async () => {
     const idempotencyKey = `integration:worker-recovery:${randomUUID()}`;
-    const id = await enqueuer.enqueue({
+    const id = await enqueuer!.enqueue({
       idempotencyKey,
       channel: "email",
       maxAttempts: 4,
