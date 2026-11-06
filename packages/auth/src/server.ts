@@ -372,7 +372,7 @@ export interface PlatformTenantRecord {
 }
 
 /** Read-only platform directory; caller must enforce tenant.list permission. */
-export async function listPlatformTenants(input: { limit: number; offset: number; status?: string }) {
+export async function listPlatformTenants(input: { limit: number; offset: number; status?: string | undefined }) {
   const values: unknown[] = [];
   const where = input.status ? (values.push(input.status), "WHERE status = $1") : "";
   values.push(input.limit, input.offset);
