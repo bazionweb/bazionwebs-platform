@@ -1,14 +1,17 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
+import { isIP } from "node:net";
 import { PostgresAuditEventWriter, type AuditEvent } from "@bazion/audit";
 import { fromNodeHeaders } from "better-auth/node";
 import { count, eq } from "drizzle-orm";
-import { requireActiveTenantPermission, requirePlatformRole, requirePlatformPermission, type ActiveTenantContext } from "@bazion/auth";
-import { auth, reconcileProvisioningTenants, listPlatformTenants, getPlatformTenant, transitionPlatformTenant, transferPlatformTenantOwner, listPlatformTenantOwnerCandidates, getPlatformTenantModuleEntitlements, updatePlatformTenantModuleEntitlement, getPlatformTenantSettings, updatePlatformTenantSettings, countPlatformTenantMembers } from "@bazion/auth/server";
+import { requireActiveTenantPermission, requirePlatformRole, requirePlatformPermission, normalizeTenantHostname, type ActiveTenantContext } from "@bazion/auth";
+import { auth, reconcileProvisioningTenants, listPlatformTenants, getPlatformTenant, transitionPlatformTenant, transferPlatformTenantOwner, listPlatformTenantOwnerCandidates, getPlatformTenantModuleEntitlements, updatePlatformTenantModuleEntitlement, getPlatformTenantSettings, updatePlatformTenantSettings, countPlatformTenantMembers, listPlatformTenantDomains, createPlatformTenantDomain, getPlatformTenantDomainChallenge, activatePlatformTenantDomain, disablePlatformTenantDomain } from "@bazion/auth/server";
 import { orders, products } from "@bazion/database";
 import { invitationInputSchema, memberListQuerySchema, memberRoleInputSchema, provisioningReconciliationInputSchema, platformTenantListQuerySchema, platformTenantLifecycleInputSchema, platformTenantOwnerTransferInputSchema, platformTenantOwnerCandidatesQuerySchema, platformTenantModuleInputSchema, platformTenantSettingsInputSchema, platformTenantAuditQuerySchema } from "./policy.js";
 import { pool, withTenantTransaction } from "../../lib/database.js";
 import { isTenantModuleEnabled } from "../../lib/tenant-modules.js";
 import { getPlatformModule, platformModuleCatalog } from "./module-catalog.js";
+import { platformTenantDomainInputSchema } from "./policy.js";
+import { verifyTenantDomainTxt } from "./domain-verification.js";
 
 const auditWriter = new PostgresAuditEventWriter(pool);
 
@@ -128,6 +131,124 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
     if (!tenant) return reply.code(404).send({ error: "TENANT_NOT_FOUND" });
     return reply.send({ tenant });
   });
+
+  app.get<{ Params: { tenantId: string } }>("/admin/platform/tenants/:tenantId/domains", async (request, reply) => {
+    const tenantId = request.params.tenantId.trim();
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(tenantId)) {
+      return reply.code(400).send({ error: "INVALID_INPUT" });
+    }
+    await requirePlatformPermission(request.headers, "tenant.domain.verify");
+    const tenant = await getPlatformTenant(tenantId);
+    if (!tenant) return reply.code(404).send({ error: "TENANT_NOT_FOUND" });
+    return reply.send({ items: await listPlatformTenantDomains(tenantId) });
+  });
+
+  app.post<{ Params: { tenantId: string } }>("/admin/platform/tenants/:tenantId/domains", async (request, reply) => {
+    const tenantId = request.params.tenantId.trim();
+    const parsed = platformTenantDomainInputSchema.safeParse(request.body);
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(tenantId) || !parsed.success) {
+      return reply.code(400).send({ error: "INVALID_INPUT", ...(parsed.success ? {} : { details: parsed.error.flatten() }) });
+    }
+    const hostname = normalizeTenantHostname(parsed.data.hostname);
+    if (!hostname || !hostname.includes(".") || isIP(hostname)) {
+      return reply.code(400).send({ error: "INVALID_HOSTNAME", message: "Enter a fully qualified DNS hostname, not an IP address or local hostname." });
+    }
+    const operator = await requirePlatformPermission(request.headers, "tenant.domain.verify");
+    const result = await withAudit(
+      request,
+      {
+        ...userAuditEvent(request, operator, "tenant_domain", null, { hostname }),
+        action: "tenant.domain.challenge.created",
+        tenantId,
+      },
+      () => createPlatformTenantDomain(tenantId, hostname),
+    );
+    if (result.kind === "tenant_not_active") {
+      return reply.code(409).send({ error: "TENANT_NOT_ACTIVE", message: "Custom domains can only be added to active tenants." });
+    }
+    if (result.kind === "hostname_conflict") {
+      return reply.code(409).send({ error: "DOMAIN_ALREADY_CLAIMED", message: "This hostname is already active or belongs to another tenant." });
+    }
+    return reply.code(201).send(result.value);
+  });
+
+  app.post<{ Params: { tenantId: string; domainId: string } }>(
+    "/admin/platform/tenants/:tenantId/domains/:domainId/verify",
+    async (request, reply) => {
+      const tenantId = request.params.tenantId.trim();
+      const domainId = request.params.domainId.trim();
+      if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(tenantId)
+        || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(domainId)) {
+        return reply.code(400).send({ error: "INVALID_INPUT" });
+      }
+      const operator = await requirePlatformPermission(request.headers, "tenant.domain.verify");
+      const challenge = await getPlatformTenantDomainChallenge(tenantId, domainId);
+      if (!challenge) return reply.code(404).send({ error: "DOMAIN_CHALLENGE_NOT_FOUND" });
+      if (challenge.status !== "pending") {
+        return reply.code(409).send({ error: "DOMAIN_NOT_PENDING", message: "Only pending domain challenges can be verified." });
+      }
+      try {
+        const domain = await withAudit(
+          request,
+          {
+            ...userAuditEvent(request, operator, "tenant_domain", domainId, { hostname: challenge.hostname }),
+            action: "tenant.domain.verification",
+            tenantId,
+          },
+          async () => {
+            const verified = await verifyTenantDomainTxt(challenge.hostname, challenge.verificationTokenHash);
+            if (!verified) {
+              throw Object.assign(new Error("The expected DNS TXT record was not found."), {
+                statusCode: 409, code: "DOMAIN_VERIFICATION_PENDING",
+              });
+            }
+            const activated = await activatePlatformTenantDomain(tenantId, domainId, challenge.verificationTokenHash);
+            if (!activated) {
+              throw Object.assign(new Error("The challenge changed or the tenant is no longer active."), {
+                statusCode: 409, code: "DOMAIN_VERIFICATION_CONFLICT",
+              });
+            }
+            return activated;
+          },
+        );
+        return reply.send({ domain });
+      } catch (error) {
+        if (error && typeof error === "object" && "statusCode" in error && typeof error.statusCode === "number") {
+          const code = "code" in error && typeof error.code === "string" ? error.code : "DOMAIN_VERIFICATION_FAILED";
+          const message = error instanceof Error ? error.message : "Domain verification failed.";
+          return reply.code(error.statusCode).send({ error: code, message });
+        }
+        throw error;
+      }
+    },
+  );
+
+  app.post<{ Params: { tenantId: string; domainId: string } }>(
+    "/admin/platform/tenants/:tenantId/domains/:domainId/disable",
+    async (request, reply) => {
+      const tenantId = request.params.tenantId.trim();
+      const domainId = request.params.domainId.trim();
+      if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(tenantId)
+        || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(domainId)) {
+        return reply.code(400).send({ error: "INVALID_INPUT" });
+      }
+      const operator = await requirePlatformPermission(request.headers, "tenant.domain.verify");
+      const existing = (await listPlatformTenantDomains(tenantId)).find((item) => item.id === domainId);
+      if (!existing) return reply.code(404).send({ error: "TENANT_DOMAIN_NOT_FOUND" });
+      if (existing.status === "disabled") return reply.code(409).send({ error: "TENANT_DOMAIN_ALREADY_DISABLED" });
+      const result = await withAudit(
+        request,
+        {
+          ...userAuditEvent(request, operator, "tenant_domain", domainId, { hostname: existing.hostname }),
+          action: "tenant.domain.disabled",
+          tenantId,
+        },
+        () => disablePlatformTenantDomain(tenantId, domainId),
+      );
+      if (!result) return reply.code(409).send({ error: "TENANT_DOMAIN_DISABLE_CONFLICT" });
+      return reply.send({ domain: result });
+    },
+  );
 
   app.post<{ Params: { tenantId: string } }>("/admin/platform/tenants/:tenantId/owner", async (request, reply) => {
     const tenantId = request.params.tenantId.trim();
