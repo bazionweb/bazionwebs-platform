@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   requirePlatformRole: vi.fn(),
   requirePlatformPermission: vi.fn(),
   listPlatformTenants: vi.fn(),
+  getPlatformTenant: vi.fn(),
   transitionPlatformTenant: vi.fn(),
   reconcileProvisioningTenants: vi.fn(),
   listMembers: vi.fn(),
@@ -20,7 +21,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("@bazion/audit", () => ({ PostgresAuditEventWriter: class { append(event: unknown) { return mocks.appendAuditEvent(event); } } }));
 vi.mock("@bazion/auth", () => ({ requireActiveTenantPermission: mocks.requirePermission, requirePlatformRole: mocks.requirePlatformRole, requirePlatformPermission: mocks.requirePlatformPermission }));
-vi.mock("@bazion/auth/server", () => ({ reconcileProvisioningTenants: mocks.reconcileProvisioningTenants, listPlatformTenants: mocks.listPlatformTenants, transitionPlatformTenant: mocks.transitionPlatformTenant, auth: { api: {
+vi.mock("@bazion/auth/server", () => ({ reconcileProvisioningTenants: mocks.reconcileProvisioningTenants, listPlatformTenants: mocks.listPlatformTenants, getPlatformTenant: mocks.getPlatformTenant, transitionPlatformTenant: mocks.transitionPlatformTenant, auth: { api: {
   listMembers: mocks.listMembers,
   listInvitations: mocks.listInvitations,
   createInvitation: mocks.createInvitation,
@@ -56,6 +57,7 @@ describe("client administration API", () => {
     mocks.requirePlatformRole.mockResolvedValue({ userId: "platform-admin", email: "admin@bazion.test", role: "platform_admin" });
     mocks.requirePlatformPermission.mockResolvedValue({ userId: "platform-admin", email: "admin@bazion.test", role: "platform_admin" });
     mocks.listPlatformTenants.mockResolvedValue({ items: [], total: 0, limit: 50, offset: 0 });
+    mocks.getPlatformTenant.mockResolvedValue({ id: "tenant-alpha", slug: "alpha", name: "Alpha Store", status: "active" });
     mocks.transitionPlatformTenant.mockResolvedValue({ id: "tenant-alpha", slug: "alpha", status: "suspended" });
     mocks.reconcileProvisioningTenants.mockResolvedValue({ scanned: 2, activated: 1, unmatched: [{ tenantId: "tenant-stuck", slug: "stuck" }], conflicted: [] });
     mocks.listMembers.mockResolvedValue({ members: [], total: 0 });
@@ -364,5 +366,57 @@ describe("platform tenant lifecycle API", () => {
       expect(mocks.requirePlatformPermission).not.toHaveBeenCalled();
       expect(mocks.transitionPlatformTenant).not.toHaveBeenCalled();
     } finally { await app.close(); }
+  });
+});
+
+
+describe("platform tenant detail API", () => {
+  it("checks tenant.read permission before returning a tenant record", async () => {
+    const app = await makeApp();
+    try {
+      const response = await app.inject({
+        method: "GET",
+        url: "/v1/admin/platform/tenants/11111111-1111-4111-8111-111111111111",
+      });
+      expect(response.statusCode).toBe(200);
+      expect(mocks.requirePlatformPermission).toHaveBeenCalledWith(expect.any(Object), "tenant.read");
+      expect(mocks.getPlatformTenant).toHaveBeenCalledWith("11111111-1111-4111-8111-111111111111");
+      expect(response.json().tenant.id).toBe("tenant-alpha");
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("does not disclose tenant records when platform permission is denied", async () => {
+    const app = await makeApp();
+    try {
+      mocks.requirePlatformPermission.mockRejectedValueOnce(Object.assign(new Error("Forbidden"), {
+        statusCode: 403, code: "PLATFORM_PERMISSION_DENIED",
+      }));
+      const response = await app.inject({
+        method: "GET",
+        url: "/v1/admin/platform/tenants/11111111-1111-4111-8111-111111111111",
+      });
+      expect(response.statusCode).toBe(403);
+      expect(mocks.getPlatformTenant).not.toHaveBeenCalled();
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("returns not found for unknown tenant IDs and rejects malformed identifiers", async () => {
+    const app = await makeApp();
+    try {
+      mocks.getPlatformTenant.mockResolvedValueOnce(null);
+      const missing = await app.inject({
+        method: "GET", url: "/v1/admin/platform/tenants/11111111-1111-4111-8111-111111111111",
+      });
+      expect(missing.statusCode).toBe(404);
+      const invalid = await app.inject({ method: "GET", url: "/v1/admin/platform/tenants/not-a-uuid" });
+      expect(invalid.statusCode).toBe(400);
+      expect(mocks.getPlatformTenant).toHaveBeenCalledTimes(1);
+    } finally {
+      await app.close();
+    }
   });
 });
