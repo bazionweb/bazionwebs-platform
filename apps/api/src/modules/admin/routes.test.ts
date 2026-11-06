@@ -5,6 +5,9 @@ import { adminRoutes } from "./routes.js";
 const mocks = vi.hoisted(() => ({
   requirePermission: vi.fn(),
   requirePlatformRole: vi.fn(),
+  requirePlatformPermission: vi.fn(),
+  listPlatformTenants: vi.fn(),
+  transitionPlatformTenant: vi.fn(),
   reconcileProvisioningTenants: vi.fn(),
   listMembers: vi.fn(),
   listInvitations: vi.fn(),
@@ -16,8 +19,8 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@bazion/audit", () => ({ PostgresAuditEventWriter: class { append(event: unknown) { return mocks.appendAuditEvent(event); } } }));
-vi.mock("@bazion/auth", () => ({ requireActiveTenantPermission: mocks.requirePermission, requirePlatformRole: mocks.requirePlatformRole }));
-vi.mock("@bazion/auth/server", () => ({ reconcileProvisioningTenants: mocks.reconcileProvisioningTenants, auth: { api: {
+vi.mock("@bazion/auth", () => ({ requireActiveTenantPermission: mocks.requirePermission, requirePlatformRole: mocks.requirePlatformRole, requirePlatformPermission: mocks.requirePlatformPermission }));
+vi.mock("@bazion/auth/server", () => ({ reconcileProvisioningTenants: mocks.reconcileProvisioningTenants, listPlatformTenants: mocks.listPlatformTenants, transitionPlatformTenant: mocks.transitionPlatformTenant, auth: { api: {
   listMembers: mocks.listMembers,
   listInvitations: mocks.listInvitations,
   createInvitation: mocks.createInvitation,
@@ -51,6 +54,9 @@ describe("client administration API", () => {
     Object.values(mocks).forEach((mock) => mock.mockReset());
     mocks.requirePermission.mockResolvedValue(context);
     mocks.requirePlatformRole.mockResolvedValue({ userId: "platform-admin", email: "admin@bazion.test", role: "platform_admin" });
+    mocks.requirePlatformPermission.mockResolvedValue({ userId: "platform-admin", email: "admin@bazion.test", role: "platform_admin" });
+    mocks.listPlatformTenants.mockResolvedValue({ items: [], total: 0, limit: 50, offset: 0 });
+    mocks.transitionPlatformTenant.mockResolvedValue({ id: "tenant-alpha", slug: "alpha", status: "suspended" });
     mocks.reconcileProvisioningTenants.mockResolvedValue({ scanned: 2, activated: 1, unmatched: [{ tenantId: "tenant-stuck", slug: "stuck" }], conflicted: [] });
     mocks.listMembers.mockResolvedValue({ members: [], total: 0 });
     mocks.listInvitations.mockResolvedValue([]);
@@ -272,5 +278,91 @@ describe("platform tenant provisioning recovery", () => {
     } finally {
       await app.close();
     }
+  });
+});
+
+
+describe("platform tenant lifecycle API", () => {
+  beforeEach(() => {
+    mocks.requirePlatformPermission.mockReset().mockResolvedValue({
+      userId: "platform-admin", email: "admin@bazion.test", role: "platform_admin",
+    });
+    mocks.listPlatformTenants.mockReset().mockResolvedValue({ items: [], total: 0, limit: 50, offset: 0 });
+    mocks.transitionPlatformTenant.mockReset().mockResolvedValue({
+      id: "tenant-alpha", slug: "alpha", status: "suspended",
+    });
+    mocks.appendAuditEvent.mockReset().mockResolvedValue(undefined);
+  });
+
+  it("lists tenants only after checking the platform tenant.list permission", async () => {
+    const app = await makeApp();
+    try {
+      const response = await app.inject({ method: "GET", url: "/v1/admin/platform/tenants?status=active&limit=20" });
+      expect(response.statusCode).toBe(200);
+      expect(mocks.requirePlatformPermission).toHaveBeenCalledWith(expect.any(Object), "tenant.list");
+      expect(mocks.listPlatformTenants).toHaveBeenCalledWith({ status: "active", limit: 20, offset: 0 });
+    } finally { await app.close(); }
+  });
+
+  it("audits and applies a suspend transition with the matching permission", async () => {
+    const app = await makeApp();
+    try {
+      const response = await app.inject({
+        method: "PATCH",
+        url: "/v1/admin/platform/tenants/11111111-1111-4111-8111-111111111111/lifecycle",
+        payload: { action: "suspend" },
+      });
+      expect(response.statusCode).toBe(200);
+      expect(mocks.requirePlatformPermission).toHaveBeenCalledWith(expect.any(Object), "tenant.suspend");
+      expect(mocks.transitionPlatformTenant).toHaveBeenCalledWith({
+        tenantId: "11111111-1111-4111-8111-111111111111", action: "suspend",
+      });
+      expect(mocks.appendAuditEvent).toHaveBeenCalledWith(expect.objectContaining({
+        action: "tenant.suspend.requested", tenantId: "11111111-1111-4111-8111-111111111111",
+      }));
+    } finally { await app.close(); }
+  });
+
+  it("requires the owner-only close permission and never silently deletes a tenant", async () => {
+    const app = await makeApp();
+    try {
+      mocks.requirePlatformPermission.mockRejectedValueOnce(Object.assign(new Error("Forbidden"), {
+        statusCode: 403, code: "PLATFORM_PERMISSION_DENIED",
+      }));
+      const response = await app.inject({
+        method: "PATCH",
+        url: "/v1/admin/platform/tenants/11111111-1111-4111-8111-111111111111/lifecycle",
+        payload: { action: "close" },
+      });
+      expect(response.statusCode).toBe(403);
+      expect(mocks.transitionPlatformTenant).not.toHaveBeenCalled();
+    } finally { await app.close(); }
+  });
+
+  it("returns a conflict when the requested state transition is not valid", async () => {
+    const app = await makeApp();
+    try {
+      mocks.transitionPlatformTenant.mockResolvedValueOnce(null);
+      const response = await app.inject({
+        method: "PATCH",
+        url: "/v1/admin/platform/tenants/11111111-1111-4111-8111-111111111111/lifecycle",
+        payload: { action: "restore" },
+      });
+      expect(response.statusCode).toBe(409);
+      expect(response.json().error).toBe("TENANT_STATE_CONFLICT");
+    } finally { await app.close(); }
+  });
+
+  it("rejects malformed tenant identifiers and extra lifecycle fields", async () => {
+    const app = await makeApp();
+    try {
+      const response = await app.inject({
+        method: "PATCH", url: "/v1/admin/platform/tenants/not-a-uuid/lifecycle",
+        payload: { action: "suspend", force: true },
+      });
+      expect(response.statusCode).toBe(400);
+      expect(mocks.requirePlatformPermission).not.toHaveBeenCalled();
+      expect(mocks.transitionPlatformTenant).not.toHaveBeenCalled();
+    } finally { await app.close(); }
   });
 });
