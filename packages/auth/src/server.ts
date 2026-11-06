@@ -417,3 +417,83 @@ export async function transitionPlatformTenant(input: {
   );
   return result.rows[0] ?? null;
 }
+
+
+export interface PlatformTenantOwnerTransfer {
+  previousOwnerUserId: string;
+  newOwnerUserId: string;
+}
+
+/**
+ * Atomically transfers the Better Auth organization owner role. The organization
+ * row serializes concurrent transfers; membership rows are locked and checked
+ * again inside the transaction. The previous owner is retained as an admin.
+ */
+export async function transferPlatformTenantOwner(
+  tenantId: string,
+  targetUserId: string,
+): Promise<PlatformTenantOwnerTransfer | null> {
+  const tenantResult = await tenantResolverPool.query<{
+    auth_organization_id: string | null;
+    status: string;
+  }>(
+    `SELECT auth_organization_id, status
+       FROM public.tenants
+      WHERE id = $1
+      LIMIT 1`,
+    [tenantId],
+  );
+  const tenant = tenantResult.rows[0];
+  if (!tenant?.auth_organization_id || tenant.status === "closed") return null;
+
+  const client = await authPool.connect();
+  try {
+    await client.query("BEGIN");
+    const organization = await client.query<{ id: string }>(
+      'SELECT id FROM "organization" WHERE id = $1 FOR UPDATE',
+      [tenant.auth_organization_id],
+    );
+    if (organization.rowCount !== 1) {
+      await client.query("ROLLBACK");
+      return null;
+    }
+
+    const membershipResult = await client.query<{
+      id: string;
+      userId: string;
+      role: string;
+    }>(
+      'SELECT id, "userId", role FROM "member" WHERE "organizationId" = $1 ORDER BY id FOR UPDATE',
+      [tenant.auth_organization_id],
+    );
+    const memberships = membershipResult.rows;
+    const hasOwner = (role: string) => role.split(",").map((item) => item.trim()).includes("owner");
+    const owners = memberships.filter((member) => hasOwner(member.role));
+    const target = memberships.find((member) => member.userId === targetUserId);
+    if (owners.length !== 1 || !target || owners[0]!.userId === targetUserId) {
+      await client.query("ROLLBACK");
+      return null;
+    }
+
+    const previousOwner = owners[0]!;
+    const previousRoles = previousOwner.role.split(",").map((item) => item.trim()).filter((item) => item && item !== "owner");
+    const targetRoles = target.role.split(",").map((item) => item.trim()).filter(Boolean);
+    if (!targetRoles.includes("owner")) targetRoles.push("owner");
+
+    await client.query(
+      'UPDATE "member" SET role = $1 WHERE id = $2',
+      [previousRoles.length ? previousRoles.join(",") : "admin", previousOwner.id],
+    );
+    await client.query(
+      'UPDATE "member" SET role = $1 WHERE id = $2',
+      [targetRoles.join(","), target.id],
+    );
+    await client.query("COMMIT");
+    return { previousOwnerUserId: previousOwner.userId, newOwnerUserId: target.userId };
+  } catch (error) {
+    await client.query("ROLLBACK").catch(() => undefined);
+    throw error;
+  } finally {
+    client.release();
+  }
+}
