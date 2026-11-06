@@ -121,7 +121,7 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
       request,
       {
         ...userAuditEvent(request, operator, "tenant_owner", tenantId, { targetUserId: parsed.data.targetUserId }),
-        action: "tenant.owner.transferred",
+        action: "tenant.owner.assignment",
         tenantId,
       },
       () => transferPlatformTenantOwner(tenantId, parsed.data.targetUserId),
@@ -129,7 +129,7 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
     if (!result) {
       return reply.code(409).send({
         error: "TENANT_OWNER_TRANSFER_CONFLICT",
-        message: "The tenant must have exactly one current owner, and the target must be a different existing tenant member. Closed or unmapped tenants cannot be transferred.",
+        message: "The tenant must have zero or one current owner, and the target must be a different existing tenant member. Closed or unmapped tenants cannot be assigned.",
       });
     }
     return reply.send({ transfer: result });
