@@ -17,6 +17,12 @@ const mocks = vi.hoisted(() => ({
   getPlatformTenantSettings: vi.fn(),
   updatePlatformTenantSettings: vi.fn(),
   countPlatformTenantMembers: vi.fn(),
+  listPlatformTenantDomains: vi.fn(),
+  createPlatformTenantDomain: vi.fn(),
+  getPlatformTenantDomainChallenge: vi.fn(),
+  activatePlatformTenantDomain: vi.fn(),
+  disablePlatformTenantDomain: vi.fn(),
+  verifyTenantDomainTxt: vi.fn(),
   query: vi.fn(),
   reconcileProvisioningTenants: vi.fn(),
   listMembers: vi.fn(),
@@ -29,8 +35,8 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@bazion/audit", () => ({ PostgresAuditEventWriter: class { append(event: unknown) { return mocks.appendAuditEvent(event); } } }));
-vi.mock("@bazion/auth", () => ({ requireActiveTenantPermission: mocks.requirePermission, requirePlatformRole: mocks.requirePlatformRole, requirePlatformPermission: mocks.requirePlatformPermission }));
-vi.mock("@bazion/auth/server", () => ({ reconcileProvisioningTenants: mocks.reconcileProvisioningTenants, listPlatformTenants: mocks.listPlatformTenants, getPlatformTenant: mocks.getPlatformTenant, transitionPlatformTenant: mocks.transitionPlatformTenant, transferPlatformTenantOwner: mocks.transferPlatformTenantOwner, listPlatformTenantOwnerCandidates: mocks.listPlatformTenantOwnerCandidates, getPlatformTenantModuleEntitlements: mocks.getPlatformTenantModuleEntitlements, updatePlatformTenantModuleEntitlement: mocks.updatePlatformTenantModuleEntitlement, isPlatformTenantModuleEnabled: mocks.isPlatformTenantModuleEnabled, getPlatformTenantSettings: mocks.getPlatformTenantSettings, updatePlatformTenantSettings: mocks.updatePlatformTenantSettings, countPlatformTenantMembers: mocks.countPlatformTenantMembers, auth: { api: {
+vi.mock("@bazion/auth", () => ({ requireActiveTenantPermission: mocks.requirePermission, requirePlatformRole: mocks.requirePlatformRole, requirePlatformPermission: mocks.requirePlatformPermission, normalizeTenantHostname: (hostname: string) => { const value = hostname.trim().toLowerCase().replace(/\\.$/, ""); return /^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$/.test(value) ? value : null; } }));
+vi.mock("@bazion/auth/server", () => ({ reconcileProvisioningTenants: mocks.reconcileProvisioningTenants, listPlatformTenants: mocks.listPlatformTenants, getPlatformTenant: mocks.getPlatformTenant, transitionPlatformTenant: mocks.transitionPlatformTenant, transferPlatformTenantOwner: mocks.transferPlatformTenantOwner, listPlatformTenantOwnerCandidates: mocks.listPlatformTenantOwnerCandidates, getPlatformTenantModuleEntitlements: mocks.getPlatformTenantModuleEntitlements, updatePlatformTenantModuleEntitlement: mocks.updatePlatformTenantModuleEntitlement, isPlatformTenantModuleEnabled: mocks.isPlatformTenantModuleEnabled, getPlatformTenantSettings: mocks.getPlatformTenantSettings, updatePlatformTenantSettings: mocks.updatePlatformTenantSettings, countPlatformTenantMembers: mocks.countPlatformTenantMembers, listPlatformTenantDomains: mocks.listPlatformTenantDomains, createPlatformTenantDomain: mocks.createPlatformTenantDomain, getPlatformTenantDomainChallenge: mocks.getPlatformTenantDomainChallenge, activatePlatformTenantDomain: mocks.activatePlatformTenantDomain, disablePlatformTenantDomain: mocks.disablePlatformTenantDomain, auth: { api: {
   listMembers: mocks.listMembers,
   listInvitations: mocks.listInvitations,
   createInvitation: mocks.createInvitation,
@@ -38,6 +44,7 @@ vi.mock("@bazion/auth/server", () => ({ reconcileProvisioningTenants: mocks.reco
   updateMemberRole: mocks.updateMemberRole,
   removeMember: mocks.removeMember,
 } } }));
+vi.mock("./domain-verification.js", () => ({ verifyTenantDomainTxt: mocks.verifyTenantDomainTxt }));
 vi.mock("../../lib/database.js", () => ({ pool: { query: mocks.query }, withTenantTransaction: vi.fn() }));
 
 const context = {
@@ -661,5 +668,112 @@ describe("platform tenant control-plane extensions", () => {
       expect(usage.statusCode).toBe(200);
       expect(usage.json()).toMatchObject({ members: 7, products: 4, activeProducts: 3, orders: 9 });
     } finally { await app.close(); }
+  });
+});
+
+
+describe("platform tenant custom domains", () => {
+  const tenantId = "00000000-0000-4000-8000-000000000001";
+  const domainId = "00000000-0000-4000-8000-000000000002";
+  const pendingDomain = {
+    id: domainId,
+    hostname: "shop.example.com",
+    status: "pending",
+    verified_at: null,
+    created_at: "2026-11-06T00:00:00.000Z",
+    updated_at: "2026-11-06T00:00:00.000Z",
+  };
+  const activeDomain = { ...pendingDomain, status: "active", verified_at: "2026-11-06T01:00:00.000Z" };
+
+  beforeEach(() => {
+    Object.values(mocks).forEach((mock) => mock.mockReset());
+    mocks.requirePlatformPermission.mockResolvedValue({ userId: "platform-admin", email: "admin@bazion.test", role: "platform_admin" });
+    mocks.getPlatformTenant.mockResolvedValue({ id: tenantId, slug: "alpha", name: "Alpha Store", status: "active" });
+    mocks.listPlatformTenantDomains.mockResolvedValue([pendingDomain]);
+    mocks.createPlatformTenantDomain.mockResolvedValue({
+      kind: "created",
+      value: {
+        domain: pendingDomain,
+        challenge: { type: "TXT", name: "_bazionweb-challenge.shop.example.com", value: "bazionweb-verification=secret-one-time-value" },
+      },
+    });
+    mocks.getPlatformTenantDomainChallenge.mockResolvedValue({
+      hostname: "shop.example.com",
+      verificationTokenHash: "a".repeat(64),
+      status: "pending",
+    });
+    mocks.verifyTenantDomainTxt.mockResolvedValue(true);
+    mocks.activatePlatformTenantDomain.mockResolvedValue(activeDomain);
+    mocks.disablePlatformTenantDomain.mockResolvedValue({ ...pendingDomain, status: "disabled" });
+    mocks.appendAuditEvent.mockResolvedValue(undefined);
+  });
+
+  it("creates a DNS challenge only after platform-domain permission and does not audit the one-time token", async () => {
+    const app = await makeApp();
+    try {
+      const response = await app.inject({
+        method: "POST",
+        url: `/v1/admin/platform/tenants/${tenantId}/domains`,
+        payload: { hostname: " Shop.Example.com. " },
+      });
+      expect(response.statusCode).toBe(201);
+      expect(mocks.requirePlatformPermission).toHaveBeenCalledWith(expect.any(Object), "tenant.domain.verify");
+      expect(mocks.createPlatformTenantDomain).toHaveBeenCalledWith(tenantId, "shop.example.com");
+      expect(response.json().challenge.name).toBe("_bazionweb-challenge.shop.example.com");
+      expect(JSON.stringify(mocks.appendAuditEvent.mock.calls)).not.toContain("secret-one-time-value");
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("activates a pending domain only after the matching DNS TXT proof succeeds", async () => {
+    const app = await makeApp();
+    try {
+      const response = await app.inject({
+        method: "POST",
+        url: `/v1/admin/platform/tenants/${tenantId}/domains/${domainId}/verify`,
+      });
+      expect(response.statusCode).toBe(200);
+      expect(mocks.verifyTenantDomainTxt).toHaveBeenCalledWith("shop.example.com", "a".repeat(64));
+      expect(mocks.activatePlatformTenantDomain).toHaveBeenCalledWith(tenantId, domainId, "a".repeat(64));
+      expect(response.json().domain.status).toBe("active");
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("keeps the domain pending and returns 409 when the TXT proof is missing", async () => {
+    const app = await makeApp();
+    try {
+      mocks.verifyTenantDomainTxt.mockResolvedValue(false);
+      const response = await app.inject({
+        method: "POST",
+        url: `/v1/admin/platform/tenants/${tenantId}/domains/${domainId}/verify`,
+      });
+      expect(response.statusCode).toBe(409);
+      expect(response.json().error).toBe("DOMAIN_VERIFICATION_PENDING");
+      expect(mocks.activatePlatformTenantDomain).not.toHaveBeenCalled();
+      expect(mocks.appendAuditEvent).toHaveBeenCalledWith(expect.objectContaining({
+        action: "tenant.domain.verification.failed",
+        tenantId,
+      }));
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("audits domain disable and delegates the tenant-scoped update", async () => {
+    const app = await makeApp();
+    try {
+      const response = await app.inject({
+        method: "POST",
+        url: `/v1/admin/platform/tenants/${tenantId}/domains/${domainId}/disable`,
+      });
+      expect(response.statusCode).toBe(200);
+      expect(mocks.disablePlatformTenantDomain).toHaveBeenCalledWith(tenantId, domainId);
+      expect(response.json().domain.status).toBe("disabled");
+    } finally {
+      await app.close();
+    }
   });
 });
