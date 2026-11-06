@@ -16,9 +16,9 @@ describe("authentication and tenant-origin policy", () => {
     expect(canCreateClientOrganization(null, true)).toBe(false);
   });
 
-  it("reserves the client owner role for platform operators", () => {
-    expect(canGrantClientOwner("platform_owner", "owner")).toBe(true);
-    expect(canGrantClientOwner("platform_admin", "admin,owner")).toBe(true);
+  it("reserves client owner grants for the audited platform transfer workflow", () => {
+    expect(canGrantClientOwner("platform_owner", "owner")).toBe(false);
+    expect(canGrantClientOwner("platform_admin", "admin,owner")).toBe(false);
     expect(canGrantClientOwner("platform_support", "admin,owner")).toBe(false);
     expect(canGrantClientOwner("admin", "owner")).toBe(false);
     expect(canGrantClientOwner("admin", "admin,orderManager")).toBe(true);
