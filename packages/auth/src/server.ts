@@ -431,6 +431,250 @@ export async function getPlatformTenant(tenantId: string): Promise<PlatformTenan
   return result.rows[0] ?? null;
 }
 
+
+export interface PlatformTenantOwnerCandidate {
+  userId: string;
+  name: string;
+  email: string;
+  emailVerified: boolean;
+  roles: string[];
+}
+
+export async function listPlatformTenantOwnerCandidates(
+  tenantId: string,
+  input: { limit: number; offset: number; query?: string },
+): Promise<{ currentOwners: PlatformTenantOwnerCandidate[]; candidates: PlatformTenantOwnerCandidate[]; total: number; limit: number; offset: number } | null> {
+  const tenantResult = await tenantResolverPool.query<{ auth_organization_id: string | null; status: string }>(
+    "SELECT auth_organization_id, status FROM public.tenants WHERE id = $1 LIMIT 1",
+    [tenantId],
+  );
+  const tenant = tenantResult.rows[0];
+  if (!tenant?.auth_organization_id || tenant.status === "closed") return null;
+
+  const values: unknown[] = [tenant.auth_organization_id];
+  let search = "";
+  if (input.query?.trim()) {
+    values.push(`%${input.query.trim().replace(/[!%_]/g, "!$&")}%`);
+    search = ` AND (u.name ILIKE $2 ESCAPE '!' OR u.email ILIKE $2 ESCAPE '!')`;
+  }
+  const pageValues = [...values, input.limit, input.offset];
+  const membershipRows = await authPool.query<{
+    user_id: string; name: string; email: string; email_verified: boolean; role: string;
+  }>(
+    `SELECT m."userId" AS user_id, u.name, u.email, u."emailVerified" AS email_verified, m.role
+       FROM "member" m
+       JOIN "user" u ON u.id = m."userId"
+      WHERE m."organizationId" = $1${search}
+      ORDER BY u.name ASC, u.email ASC, m.id ASC
+      LIMIT ${pageValues.length - 1} OFFSET ${pageValues.length}`,
+    pageValues,
+  );
+  const countResult = await authPool.query<{ total: string }>(
+    `SELECT count(*)::text AS total
+       FROM "member" m
+       JOIN "user" u ON u.id = m."userId"
+      WHERE m."organizationId" = $1${search}`,
+    values,
+  );
+  const ownerResult = await authPool.query<{
+    user_id: string; name: string; email: string; email_verified: boolean; role: string;
+  }>(
+    `SELECT m."userId" AS user_id, u.name, u.email, u."emailVerified" AS email_verified, m.role
+       FROM "member" m
+       JOIN "user" u ON u.id = m."userId"
+      WHERE m."organizationId" = $1
+        AND (',' || replace(m.role, ' ', '') || ',') LIKE '%,owner,%'
+      ORDER BY u.name ASC, m.id ASC`,
+    [tenant.auth_organization_id],
+  );
+  const toCandidate = (row: typeof membershipRows.rows[number]): PlatformTenantOwnerCandidate => ({
+    userId: row.user_id,
+    name: row.name,
+    email: row.email,
+    emailVerified: row.email_verified,
+    roles: row.role.split(",").map((role) => role.trim()).filter(Boolean),
+  });
+  return {
+    currentOwners: ownerResult.rows.map(toCandidate),
+    candidates: membershipRows.rows.map(toCandidate),
+    total: Number(countResult.rows[0]?.total ?? 0),
+    limit: input.limit,
+    offset: input.offset,
+  };
+}
+
+export interface PlatformTenantModuleEntitlement {
+  module_id: string;
+  enabled: boolean;
+  updated_at: string;
+  updated_by: string;
+}
+
+export async function getPlatformTenantModuleEntitlements(tenantId: string): Promise<PlatformTenantModuleEntitlement[]> {
+  const result = await tenantResolverPool.query<PlatformTenantModuleEntitlement>(
+    `SELECT module_id, enabled, updated_at, updated_by
+       FROM public.tenant_module_entitlements
+      WHERE tenant_id = $1
+      ORDER BY module_id ASC`,
+    [tenantId],
+  );
+  return result.rows;
+}
+
+export async function updatePlatformTenantModuleEntitlement(input: {
+  tenantId: string;
+  moduleId: string;
+  enabled: boolean;
+  actorUserId: string;
+}): Promise<PlatformTenantModuleEntitlement | null> {
+  const client = await tenantProvisionerPool.connect();
+  try {
+    await client.query("BEGIN");
+    const tenant = await client.query<{ id: string; status: string }>(
+      "SELECT id, status FROM public.tenants WHERE id = $1 FOR UPDATE",
+      [input.tenantId],
+    );
+    if (tenant.rowCount !== 1 || tenant.rows[0]?.status === "closed") {
+      await client.query("ROLLBACK");
+      return null;
+    }
+    const result = await client.query<PlatformTenantModuleEntitlement>(
+      `INSERT INTO public.tenant_module_entitlements (tenant_id, module_id, enabled, updated_by)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (tenant_id, module_id)
+       DO UPDATE SET enabled = EXCLUDED.enabled, updated_by = EXCLUDED.updated_by, updated_at = now()
+       RETURNING module_id, enabled, updated_at, updated_by`,
+      [input.tenantId, input.moduleId, input.enabled, input.actorUserId],
+    );
+    await client.query("COMMIT");
+    return result.rows[0] ?? null;
+  } catch (error) {
+    await client.query("ROLLBACK").catch(() => undefined);
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+export interface PlatformTenantSettings {
+  settings: {
+    locale: string;
+    timeZone: string;
+    defaultCurrency: "KES" | "USD" | "EUR" | "GBP";
+    brandName: string;
+    primaryColor: string;
+    supportEmail: string;
+  };
+  version: number;
+  updatedAt: string | null;
+}
+
+const defaultPlatformTenantSettings = {
+  locale: "en-KE",
+  timeZone: "Africa/Nairobi",
+  defaultCurrency: "KES" as const,
+  brandName: "",
+  primaryColor: "#236b4c",
+  supportEmail: "",
+};
+
+export async function getPlatformTenantSettings(tenantId: string): Promise<PlatformTenantSettings | null> {
+  const tenant = await tenantResolverPool.query<{ id: string; default_currency: "KES" | "USD" | "EUR" | "GBP" }>(
+    "SELECT id, default_currency FROM public.tenants WHERE id = $1 LIMIT 1",
+    [tenantId],
+  );
+  if (tenant.rowCount !== 1) return null;
+  const result = await tenantResolverPool.query<{
+    settings: Partial<PlatformTenantSettings["settings"]>;
+    version: number;
+    updated_at: Date | null;
+  }>(
+    "SELECT settings, version, updated_at FROM public.tenant_platform_settings WHERE tenant_id = $1 LIMIT 1",
+    [tenantId],
+  );
+  const row = result.rows[0];
+  return {
+    settings: { ...defaultPlatformTenantSettings, ...(row?.settings ?? {}), defaultCurrency: tenant.rows[0]!.default_currency },
+    version: row?.version ?? 0,
+    updatedAt: row?.updated_at?.toISOString() ?? null,
+  };
+}
+
+export async function updatePlatformTenantSettings(input: {
+  tenantId: string;
+  expectedVersion: number;
+  settings: Partial<PlatformTenantSettings["settings"]>;
+  actorUserId: string;
+}): Promise<{ kind: "updated"; value: PlatformTenantSettings } | { kind: "conflict" | "not_found" }> {
+  const client = await tenantProvisionerPool.connect();
+  try {
+    await client.query("BEGIN");
+    const tenant = await client.query<{ id: string; status: string; default_currency: "KES" | "USD" | "EUR" | "GBP" }>(
+      "SELECT id, status, default_currency FROM public.tenants WHERE id = $1 FOR UPDATE",
+      [input.tenantId],
+    );
+    if (tenant.rowCount !== 1 || tenant.rows[0]?.status === "closed") {
+      await client.query("ROLLBACK");
+      return { kind: "not_found" };
+    }
+    const current = await client.query<{
+      settings: Partial<PlatformTenantSettings["settings"]>;
+      version: number;
+      updated_at: Date | null;
+    }>(
+      "SELECT settings, version, updated_at FROM public.tenant_platform_settings WHERE tenant_id = $1 FOR UPDATE",
+      [input.tenantId],
+    );
+    const row = current.rows[0];
+    const version = row?.version ?? 0;
+    if (version !== input.expectedVersion) {
+      await client.query("ROLLBACK");
+      return { kind: "conflict" };
+    }
+    const settings = { ...defaultPlatformTenantSettings, ...(row?.settings ?? {}), ...input.settings, defaultCurrency: input.settings.defaultCurrency ?? tenant.rows[0]!.default_currency };
+    await client.query("UPDATE public.tenants SET default_currency = $1, updated_at = now() WHERE id = $2", [settings.defaultCurrency, input.tenantId]);
+    const { defaultCurrency, ...persistedSettings } = settings;
+    const written = await client.query<{
+      settings: PlatformTenantSettings["settings"];
+      version: number;
+      updated_at: Date;
+    }>(
+      `INSERT INTO public.tenant_platform_settings (tenant_id, settings, version, updated_by)
+       VALUES ($1, $2::jsonb, 1, $3)
+       ON CONFLICT (tenant_id)
+       DO UPDATE SET settings = EXCLUDED.settings, version = public.tenant_platform_settings.version + 1,
+                     updated_by = EXCLUDED.updated_by, updated_at = now()
+       RETURNING settings, version, updated_at`,
+      [input.tenantId, JSON.stringify(persistedSettings), input.actorUserId],
+    );
+    await client.query("COMMIT");
+    const saved = written.rows[0]!;
+    return {
+      kind: "updated",
+      value: { settings: { ...defaultPlatformTenantSettings, ...saved.settings, defaultCurrency }, version: saved.version, updatedAt: saved.updated_at.toISOString() },
+    };
+  } catch (error) {
+    await client.query("ROLLBACK").catch(() => undefined);
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+export async function countPlatformTenantMembers(tenantId: string): Promise<number | null> {
+  const tenant = await tenantResolverPool.query<{ auth_organization_id: string | null }>(
+    "SELECT auth_organization_id FROM public.tenants WHERE id = $1 LIMIT 1",
+    [tenantId],
+  );
+  const organizationId = tenant.rows[0]?.auth_organization_id;
+  if (!organizationId) return null;
+  const result = await authPool.query<{ total: string }>(
+    'SELECT count(*)::text AS total FROM "member" WHERE "organizationId" = $1',
+    [organizationId],
+  );
+  return Number(result.rows[0]?.total ?? 0);
+}
+
 export interface PlatformTenantOwnerTransfer {
   previousOwnerUserId: string | null;
   newOwnerUserId: string;
@@ -475,15 +719,16 @@ export async function transferPlatformTenantOwner(
       id: string;
       userId: string;
       role: string;
+      email_verified: boolean;
     }>(
-      'SELECT id, "userId", role FROM "member" WHERE "organizationId" = $1 ORDER BY id FOR UPDATE',
+      'SELECT m.id, m."userId", m.role, u."emailVerified" AS email_verified FROM "member" m JOIN "user" u ON u.id = m."userId" WHERE m."organizationId" = $1 ORDER BY m.id FOR UPDATE OF m',
       [tenant.auth_organization_id],
     );
     const memberships = membershipResult.rows;
     const hasOwner = (role: string) => role.split(",").map((item) => item.trim()).includes("owner");
     const owners = memberships.filter((member) => hasOwner(member.role));
     const target = memberships.find((member) => member.userId === targetUserId);
-    if (owners.length > 1 || !target || owners[0]?.userId === targetUserId) {
+    if (owners.length > 1 || !target || !target.email_verified || owners[0]?.userId === targetUserId) {
       await client.query("ROLLBACK");
       return null;
     }

@@ -4,6 +4,10 @@ import {
   invitationInputSchema,
   memberListQuerySchema,
   memberRoleInputSchema,
+  platformTenantOwnerCandidatesQuerySchema,
+  platformTenantModuleInputSchema,
+  platformTenantSettingsInputSchema,
+  platformTenantAuditQuerySchema,
 } from "./policy.js";
 
 describe("client administration input policy", () => {
@@ -27,5 +31,40 @@ describe("client administration input policy", () => {
     expect(memberListQuerySchema.parse({ limit: "25", offset: "50" })).toEqual({ limit: 25, offset: 50 });
     expect(memberListQuerySchema.safeParse({ limit: "500" }).success).toBe(false);
     expect(memberListQuerySchema.safeParse({ offset: "-1" }).success).toBe(false);
+  });
+});
+
+
+describe("platform tenant control-plane input policy", () => {
+  it("bounds and normalizes owner candidate searches", () => {
+    expect(platformTenantOwnerCandidatesQuerySchema.parse({ q: "  jane ", limit: "25" }))
+      .toEqual({ q: "jane", limit: 25, offset: 0 });
+    expect(platformTenantOwnerCandidatesQuerySchema.safeParse({ limit: "500" }).success).toBe(false);
+  });
+
+  it("accepts only explicit module enabled state", () => {
+    expect(platformTenantModuleInputSchema.safeParse({ enabled: false }).success).toBe(true);
+    expect(platformTenantModuleInputSchema.safeParse({ enabled: true, force: true }).success).toBe(false);
+  });
+
+  it("requires a version and a non-empty allowlisted settings patch", () => {
+    expect(platformTenantSettingsInputSchema.safeParse({
+      expectedVersion: 0,
+      settings: { brandName: "Bazion Client", primaryColor: "#236b4c", defaultCurrency: "KES" },
+    }).success).toBe(true);
+    expect(platformTenantSettingsInputSchema.safeParse({
+      expectedVersion: 0, settings: { arbitrary: "unsafe" },
+    }).success).toBe(false);
+    expect(platformTenantSettingsInputSchema.safeParse({
+      expectedVersion: 0, settings: { defaultCurrency: "XXX" },
+    }).success).toBe(false);
+    expect(platformTenantSettingsInputSchema.safeParse({
+      expectedVersion: 0, settings: {},
+    }).success).toBe(false);
+  });
+
+  it("bounds audit history pagination and optional action filters", () => {
+    expect(platformTenantAuditQuerySchema.parse({ limit: "10" })).toEqual({ limit: 10, offset: 0 });
+    expect(platformTenantAuditQuerySchema.safeParse({ offset: "-1" }).success).toBe(false);
   });
 });

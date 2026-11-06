@@ -28,11 +28,11 @@ Build capabilities once and assemble client products with tenant configuration, 
 | [x] | Client workspace administration | /admin workspace metrics, team listing, invitations, role changes and member removal; PR #5 is merged. |
 | [ ] | Platform-owner administration | Global tenant directory/lifecycle, platform-member management, assign client owners, suspend/close tenants, support tools and global audit. Separate from client administration. |
 | [~] | Client provisioning | Organization-to-tenant reservation/mapping exists. Still add onboarding workflow, failure reconciliation, initial workspace configuration and provisioning status. |
-| [ ] | Tenant settings and branding | Logo, colors, typography, favicon, locale, timezone, currency, contact/legal details, navigation and configurable defaults. |
+| [~] | Tenant settings and branding | Superadmin API/UI now supports locale, timezone, default currency, brand name, primary color and support email with optimistic versioning. Extend to logo, typography, favicon, legal details, navigation and client-side propagation. |
 | [~] | Custom domains | Verified-domain lookup exists. Add DNS challenge, domain ownership workflow, retries, TLS/SSL lifecycle, redirects, removal and domain settings UI. |
-| [ ] | Module catalogue and entitlements | Per-tenant enabled modules, dependencies, plan entitlements, defaults, safe enable/disable and upgrade handling. |
+| [~] | Module catalogue and entitlements | Manifest-backed catalogue snapshot, per-tenant overrides, dependency checks and server-side commerce/analytics gates exist. Add generated catalogue loading, plan entitlements, quotas and gates to every module/job before enabling more modules. |
 | [ ] | Permission registry | Central resource/action vocabulary, module-owned permission declarations, role mapping and server enforcement. |
-| [ ] | Audit log | Append-only records of sensitive actions: actor, tenant, action, target, timestamp, correlation ID and safe change metadata. Not the same as analytics. |
+| [~] | Audit log | Append-only storage and permission-checked tenant history view exist. Add platform-wide search, retention/archive policy, filters and export. Not the same as analytics. |
 | [ ] | API keys and service accounts | Scoped machine identities, hashed secrets, expiry, rotation, revocation, tenant binding, rate limits and audit events. |
 | [ ] | Webhook platform | Tenant-configured outbound endpoints, subscriptions, signing secrets, attempts, retries, replay protection and delivery logs. Separate from inbound payment webhooks. |
 | [ ] | Localization foundation | Language/locale, timezone, translated messages, currency/date formatting, regional address rules and time-zone-safe scheduling. |
@@ -113,7 +113,7 @@ Each pack needs a manifest specifying required/optional modules, default roles, 
 | [ ] | Backups and recovery | Automated DB/object backups, retention, off-site copies, point-in-time recovery where supported and scheduled restore drills. |
 | [ ] | Observability | Structured logs, metrics, traces, correlation IDs, error reporting and tenant-safe operations views. |
 | [ ] | Uptime and status | Health/synthetic checks, incidents, maintenance notices and client status page. |
-| [ ] | Usage metering | Seats, storage, bandwidth where measurable, domains, deployments, jobs and API usage. |
+| [~] | Usage metering | Live tenant member, product and order counts are available. Add storage, bandwidth, API requests, domains, deployments, jobs and billing-grade aggregation. |
 | [ ] | Security operations | Dependency/secret scanning, vulnerability response, security headers, rate limits, incident log and access reviews. |
 | [ ] | Release management | Versioned packages/templates, compatibility checks, migration release notes, previews and rollback procedures. |
 | [ ] | CLI and scaffolding | Generate a module, adapter, template or client project using approved conventions. |
@@ -208,8 +208,8 @@ Mandatory rules:
 ## Gate 1 — finish the shared platform shell
 - [ ] Build the platform-owner dashboard and tenant lifecycle.
 - [ ] Complete tenant provisioning reconciliation and custom-domain verification.
-- [ ] Implement the module registry, tenant entitlements and tenant settings.
-- [ ] Add platform audit logs and API keys/service accounts.
+- [~] Implement the module registry, tenant entitlements and tenant settings; expand manifest loading and feature gates across all modules.
+- [~] Add platform audit logs and API keys/service accounts; tenant-scoped audit read UI/API is in place.
 - [ ] Update README/architecture docs to reflect merged authentication, lockfile, migrations and client dashboard.
 
 ## Gate 2 — reusable delivery primitives
@@ -225,7 +225,7 @@ Mandatory rules:
 - [ ] Commerce hardening: inventory, real payments, tax, shipping, fulfilment, returns/refunds and customer portal.
 - [ ] Booking/reservations.
 - [ ] CRM/customer management.
-- [ ] Platform billing and usage metering.
+- [~] Usage counts are available; billing-grade metering and platform billing remain.
 - [ ] Document generation and support workflows.
 
 ## Gate 4 — vertical solutions
@@ -239,7 +239,7 @@ Mandatory rules:
 ## Gate 5 — operations and AI
 - [ ] Project provisioning, deployments, domains and environments.
 - [ ] Backups, restore drills, observability, monitoring and status.
-- [ ] CLI/scaffolding, package versioning and module catalogue UI.
+- [~] Tenant module catalogue/entitlement UI exists; CLI/scaffolding and package versioning remain.
 - [ ] Permission-checked MCP servers and agent workflows.
 
 ## Release rule

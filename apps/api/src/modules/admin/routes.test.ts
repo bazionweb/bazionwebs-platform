@@ -10,6 +10,14 @@ const mocks = vi.hoisted(() => ({
   getPlatformTenant: vi.fn(),
   transitionPlatformTenant: vi.fn(),
   transferPlatformTenantOwner: vi.fn(),
+  listPlatformTenantOwnerCandidates: vi.fn(),
+  getPlatformTenantModuleEntitlements: vi.fn(),
+  updatePlatformTenantModuleEntitlement: vi.fn(),
+  isPlatformTenantModuleEnabled: vi.fn(),
+  getPlatformTenantSettings: vi.fn(),
+  updatePlatformTenantSettings: vi.fn(),
+  countPlatformTenantMembers: vi.fn(),
+  query: vi.fn(),
   reconcileProvisioningTenants: vi.fn(),
   listMembers: vi.fn(),
   listInvitations: vi.fn(),
@@ -22,7 +30,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("@bazion/audit", () => ({ PostgresAuditEventWriter: class { append(event: unknown) { return mocks.appendAuditEvent(event); } } }));
 vi.mock("@bazion/auth", () => ({ requireActiveTenantPermission: mocks.requirePermission, requirePlatformRole: mocks.requirePlatformRole, requirePlatformPermission: mocks.requirePlatformPermission }));
-vi.mock("@bazion/auth/server", () => ({ reconcileProvisioningTenants: mocks.reconcileProvisioningTenants, listPlatformTenants: mocks.listPlatformTenants, getPlatformTenant: mocks.getPlatformTenant, transitionPlatformTenant: mocks.transitionPlatformTenant, transferPlatformTenantOwner: mocks.transferPlatformTenantOwner, auth: { api: {
+vi.mock("@bazion/auth/server", () => ({ reconcileProvisioningTenants: mocks.reconcileProvisioningTenants, listPlatformTenants: mocks.listPlatformTenants, getPlatformTenant: mocks.getPlatformTenant, transitionPlatformTenant: mocks.transitionPlatformTenant, transferPlatformTenantOwner: mocks.transferPlatformTenantOwner, listPlatformTenantOwnerCandidates: mocks.listPlatformTenantOwnerCandidates, getPlatformTenantModuleEntitlements: mocks.getPlatformTenantModuleEntitlements, updatePlatformTenantModuleEntitlement: mocks.updatePlatformTenantModuleEntitlement, isPlatformTenantModuleEnabled: mocks.isPlatformTenantModuleEnabled, getPlatformTenantSettings: mocks.getPlatformTenantSettings, updatePlatformTenantSettings: mocks.updatePlatformTenantSettings, countPlatformTenantMembers: mocks.countPlatformTenantMembers, auth: { api: {
   listMembers: mocks.listMembers,
   listInvitations: mocks.listInvitations,
   createInvitation: mocks.createInvitation,
@@ -30,7 +38,7 @@ vi.mock("@bazion/auth/server", () => ({ reconcileProvisioningTenants: mocks.reco
   updateMemberRole: mocks.updateMemberRole,
   removeMember: mocks.removeMember,
 } } }));
-vi.mock("../../lib/database.js", () => ({ pool: {}, withTenantTransaction: vi.fn() }));
+vi.mock("../../lib/database.js", () => ({ pool: { query: mocks.query }, withTenantTransaction: vi.fn() }));
 
 const context = {
   userId: "user-a",
@@ -61,6 +69,14 @@ describe("client administration API", () => {
     mocks.getPlatformTenant.mockResolvedValue({ id: "tenant-alpha", slug: "alpha", name: "Alpha Store", status: "active" });
     mocks.transitionPlatformTenant.mockResolvedValue({ id: "tenant-alpha", slug: "alpha", status: "suspended" });
     mocks.transferPlatformTenantOwner.mockResolvedValue({ previousOwnerUserId: "old-owner", newOwnerUserId: "new-owner" });
+    mocks.listPlatformTenantOwnerCandidates.mockResolvedValue({ currentOwners: [], candidates: [], total: 0, limit: 50, offset: 0 });
+    mocks.getPlatformTenantModuleEntitlements.mockResolvedValue([]);
+    mocks.updatePlatformTenantModuleEntitlement.mockResolvedValue({ module_id: "commerce", enabled: false, updated_at: "2026-11-06T00:00:00.000Z", updated_by: "platform-owner" });
+    mocks.isPlatformTenantModuleEnabled.mockResolvedValue(true);
+    mocks.getPlatformTenantSettings.mockResolvedValue({ settings: { locale: "en-KE", timeZone: "Africa/Nairobi", brandName: "", primaryColor: "#236b4c", supportEmail: "" }, version: 0, updatedAt: null });
+    mocks.updatePlatformTenantSettings.mockResolvedValue({ kind: "updated", value: { settings: { locale: "en-KE", timeZone: "Africa/Nairobi", brandName: "Alpha", primaryColor: "#236b4c", supportEmail: "" }, version: 1, updatedAt: "2026-11-06T00:00:00.000Z" } });
+    mocks.countPlatformTenantMembers.mockResolvedValue(3);
+    mocks.query.mockResolvedValue({ rows: [], rowCount: 0 });
     mocks.reconcileProvisioningTenants.mockResolvedValue({ scanned: 2, activated: 1, unmatched: [{ tenantId: "tenant-stuck", slug: "stuck" }], conflicted: [] });
     mocks.listMembers.mockResolvedValue({ members: [], total: 0 });
     mocks.listInvitations.mockResolvedValue([]);
@@ -506,5 +522,144 @@ describe("platform tenant owner transfer API", () => {
     } finally {
       await app.close();
     }
+  });
+});
+
+
+describe("platform tenant control-plane extensions", () => {
+  beforeEach(() => {
+    mocks.requirePlatformPermission.mockReset().mockResolvedValue({
+      userId: "platform-owner", email: "owner@bazion.test", role: "platform_owner",
+    });
+    mocks.appendAuditEvent.mockReset().mockResolvedValue(undefined);
+    mocks.getPlatformTenant.mockReset().mockResolvedValue({ id: "11111111-1111-4111-8111-111111111111", slug: "alpha", name: "Alpha Store", default_currency: "KES", status: "active", created_at: "2026-11-06T00:00:00.000Z", suspended_at: null, closed_at: null });
+    mocks.updatePlatformTenantModuleEntitlement.mockReset().mockResolvedValue({
+      module_id: "commerce", enabled: false, updated_at: "2026-11-06T00:00:00.000Z", updated_by: "platform-owner",
+    });
+    mocks.countPlatformTenantMembers.mockReset().mockResolvedValue(3);
+    mocks.listPlatformTenantOwnerCandidates.mockReset().mockResolvedValue({
+      currentOwners: [{ userId: "owner-a", name: "Owner A", email: "owner@example.test", emailVerified: true, roles: ["owner"] }],
+      candidates: [{ userId: "member-b", name: "Member B", email: "member@example.test", emailVerified: true, roles: ["member"] }],
+      total: 1, limit: 50, offset: 0,
+    });
+    mocks.getPlatformTenantModuleEntitlements.mockReset().mockResolvedValue([]);
+    mocks.updatePlatformTenantModuleEntitlement.mockReset().mockResolvedValue({
+      module_id: "commerce", enabled: false, updated_at: "2026-11-06T00:00:00.000Z", updated_by: "platform-owner",
+    });
+    mocks.getPlatformTenantSettings.mockReset().mockResolvedValue({
+      settings: { locale: "en-KE", timeZone: "Africa/Nairobi", brandName: "", primaryColor: "#236b4c", supportEmail: "" },
+      version: 0, updatedAt: null,
+    });
+    mocks.updatePlatformTenantSettings.mockReset().mockResolvedValue({
+      kind: "updated",
+      value: { settings: { locale: "en-KE", timeZone: "Africa/Nairobi", brandName: "Alpha", primaryColor: "#236b4c", supportEmail: "" }, version: 1, updatedAt: "2026-11-06T00:00:00.000Z" },
+    });
+    mocks.query.mockReset().mockResolvedValue({ rows: [], rowCount: 0 });
+  });
+
+  it("lists owner candidates only for platform owners with the dedicated permission", async () => {
+    const app = await makeApp();
+    try {
+      const response = await app.inject({
+        method: "GET",
+        url: "/v1/admin/platform/tenants/11111111-1111-4111-8111-111111111111/owner-candidates?q=member",
+      });
+      expect(response.statusCode).toBe(200);
+      expect(mocks.requirePlatformPermission).toHaveBeenCalledWith(expect.any(Object), "tenant.owner.assign");
+      expect(mocks.listPlatformTenantOwnerCandidates).toHaveBeenCalledWith(
+        "11111111-1111-4111-8111-111111111111", { limit: 50, offset: 0, query: "member" },
+      );
+      expect(response.json().candidates[0].userId).toBe("member-b");
+    } finally { await app.close(); }
+  });
+
+  it("returns manifest-backed module metadata and default effective entitlements", async () => {
+    const app = await makeApp();
+    try {
+      const response = await app.inject({
+        method: "GET",
+        url: "/v1/admin/platform/tenants/11111111-1111-4111-8111-111111111111/modules",
+      });
+      expect(response.statusCode).toBe(200);
+      expect(mocks.requirePlatformPermission).toHaveBeenCalledWith(expect.any(Object), "module.catalog.read");
+      expect(response.json().modules.find((item: { id: string }) => item.id === "commerce").enabled).toBe(true);
+      expect(response.json().modules.find((item: { id: string }) => item.id === "contacts-crm").canManage).toBe(false);
+    } finally { await app.close(); }
+  });
+
+  it("audits entitlement changes and prevents activation of planned modules", async () => {
+    const app = await makeApp();
+    try {
+      const planned = await app.inject({
+        method: "PUT",
+        url: "/v1/admin/platform/tenants/11111111-1111-4111-8111-111111111111/modules/contacts-crm",
+        payload: { enabled: true },
+      });
+      expect(planned.statusCode).toBe(409);
+      expect(mocks.updatePlatformTenantModuleEntitlement).not.toHaveBeenCalled();
+
+      const changed = await app.inject({
+        method: "PUT",
+        url: "/v1/admin/platform/tenants/11111111-1111-4111-8111-111111111111/modules/commerce",
+        payload: { enabled: false },
+      });
+      expect(changed.statusCode).toBe(200);
+      expect(mocks.requirePlatformPermission).toHaveBeenCalledWith(expect.any(Object), "tenant.modules.update");
+      expect(mocks.appendAuditEvent).toHaveBeenCalledWith(expect.objectContaining({
+        action: "tenant.module.entitlement.updated.requested",
+        metadata: { moduleId: "commerce", enabled: false },
+      }));
+    } finally { await app.close(); }
+  });
+
+  it("reads and version-checks tenant configuration updates", async () => {
+    const app = await makeApp();
+    try {
+      const read = await app.inject({
+        method: "GET",
+        url: "/v1/admin/platform/tenants/11111111-1111-4111-8111-111111111111/settings",
+      });
+      const write = await app.inject({
+        method: "PATCH",
+        url: "/v1/admin/platform/tenants/11111111-1111-4111-8111-111111111111/settings",
+        payload: { expectedVersion: 0, settings: { brandName: "Alpha" } },
+      });
+      expect(read.statusCode).toBe(200);
+      expect(write.statusCode).toBe(200);
+      expect(mocks.requirePlatformPermission).toHaveBeenCalledWith(expect.any(Object), "tenant.settings.read");
+      expect(mocks.requirePlatformPermission).toHaveBeenCalledWith(expect.any(Object), "tenant.settings.update");
+      expect(mocks.updatePlatformTenantSettings).toHaveBeenCalledWith(expect.objectContaining({
+        tenantId: "11111111-1111-4111-8111-111111111111", expectedVersion: 0, settings: { brandName: "Alpha" },
+      }));
+      expect(mocks.appendAuditEvent).toHaveBeenCalledWith(expect.objectContaining({
+        action: "tenant.settings.updated.requested", metadata: { changedKeys: "brandName", expectedVersion: 0 },
+      }));
+    } finally { await app.close(); }
+  });
+
+  it("returns append-only audit history and scoped usage counters", async () => {
+    const app = await makeApp();
+    try {
+      mocks.query.mockResolvedValueOnce({ rows: [{ total: "1" }], rowCount: 1 })
+        .mockResolvedValueOnce({ rows: [{ id: "event-a", action: "tenant.suspend.completed" }], rowCount: 1 });
+      const audit = await app.inject({
+        method: "GET",
+        url: "/v1/admin/platform/tenants/11111111-1111-4111-8111-111111111111/audit?limit=10",
+      });
+      expect(audit.statusCode).toBe(200);
+      expect(audit.json().items[0].id).toBe("event-a");
+
+      const { withTenantTransaction } = await import("../../lib/database.js");
+      vi.mocked(withTenantTransaction).mockResolvedValueOnce({
+        products: 4, activeProducts: 3, orders: 9, paidOrders: 5, pendingOrders: 2,
+      } as never);
+      mocks.countPlatformTenantMembers.mockResolvedValueOnce(7);
+      const usage = await app.inject({
+        method: "GET",
+        url: "/v1/admin/platform/tenants/11111111-1111-4111-8111-111111111111/usage",
+      });
+      expect(usage.statusCode).toBe(200);
+      expect(usage.json()).toMatchObject({ members: 7, products: 4, activeProducts: 3, orders: 9 });
+    } finally { await app.close(); }
   });
 });
