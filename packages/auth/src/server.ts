@@ -427,7 +427,8 @@ export interface PlatformTenantOwnerTransfer {
 /**
  * Atomically transfers the Better Auth organization owner role. The organization
  * row serializes concurrent transfers; membership rows are locked and checked
- * again inside the transaction. The previous owner is retained as an admin.
+ * again inside the transaction. Initial assignment is allowed when no owner
+ * exists; on transfer, the previous owner is retained as an admin.
  */
 export async function transferPlatformTenantOwner(
   tenantId: string,
