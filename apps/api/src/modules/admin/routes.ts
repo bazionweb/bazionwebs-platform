@@ -164,7 +164,7 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
         return reply.code(400).send({ error: "INVALID_INPUT", ...(parsed.success ? {} : { details: parsed.error.flatten() }) });
       }
       await requirePlatformPermission(request.headers, "tenant.owner.assign");
-      const result = await listPlatformTenantOwnerCandidates(tenantId, { limit: parsed.data.limit, offset: parsed.data.offset, query: parsed.data.q });
+      const result = await listPlatformTenantOwnerCandidates(tenantId, { limit: parsed.data.limit, offset: parsed.data.offset, ...(parsed.data.q === undefined ? {} : { query: parsed.data.q }) });
       if (!result) return reply.code(404).send({ error: "TENANT_NOT_FOUND_OR_NOT_ASSIGNABLE" });
       return reply.send(result);
     },
@@ -292,7 +292,14 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
           const result = await updatePlatformTenantSettings({
             tenantId,
             expectedVersion: parsed.data.expectedVersion,
-            settings: parsed.data.settings,
+            settings: {
+              ...(parsed.data.settings.locale === undefined ? {} : { locale: parsed.data.settings.locale }),
+              ...(parsed.data.settings.timeZone === undefined ? {} : { timeZone: parsed.data.settings.timeZone }),
+              ...(parsed.data.settings.defaultCurrency === undefined ? {} : { defaultCurrency: parsed.data.settings.defaultCurrency }),
+              ...(parsed.data.settings.brandName === undefined ? {} : { brandName: parsed.data.settings.brandName }),
+              ...(parsed.data.settings.primaryColor === undefined ? {} : { primaryColor: parsed.data.settings.primaryColor }),
+              ...(parsed.data.settings.supportEmail === undefined ? {} : { supportEmail: parsed.data.settings.supportEmail }),
+            },
             actorUserId: operator.userId,
           });
           if (result.kind !== "updated") {
