@@ -20,14 +20,14 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("@bazion/audit", () => ({ PostgresAuditEventWriter: class { append(event: unknown) { return mocks.appendAuditEvent(event); } } }));
 vi.mock("@bazion/auth", () => ({ requireActiveTenantPermission: mocks.requirePermission, requirePlatformRole: mocks.requirePlatformRole, requirePlatformPermission: mocks.requirePlatformPermission }));
-vi.mock("@bazion/auth/server", () => ({ reconcileProvisioningTenants: mocks.reconcileProvisioningTenants, listPlatformTenants: mocks.listPlatformTenants, transitionPlatformTenant: mocks.transitionPlatformTenant, auth: {
+vi.mock("@bazion/auth/server", () => ({ reconcileProvisioningTenants: mocks.reconcileProvisioningTenants, listPlatformTenants: mocks.listPlatformTenants, transitionPlatformTenant: mocks.transitionPlatformTenant, auth: { api: {
   listMembers: mocks.listMembers,
   listInvitations: mocks.listInvitations,
   createInvitation: mocks.createInvitation,
   cancelInvitation: mocks.cancelInvitation,
   updateMemberRole: mocks.updateMemberRole,
   removeMember: mocks.removeMember,
-} }));
+} } }));
 vi.mock("../../lib/database.js", () => ({ pool: {}, withTenantTransaction: vi.fn() }));
 
 const context = {
