@@ -404,6 +404,7 @@ export async function getPlatformTenantDomainChallenge(
     `SELECT hostname, verification_token_hash, status
        FROM public.tenant_domains
       WHERE tenant_id = $1 AND id = $2
+        AND status = 'pending' AND updated_at > now() - interval '7 days'
       LIMIT 1`,
     [tenantId, domainId],
   );
@@ -423,6 +424,7 @@ export async function activatePlatformTenantDomain(
         SET status = 'active', verified_at = now(), verification_token_hash = NULL, updated_at = now()
       WHERE d.tenant_id = $1 AND d.id = $2 AND d.status = 'pending'
         AND d.verification_token_hash = $3
+        AND d.updated_at > now() - interval '7 days'
         AND EXISTS (SELECT 1 FROM public.tenants t WHERE t.id = d.tenant_id AND t.status = 'active')
       RETURNING d.id, d.hostname, d.status, d.verified_at::text AS verified_at,
                 d.created_at::text AS created_at, d.updated_at::text AS updated_at`,
