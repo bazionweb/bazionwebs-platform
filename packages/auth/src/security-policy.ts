@@ -82,7 +82,9 @@ export function canGrantClientOwner(
   platformRole: string | null | undefined,
   requestedOrganizationRoles: string,
 ): boolean {
-  return !parseRoles(requestedOrganizationRoles).includes("owner") || isPlatformOrganizationCreator(platformRole);
+  // Client ownership is a platform-level authority transfer. Platform admins
+  // may create organizations, but only the platform owner may grant ownership.
+  return !parseRoles(requestedOrganizationRoles).includes("owner") || platformRole === "platform_owner";
 }
 
 export function normalizeTenantHostname(hostname: string): string | null {
