@@ -38,3 +38,8 @@ export const platformTenantListQuerySchema = z.object({
 export const platformTenantLifecycleInputSchema = z.object({
   action: z.enum(["suspend", "restore", "close"]),
 }).strict();
+
+
+export const platformTenantOwnerTransferInputSchema = z.object({
+  targetUserId: z.string().trim().min(1).max(128),
+}).strict();
