@@ -222,7 +222,7 @@ export function TenantControlPanel(props: {
         </form>
         {domainChallenge && <div className="notice-inline domain-challenge" role="status">
           <strong>Publish this DNS TXT record</strong>
-          <p>Add the record below at your DNS provider. The challenge value is shown only when generated; add the same hostname again to rotate it if it is lost.</p>
+          <p>Add the record below at your DNS provider. The challenge value is shown only when generated; it expires after seven days. Add the same hostname again to rotate it if it is lost.</p>
           <p><strong>Type:</strong> TXT<br/><strong>Name / Host:</strong> <code>{domainChallenge.name}</code><br/><strong>Value:</strong> <code>{domainChallenge.value}</code></p>
           <p>After the DNS record has propagated, select Verify. The platform checks the TXT record before enabling the hostname.</p>
         </div>}
