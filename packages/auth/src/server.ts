@@ -419,6 +419,18 @@ export async function transitionPlatformTenant(input: {
 }
 
 
+/** Read-only detail lookup; caller must enforce tenant.read permission. */
+export async function getPlatformTenant(tenantId: string): Promise<PlatformTenantRecord | null> {
+  const result = await tenantResolverPool.query<PlatformTenantRecord>(
+    `SELECT id, slug, name, default_currency, status, created_at, suspended_at, closed_at
+       FROM public.tenants
+      WHERE id = $1
+      LIMIT 1`,
+    [tenantId],
+  );
+  return result.rows[0] ?? null;
+}
+
 export interface PlatformTenantOwnerTransfer {
   previousOwnerUserId: string | null;
   newOwnerUserId: string;

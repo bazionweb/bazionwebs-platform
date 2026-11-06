@@ -3,7 +3,7 @@ import { PostgresAuditEventWriter, type AuditEvent } from "@bazion/audit";
 import { fromNodeHeaders } from "better-auth/node";
 import { count, eq } from "drizzle-orm";
 import { requireActiveTenantPermission, requirePlatformRole, requirePlatformPermission, type ActiveTenantContext } from "@bazion/auth";
-import { auth, reconcileProvisioningTenants, listPlatformTenants, transitionPlatformTenant, transferPlatformTenantOwner } from "@bazion/auth/server";
+import { auth, reconcileProvisioningTenants, listPlatformTenants, getPlatformTenant, transitionPlatformTenant, transferPlatformTenantOwner } from "@bazion/auth/server";
 import { orders, products } from "@bazion/database";
 import { invitationInputSchema, memberListQuerySchema, memberRoleInputSchema, provisioningReconciliationInputSchema, platformTenantListQuerySchema, platformTenantLifecycleInputSchema, platformTenantOwnerTransferInputSchema } from "./policy.js";
 import { pool, withTenantTransaction } from "../../lib/database.js";
@@ -109,6 +109,17 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
     return reply.send(await listPlatformTenants(parsed.data));
   });
 
+
+  app.get<{ Params: { tenantId: string } }>("/admin/platform/tenants/:tenantId", async (request, reply) => {
+    const tenantId = request.params.tenantId.trim();
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(tenantId)) {
+      return reply.code(400).send({ error: "INVALID_INPUT" });
+    }
+    await requirePlatformPermission(request.headers, "tenant.read");
+    const tenant = await getPlatformTenant(tenantId);
+    if (!tenant) return reply.code(404).send({ error: "TENANT_NOT_FOUND" });
+    return reply.send({ tenant });
+  });
 
   app.post<{ Params: { tenantId: string } }>("/admin/platform/tenants/:tenantId/owner", async (request, reply) => {
     const tenantId = request.params.tenantId.trim();
