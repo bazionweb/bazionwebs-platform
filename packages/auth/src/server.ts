@@ -420,7 +420,7 @@ export async function transitionPlatformTenant(input: {
 
 
 export interface PlatformTenantOwnerTransfer {
-  previousOwnerUserId: string;
+  previousOwnerUserId: string | null;
   newOwnerUserId: string;
 }
 
@@ -470,26 +470,28 @@ export async function transferPlatformTenantOwner(
     const hasOwner = (role: string) => role.split(",").map((item) => item.trim()).includes("owner");
     const owners = memberships.filter((member) => hasOwner(member.role));
     const target = memberships.find((member) => member.userId === targetUserId);
-    if (owners.length !== 1 || !target || owners[0]!.userId === targetUserId) {
+    if (owners.length > 1 || !target || owners[0]?.userId === targetUserId) {
       await client.query("ROLLBACK");
       return null;
     }
 
-    const previousOwner = owners[0]!;
-    const previousRoles = previousOwner.role.split(",").map((item) => item.trim()).filter((item) => item && item !== "owner");
+    const previousOwner = owners[0] ?? null;
     const targetRoles = target.role.split(",").map((item) => item.trim()).filter(Boolean);
     if (!targetRoles.includes("owner")) targetRoles.push("owner");
 
-    await client.query(
-      'UPDATE "member" SET role = $1 WHERE id = $2',
-      [previousRoles.length ? previousRoles.join(",") : "admin", previousOwner.id],
-    );
+    if (previousOwner) {
+      const previousRoles = previousOwner.role.split(",").map((item) => item.trim()).filter((item) => item && item !== "owner");
+      await client.query(
+        'UPDATE "member" SET role = $1 WHERE id = $2',
+        [previousRoles.length ? previousRoles.join(",") : "admin", previousOwner.id],
+      );
+    }
     await client.query(
       'UPDATE "member" SET role = $1 WHERE id = $2',
       [targetRoles.join(","), target.id],
     );
     await client.query("COMMIT");
-    return { previousOwnerUserId: previousOwner.userId, newOwnerUserId: target.userId };
+    return { previousOwnerUserId: previousOwner?.userId ?? null, newOwnerUserId: target.userId };
   } catch (error) {
     await client.query("ROLLBACK").catch(() => undefined);
     throw error;
