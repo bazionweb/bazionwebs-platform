@@ -339,7 +339,8 @@ export async function createPlatformTenantDomain(
   hostname: string,
 ): Promise<
   | { kind: "created"; value: PlatformTenantDomainChallenge }
-  | { kind: "tenant_not_active" | "hostname_conflict" }
+  | { kind: "tenant_not_active" }
+  | { kind: "hostname_conflict" }
 > {
   const token = randomBytes(32).toString("hex");
   const tokenHash = createHash("sha256").update(token).digest("hex");
