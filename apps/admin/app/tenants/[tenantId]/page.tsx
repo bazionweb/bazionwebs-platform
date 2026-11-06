@@ -23,6 +23,8 @@ type Usage = {
   tenantId: string; asOf: string; members: number | null; products: number; activeProducts: number;
   orders: number; paidOrders: number; pendingOrders: number;
 };
+type TenantDomain = { id: string; hostname: string; status: "pending" | "active" | "disabled"; verified_at: string | null; created_at: string; updated_at: string };
+type TenantDomains = { items: TenantDomain[] };
 
 export default async function TenantDetail({ params }: { params: Promise<{ tenantId: string }> }) {
   const { tenantId } = await params;
@@ -31,7 +33,7 @@ export default async function TenantDetail({ params }: { params: Promise<{ tenan
   if (!result.data) return <main className="detail-shell"><Link href="/">← Back to tenants</Link><section className="notice-card"><h1>Unable to load tenant</h1><p>Request failed with HTTP {result.status}. You may need platform tenant-read permission.</p></section></main>;
   const tenant = result.data.tenant;
 
-  const [owner, modules, settings, audit, usage] = await Promise.all([
+  const [owner, modules, settings, audit, usage, domains] = await Promise.all([
     platformFetch<{ currentOwners: OwnerCandidate[]; candidates: OwnerCandidate[]; total: number; limit: number; offset: number }>(
       `tenants/${encodeURIComponent(tenantId)}/owner-candidates?limit=50`,
     ),
@@ -41,6 +43,7 @@ export default async function TenantDetail({ params }: { params: Promise<{ tenan
       `tenants/${encodeURIComponent(tenantId)}/audit?limit=10`,
     ),
     platformFetch<Usage>(`tenants/${encodeURIComponent(tenantId)}/usage`),
+    platformFetch<TenantDomains>(`tenants/${encodeURIComponent(tenantId)}/domains`),
   ]);
 
   return <main className="detail-shell">
@@ -66,6 +69,8 @@ export default async function TenantDetail({ params }: { params: Promise<{ tenan
       auditStatus={audit.status}
       usageInitial={usage.data}
       usageStatus={usage.status}
+      domainsInitial={domains.data}
+      domainsStatus={domains.status}
     />
     <p className="security">Control-plane access is enforced by platform permissions on every API request. Tenant identifiers are never treated as authorization. Audit records are append-only; usage metrics currently cover member, product and order counts.</p>
   </main>;
