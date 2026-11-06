@@ -1,5 +1,5 @@
 import { betterAuth } from "better-auth";
-import { createHash } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { createOutboxPayloadCodec, PostgresNotificationOutbox } from "@bazion/notifications";
 import { organization } from "better-auth/plugins";
 import { Pool } from "pg";
@@ -304,6 +304,149 @@ export async function resolvePublicTenantByHostname(hostname: string) {
   );
   return result.rows[0] ?? null;
 }
+
+
+export interface PlatformTenantDomain {
+  id: string;
+  hostname: string;
+  status: "pending" | "active" | "disabled";
+  verified_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PlatformTenantDomainChallenge {
+  domain: PlatformTenantDomain;
+  challenge: { type: "TXT"; name: string; value: string };
+}
+
+/** Lists tenant domains without exposing stored verification hashes. */
+export async function listPlatformTenantDomains(tenantId: string): Promise<PlatformTenantDomain[]> {
+  const result = await tenantProvisionerPool.query<PlatformTenantDomain>(
+    `SELECT id, hostname, status, verified_at::text AS verified_at,
+            created_at::text AS created_at, updated_at::text AS updated_at
+       FROM public.tenant_domains
+      WHERE tenant_id = $1
+      ORDER BY created_at DESC, hostname ASC`,
+    [tenantId],
+  );
+  return result.rows;
+}
+
+/** Creates or rotates a DNS challenge only for an inactive domain owned by this tenant. */
+export async function createPlatformTenantDomain(
+  tenantId: string,
+  hostname: string,
+): Promise<
+  | { kind: "created"; value: PlatformTenantDomainChallenge }
+  | { kind: "tenant_not_active" | "hostname_conflict" }
+> {
+  const token = randomBytes(32).toString("hex");
+  const tokenHash = createHash("sha256").update(token).digest("hex");
+  const client = await tenantProvisionerPool.connect();
+  try {
+    await client.query("BEGIN");
+    const tenant = await client.query<{ status: string }>(
+      "SELECT status FROM public.tenants WHERE id = $1 FOR UPDATE",
+      [tenantId],
+    );
+    if (tenant.rowCount !== 1 || tenant.rows[0]?.status !== "active") {
+      await client.query("ROLLBACK");
+      return { kind: "tenant_not_active" };
+    }
+    const result = await client.query<PlatformTenantDomain>(
+      `INSERT INTO public.tenant_domains (tenant_id, hostname, verification_token_hash, status, verified_at)
+       VALUES ($1, $2, $3, 'pending', NULL)
+       ON CONFLICT (hostname)
+       DO UPDATE SET verification_token_hash = EXCLUDED.verification_token_hash,
+                     status = 'pending', verified_at = NULL, updated_at = now()
+       WHERE public.tenant_domains.tenant_id = EXCLUDED.tenant_id
+         AND public.tenant_domains.status IN ('pending', 'disabled')
+       RETURNING id, hostname, status, verified_at::text AS verified_at,
+                 created_at::text AS created_at, updated_at::text AS updated_at`,
+      [tenantId, hostname, tokenHash],
+    );
+    const domain = result.rows[0];
+    if (!domain) {
+      await client.query("ROLLBACK");
+      return { kind: "hostname_conflict" };
+    }
+    await client.query("COMMIT");
+    return {
+      kind: "created",
+      value: {
+        domain,
+        challenge: {
+          type: "TXT",
+          name: `_bazionweb-challenge.${hostname}`,
+          value: `bazionweb-verification=${token}`,
+        },
+      },
+    };
+  } catch (error) {
+    await client.query("ROLLBACK").catch(() => undefined);
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+/** Returns the verification hash only to the API verification service. */
+export async function getPlatformTenantDomainChallenge(
+  tenantId: string,
+  domainId: string,
+): Promise<{ hostname: string; verificationTokenHash: string; status: "pending" | "active" | "disabled" } | null> {
+  const result = await tenantProvisionerPool.query<{
+    hostname: string;
+    verification_token_hash: string | null;
+    status: "pending" | "active" | "disabled";
+  }>(
+    `SELECT hostname, verification_token_hash, status
+       FROM public.tenant_domains
+      WHERE tenant_id = $1 AND id = $2
+      LIMIT 1`,
+    [tenantId, domainId],
+  );
+  const row = result.rows[0];
+  if (!row || !row.verification_token_hash) return null;
+  return { hostname: row.hostname, verificationTokenHash: row.verification_token_hash, status: row.status };
+}
+
+/** Activates only the exact pending challenge checked against DNS. */
+export async function activatePlatformTenantDomain(
+  tenantId: string,
+  domainId: string,
+  verificationTokenHash: string,
+): Promise<PlatformTenantDomain | null> {
+  const result = await tenantProvisionerPool.query<PlatformTenantDomain>(
+    `UPDATE public.tenant_domains d
+        SET status = 'active', verified_at = now(), verification_token_hash = NULL, updated_at = now()
+      WHERE d.tenant_id = $1 AND d.id = $2 AND d.status = 'pending'
+        AND d.verification_token_hash = $3
+        AND EXISTS (SELECT 1 FROM public.tenants t WHERE t.id = d.tenant_id AND t.status = 'active')
+      RETURNING d.id, d.hostname, d.status, d.verified_at::text AS verified_at,
+                d.created_at::text AS created_at, d.updated_at::text AS updated_at`,
+    [tenantId, domainId, verificationTokenHash],
+  );
+  return result.rows[0] ?? null;
+}
+
+/** Disabling removes a hostname from the read-only resolver view immediately. */
+export async function disablePlatformTenantDomain(
+  tenantId: string,
+  domainId: string,
+): Promise<PlatformTenantDomain | null> {
+  const result = await tenantProvisionerPool.query<PlatformTenantDomain>(
+    `UPDATE public.tenant_domains
+        SET status = 'disabled', verification_token_hash = NULL, updated_at = now()
+      WHERE tenant_id = $1 AND id = $2 AND status <> 'disabled'
+      RETURNING id, hostname, status, verified_at::text AS verified_at,
+                created_at::text AS created_at, updated_at::text AS updated_at`,
+    [tenantId, domainId],
+  );
+  return result.rows[0] ?? null;
+}
+
 
 export async function closeAuthResources(): Promise<void> {
   await Promise.all([authPool.end(), tenantResolverPool.end(), tenantProvisionerPool.end(), notificationEnqueuerPool.end()]);
