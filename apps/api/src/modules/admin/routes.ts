@@ -6,11 +6,10 @@ import { count, eq } from "drizzle-orm";
 import { requireActiveTenantPermission, requirePlatformRole, requirePlatformPermission, normalizeTenantHostname, type ActiveTenantContext } from "@bazion/auth";
 import { auth, reconcileProvisioningTenants, listPlatformTenants, getPlatformTenant, transitionPlatformTenant, transferPlatformTenantOwner, listPlatformTenantOwnerCandidates, getPlatformTenantModuleEntitlements, updatePlatformTenantModuleEntitlement, getPlatformTenantSettings, updatePlatformTenantSettings, countPlatformTenantMembers, listPlatformTenantDomains, createPlatformTenantDomain, getPlatformTenantDomainChallenge, activatePlatformTenantDomain, disablePlatformTenantDomain } from "@bazion/auth/server";
 import { orders, products } from "@bazion/database";
-import { invitationInputSchema, memberListQuerySchema, memberRoleInputSchema, provisioningReconciliationInputSchema, platformTenantListQuerySchema, platformTenantLifecycleInputSchema, platformTenantOwnerTransferInputSchema, platformTenantOwnerCandidatesQuerySchema, platformTenantModuleInputSchema, platformTenantSettingsInputSchema, platformTenantAuditQuerySchema } from "./policy.js";
+import { invitationInputSchema, memberListQuerySchema, memberRoleInputSchema, provisioningReconciliationInputSchema, platformTenantListQuerySchema, platformTenantLifecycleInputSchema, platformTenantOwnerTransferInputSchema, platformTenantOwnerCandidatesQuerySchema, platformTenantModuleInputSchema, platformTenantSettingsInputSchema, platformTenantAuditQuerySchema, platformTenantDomainInputSchema } from "./policy.js";
 import { pool, withTenantTransaction } from "../../lib/database.js";
 import { isTenantModuleEnabled } from "../../lib/tenant-modules.js";
 import { getPlatformModule, platformModuleCatalog } from "./module-catalog.js";
-import { platformTenantDomainInputSchema } from "./policy.js";
 import { verifyTenantDomainTxt } from "./domain-verification.js";
 
 const auditWriter = new PostgresAuditEventWriter(pool);
