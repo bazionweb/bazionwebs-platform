@@ -21,7 +21,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("@bazion/audit", () => ({ PostgresAuditEventWriter: class { append(event: unknown) { return mocks.appendAuditEvent(event); } } }));
 vi.mock("@bazion/auth", () => ({ requireActiveTenantPermission: mocks.requirePermission, requirePlatformRole: mocks.requirePlatformRole, requirePlatformPermission: mocks.requirePlatformPermission }));
-vi.mock("@bazion/auth/server", () => ({ reconcileProvisioningTenants: mocks.reconcileProvisioningTenants, listPlatformTenants: mocks.listPlatformTenants, transitionPlatformTenant: mocks.transitionPlatformTenant, auth: { api: {
+vi.mock("@bazion/auth/server", () => ({ reconcileProvisioningTenants: mocks.reconcileProvisioningTenants, listPlatformTenants: mocks.listPlatformTenants, transitionPlatformTenant: mocks.transitionPlatformTenant, transferPlatformTenantOwner: mocks.transferPlatformTenantOwner, auth: { api: {
   listMembers: mocks.listMembers,
   listInvitations: mocks.listInvitations,
   createInvitation: mocks.createInvitation,
