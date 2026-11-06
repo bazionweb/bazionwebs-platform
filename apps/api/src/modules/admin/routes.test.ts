@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   requirePlatformPermission: vi.fn(),
   listPlatformTenants: vi.fn(),
   transitionPlatformTenant: vi.fn(),
+  transferPlatformTenantOwner: vi.fn(),
   reconcileProvisioningTenants: vi.fn(),
   listMembers: vi.fn(),
   listInvitations: vi.fn(),
@@ -57,6 +58,7 @@ describe("client administration API", () => {
     mocks.requirePlatformPermission.mockResolvedValue({ userId: "platform-admin", email: "admin@bazion.test", role: "platform_admin" });
     mocks.listPlatformTenants.mockResolvedValue({ items: [], total: 0, limit: 50, offset: 0 });
     mocks.transitionPlatformTenant.mockResolvedValue({ id: "tenant-alpha", slug: "alpha", status: "suspended" });
+    mocks.transferPlatformTenantOwner.mockResolvedValue({ previousOwnerUserId: "old-owner", newOwnerUserId: "new-owner" });
     mocks.reconcileProvisioningTenants.mockResolvedValue({ scanned: 2, activated: 1, unmatched: [{ tenantId: "tenant-stuck", slug: "stuck" }], conflicted: [] });
     mocks.listMembers.mockResolvedValue({ members: [], total: 0 });
     mocks.listInvitations.mockResolvedValue([]);
@@ -364,5 +366,85 @@ describe("platform tenant lifecycle API", () => {
       expect(mocks.requirePlatformPermission).not.toHaveBeenCalled();
       expect(mocks.transitionPlatformTenant).not.toHaveBeenCalled();
     } finally { await app.close(); }
+  });
+});
+
+
+describe("platform tenant owner transfer API", () => {
+  beforeEach(() => {
+    mocks.requirePlatformPermission.mockReset().mockResolvedValue({
+      userId: "platform-owner", email: "owner@bazion.test", role: "platform_owner",
+    });
+    mocks.transferPlatformTenantOwner.mockReset().mockResolvedValue({
+      previousOwnerUserId: "old-owner", newOwnerUserId: "new-owner",
+    });
+    mocks.appendAuditEvent.mockReset().mockResolvedValue(undefined);
+  });
+
+  it("requires tenant.owner.assign and records an audited transfer", async () => {
+    const app = await makeApp();
+    try {
+      const response = await app.inject({
+        method: "POST",
+        url: "/v1/admin/platform/tenants/11111111-1111-4111-8111-111111111111/owner",
+        payload: { targetUserId: "new-owner" },
+      });
+      expect(response.statusCode).toBe(200);
+      expect(mocks.requirePlatformPermission).toHaveBeenCalledWith(expect.any(Object), "tenant.owner.assign");
+      expect(mocks.transferPlatformTenantOwner).toHaveBeenCalledWith(
+        "11111111-1111-4111-8111-111111111111", "new-owner",
+      );
+      expect(response.json().transfer).toEqual({
+        previousOwnerUserId: "old-owner", newOwnerUserId: "new-owner",
+      });
+      expect(mocks.appendAuditEvent).toHaveBeenCalledWith(expect.objectContaining({
+        action: "tenant.owner.transferred.requested",
+        tenantId: "11111111-1111-4111-8111-111111111111",
+        metadata: { targetUserId: "new-owner" },
+      }));
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("does not attempt a transfer when owner-assignment permission is denied", async () => {
+    const app = await makeApp();
+    try {
+      mocks.requirePlatformPermission.mockRejectedValueOnce(Object.assign(new Error("Forbidden"), {
+        statusCode: 403, code: "PLATFORM_PERMISSION_DENIED",
+      }));
+      const response = await app.inject({
+        method: "POST",
+        url: "/v1/admin/platform/tenants/11111111-1111-4111-8111-111111111111/owner",
+        payload: { targetUserId: "new-owner" },
+      });
+      expect(response.statusCode).toBe(403);
+      expect(mocks.transferPlatformTenantOwner).not.toHaveBeenCalled();
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("returns a conflict when the target is not eligible and rejects malformed input", async () => {
+    const app = await makeApp();
+    try {
+      mocks.transferPlatformTenantOwner.mockResolvedValueOnce(null);
+      const conflict = await app.inject({
+        method: "POST",
+        url: "/v1/admin/platform/tenants/11111111-1111-4111-8111-111111111111/owner",
+        payload: { targetUserId: "not-a-member" },
+      });
+      const invalid = await app.inject({
+        method: "POST",
+        url: "/v1/admin/platform/tenants/not-a-uuid/owner",
+        payload: { targetUserId: "new-owner", extra: true },
+      });
+      expect(conflict.statusCode).toBe(409);
+      expect(conflict.json().error).toBe("TENANT_OWNER_TRANSFER_CONFLICT");
+      expect(invalid.statusCode).toBe(400);
+      expect(mocks.transferPlatformTenantOwner).toHaveBeenCalledTimes(1);
+    } finally {
+      await app.close();
+    }
   });
 });
