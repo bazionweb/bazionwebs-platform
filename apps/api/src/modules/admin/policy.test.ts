@@ -8,6 +8,7 @@ import {
   platformTenantModuleInputSchema,
   platformTenantSettingsInputSchema,
   platformTenantAuditQuerySchema,
+  platformTenantDomainInputSchema,
 } from "./policy.js";
 
 describe("client administration input policy", () => {
@@ -61,6 +62,13 @@ describe("platform tenant control-plane input policy", () => {
     expect(platformTenantSettingsInputSchema.safeParse({
       expectedVersion: 0, settings: {},
     }).success).toBe(false);
+  });
+
+  it("accepts only a hostname for custom-domain challenges", () => {
+    expect(platformTenantDomainInputSchema.safeParse({ hostname: "shop.example.com" }).success).toBe(true);
+    expect(platformTenantDomainInputSchema.safeParse({ hostname: "  shop.example.com  " }).success).toBe(true);
+    expect(platformTenantDomainInputSchema.safeParse({ hostname: "shop.example.com", token: "do-not-accept" }).success).toBe(false);
+    expect(platformTenantDomainInputSchema.safeParse({ hostname: "" }).success).toBe(false);
   });
 
   it("bounds audit history pagination and optional action filters", () => {
