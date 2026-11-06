@@ -397,9 +397,16 @@ describe("platform tenant owner transfer API", () => {
       expect(response.json().transfer).toEqual({
         previousOwnerUserId: "old-owner", newOwnerUserId: "new-owner",
       });
-      expect(mocks.appendAuditEvent).toHaveBeenCalledWith(expect.objectContaining({
-        action: "tenant.owner.transferred.requested",
+      expect(mocks.appendAuditEvent).toHaveBeenNthCalledWith(1, expect.objectContaining({
+        action: "tenant.owner.assignment.requested",
         tenantId: "11111111-1111-4111-8111-111111111111",
+        outcome: "succeeded",
+        metadata: { targetUserId: "new-owner" },
+      }));
+      expect(mocks.appendAuditEvent).toHaveBeenNthCalledWith(2, expect.objectContaining({
+        action: "tenant.owner.assignment.completed",
+        tenantId: "11111111-1111-4111-8111-111111111111",
+        outcome: "succeeded",
         metadata: { targetUserId: "new-owner" },
       }));
     } finally {
