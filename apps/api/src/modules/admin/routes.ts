@@ -5,7 +5,7 @@ import { count, eq } from "drizzle-orm";
 import { requireActiveTenantPermission, requirePlatformRole, requirePlatformPermission, type ActiveTenantContext } from "@bazion/auth";
 import { auth, reconcileProvisioningTenants, listPlatformTenants, transitionPlatformTenant } from "@bazion/auth/server";
 import { orders, products } from "@bazion/database";
-import { invitationInputSchema, memberListQuerySchema, memberRoleInputSchema, provisioningReconciliationInputSchema, platformTenantListQuerySchema, platformTenantLifecycleInputSchema } from "./policy.js";
+import { invitationInputSchema, memberListQuerySchema, memberRoleInputSchema, provisioningReconciliationInputSchema, platformTenantListQuerySchema, platformTenantLifecycleInputSchema, platformTenantOwnerTransferInputSchema } from "./policy.js";
 import { pool, withTenantTransaction } from "../../lib/database.js";
 
 const auditWriter = new PostgresAuditEventWriter(pool);
@@ -107,6 +107,32 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
     if (!parsed.success) return reply.code(400).send({ error: "INVALID_INPUT", details: parsed.error.flatten() });
     await requirePlatformPermission(request.headers, "tenant.list");
     return reply.send(await listPlatformTenants(parsed.data));
+  });
+
+
+  app.post<{ Params: { tenantId: string } }>("/admin/platform/tenants/:tenantId/owner", async (request, reply) => {
+    const tenantId = request.params.tenantId.trim();
+    const parsed = platformTenantOwnerTransferInputSchema.safeParse(request.body);
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(tenantId) || !parsed.success) {
+      return reply.code(400).send({ error: "INVALID_INPUT", ...(parsed.success ? {} : { details: parsed.error.flatten() }) });
+    }
+    const operator = await requirePlatformPermission(request.headers, "tenant.owner.assign");
+    const result = await withAudit(
+      request,
+      {
+        ...userAuditEvent(request, operator, "tenant_owner", tenantId, { targetUserId: parsed.data.targetUserId }),
+        action: "tenant.owner.transferred",
+        tenantId,
+      },
+      () => transferPlatformTenantOwner(tenantId, parsed.data.targetUserId),
+    );
+    if (!result) {
+      return reply.code(409).send({
+        error: "TENANT_OWNER_TRANSFER_CONFLICT",
+        message: "The tenant must have exactly one current owner, and the target must be a different existing tenant member. Closed or unmapped tenants cannot be transferred.",
+      });
+    }
+    return reply.send({ transfer: result });
   });
 
   app.patch<{ Params: { tenantId: string } }>("/admin/platform/tenants/:tenantId/lifecycle", async (request, reply) => {
