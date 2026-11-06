@@ -8,7 +8,7 @@ The superadmin application is the platform operator control plane, separate from
 - API: `pnpm --filter @bazion/api dev` (port 4000).
 - Configure `API_BASE_URL=http://localhost:4000` for the admin app.
 
-The Next.js app proxies `/v1/*` and `/api/auth/*` to the API. Server-rendered platform reads forward the incoming session cookie server-to-server; browser mutations use same-origin requests. Do not expose API secrets to browser code.
+The Next.js app proxies `/v1/*` and `/api/auth/*` to the API. Server-rendered platform reads forward the incoming session cookie server-to-server; browser mutations use same-origin requests. Do not expose API secrets to browser code. In each environment, include the admin origin (for example, `https://admin.bazionweb.com`) in both `CORS_ORIGINS` and `BETTER_AUTH_TRUSTED_ORIGINS`; otherwise the API's origin and Better Auth checks will reject sign-in or lifecycle mutations.
 
 ## Implemented
 
