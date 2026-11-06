@@ -3,7 +3,7 @@ import { PostgresAuditEventWriter, type AuditEvent } from "@bazion/audit";
 import { fromNodeHeaders } from "better-auth/node";
 import { count, eq } from "drizzle-orm";
 import { requireActiveTenantPermission, requirePlatformRole, requirePlatformPermission, type ActiveTenantContext } from "@bazion/auth";
-import { auth, reconcileProvisioningTenants, listPlatformTenants, transitionPlatformTenant } from "@bazion/auth/server";
+import { auth, reconcileProvisioningTenants, listPlatformTenants, transitionPlatformTenant, transferPlatformTenantOwner } from "@bazion/auth/server";
 import { orders, products } from "@bazion/database";
 import { invitationInputSchema, memberListQuerySchema, memberRoleInputSchema, provisioningReconciliationInputSchema, platformTenantListQuerySchema, platformTenantLifecycleInputSchema, platformTenantOwnerTransferInputSchema } from "./policy.js";
 import { pool, withTenantTransaction } from "../../lib/database.js";
