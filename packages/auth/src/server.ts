@@ -240,13 +240,13 @@ export const auth = betterAuth({
         beforeCreateInvitation: async ({ invitation, inviter }) => {
           const platformMember = await resolvePlatformMemberByUserId(inviter.id);
           if (!canGrantClientOwner(platformMember?.role, invitation.role)) {
-            throw new Error("Only a Bazion platform administrator can invite a new client owner.");
+            throw new Error("Client ownership must be assigned through the audited platform ownership transfer workflow.");
           }
         },
         beforeUpdateMemberRole: async ({ newRole, user }) => {
           const platformMember = await resolvePlatformMemberByUserId(user.id);
           if (!canGrantClientOwner(platformMember?.role, newRole)) {
-            throw new Error("Only an authorized Bazion platform administrator can assign the client owner role.");
+            throw new Error("Client ownership must be assigned through the audited platform ownership transfer workflow.");
           }
         },
         afterCreateOrganization,
