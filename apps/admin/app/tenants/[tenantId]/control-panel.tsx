@@ -10,6 +10,9 @@ type Settings = { locale: string; timeZone: string; defaultCurrency: "KES" | "US
 type SettingsState = { settings: Settings; version: number; updatedAt: string | null };
 type AuditItem = { id: string; occurred_at: string; actor_type: string; actor_id: string; actor_role: string | null; action: string; resource_type: string; resource_id: string | null; outcome: string };
 type Usage = { asOf: string; members: number | null; products: number; activeProducts: number; orders: number; paidOrders: number; pendingOrders: number };
+type TenantDomain = { id: string; hostname: string; status: "pending" | "active" | "disabled"; verified_at: string | null; created_at: string; updated_at: string };
+type TenantDomains = { items: TenantDomain[] };
+type DomainChallenge = { domainId: string; hostname: string; name: string; value: string };
 
 async function responseData(response: Response): Promise<Record<string, unknown>> {
   return response.json().catch(() => ({})) as Promise<Record<string, unknown>>;
@@ -25,6 +28,7 @@ export function TenantControlPanel(props: {
   settingsInitial: SettingsState | null; settingsStatus: number;
   auditInitial: { items: AuditItem[]; total: number } | null; auditStatus: number;
   usageInitial: Usage | null; usageStatus: number;
+  domainsInitial: TenantDomains | null; domainsStatus: number;
 }) {
   const router = useRouter();
   const [owners, setOwners] = useState(props.ownerInitial);
@@ -35,6 +39,9 @@ export function TenantControlPanel(props: {
   });
   const audit = props.auditInitial;
   const usage = props.usageInitial;
+  const [domains, setDomains] = useState<TenantDomain[]>(props.domainsInitial?.items ?? []);
+  const [domainInput, setDomainInput] = useState("");
+  const [domainChallenge, setDomainChallenge] = useState<DomainChallenge | null>(null);
   const [search, setSearch] = useState("");
   const [candidateId, setCandidateId] = useState("");
   const [busy, setBusy] = useState("");
@@ -43,8 +50,9 @@ export function TenantControlPanel(props: {
     setOwners(props.ownerInitial);
     setModules(props.modulesInitial?.modules ?? []);
     setSettings(props.settingsInitial);
+    setDomains(props.domainsInitial?.items ?? []);
     if (props.settingsInitial) setDraft(props.settingsInitial.settings);
-  }, [props.ownerInitial, props.modulesInitial, props.settingsInitial]);
+  }, [props.ownerInitial, props.modulesInitial, props.settingsInitial, props.domainsInitial]);
 
   const setMessage = (key: string, value: string) => setMessages((current) => ({ ...current, [key]: value }));
   const url = (path: string) => `/v1/admin/platform/tenants/${encodeURIComponent(props.tenantId)}/${path}`;
@@ -119,6 +127,61 @@ export function TenantControlPanel(props: {
     finally { setBusy(""); }
   }
 
+
+  async function addDomain(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setBusy("domain-create"); setMessage("domains", "");
+    try {
+      const response = await fetch(url("domains"), {
+        method: "POST", credentials: "include", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ hostname: domainInput }),
+      });
+      const data = await responseData(response);
+      if (!response.ok) throw new Error(String(data.message ?? data.error ?? `Request failed (${response.status})`));
+      const domain = data.domain as TenantDomain;
+      const challenge = data.challenge as { type: "TXT"; name: string; value: string };
+      setDomains((current) => [domain, ...current.filter((item) => item.id !== domain.id)]);
+      setDomainChallenge({ domainId: domain.id, hostname: domain.hostname, name: challenge.name, value: challenge.value });
+      setDomainInput("");
+      setMessage("domains", "DNS challenge created. Add the TXT record, allow DNS to propagate, then verify.");
+    } catch (error) { setMessage("domains", error instanceof Error ? error.message : "Could not add the domain."); }
+    finally { setBusy(""); }
+  }
+
+  async function verifyDomain(domain: TenantDomain) {
+    setBusy(`domain-verify:${domain.id}`); setMessage("domains", "");
+    try {
+      const response = await fetch(url(`domains/${encodeURIComponent(domain.id)}/verify`), {
+        method: "POST", credentials: "include",
+      });
+      const data = await responseData(response);
+      if (!response.ok) throw new Error(String(data.message ?? data.error ?? `Request failed (${response.status})`));
+      const updated = data.domain as TenantDomain;
+      setDomains((current) => current.map((item) => item.id === updated.id ? updated : item));
+      setDomainChallenge((current) => current?.domainId === updated.id ? null : current);
+      setMessage("domains", `${updated.hostname} is verified and active.`);
+    } catch (error) { setMessage("domains", error instanceof Error ? error.message : "Domain verification failed."); }
+    finally { setBusy(""); }
+  }
+
+  async function disableDomain(domain: TenantDomain) {
+    if (!window.confirm(`Disable ${domain.hostname}? It will stop resolving to this tenant.`)) return;
+    setBusy(`domain-disable:${domain.id}`); setMessage("domains", "");
+    try {
+      const response = await fetch(url(`domains/${encodeURIComponent(domain.id)}/disable`), {
+        method: "POST", credentials: "include",
+      });
+      const data = await responseData(response);
+      if (!response.ok) throw new Error(String(data.message ?? data.error ?? `Request failed (${response.status})`));
+      const updated = data.domain as TenantDomain;
+      setDomains((current) => current.map((item) => item.id === updated.id ? updated : item));
+      if (domainChallenge?.domainId === updated.id) setDomainChallenge(null);
+      setMessage("domains", `${updated.hostname} has been disabled.`);
+    } catch (error) { setMessage("domains", error instanceof Error ? error.message : "Could not disable the domain."); }
+    finally { setBusy(""); }
+  }
+
+
   return <div className="tenant-controls">
     <section className="panel">
       <div className="panel-head"><div><p className="eyebrow">OWNERSHIP</p><h2>Tenant owner</h2><p className="muted">Platform-owner authority only. New owners must be verified existing tenant members.</p></div></div>
@@ -147,6 +210,35 @@ export function TenantControlPanel(props: {
         <div className="settings-footer"><small>Version {settings.version}{settings.updatedAt ? ` · Updated ${new Date(settings.updatedAt).toLocaleString("en-KE")}` : " · Defaults"}</small><button className="primary" disabled={busy === "settings"}>{busy === "settings" ? "Saving…" : "Save settings"}</button></div>
       </form>}
       {messages.settings && <p className="feedback" role="status">{messages.settings}</p>}
+    </section>
+
+
+    <section className="panel">
+      <div className="panel-head"><div><p className="eyebrow">CUSTOM DOMAINS</p><h2>Tenant domains</h2><p className="muted">Verify domain ownership with a DNS TXT record before the hostname becomes active.</p></div><span className="count">{domains.length} DOMAINS</span></div>
+      {props.domainsStatus !== 200 && !props.domainsInitial ? <LoadError status={props.domainsStatus} label="custom domains"/> : <>
+        <form className="owner-search" onSubmit={addDomain}>
+          <label>Hostname<input value={domainInput} onChange={(event) => setDomainInput(event.target.value)} placeholder="shop.example.com" maxLength={253}/></label>
+          <button className="primary" disabled={!domainInput.trim() || busy === "domain-create"}>{busy === "domain-create" ? "Creating…" : "Add domain"}</button>
+        </form>
+        {domainChallenge && <div className="notice-inline domain-challenge" role="status">
+          <strong>Publish this DNS TXT record</strong>
+          <p>Add the record below at your DNS provider. The challenge value is shown only when generated; add the same hostname again to rotate it if it is lost.</p>
+          <p><strong>Type:</strong> TXT<br/><strong>Name / Host:</strong> <code>{domainChallenge.name}</code><br/><strong>Value:</strong> <code>{domainChallenge.value}</code></p>
+          <p>After the DNS record has propagated, select Verify. The platform checks the TXT record before enabling the hostname.</p>
+        </div>}
+        <div className="table-wrap">
+          <table><thead><tr><th>HOSTNAME</th><th>STATUS</th><th>VERIFIED</th><th>ACTIONS</th></tr></thead>
+            <tbody>{domains.map((domain) => <tr key={domain.id}>
+              <td><strong>{domain.hostname}</strong><small>{domain.id}</small></td>
+              <td><span className={`status status-${domain.status === "active" ? "active" : domain.status === "pending" ? "provisioning" : "suspended"}`}>{domain.status}</span></td>
+              <td>{domain.verified_at ? new Date(domain.verified_at).toLocaleString("en-KE") : "—"}</td>
+              <td>{domain.status === "pending" ? <button className="secondary" disabled={busy === `domain-verify:${domain.id}`} onClick={() => void verifyDomain(domain)}>{busy === `domain-verify:${domain.id}` ? "Checking…" : "Verify"}</button> : null}
+                {domain.status !== "disabled" ? <button className="danger" style={{ marginLeft: 8 }} disabled={busy === `domain-disable:${domain.id}`} onClick={() => void disableDomain(domain)}>Disable</button> : "—"}</td>
+            </tr>)}{domains.length === 0 && <tr><td className="empty" colSpan={4}>No custom domains registered for this tenant.</td></tr>}</tbody>
+          </table>
+        </div>
+      </>}
+      {messages.domains && <p className="feedback" role="status">{messages.domains}</p>}
     </section>
 
     <section className="panel"><div className="panel-head"><div><p className="eyebrow">PLATFORM TELEMETRY</p><h2>Usage reporting</h2><p className="muted">Live counts from tenant membership, products and orders.</p></div></div>
