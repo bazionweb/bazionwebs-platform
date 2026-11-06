@@ -82,7 +82,9 @@ export function canGrantClientOwner(
   platformRole: string | null | undefined,
   requestedOrganizationRoles: string,
 ): boolean {
-  return !parseRoles(requestedOrganizationRoles).includes("owner") || isPlatformOrganizationCreator(platformRole);
+  // The generic Better Auth invitation/member APIs cannot grant ownership.
+  // The audited, atomic platform transfer service is the only owner-grant path.
+  return !parseRoles(requestedOrganizationRoles).includes("owner");
 }
 
 export function normalizeTenantHostname(hostname: string): string | null {
