@@ -20,7 +20,7 @@ Tenant configuration is stored separately from the tenant registry in `tenant_pl
 
 ## Custom domains
 
-Custom domains use the existing `tenant_domains` registry. A platform operator with `tenant.domain.verify` can add a fully qualified hostname, issue a one-time TXT challenge, verify it, or disable it. The challenge is published at `_bazionweb-challenge.<hostname>` as `bazionweb-verification=<random-token>`. Only the SHA-256 hash is stored; the plaintext challenge is returned once when issued and is never written to audit metadata.
+Custom domains use the existing `tenant_domains` registry. A platform operator with `tenant.domain.verify` can add a fully qualified hostname, issue a one-time TXT challenge, verify it, or disable it. The challenge is published at `_bazionweb-challenge.<hostname>` as `bazionweb-verification=<random-token>`. Only the SHA-256 hash is stored; the plaintext challenge is returned once when issued and is never written to audit metadata. Challenges expire after seven days and can be rotated by submitting the same hostname again.
 
 The hostname becomes active only after the API resolves the TXT record and confirms its token hash. Activation clears the stored challenge hash and sets `verified_at`; the existing `tenant_domain_directory` view then exposes the hostname to the read-only tenant resolver. Disabling a domain immediately removes it from that view. A pending or disabled hostname can have its challenge rotated only by the tenant that already owns the registry row; a hostname claimed by another tenant or already active cannot be re-assigned.
 
