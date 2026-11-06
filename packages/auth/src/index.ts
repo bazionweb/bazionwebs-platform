@@ -25,6 +25,7 @@ export {
   canAccessPlatformPermission,
   getPlatformPermissions,
   platformPermissions,
+  normalizeTenantHostname,
   type PlatformPermission,
   type PlatformRole,
 } from "./security-policy.js";

@@ -12,12 +12,16 @@ The Next.js app proxies `/v1/*` and `/api/auth/*` to the API. Server-rendered pl
 
 ## Implemented
 
-- `GET /v1/admin/platform/tenants` — bounded pagination and lifecycle status filter; requires `tenant.list`.
-- `GET /v1/admin/platform/tenants/:tenantId` — read-only tenant details; requires `tenant.read`.
-- `PATCH /v1/admin/platform/tenants/:tenantId/lifecycle` — audited suspend, restore, and soft-close; requires the matching lifecycle permission.
-- Overview/tenant directory, status filtering, page navigation, tenant detail, Better Auth email/password sign-in, and lifecycle controls.
+- `GET /v1/admin/platform/tenants` and `GET /v1/admin/platform/tenants/:tenantId` — permission-checked tenant directory and detail metadata.
+- `PATCH /v1/admin/platform/tenants/:tenantId/lifecycle` — audited suspend, restore and soft-close transitions.
+- `GET /v1/admin/platform/tenants/:tenantId/owner-candidates` and `POST /v1/admin/platform/tenants/:tenantId/owner` — platform-owner-only verified member selection, initial assignment and atomic audited transfer.
+- `GET /v1/admin/platform/modules` and tenant module endpoints — manifest-backed catalogue, effective tenant entitlements and audited enable/disable overrides.
+- Tenant settings GET/PATCH endpoints — validated, versioned configuration with optimistic concurrency.
+- Tenant audit history and usage endpoints — append-only audit reads and live member/product/order counters.
+- Superadmin tenant directory, tenant detail, lifecycle, ownership, module, configuration, audit and usage interfaces.
+- Better Auth email/password sign-in and server-side session forwarding.
 
-Search currently filters the loaded page only. The API does not yet provide full-text search. The UI intentionally displays registry metadata only.
+The module catalogue is currently a runtime snapshot of the checked-in manifests for the seven platform modules. Planned modules are visible but cannot be activated. Existing tenants retain the commerce and analytics defaults unless an explicit entitlement override is saved. The commerce routes enforce the commerce entitlement. Usage reporting currently covers member, product and order counts; storage, bandwidth and API-request metering are not yet collected.
 
 ## Security boundary
 
@@ -27,6 +31,9 @@ Search currently filters the loaded page only. The API does not yet provide full
 - Lifecycle changes are audited; closing is terminal and requires a suspended tenant.
 - Tenant creation remains in the existing Better Auth organization provisioning flow. Do not add a competing creation path.
 
-## Next modules
+## Remaining platform work
 
-Owner assignment and transfer, module catalogue and tenant entitlements, tenant settings, audit history and usage visibility are not yet implemented. Implement each as separately permission-checked and audited API operations before exposing controls in the UI.
+- Add full API-request, storage, bandwidth, deployment and job usage metering.
+- Add audit-history pagination/action filters in the UI.
+- Integrate entitlements into future modules as their APIs are implemented.
+- Add tenant domain verification management and platform billing when those foundations are ready.

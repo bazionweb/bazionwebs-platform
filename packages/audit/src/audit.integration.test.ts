@@ -22,7 +22,7 @@ describe.skipIf(!enabled)("platform audit database append-only policy", () => {
     await Promise.all([runtime?.end(), owner?.end()]);
   });
 
-  it("allows runtime inserts while denying mutation and confirms the database trigger", async () => {
+  it("allows runtime inserts and reads while denying mutation and confirms the database trigger", async () => {
     const requestId = `audit-integration:${randomUUID()}`;
     const privileges = await runtime!.query<{
       can_insert: boolean;
@@ -38,7 +38,7 @@ describe.skipIf(!enabled)("platform audit database append-only policy", () => {
     );
     expect(privileges.rows[0]).toEqual({
       can_insert: true,
-      can_select: false,
+      can_select: true,
       can_update: false,
       can_delete: false,
     });
@@ -53,7 +53,7 @@ describe.skipIf(!enabled)("platform audit database append-only policy", () => {
       metadata: { suite: "database-policy" },
     });
 
-    const stored = await owner!.query<{ id: string }>(
+    const stored = await runtime!.query<{ id: string }>(
       "SELECT id FROM public.platform_audit_events WHERE request_id = $1",
       [requestId],
     );

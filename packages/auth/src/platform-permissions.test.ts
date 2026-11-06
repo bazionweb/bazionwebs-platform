@@ -23,6 +23,8 @@ describe("platform permission contract", () => {
     expect(canAccessPlatformPermission("platform_support", "tenant.update")).toBe(false);
     expect(canAccessPlatformPermission("platform_support", "tenant.suspend")).toBe(false);
     expect(canAccessPlatformPermission("platform_support", "tenant.modules.update")).toBe(false);
+    expect(canAccessPlatformPermission("platform_admin", "tenant.domain.verify")).toBe(true);
+    expect(canAccessPlatformPermission("platform_support", "tenant.domain.verify")).toBe(false);
   });
 
   it("does not treat client organization roles as platform roles", () => {
