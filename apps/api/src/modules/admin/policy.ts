@@ -71,6 +71,10 @@ export const platformTenantSettingsInputSchema = z.object({
   settings: tenantSettingsPatchSchema,
 }).strict();
 
+export const platformTenantDomainInputSchema = z.object({
+  hostname: z.string().trim().min(3).max(253),
+}).strict();
+
 export const platformTenantAuditQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(25),
   offset: z.coerce.number().int().min(0).max(100_000).default(0),
