@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import {
   ChurchNav,
@@ -6,6 +7,27 @@ import {
 } from "@bazion/ui";
 import { globalMissionConfig } from "../../../../../templates/global-mission.config";
 import { sampleEvents } from "../../../../../templates/church-sample-data";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
+  const { slug } = await params;
+  const event = sampleEvents.find((e) => e.slug === slug);
+  if (!event) return { title: "Event Not Found – Global Mission" };
+  return {
+    title: `${event.title} | Global Mission for Christ Events`,
+    description:
+      event.description ??
+      `Join us for ${event.title} on ${event.dateStr} at ${event.venue}, ${event.location}.`,
+    openGraph: {
+      title: event.title,
+      description: event.description,
+      images: event.posterUrl ? [event.posterUrl] : [],
+    },
+  };
+}
 
 export default async function EventDetailPage({
   params,

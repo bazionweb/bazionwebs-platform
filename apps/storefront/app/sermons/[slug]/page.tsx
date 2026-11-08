@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import {
   ChurchNav,
@@ -7,6 +8,29 @@ import {
 } from "@bazion/ui";
 import { globalMissionConfig } from "../../../../../templates/global-mission.config";
 import { sampleSermons } from "../../../../../templates/church-sample-data";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
+  const { slug } = await params;
+  const sermon = sampleSermons.find((s) => s.slug === slug);
+  if (!sermon) return { title: "Sermon Not Found – Global Mission" };
+  return {
+    title: `${sermon.title} – ${sermon.speaker} | Global Mission for Christ`,
+    description:
+      sermon.description ??
+      `Watch and listen to "${sermon.title}" preached by ${sermon.speaker}. Scripture: ${sermon.scriptureReference}.`,
+    openGraph: {
+      title: sermon.title,
+      description: sermon.description,
+      images: sermon.youtubeVideoId
+        ? [`https://img.youtube.com/vi/${sermon.youtubeVideoId}/hqdefault.jpg`]
+        : [],
+    },
+  };
+}
 
 export default async function SermonDetailPage({
   params,
