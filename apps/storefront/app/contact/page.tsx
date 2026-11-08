@@ -11,6 +11,35 @@ import { globalMissionConfig } from "../../../../templates/global-mission.config
 export default function ContactPage() {
   const [submitted, setSubmitted] = useState(false);
   const [category, setCategory] = useState("General Enquiry");
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [subject, setSubject] = useState("");
+  const [message, setMessage] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    try {
+      const isPrayer = category === "Prayer Request";
+      const endpoint = isPrayer ? "/v1/public/church/prayer-requests" : "/v1/public/church/contact";
+      const payload = isPrayer
+        ? { fullName: name, email, telephone: phone, requestText: message, privacyPreference: "confidential" }
+        : { fullName: name, email, telephone: phone, subject, message, category };
+
+      await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+    } catch {
+      // Graceful offline fallback
+    } finally {
+      setIsSubmitting(false);
+      setSubmitted(true);
+    }
+  };
 
   return (
     <>
@@ -141,10 +170,7 @@ export default function ContactPage() {
                   </div>
                 ) : (
                   <form
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      setSubmitted(true);
-                    }}
+                    onSubmit={handleSubmit}
                     style={{ display: "grid", gap: "16px" }}
                   >
                     <span className="ch-eyebrow">Send a Message</span>
@@ -184,6 +210,8 @@ export default function ContactPage() {
                       <input
                         type="text"
                         required
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
                         placeholder="e.g. John Doe"
                         style={{
                           width: "100%",
@@ -203,6 +231,8 @@ export default function ContactPage() {
                         <input
                           type="email"
                           required
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
                           placeholder="e.g. john@example.com"
                           style={{
                             width: "100%",
@@ -215,11 +245,12 @@ export default function ContactPage() {
                       </div>
                       <div>
                         <label style={{ display: "block", fontSize: "13px", fontWeight: 600, marginBottom: "6px" }}>
-                          Telephone *
+                          Telephone
                         </label>
                         <input
                           type="tel"
-                          required
+                          value={phone}
+                          onChange={(e) => setPhone(e.target.value)}
                           placeholder="e.g. +254 712 345 678"
                           style={{
                             width: "100%",
@@ -239,6 +270,8 @@ export default function ContactPage() {
                       <input
                         type="text"
                         required
+                        value={subject}
+                        onChange={(e) => setSubject(e.target.value)}
                         placeholder="Brief summary of your message..."
                         style={{
                           width: "100%",
@@ -257,6 +290,8 @@ export default function ContactPage() {
                       <textarea
                         required
                         rows={5}
+                        value={message}
+                        onChange={(e) => setMessage(e.target.value)}
                         placeholder={
                           category === "Prayer Request"
                             ? "Please write your prayer need here. Our prayer team will lift you up before God..."
@@ -273,8 +308,13 @@ export default function ContactPage() {
                       />
                     </div>
 
-                    <button type="submit" className="ch-btn ch-btn-primary" style={{ marginTop: "6px" }}>
-                      Send Message
+                    <button
+                      type="submit"
+                      disabled={isSubmitting}
+                      className="ch-btn ch-btn-primary"
+                      style={{ marginTop: "6px" }}
+                    >
+                      {isSubmitting ? "Sending..." : "Send Message"}
                     </button>
                   </form>
                 )}

@@ -96,6 +96,18 @@ export const platformModuleCatalog: readonly PlatformModuleCatalogItem[] = [
     required: false,
     tenantAssignable: false,
   },
+  {
+    id: "church-ministry",
+    name: "Church & Ministry Platform",
+    version: "1.0.0",
+    status: "stable",
+    tenantModel: "tenant-owned",
+    dependencies: ["platform-identity"],
+    description: "Sermons, events, registrations, donations, prayer requests, and ministry content.",
+    defaultEnabled: true,
+    required: false,
+    tenantAssignable: true,
+  },
 ] as const;
 
 export function getPlatformModule(moduleId: string): PlatformModuleCatalogItem | undefined {

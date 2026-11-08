@@ -8,6 +8,7 @@ const defaultTenantModuleStates: Readonly<Record<string, boolean>> = {
   notifications: true,
   "contacts-crm": false,
   "website-content": false,
+  "church-ministry": true,
 };
 
 /** Check the effective tenant entitlement before entering a module API. */

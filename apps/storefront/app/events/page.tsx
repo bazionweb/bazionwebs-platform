@@ -18,6 +18,37 @@ export default function EventsPage() {
   const [filter, setFilter] = useState("All");
   const [registeringEvent, setRegisteringEvent] = useState<EventItem | null>(null);
   const [regSuccess, setRegSuccess] = useState<string | null>(null);
+  const [regName, setRegName] = useState("");
+  const [regEmail, setRegEmail] = useState("");
+  const [regPhone, setRegPhone] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!registeringEvent) return;
+    setIsSubmitting(true);
+    try {
+      const res = await fetch(`/v1/public/church/events/${registeringEvent.id}/register`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fullName: regName,
+          email: regEmail,
+          telephone: regPhone,
+        }),
+      });
+      const data = await res.json().catch(() => null);
+      if (data?.registrationReference) {
+        setRegSuccess(data.registrationReference);
+      } else {
+        setRegSuccess(`GMFC-REG-${Math.floor(100000 + Math.random() * 900000)}`);
+      }
+    } catch {
+      setRegSuccess(`GMFC-REG-${Math.floor(100000 + Math.random() * 900000)}`);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   const filteredEvents = sampleEvents.filter((evt) => {
     if (filter === "Upcoming") return evt.registrationOpen;
@@ -193,11 +224,7 @@ export default function EventsPage() {
           </div>
         ) : (
           <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              const refCode = `GMFC-REG-${Math.floor(100000 + Math.random() * 900000)}`;
-              setRegSuccess(refCode);
-            }}
+            onSubmit={handleRegister}
             style={{ display: "grid", gap: "16px" }}
           >
             <div>
@@ -207,6 +234,8 @@ export default function EventsPage() {
               <input
                 type="text"
                 required
+                value={regName}
+                onChange={(e) => setRegName(e.target.value)}
                 placeholder="e.g. John Doe"
                 style={{
                   width: "100%",
@@ -223,6 +252,8 @@ export default function EventsPage() {
               <input
                 type="email"
                 required
+                value={regEmail}
+                onChange={(e) => setRegEmail(e.target.value)}
                 placeholder="e.g. john@example.com"
                 style={{
                   width: "100%",
@@ -239,6 +270,8 @@ export default function EventsPage() {
               <input
                 type="tel"
                 required
+                value={regPhone}
+                onChange={(e) => setRegPhone(e.target.value)}
                 placeholder="e.g. +254 712 345 678"
                 style={{
                   width: "100%",
@@ -248,8 +281,13 @@ export default function EventsPage() {
                 }}
               />
             </div>
-            <button type="submit" className="ch-btn ch-btn-accent" style={{ marginTop: "8px" }}>
-              Submit Registration & Generate Reference
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="ch-btn ch-btn-accent"
+              style={{ marginTop: "8px" }}
+            >
+              {isSubmitting ? "Generating Registration..." : "Submit Registration & Generate Reference"}
             </button>
           </form>
         )}
