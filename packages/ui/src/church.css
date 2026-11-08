@@ -1,0 +1,616 @@
+/* ==========================================================================
+   Bazion Web Platform — Church & Ministry Design System Tokens & Base Styles
+   Target: Reusable across church/ministry tenants (Global Mission FC, etc.)
+   ========================================================================== */
+
+:root {
+  --church-primary: #0a192f;
+  --church-primary-light: #112240;
+  --church-primary-dark: #020c1b;
+  --church-secondary: #1d4ed8;
+  --church-secondary-light: #3b82f6;
+  --church-accent: #d97706;
+  --church-accent-hover: #b45309;
+  --church-accent-light: #fef3c7;
+  --church-bg: #ffffff;
+  --church-bg-alt: #f8fafc;
+  --church-bg-muted: #f1f5f9;
+  --church-text: #1e293b;
+  --church-text-muted: #64748b;
+  --church-text-light: #94a3b8;
+  --church-border: #e2e8f0;
+  --church-border-dark: #cbd5e1;
+  --church-success: #16a34a;
+  --church-warning: #f59e0b;
+  --church-radius: 8px;
+  --church-radius-lg: 14px;
+  --church-shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --church-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+  --church-shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+}
+
+/* ── Container & Layout ────────────────────────────────────────── */
+.ch-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+.ch-section {
+  padding: 72px 0;
+}
+
+.ch-section-alt {
+  background-color: var(--church-bg-alt);
+}
+
+.ch-section-dark {
+  background-color: var(--church-primary);
+  color: #ffffff;
+}
+
+/* ── Section Headings ─────────────────────────────────────────── */
+.ch-heading-wrap {
+  text-align: center;
+  max-width: 720px;
+  margin: 0 auto 48px auto;
+}
+
+.ch-eyebrow {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: var(--church-accent);
+  margin-bottom: 8px;
+}
+
+.ch-title {
+  font-size: clamp(28px, 4vw, 40px);
+  font-weight: 800;
+  color: var(--church-primary);
+  line-height: 1.2;
+  margin: 0 0 16px 0;
+}
+
+.ch-section-dark .ch-title {
+  color: #ffffff;
+}
+
+.ch-subtitle {
+  font-size: 17px;
+  color: var(--church-text-muted);
+  line-height: 1.6;
+  margin: 0;
+}
+
+.ch-section-dark .ch-subtitle {
+  color: var(--church-text-light);
+}
+
+/* ── Buttons ──────────────────────────────────────────────────── */
+.ch-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 12px 24px;
+  border-radius: var(--church-radius);
+  text-decoration: none;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.2s ease;
+  line-height: 1.4;
+}
+
+.ch-btn-primary {
+  background-color: var(--church-secondary);
+  color: #ffffff;
+}
+
+.ch-btn-primary:hover {
+  background-color: #1e40af;
+}
+
+.ch-btn-accent {
+  background-color: var(--church-accent);
+  color: #ffffff;
+}
+
+.ch-btn-accent:hover {
+  background-color: var(--church-accent-hover);
+}
+
+.ch-btn-dark {
+  background-color: var(--church-primary);
+  color: #ffffff;
+}
+
+.ch-btn-dark:hover {
+  background-color: var(--church-primary-light);
+}
+
+.ch-btn-outline {
+  background-color: transparent;
+  border-color: var(--church-border-dark);
+  color: var(--church-text);
+}
+
+.ch-btn-outline:hover {
+  background-color: var(--church-bg-muted);
+}
+
+.ch-btn-outline-white {
+  background-color: transparent;
+  border-color: rgba(255, 255, 255, 0.4);
+  color: #ffffff;
+}
+
+.ch-btn-outline-white:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+  border-color: #ffffff;
+}
+
+/* ── Navigation ───────────────────────────────────────────────── */
+.ch-nav-header {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background-color: #ffffff;
+  border-bottom: 1px solid var(--church-border);
+  box-shadow: var(--church-shadow-sm);
+}
+
+.ch-nav-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 76px;
+}
+
+.ch-nav-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-decoration: none;
+  color: var(--church-primary);
+}
+
+.ch-nav-logo {
+  height: 44px;
+  width: auto;
+  object-fit: contain;
+}
+
+.ch-nav-title {
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  line-height: 1.2;
+}
+
+.ch-nav-links {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.ch-nav-link {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--church-text);
+  text-decoration: none;
+  padding: 8px 4px;
+  position: relative;
+  transition: color 0.2s ease;
+}
+
+.ch-nav-link:hover,
+.ch-nav-link.active {
+  color: var(--church-secondary);
+}
+
+.ch-nav-link.active::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background-color: var(--church-secondary);
+}
+
+.ch-nav-mobile-toggle {
+  display: none;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  padding: 8px;
+  color: var(--church-primary);
+}
+
+@media (max-width: 900px) {
+  .ch-nav-links {
+    display: none;
+  }
+  .ch-nav-mobile-toggle {
+    display: block;
+  }
+  .ch-nav-mobile-menu {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding: 24px;
+    background-color: #ffffff;
+    border-bottom: 1px solid var(--church-border);
+  }
+}
+
+/* ── Hero Banner ──────────────────────────────────────────────── */
+.ch-hero-wrap {
+  position: relative;
+  background: linear-gradient(135deg, var(--church-primary-dark) 0%, var(--church-primary) 60%, #172554 100%);
+  color: #ffffff;
+  padding: 100px 0 120px 0;
+  overflow: hidden;
+}
+
+.ch-hero-content {
+  position: relative;
+  z-index: 2;
+  max-width: 800px;
+}
+
+.ch-hero-title {
+  font-size: clamp(38px, 6vw, 64px);
+  font-weight: 900;
+  line-height: 1.1;
+  letter-spacing: -1px;
+  margin: 16px 0 24px 0;
+}
+
+.ch-hero-title span {
+  color: var(--church-accent);
+}
+
+.ch-hero-subtitle {
+  font-size: clamp(16px, 2vw, 20px);
+  line-height: 1.6;
+  color: #cbd5e1;
+  margin-bottom: 36px;
+  max-width: 650px;
+}
+
+.ch-hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+/* ── Cards & Grids ────────────────────────────────────────────── */
+.ch-grid-3 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 28px;
+}
+
+.ch-grid-4 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 24px;
+}
+
+.ch-grid-2 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+  gap: 32px;
+}
+
+.ch-card {
+  background-color: #ffffff;
+  border-radius: var(--church-radius-lg);
+  border: 1px solid var(--church-border);
+  overflow: hidden;
+  box-shadow: var(--church-shadow-sm);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  display: flex;
+  flex-direction: column;
+}
+
+.ch-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--church-shadow-lg);
+}
+
+.ch-card-body {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+}
+
+.ch-card-media {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  background-color: var(--church-bg-muted);
+  overflow: hidden;
+}
+
+.ch-card-media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* ── Sermon Card ──────────────────────────────────────────────── */
+.ch-sermon-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background-color: var(--church-accent-light);
+  color: var(--church-accent-hover);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 4px 10px;
+  border-radius: 999px;
+  margin-bottom: 12px;
+}
+
+.ch-sermon-title {
+  font-size: 19px;
+  font-weight: 700;
+  color: var(--church-primary);
+  margin: 0 0 8px 0;
+  line-height: 1.3;
+}
+
+.ch-sermon-meta {
+  font-size: 13px;
+  color: var(--church-text-muted);
+  margin-bottom: 14px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.ch-sermon-scripture {
+  font-size: 13px;
+  font-style: italic;
+  color: var(--church-secondary);
+  margin-bottom: 16px;
+}
+
+/* ── Event Card ───────────────────────────────────────────────── */
+.ch-event-date-badge {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  background-color: var(--church-primary);
+  color: #ffffff;
+  padding: 8px 12px;
+  border-radius: var(--church-radius);
+  text-align: center;
+  box-shadow: var(--church-shadow);
+}
+
+.ch-event-date-day {
+  font-size: 20px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.ch-event-date-month {
+  font-size: 10px;
+  text-transform: uppercase;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+
+.ch-event-title {
+  font-size: 19px;
+  font-weight: 700;
+  color: var(--church-primary);
+  margin: 0 0 10px 0;
+}
+
+.ch-event-details {
+  font-size: 13px;
+  color: var(--church-text-muted);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 18px;
+}
+
+/* ── Stats Counter ────────────────────────────────────────────── */
+.ch-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 24px;
+  text-align: center;
+}
+
+.ch-stat-item {
+  padding: 24px;
+  background-color: #ffffff;
+  border-radius: var(--church-radius-lg);
+  border: 1px solid var(--church-border);
+}
+
+.ch-stat-val {
+  font-size: clamp(36px, 5vw, 48px);
+  font-weight: 900;
+  color: var(--church-secondary);
+  line-height: 1;
+  margin-bottom: 8px;
+}
+
+.ch-stat-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--church-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* ── Scripture Callout ────────────────────────────────────────── */
+.ch-scripture-box {
+  background: linear-gradient(135deg, var(--church-primary-light), var(--church-primary));
+  color: #ffffff;
+  padding: 40px;
+  border-radius: var(--church-radius-lg);
+  text-align: center;
+  margin: 40px auto;
+  max-width: 840px;
+  border-left: 6px solid var(--church-accent);
+}
+
+.ch-scripture-text {
+  font-size: clamp(18px, 2.5vw, 24px);
+  font-style: italic;
+  line-height: 1.6;
+  margin: 0 0 16px 0;
+  font-family: Georgia, 'Times New Roman', serif;
+}
+
+.ch-scripture-ref {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--church-accent);
+  text-transform: uppercase;
+}
+
+/* ── Filters Bar ──────────────────────────────────────────────── */
+.ch-filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  margin-bottom: 36px;
+}
+
+.ch-filter-btn {
+  padding: 8px 18px;
+  border-radius: 999px;
+  border: 1px solid var(--church-border-dark);
+  background-color: #ffffff;
+  color: var(--church-text);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.ch-filter-btn:hover {
+  background-color: var(--church-bg-muted);
+}
+
+.ch-filter-btn.active {
+  background-color: var(--church-secondary);
+  color: #ffffff;
+  border-color: var(--church-secondary);
+}
+
+/* ── Modal Dialog ─────────────────────────────────────────────── */
+.ch-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(10, 25, 47, 0.8);
+  backdrop-filter: blur(4px);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.ch-modal-content {
+  background-color: #ffffff;
+  border-radius: var(--church-radius-lg);
+  max-width: 800px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  position: relative;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+}
+
+.ch-modal-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  background: var(--church-bg-muted);
+  border: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+}
+
+/* ── Footer ───────────────────────────────────────────────────── */
+.ch-footer {
+  background-color: var(--church-primary-dark);
+  color: #cbd5e1;
+  padding: 64px 0 24px 0;
+  font-size: 14px;
+}
+
+.ch-footer-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 40px;
+  margin-bottom: 48px;
+}
+
+.ch-footer-col h4 {
+  color: #ffffff;
+  font-size: 16px;
+  font-weight: 700;
+  margin: 0 0 16px 0;
+  letter-spacing: -0.2px;
+}
+
+.ch-footer-col ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.ch-footer-col li {
+  margin-bottom: 10px;
+}
+
+.ch-footer-col a {
+  color: #94a3b8;
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.ch-footer-col a:hover {
+  color: var(--church-accent);
+}
+
+.ch-footer-bottom {
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding-top: 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  font-size: 13px;
+  color: #64748b;
+}
