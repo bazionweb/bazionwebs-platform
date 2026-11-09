@@ -3,6 +3,14 @@ import { mkdir, readdir, readFile, stat, unlink, writeFile } from "node:fs/promi
 import { tmpdir } from "node:os";
 import { basename, extname, isAbsolute, join, relative, resolve, sep } from "node:path";
 
+export {
+  detectImageContentType,
+  imageContentTypeExtensions,
+  imageExtensionForContentType,
+  sanitizeImageFilename,
+  type SupportedImageContentType,
+} from "./image-upload.js";
+
 export interface StoredObject {
   key: string;
   url: string;

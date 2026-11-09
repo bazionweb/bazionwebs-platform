@@ -37,7 +37,14 @@ import { withTenantTransaction, type TenantTransaction } from "../../lib/databas
 import { resolveTenantId } from "../../lib/tenant-resolution.js";
 import { isTenantModuleEnabled } from "../../lib/tenant-modules.js";
 import { DarajaClient, normalizeKenyanPhoneNumber } from "@bazion/payments";
-import { buildTenantObjectKey, createObjectStorage, type ObjectStorage } from "@bazion/storage";
+import {
+  buildTenantObjectKey,
+  createObjectStorage,
+  detectImageContentType,
+  imageExtensionForContentType,
+  sanitizeImageFilename,
+  type ObjectStorage,
+} from "@bazion/storage";
 
 interface RouteOptions {
   config: AppConfig;
@@ -45,28 +52,6 @@ interface RouteOptions {
 }
 
 const MEDIA_UPLOAD_LIMIT_BYTES = 8 * 1024 * 1024;
-
-const mediaTypeExtension: Record<string, string> = {
-  "image/avif": ".avif",
-  "image/jpeg": ".jpg",
-  "image/png": ".png",
-  "image/webp": ".webp",
-};
-
-function detectedImageType(bytes: Buffer): string | undefined {
-  if (bytes.length >= 8 && bytes.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return "image/png";
-  if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return "image/jpeg";
-  if (bytes.length >= 12 && bytes.toString("ascii", 0, 4) === "RIFF" && bytes.toString("ascii", 8, 12) === "WEBP") return "image/webp";
-  if (bytes.length >= 12 && bytes.toString("ascii", 4, 8) === "ftyp" && ["avif", "avis"].includes(bytes.toString("ascii", 8, 12))) return "image/avif";
-  return undefined;
-}
-
-function safeMediaFilename(value: string | undefined, extension: string): string {
-  const basename = (value ?? "image").replaceAll("\\", "/").split("/").pop() ?? "image";
-  const name = basename.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 100);
-  const stem = name.replace(/\.[^.]*$/, "").slice(0, 80) || "image";
-  return `${stem}${extension}`;
-}
 
 function sha256(value: string): string {
   return createHash("sha256").update(value).digest("hex");
@@ -797,12 +782,13 @@ export async function churchRoutes(app: FastifyInstance, options: RouteOptions) 
       return reply.code(413).send({ error: "MEDIA_TOO_LARGE", message: "Images must be 8 MB or smaller." });
     }
     const declaredType = request.query.contentType?.trim().toLowerCase() ?? "";
-    const actualType = detectedImageType(bytes);
-    if (!actualType || actualType !== declaredType || !mediaTypeExtension[actualType]) {
+    const actualType = detectImageContentType(bytes);
+    const extension = actualType ? imageExtensionForContentType(actualType) : undefined;
+    if (!actualType || actualType !== declaredType || !extension) {
       return reply.code(415).send({ error: "UNSUPPORTED_MEDIA_TYPE", message: "Upload a valid JPEG, PNG, WebP, or AVIF image." });
     }
 
-    const filename = safeMediaFilename(request.query.filename, mediaTypeExtension[actualType]);
+    const filename = sanitizeImageFilename(request.query.filename, extension);
     const key = buildTenantObjectKey(context.tenantId, randomBytes(16).toString("hex"), filename);
     await storage.putObject({ tenantId: context.tenantId, key, body: bytes, contentType: actualType });
     return reply.code(201).send({

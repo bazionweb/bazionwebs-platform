@@ -49,7 +49,7 @@ The manifest validator checks package names against actual workspace packages an
 ## Adoption order
 
 1. Keep all existing manifests explicit about their implementation mode and validate that each reference points to real code.
-2. Use church/ministry as the first boundary pilot: keep Fastify and Next.js as adapters, extract bounded reusable logic rather than moving the whole route file at once, and keep Global Mission content in tenant configuration. The first extracted rule is tenant-scoped unique content slugs in `@bazion/church-ministry-domain`.
+2. Use church/ministry as the first boundary pilot: keep Fastify and Next.js as adapters, extract bounded reusable logic rather than moving the whole route file at once, and keep Global Mission content in tenant configuration. The first extracted rule is tenant-scoped unique content slugs in `@bazion/church-ministry-domain`; image signature detection and safe upload filenames now belong to the reusable `@bazion/storage` package, while request authorization and upload limits stay in the API adapter.
 3. Provision a second ministry with different identity and content. Verify neutral defaults, saved settings, public content, media, and module enablement are tenant-scoped.
 4. Apply the same contract to commerce and the next module only after the pilot passes the module and tenant-isolation checks.
 5. Revisit package publication after an independent consumer exists; do not turn the current module catalogue into 37 separately released repositories.

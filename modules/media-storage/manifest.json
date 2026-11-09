@@ -1,0 +1,27 @@
+{
+  "id": "media-storage",
+  "name": "Tenant media storage adapters",
+  "version": "1.0.0",
+  "owner": "platform",
+  "status": "partial",
+  "entrypoints": {
+    "domain": "packages/storage"
+  },
+  "implementation": { "mode": "workspace-package", "packageName": "@bazion/storage" },
+  "tenantModel": "tenant-owned",
+  "permissions": [],
+  "tables": [],
+  "dependencies": [],
+  "operations": {
+    "logs": false,
+    "metrics": false,
+    "retention": "Object lifecycle and tenant data retention are controlled by storage configuration and the consuming tenant module.",
+    "recovery": "Restore media from the configured object-store backup or replication policy and verify tenant prefixes before reopening uploads.",
+    "enableDisable": "Authorization is enforced by consuming module routes; disable those routes before disabling storage, and preserve tenant export and retention access."
+  },
+  "events": [],
+  "jobs": [],
+  "providers": ["Local filesystem", "S3-compatible object storage"],
+  "tests": ["packages/storage/src/image-upload.test.ts"],
+  "docs": ["docs/module-development-contract.md"]
+}

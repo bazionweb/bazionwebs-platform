@@ -33,7 +33,7 @@
     { "name": "church_newsletter_subscribers", "owner": "church-ministry", "tenantScoped": true, "rls": "forced", "migration": "0008_church_ministry_domain.sql" }
   ],
   "providers": ["Safaricom Daraja M-Pesa STK Push for donations; requires merchant credentials and provider callback verification"],
-  "dependencies": ["platform-identity"],
+  "dependencies": ["platform-identity", "media-storage"],
   "operations": {
     "logs": true,
     "metrics": false,
