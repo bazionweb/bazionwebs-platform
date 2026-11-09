@@ -8,6 +8,7 @@
   },
   "scripts": {
     "dev": "dotenv -e .env -- turbo run dev --parallel",
+    "dev:gmfc": "dotenv -e .env -o -v DEFAULT_TENANT_ID=7a80eaae-6f8c-44c1-b22a-3dca458f0ec1 -v PORT=4100 -v API_BASE_URL=http://localhost:4100 -v NEXT_DIST_DIR=.next-gmfc -v BETTER_AUTH_URL=http://localhost:4100 -v AUTH_APP_URL=http://localhost:3100 -v PUBLIC_STOREFRONT_URL=http://localhost:3100 -v CORS_ORIGINS=http://localhost:3100,http://localhost:4100 -v BETTER_AUTH_TRUSTED_ORIGINS=http://localhost:3100,http://localhost:4100 -- turbo run dev:gmfc --filter=@bazion/api --filter=@bazion/storefront",
     "build": "turbo run build",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
@@ -16,6 +17,8 @@
     "db:migrate": "dotenv -e .env -- pnpm --filter @bazion/database migrate",
     "db:seed": "dotenv -e .env -- pnpm --filter @bazion/database seed",
     "db:auth:migrate": "dotenv -e .env -- pnpm --filter @bazion/auth migrate",
+    "gmfc:migrate": "dotenv -e .env -o -v GMFC_TENANT_ID=7a80eaae-6f8c-44c1-b22a-3dca458f0ec1 -v DEFAULT_TENANT_ID=7a80eaae-6f8c-44c1-b22a-3dca458f0ec1 -- pnpm --filter @bazion/database migrate:global-mission",
+    "gmfc:migrate:apply": "dotenv -e .env -o -v GMFC_TENANT_ID=7a80eaae-6f8c-44c1-b22a-3dca458f0ec1 -v DEFAULT_TENANT_ID=7a80eaae-6f8c-44c1-b22a-3dca458f0ec1 -- pnpm --filter @bazion/database migrate:global-mission --apply",
     "auth:check": "pnpm --filter @bazion/auth typecheck && pnpm --filter @bazion/auth test",
     "catalog:validate": "node scripts/validate-product-catalog.mjs && node scripts/validate-module-manifests.mjs",
     "modules:validate": "node scripts/validate-module-manifests.mjs",

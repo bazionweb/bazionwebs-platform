@@ -4,6 +4,8 @@ const apiBaseUrl = (process.env.API_BASE_URL ?? "http://localhost:4000").replace
 
 const nextConfig: NextConfig = {
   transpilePackages: ["@bazion/ui"],
+  // Allow an isolated tenant preview to run beside the generic storefront.
+  distDir: process.env.NEXT_DIST_DIR ?? ".next",
   // Keep the guest-cart HttpOnly cookie first-party on each client storefront
   // domain. The browser calls /v1 on this origin; Next proxies it to the API.
   async rewrites() {

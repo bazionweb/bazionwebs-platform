@@ -15,6 +15,7 @@
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "migrate": "tsx scripts/migrate.ts",
+    "migrate:global-mission": "tsx scripts/migrate-global-mission.ts",
     "seed": "tsx scripts/seed.ts",
     "test": "vitest run src",
     "preflight": "tsx src/production-preflight.ts"

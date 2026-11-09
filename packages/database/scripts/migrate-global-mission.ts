@@ -1,0 +1,158 @@
+import { readdir, readFile } from "node:fs/promises";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { Pool } from "pg";
+import { mapGlobalMissionEvents, type SourceEvent } from "../src/global-mission-migration.js";
+import { globalMissionConfig } from "../../../templates/global-mission.config.js";
+
+const args = process.argv.slice(2);
+const apply = args.includes("--apply");
+const inputArgument = args.find((value) => value.startsWith("--input="))?.slice("--input=".length);
+const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
+const inputFile = resolve(repoRoot, inputArgument ?? "data/migrations/global-mission-events.json");
+const tenantId = process.env.GMFC_TENANT_ID ?? process.env.DEFAULT_TENANT_ID;
+const connectionString = process.env.MIGRATION_DATABASE_URL;
+
+if (!tenantId) throw new Error("Set GMFC_TENANT_ID (or DEFAULT_TENANT_ID) to the local GMFC tenant UUID.");
+if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(tenantId)) {
+  throw new Error("GMFC_TENANT_ID must be a UUID.");
+}
+
+let eventExport: { source?: unknown; events?: unknown };
+try {
+  eventExport = JSON.parse(await readFile(inputFile, "utf8")) as typeof eventExport;
+} catch {
+  throw new Error(`Could not read ${inputFile}. Export the source's public events first.`);
+}
+if (eventExport.source !== "global-mission-fc" || !Array.isArray(eventExport.events)) {
+  throw new Error("The import file is not a Global Mission public event export.");
+}
+
+const { events: eventRows, skipped: skippedEvents } = mapGlobalMissionEvents(eventExport.events as SourceEvent[]);
+
+const { ministryName, tagline, branding, hero, contact, social, vision, mission, outreach } = globalMissionConfig;
+const galleryDirectory = join(repoRoot, "apps/storefront/public/images/gallery");
+const galleryEntries = await readdir(galleryDirectory, { withFileTypes: true }).catch(() => []);
+const galleryImages = galleryEntries
+  .filter((entry) => entry.isFile() && /\.(jpe?g|png|webp|avif)$/i.test(entry.name))
+  .sort((a, b) => a.name.localeCompare(b.name))
+  .map((entry) => ({
+    imageUrl: `/images/gallery/${encodeURIComponent(entry.name)}`,
+    alt: "Global Mission for Christ International ministry gallery photo",
+  }));
+const profile = {
+  ministryName,
+  tagline,
+  logoUrl: branding.logoUrl,
+  vision: vision.statement,
+  mission: mission.statement,
+  outreach: outreach.statement,
+  contact: { address: contact.address, email: contact.email, phones: contact.phones },
+  social,
+};
+const settings = {
+  branding: {
+    primaryColor: branding.primaryColor,
+    secondaryColor: branding.secondaryColor,
+    accentColor: branding.accentColor,
+    heroImageUrl: branding.heroBgUrl,
+  },
+  hero,
+  serviceTimes: globalMissionConfig.serviceTimes,
+  locations: globalMissionConfig.locations,
+  visitorInfo: globalMissionConfig.visitorInfo,
+  online: globalMissionConfig.online,
+  scripture: globalMissionConfig.scripture,
+  ministries: globalMissionConfig.ministries,
+  galleryImages,
+  faqs: globalMissionConfig.faqs,
+  giving: globalMissionConfig.giving,
+  coreValues: globalMissionConfig.coreValues,
+  leadership: globalMissionConfig.leadership.map(({ name, role, bio, photoUrl }) => ({ name, role, bio, photoUrl })),
+  statementOfFaith: globalMissionConfig.statementOfFaith,
+  metadata: globalMissionConfig.metadata,
+};
+
+console.log(`Previewing ${globalMissionConfig.ministryName} → tenant ${tenantId}`);
+console.log(`Site profile/settings: 1; valid public events: ${eventRows.length}; skipped events with incomplete identifiers/dates: ${skippedEvents}.`);
+console.log(`Target database: local PostgreSQL only; source contact messages, prayer requests, donations and subscribers are excluded.`);
+if (!apply) {
+  console.log("Dry run only. Add --apply to write the profile, public settings, and event records.");
+  process.exit(0);
+}
+if (!connectionString) throw new Error("MIGRATION_DATABASE_URL is required.");
+const databaseUrl = new URL(connectionString);
+if (!["localhost", "127.0.0.1", "::1"].includes(databaseUrl.hostname)) {
+  throw new Error("This importer is restricted to local PostgreSQL. Remote database migration requires a separately reviewed process.");
+}
+
+const pool = new Pool({ connectionString, max: 1 });
+const client = await pool.connect();
+try {
+  await client.query("BEGIN");
+  const tenantResult = await client.query<{ id: string; slug: string; name: string }>(
+    "SELECT id, slug, name FROM public.tenants WHERE id = $1 OR slug = $2 FOR UPDATE",
+    [tenantId, globalMissionConfig.tenantSlug],
+  );
+  const tenantById = tenantResult.rows.find((row) => row.id === tenantId);
+  const tenantBySlug = tenantResult.rows.find((row) => row.slug === globalMissionConfig.tenantSlug);
+  if (tenantById && tenantById.slug !== globalMissionConfig.tenantSlug) {
+    throw new Error(`Tenant UUID already belongs to '${tenantById.slug}'. Choose a new GMFC_TENANT_ID; existing tenant data was left untouched.`);
+  }
+  if (tenantBySlug && tenantBySlug.id !== tenantId) {
+    throw new Error(`'${globalMissionConfig.tenantSlug}' already belongs to another UUID. Existing tenant data was left untouched.`);
+  }
+  if (!tenantById) {
+    await client.query(
+      "INSERT INTO public.tenants (id, slug, name, default_currency) VALUES ($1, $2, $3, 'KES')",
+      [tenantId, globalMissionConfig.tenantSlug, globalMissionConfig.ministryName],
+    );
+  }
+  const entitlement = await client.query<{ enabled: boolean }>(
+    "SELECT enabled FROM public.tenant_module_entitlements WHERE tenant_id = $1 AND module_id = 'church-ministry'",
+    [tenantId],
+  );
+  if (entitlement.rows[0]?.enabled === false) {
+    throw new Error("Church Ministry is explicitly disabled for this tenant. Enable it in the platform tenant settings before import.");
+  }
+
+  await client.query("SELECT set_config('app.tenant_id', $1, true)", [tenantId]);
+  await client.query(
+    `INSERT INTO public.ministry_profiles
+       (tenant_id, ministry_name, logo_asset_url, description, vision, mission, outreach, address, email, telephone_numbers, social_links)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11::jsonb)
+     ON CONFLICT (tenant_id) DO UPDATE SET
+       ministry_name=EXCLUDED.ministry_name, logo_asset_url=EXCLUDED.logo_asset_url,
+       description=EXCLUDED.description, vision=EXCLUDED.vision, mission=EXCLUDED.mission,
+       outreach=EXCLUDED.outreach, address=EXCLUDED.address, email=EXCLUDED.email,
+       telephone_numbers=EXCLUDED.telephone_numbers, social_links=EXCLUDED.social_links, updated_at=now()`,
+    [tenantId, profile.ministryName, profile.logoUrl, profile.tagline, profile.vision, profile.mission,
+      profile.outreach, profile.contact.address, profile.contact.email, JSON.stringify(profile.contact.phones), JSON.stringify(profile.social)],
+  );
+  await client.query(
+    `INSERT INTO public.ministry_settings (tenant_id, setting_key, setting_value)
+     VALUES ($1, 'public_site', $2)
+     ON CONFLICT (tenant_id, setting_key) DO UPDATE SET setting_value=EXCLUDED.setting_value, updated_at=now()`,
+    [tenantId, JSON.stringify(settings)],
+  );
+
+  let insertedEvents = 0;
+  for (const event of eventRows) {
+    const result = await client.query(
+      `INSERT INTO public.church_events
+         (tenant_id, title, slug, description, poster_url, venue, starts_at, ends_at, registration_enabled, status)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,false,$9)
+       ON CONFLICT (tenant_id, slug) DO NOTHING`,
+      [tenantId, event.title, event.slug, event.description, event.posterUrl, event.venue, event.startsAt, event.endsAt, event.status],
+    );
+    insertedEvents += result.rowCount ?? 0;
+  }
+  await client.query("COMMIT");
+  console.log(`Migration applied. Tenant site settings saved; ${insertedEvents} new events inserted; existing same-slug events were preserved.`);
+} catch (error) {
+  await client.query("ROLLBACK");
+  throw error;
+} finally {
+  client.release();
+  await pool.end();
+}
