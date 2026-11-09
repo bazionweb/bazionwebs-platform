@@ -45,6 +45,12 @@ export function PageHero({
         <span />
         <span />
         <span />
+        <span />
+        <span />
+        <span />
+        <span />
+        <span />
+        <span />
       </div>
       <div className="ch-container">
         <div className="ch-hero-content">
