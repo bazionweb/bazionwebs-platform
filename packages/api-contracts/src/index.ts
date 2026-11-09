@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const currencySchema = z.enum(["KES", "USD", "EUR", "GBP"]);
+export const currencySchema = z.enum(["KES", "USD", "EUR", "GBP", "CAD", "AUD", "NZD", "CHF", "SGD", "ZAR", "NGN", "GHS", "INR", "AED", "BRL", "MXN", "SAR", "CNY", "HKD", "SEK", "NOK", "DKK", "PLN", "THB", "PHP"]);
 export const createCartSchema = z.object({ currency: currencySchema.default("KES") });
 export const addCartItemSchema = z.object({
   productId: z.string().uuid(),

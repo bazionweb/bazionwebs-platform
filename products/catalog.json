@@ -124,7 +124,7 @@
         "apps/api/src/modules/commerce"
       ],
       "status": "partial",
-      "scope": "Foundational catalogue/cart/checkout/order flow exists; strengthen editor, variants, order lifecycle and customer portal."
+      "scope": "Tenant-scoped storefront, search/categories, product details, catalog editor, guest cart/checkout and paid-order fulfillment are implemented. Product variants, customer accounts, promotions, refunds, automated tax and global live-payment adapters remain gaps."
     },
     {
       "id": "payments",

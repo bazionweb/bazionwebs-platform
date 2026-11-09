@@ -1,14 +1,15 @@
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import type { FastifyInstance, FastifyRequest } from "fastify";
-import { and, eq, sql } from "drizzle-orm";
-import { calculateTotals } from "@bazion/commerce-domain";
+import { and, asc, desc, eq, ilike, sql } from "drizzle-orm";
+import { calculateTotals, type CurrencyCode } from "@bazion/commerce-domain";
 import { addCartItemSchema, checkoutSchema, createCartSchema, updateCartItemSchema } from "@bazion/api-contracts";
-import { carts, cartItems, idempotencyRecords, orderItems, orders, paymentAttempts, products, webhookEvents } from "@bazion/database";
+import { carts, cartItems, commerceStoreSettings, idempotencyRecords, orderItems, orders, paymentAttempts, products, webhookEvents } from "@bazion/database";
 import { withTenantTransaction, type TenantTransaction } from "../../lib/database.js";
 import type { AppConfig } from "../../config.js";
 import { resolveTenantId } from "../../lib/tenant-resolution.js";
 import { isTenantModuleEnabled } from "../../lib/tenant-modules.js";
 import { DarajaClient, DarajaRequestError, normalizeKenyanPhoneNumber } from "@bazion/payments";
+import { productListQuerySchema } from "./admin-policy.js";
 
 interface RouteOptions { config: AppConfig }
 
@@ -88,21 +89,78 @@ async function authorizeCart(tx: TenantTransaction, tenantId: string, cartId: st
 
 function toPublicCart(cart: { id: string; currency: string; status: string; expiresAt: Date }, items: Array<{ id: string; productId: string; quantity: number; unitPriceMinor: number; name: string; sku: string }>) {
   const totals = items.length
-    ? calculateTotals(items.map((item) => ({ productId: item.productId, quantity: item.quantity, unitPriceMinor: item.unitPriceMinor })), cart.currency as "KES" | "USD" | "EUR" | "GBP")
+    ? calculateTotals(items.map((item) => ({ productId: item.productId, quantity: item.quantity, unitPriceMinor: item.unitPriceMinor })), cart.currency as CurrencyCode)
     : { currency: cart.currency, subtotalMinor: 0, discountMinor: 0, shippingMinor: 0, taxMinor: 0, totalMinor: 0 };
   return { id: cart.id, currency: cart.currency, status: cart.status, expiresAt: cart.expiresAt, items, totals };
 }
 
 export async function commerceRoutes(app: FastifyInstance, options: RouteOptions) {
   const daraja = options.config.mpesa ? new DarajaClient(options.config.mpesa) : null;
-  app.get("/products", async (request) => {
+  app.get("/storefront", async (request) => {
     const tenantId = await resolveTenantId(request.hostname, options.config);
     await assertCommerceEnabled(tenantId);
     return withTenantTransaction(tenantId, async (tx) => {
-    return tx.select({ id: products.id, sku: products.sku, name: products.name, description: products.description,
-      currency: products.currency, priceMinor: products.priceMinor, stockAvailable: sql<number | null>`case when ${products.stockTracked} then ${products.stockOnHand} - ${products.stockReserved} else null end` })
-      .from(products).where(and(eq(products.tenantId, tenantId), eq(products.active, true)));
+      const [settings] = await tx.select().from(commerceStoreSettings)
+        .where(eq(commerceStoreSettings.tenantId, tenantId)).limit(1);
+      return { store: settings ?? {
+        tenantId, storeName: "Our Store", tagline: "Thoughtfully selected for you.", supportEmail: "", isHomePage: false, locale: "en-KE",
+        timeZone: "Africa/Nairobi", defaultCountryCode: "KE", defaultCurrency: "KES", supportedCurrencies: ["KES"],
+        shippingRates: { KES: 0 }, shippingCountries: [], updatedAt: null,
+      }, paymentProvider: options.config.PAYMENT_PROVIDER };
     });
+  });
+
+  app.get<{ Querystring: { q?: string; category?: string; currency?: string; sort?: string; limit?: string; offset?: string } }>("/products", async (request, reply) => {
+    const parsed = productListQuerySchema.safeParse(request.query);
+    if (!parsed.success) return reply.code(400).send({ error: "INVALID_INPUT", details: parsed.error.flatten() });
+    const tenantId = await resolveTenantId(request.hostname, options.config);
+    await assertCommerceEnabled(tenantId);
+    return withTenantTransaction(tenantId, async (tx) => {
+      const [settings] = await tx.select().from(commerceStoreSettings)
+        .where(eq(commerceStoreSettings.tenantId, tenantId)).limit(1);
+      const supportedCurrencies = settings?.supportedCurrencies ?? ["KES"];
+      if (parsed.data.currency && !supportedCurrencies.includes(parsed.data.currency)) {
+        return reply.code(400).send({ error: "CURRENCY_NOT_AVAILABLE" });
+      }
+      const filters = [eq(products.tenantId, tenantId), eq(products.active, true)];
+      if (parsed.data.currency) filters.push(eq(products.currency, parsed.data.currency));
+      if (parsed.data.category) filters.push(eq(products.category, parsed.data.category));
+      if (parsed.data.q) {
+        const escaped = `%${parsed.data.q.replace(/[\\%_]/g, "\\$&")}%`;
+        filters.push(ilike(products.name, escaped));
+      }
+      const orderBy = parsed.data.sort === "price_asc" ? asc(products.priceMinor)
+        : parsed.data.sort === "price_desc" ? desc(products.priceMinor)
+          : parsed.data.sort === "newest" ? desc(products.createdAt)
+            : desc(products.featured);
+      const [items, categories, [total]] = await Promise.all([
+        tx.select({
+          id: products.id, sku: products.sku, slug: products.slug, name: products.name,
+          description: products.description, category: products.category, imageUrl: products.imageUrl,
+          imageAlt: products.imageAlt, featured: products.featured, compareAtPriceMinor: products.compareAtPriceMinor,
+          currency: products.currency, priceMinor: products.priceMinor,
+          stockAvailable: sql<number | null>`case when ${products.stockTracked} then ${products.stockOnHand} - ${products.stockReserved} else null end`,
+        }).from(products).where(and(...filters)).orderBy(orderBy).limit(parsed.data.limit).offset(parsed.data.offset),
+        tx.selectDistinct({ category: products.category }).from(products)
+          .where(and(eq(products.tenantId, tenantId), eq(products.active, true))).orderBy(asc(products.category)),
+        tx.select({ total: sql<number>`count(*)::int` }).from(products).where(and(...filters)),
+      ]);
+      return { items, categories: categories.map((item) => item.category), total: total?.total ?? 0, limit: parsed.data.limit, offset: parsed.data.offset };
+    });
+  });
+
+  app.get<{ Params: { slug: string } }>("/products/:slug", async (request, reply) => {
+    const tenantId = await resolveTenantId(request.hostname, options.config);
+    await assertCommerceEnabled(tenantId);
+    const [product] = await withTenantTransaction(tenantId, (tx) => tx.select({
+      id: products.id, sku: products.sku, slug: products.slug, name: products.name,
+      description: products.description, category: products.category, imageUrl: products.imageUrl,
+      imageAlt: products.imageAlt, featured: products.featured, compareAtPriceMinor: products.compareAtPriceMinor,
+      currency: products.currency, priceMinor: products.priceMinor,
+      stockAvailable: sql<number | null>`case when ${products.stockTracked} then ${products.stockOnHand} - ${products.stockReserved} else null end`,
+    }).from(products).where(and(eq(products.tenantId, tenantId), eq(products.slug, request.params.slug), eq(products.active, true))).limit(1));
+    if (!product) return reply.code(404).send({ error: "PRODUCT_NOT_FOUND" });
+    return reply.send({ product });
   });
 
   app.post("/carts", async (request, reply) => {
@@ -110,6 +168,12 @@ export async function commerceRoutes(app: FastifyInstance, options: RouteOptions
     await assertCommerceEnabled(tenantId);
     const parsed = createCartSchema.safeParse(request.body ?? {});
     if (!parsed.success) return reply.code(400).send({ error: "INVALID_INPUT", details: parsed.error.flatten() });
+    const supportedCurrencies = await withTenantTransaction(tenantId, async (tx) => {
+      const [settings] = await tx.select().from(commerceStoreSettings)
+        .where(eq(commerceStoreSettings.tenantId, tenantId)).limit(1);
+      return settings?.supportedCurrencies ?? ["KES"];
+    });
+    if (!supportedCurrencies.includes(parsed.data.currency)) return reply.code(400).send({ error: "CURRENCY_NOT_AVAILABLE" });
     const guestAccessToken = randomBytes(32).toString("base64url");
     const [cart] = await withTenantTransaction(tenantId, async (tx) => tx.insert(carts).values({
       tenantId, currency: parsed.data.currency, guestTokenHash: tokenHash(guestAccessToken),
@@ -155,7 +219,8 @@ export async function commerceRoutes(app: FastifyInstance, options: RouteOptions
         throw Object.assign(new Error("Insufficient available stock."), { statusCode: 409, code: "OUT_OF_STOCK" });
       }
       if (existing) {
-        await tx.update(cartItems).set({ quantity: nextQuantity, unitPriceMinor: product.priceMinor, updatedAt: new Date() }).where(eq(cartItems.id, existing.id));
+        await tx.update(cartItems).set({ quantity: nextQuantity, unitPriceMinor: product.priceMinor, updatedAt: new Date() })
+          .where(and(eq(cartItems.id, existing.id), eq(cartItems.tenantId, tenantId)));
       } else {
         await tx.insert(cartItems).values({ tenantId, cartId: cart.id, productId: product.id, quantity: parsed.data.quantity, unitPriceMinor: product.priceMinor });
       }
@@ -182,7 +247,8 @@ export async function commerceRoutes(app: FastifyInstance, options: RouteOptions
       const [product] = await tx.select().from(products).where(and(eq(products.id, item.productId), eq(products.tenantId, tenantId))).limit(1);
       if (!product || !product.active) throw Object.assign(new Error("Product is no longer available."), { statusCode: 409, code: "PRODUCT_UNAVAILABLE" });
       if (product.stockTracked && product.stockOnHand - product.stockReserved < parsed.data.quantity) throw Object.assign(new Error("Insufficient available stock."), { statusCode: 409, code: "OUT_OF_STOCK" });
-      await tx.update(cartItems).set({ quantity: parsed.data.quantity, unitPriceMinor: product.priceMinor, updatedAt: new Date() }).where(eq(cartItems.id, item.id));
+      await tx.update(cartItems).set({ quantity: parsed.data.quantity, unitPriceMinor: product.priceMinor, updatedAt: new Date() })
+        .where(and(eq(cartItems.id, item.id), eq(cartItems.tenantId, tenantId)));
       const items = await tx.select({ id: cartItems.id, productId: cartItems.productId, quantity: cartItems.quantity,
         unitPriceMinor: cartItems.unitPriceMinor, name: products.name, sku: products.sku })
         .from(cartItems).innerJoin(products, and(eq(products.id, cartItems.productId), eq(products.tenantId, tenantId)))
@@ -254,8 +320,23 @@ export async function commerceRoutes(app: FastifyInstance, options: RouteOptions
       }
 
       if (cart.status !== "open") throw Object.assign(new Error("Cart has already been checked out or is not open."), { statusCode: 409, code: "CART_NOT_OPEN" });
+      const [storeSettings] = await tx.select().from(commerceStoreSettings)
+        .where(eq(commerceStoreSettings.tenantId, tenantId)).limit(1);
+      const supportedCurrencies = storeSettings?.supportedCurrencies ?? ["KES"];
+      if (!supportedCurrencies.includes(cart.currency)) {
+        throw Object.assign(new Error("This currency is not enabled for the store."), { statusCode: 400, code: "CURRENCY_NOT_AVAILABLE" });
+      }
+      const countryCode = parsed.data.shippingAddress.countryCode;
+      const shippingCountries = storeSettings?.shippingCountries ?? [];
+      if (shippingCountries.length > 0 && !shippingCountries.includes(countryCode)) {
+        throw Object.assign(new Error("This store does not currently ship to the selected country."), { statusCode: 400, code: "SHIPPING_COUNTRY_UNAVAILABLE" });
+      }
+      const shippingMinor = Number(storeSettings?.shippingRates?.[cart.currency as CurrencyCode] ?? 0);
+      if (!Number.isSafeInteger(shippingMinor) || shippingMinor < 0) {
+        throw new Error("Invalid shipping configuration for the selected currency.");
+      }
       const rows = await tx.select({ item: cartItems, product: products })
-        .from(cartItems).innerJoin(products, eq(products.id, cartItems.productId))
+        .from(cartItems).innerJoin(products, and(eq(products.id, cartItems.productId), eq(products.tenantId, tenantId)))
         .where(and(eq(cartItems.cartId, cart.id), eq(cartItems.tenantId, tenantId)))
         .orderBy(products.id);
       if (rows.length === 0) throw Object.assign(new Error("Cannot check out an empty cart."), { statusCode: 409, code: "EMPTY_CART" });
@@ -274,7 +355,7 @@ export async function commerceRoutes(app: FastifyInstance, options: RouteOptions
       }
 
       const lines = lockedProducts.map(({ item, product }) => ({ productId: product.id, quantity: item.quantity, unitPriceMinor: product.priceMinor }));
-      const totals = calculateTotals(lines, cart.currency as "KES" | "USD" | "EUR" | "GBP");
+      const totals = calculateTotals(lines, cart.currency as CurrencyCode, { shippingMinor });
       if (paymentProvider === "mpesa" && (totals.totalMinor < 100 || totals.totalMinor % 100 !== 0)) {
         throw Object.assign(new Error("M-Pesa checkout requires a whole-KES order total of at least KES 1."), { statusCode: 400, code: "INVALID_PAYMENT_AMOUNT" });
       }
@@ -282,7 +363,7 @@ export async function commerceRoutes(app: FastifyInstance, options: RouteOptions
       const orderNumber = `BW-${new Date().toISOString().slice(0, 10).replaceAll("-", "")}-${randomBytes(5).toString("hex").toUpperCase()}`;
       const [order] = await tx.insert(orders).values({
         id: orderId, tenantId, orderNumber, cartId: cart.id, currency: cart.currency, status: "pending_payment",
-        subtotalMinor: totals.subtotalMinor, discountMinor: 0, shippingMinor: 0, taxMinor: 0, totalMinor: totals.totalMinor,
+        subtotalMinor: totals.subtotalMinor, discountMinor: 0, shippingMinor: totals.shippingMinor, taxMinor: 0, totalMinor: totals.totalMinor,
         customerName: parsed.data.customer.name, customerEmail: parsed.data.customer.email, customerPhone: parsed.data.customer.phone,
         shippingAddress: parsed.data.shippingAddress,
       }).returning();
@@ -307,7 +388,8 @@ export async function commerceRoutes(app: FastifyInstance, options: RouteOptions
         callbackTokenHash,
         statusTokenHash,
       }).returning();
-      await tx.update(carts).set({ status: "converted", updatedAt: new Date() }).where(eq(carts.id, cart.id));
+      await tx.update(carts).set({ status: "converted", updatedAt: new Date() })
+        .where(and(eq(carts.id, cart.id), eq(carts.tenantId, tenantId)));
       await tx.insert(idempotencyRecords).values({ tenantId, key: keyHeader, requestHash, resourceId: orderId });
       return { order, payment, reused: false };
     });
@@ -536,7 +618,8 @@ export async function commerceRoutes(app: FastifyInstance, options: RouteOptions
         const [existingEvent] = await tx.select().from(webhookEvents).where(and(eq(webhookEvents.tenantId, tenantId), eq(webhookEvents.provider, "mock"), eq(webhookEvents.providerEventId, eventId))).limit(1);
         if (!existingEvent) await tx.insert(webhookEvents).values({ tenantId, provider: "mock", providerEventId: eventId, eventType: "payment.succeeded" });
         await releaseOrderReservations(tx, tenantId, order.id, true);
-        await tx.update(orders).set({ status: "paid", updatedAt: new Date() }).where(eq(orders.id, order.id));
+        await tx.update(orders).set({ status: "paid", updatedAt: new Date() })
+          .where(and(eq(orders.id, order.id), eq(orders.tenantId, tenantId), eq(orders.status, "pending_payment")));
         await tx.update(paymentAttempts).set({ status: "succeeded", updatedAt: new Date() }).where(and(eq(paymentAttempts.orderId, order.id), eq(paymentAttempts.tenantId, tenantId), eq(paymentAttempts.provider, "mock")));
         return { kind: "paid" as const, orderNumber: order.orderNumber };
       });

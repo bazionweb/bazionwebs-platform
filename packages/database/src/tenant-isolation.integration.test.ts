@@ -60,12 +60,16 @@ describe.skipIf(!enabled)("PostgreSQL tenant isolation (real roles and RLS)", ()
       pendingHostname: `${label}-${unique.slice(0, 8)}.pending.example.test`,
     };
     await withTenant(migrationPool, tenantId, async (client) => {
+      await client.query(
+        "INSERT INTO public.commerce_store_settings (tenant_id, store_name) VALUES ($1, $2)",
+        [tenantId, `Tenant ${label} shop`],
+      );
       const product = await client.query<{ id: string }>(
         `INSERT INTO public.products
-          (tenant_id, sku, name, currency, price_minor, stock_tracked, stock_on_hand, stock_reserved, active)
-         VALUES ($1, $2, $3, 'KES', 125000, true, 12, 0, true)
+          (tenant_id, sku, slug, name, currency, price_minor, stock_tracked, stock_on_hand, stock_reserved, active)
+         VALUES ($1, $2, $3, $4, 'KES', 125000, true, 12, 0, true)
          RETURNING id`,
-        [tenantId, `SKU-${label}-${unique.slice(0, 8)}`, `Tenant ${label} product`],
+        [tenantId, `SKU-${label}-${unique.slice(0, 8)}`, `tenant-${label}-${unique.slice(0, 8)}-product`, `Tenant ${label} product`],
       );
       fixture.productId = product.rows[0]!.id;
 
@@ -170,7 +174,7 @@ describe.skipIf(!enabled)("PostgreSQL tenant isolation (real roles and RLS)", ()
   });
 
   it("forces RLS on every tenant-owned table and keeps the runtime role unprivileged", async () => {
-    const tables = ["products", "carts", "cart_items", "orders", "order_items", "payment_attempts", "webhook_events", "idempotency_records"];
+    const tables = ["products", "commerce_store_settings", "carts", "cart_items", "orders", "order_items", "payment_attempts", "webhook_events", "idempotency_records"];
     const flags = await migrationPool.query<{ relname: string; relrowsecurity: boolean; relforcerowsecurity: boolean }>(
       `SELECT c.relname, c.relrowsecurity, c.relforcerowsecurity
          FROM pg_class c
@@ -196,7 +200,7 @@ describe.skipIf(!enabled)("PostgreSQL tenant isolation (real roles and RLS)", ()
   it("isolates reads across all tenant-owned business tables", async () => {
     const alpha = fixtures[0]!;
     const beta = fixtures[1]!;
-    const tables = ["products", "carts", "cart_items", "orders", "order_items", "payment_attempts", "webhook_events", "idempotency_records"];
+    const tables = ["products", "commerce_store_settings", "carts", "cart_items", "orders", "order_items", "payment_attempts", "webhook_events", "idempotency_records"];
     const result = await withTenant(appPool, alpha.tenantId, async (client) => {
       const counts: Record<string, number> = {};
       for (const table of tables) {
@@ -222,6 +226,10 @@ describe.skipIf(!enabled)("PostgreSQL tenant isolation (real roles and RLS)", ()
       client.query("UPDATE public.products SET name = 'cross-tenant mutation' WHERE id = $1 RETURNING id", [beta.productId]),
     );
     expect(updated.rowCount).toBe(0);
+    const settingsUpdated = await withTenant(appPool, alpha.tenantId, (client) =>
+      client.query("UPDATE public.commerce_store_settings SET store_name = 'cross-tenant mutation' WHERE tenant_id = $1 RETURNING tenant_id", [beta.tenantId]),
+    );
+    expect(settingsUpdated.rowCount).toBe(0);
 
     const client = await appPool.connect();
     try {

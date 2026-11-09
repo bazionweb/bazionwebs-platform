@@ -1,4 +1,5 @@
 import { headers } from "next/headers";
+import { cache } from "react";
 
 const apiBaseUrl = (process.env.API_BASE_URL ?? "http://localhost:4000").replace(/\/$/, "");
 
@@ -21,7 +22,7 @@ export async function getTenantRequestContext(): Promise<{ origin: string; heade
 }
 
 /** Fetch public tenant content for server-rendered metadata using the site's incoming host. */
-export async function fetchTenantPublicData<T>(path: string): Promise<T | null> {
+export const fetchTenantPublicData = cache(async function fetchTenantPublicData<T>(path: string): Promise<T | null> {
   try {
     const tenantContext = await getTenantRequestContext();
     if (!tenantContext) return null;
@@ -35,4 +36,4 @@ export async function fetchTenantPublicData<T>(path: string): Promise<T | null> 
   } catch {
     return null;
   }
-}
+});

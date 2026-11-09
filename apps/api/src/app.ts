@@ -6,6 +6,7 @@ import { fromNodeHeaders } from "better-auth/node";
 import { auth, isVerifiedTenantHost } from "@bazion/auth/server";
 import type { AppConfig } from "./config.js";
 import { commerceRoutes } from "./modules/commerce/routes.js";
+import { commerceAdminRoutes } from "./modules/commerce/admin-routes.js";
 import { authRoutes } from "./modules/auth/routes.js";
 import { adminRoutes } from "./modules/admin/routes.js";
 import { churchRoutes } from "./modules/church/routes.js";
@@ -99,6 +100,7 @@ export async function buildApp(config: AppConfig) {
   await app.register(authRoutes, { prefix: "/v1" });
   await app.register(adminRoutes, { prefix: "/v1" });
   await app.register(commerceRoutes, { prefix: "/v1", config });
+  await app.register(commerceAdminRoutes, { prefix: "/v1" });
   await app.register(churchRoutes, { prefix: "/v1", config });
 
   app.setErrorHandler((error, request, reply) => {

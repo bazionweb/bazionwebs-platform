@@ -30,8 +30,8 @@ for (const module of catalog.modules) {
   }
 }
 
-if (catalog.modules.length !== 36) {
-  fail(`Expected 36 unique module records, found ${catalog.modules.length}`);
+if (catalog.modules.length !== 37) {
+  fail(`Expected 37 unique module records, found ${catalog.modules.length}`);
 }
 
 const capabilityIds = new Set();

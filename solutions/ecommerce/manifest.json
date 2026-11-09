@@ -1,9 +1,9 @@
 {
   "version": "1.0.0",
-  "status": "planned",
+  "status": "experimental",
   "id": "ecommerce",
   "name": "Ecommerce",
-  "description": "Composable online store with product catalogue, checkout, payment, stock, delivery and customer workflows.",
+  "description": "Reusable tenant-configurable storefront and commerce workspace for local and international sellers.",
   "requiredModules": [
     "commerce",
     "payments",
@@ -67,25 +67,25 @@
       "id": "products",
       "label": "Products",
       "module": "commerce",
-      "path": "/admin/products"
+      "path": "/admin/commerce?tab=products"
     },
     {
       "id": "orders",
       "label": "Orders",
       "module": "commerce",
-      "path": "/admin/orders"
+      "path": "/admin/commerce?tab=orders"
     },
     {
       "id": "inventory",
       "label": "Inventory",
       "module": "inventory-pricing",
-      "path": "/admin/inventory"
+      "path": "/admin/commerce?tab=products"
     },
     {
       "id": "fulfilment",
       "label": "Delivery",
       "module": "fulfilment",
-      "path": "/admin/fulfilment"
+      "path": "/admin/commerce?tab=settings"
     }
   ],
   "defaults": {
@@ -94,16 +94,26 @@
     "currency": "KES",
     "features": [
       "catalogue",
+      "product-search-and-categories",
+      "product-detail-pages",
       "cart",
       "checkout",
       "orders",
       "stock",
       "delivery",
+      "tenant-configurable-homepage",
+      "locale-and-multi-currency-price-lists",
       "mpesa-adapter"
     ]
   },
   "templateIds": [
     "ecommerce-starter",
     "ecommerce-business"
+  ],
+  "migrationNotes": [
+    "Apply database migration 0012_ecommerce_template.sql before enabling the shop or commerce admin routes.",
+    "Each tenant configures its own shop name, homepage selection, supported currencies, delivery countries and flat delivery estimates.",
+    "Currency values are tenant price lists; automatic FX conversion and automatic tax calculation are not provided.",
+    "Live payment support is limited to the existing M-Pesa adapter; the mock adapter is development-only. Add a verified global provider before accepting international payments."
   ]
 }

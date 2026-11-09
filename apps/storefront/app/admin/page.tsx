@@ -31,6 +31,12 @@ export default function AdminPage() {
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+          <Link
+            href="/admin/commerce"
+            style={{ color: "#ffffff", textDecoration: "none", fontSize: "13px", padding: "6px 12px", borderRadius: "4px", border: "1px solid rgba(255,255,255,0.2)" }}
+          >
+            Commerce workspace
+          </Link>
           <div style={{ display: "flex", background: "rgba(255,255,255,0.1)", borderRadius: "6px", padding: "2px" }}>
             <button
               type="button"

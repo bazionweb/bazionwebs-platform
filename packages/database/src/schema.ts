@@ -20,10 +20,16 @@ export const products = pgTable("products", {
   id: uuid("id").defaultRandom().primaryKey(),
   tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
   sku: varchar("sku", { length: 80 }).notNull(),
+  slug: varchar("slug", { length: 180 }).notNull(),
   name: varchar("name", { length: 180 }).notNull(),
   description: text("description"),
+  category: varchar("category", { length: 80 }).notNull().default("General"),
+  imageUrl: text("image_url"),
+  imageAlt: varchar("image_alt", { length: 180 }),
   currency: varchar("currency", { length: 3 }).notNull().default("KES"),
   priceMinor: bigint("price_minor", { mode: "number" }).notNull(),
+  compareAtPriceMinor: bigint("compare_at_price_minor", { mode: "number" }),
+  featured: boolean("featured").notNull().default(false),
   stockTracked: boolean("stock_tracked").notNull().default(true),
   stockOnHand: integer("stock_on_hand").notNull().default(0),
   stockReserved: integer("stock_reserved").notNull().default(0),
@@ -31,14 +37,35 @@ export const products = pgTable("products", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
-  check("products_currency_ck", sql`${table.currency} in ('KES', 'USD', 'EUR', 'GBP')`),
+  check("products_currency_ck", sql`${table.currency} in ('KES', 'USD', 'EUR', 'GBP', 'CAD', 'AUD', 'NZD', 'CHF', 'SGD', 'ZAR', 'NGN', 'GHS', 'INR', 'AED', 'BRL', 'MXN', 'SAR', 'CNY', 'HKD', 'SEK', 'NOK', 'DKK', 'PLN', 'THB', 'PHP')`),
   check("products_price_minor_safe_ck", sql`${table.priceMinor} between 0 and 9007199254740991`),
+  check("products_compare_at_safe_ck", sql`${table.compareAtPriceMinor} is null or (${table.compareAtPriceMinor} between ${table.priceMinor} and 9007199254740991)`),
   check("products_stock_on_hand_ck", sql`${table.stockOnHand} >= 0`),
   check("products_stock_reserved_nonnegative_ck", sql`${table.stockReserved} >= 0`),
   check("products_stock_reserved_ck", sql`${table.stockReserved} <= ${table.stockOnHand}`),
   uniqueIndex("products_tenant_sku_uq").on(table.tenantId, table.sku),
+  uniqueIndex("products_tenant_slug_uq").on(table.tenantId, table.slug),
   uniqueIndex("products_id_tenant_uq").on(table.id, table.tenantId),
   index("products_tenant_active_idx").on(table.tenantId, table.active),
+]);
+
+export const commerceStoreSettings = pgTable("commerce_store_settings", {
+  tenantId: uuid("tenant_id").primaryKey().references(() => tenants.id),
+  storeName: varchar("store_name", { length: 160 }).notNull().default("Our Store"),
+  tagline: varchar("tagline", { length: 240 }).notNull().default("Thoughtfully selected for you."),
+  supportEmail: varchar("support_email", { length: 254 }).notNull().default(""),
+  isHomePage: boolean("is_home_page").notNull().default(false),
+  locale: varchar("locale", { length: 16 }).notNull().default("en-KE"),
+  timeZone: varchar("time_zone", { length: 64 }).notNull().default("Africa/Nairobi"),
+  defaultCountryCode: varchar("default_country_code", { length: 2 }).notNull().default("KE"),
+  defaultCurrency: varchar("default_currency", { length: 3 }).notNull().default("KES"),
+  supportedCurrencies: text("supported_currencies").array().notNull().default(sql`ARRAY['KES']::text[]`),
+  shippingRates: jsonb("shipping_rates").$type<Partial<Record<"KES" | "USD" | "EUR" | "GBP" | "CAD" | "AUD" | "NZD" | "CHF" | "SGD" | "ZAR" | "NGN" | "GHS" | "INR" | "AED" | "BRL" | "MXN" | "SAR" | "CNY" | "HKD" | "SEK" | "NOK" | "DKK" | "PLN" | "THB" | "PHP", number>>>().notNull().default(sql`'{"KES":0}'::jsonb`),
+  shippingCountries: text("shipping_countries").array().notNull().default(sql`ARRAY[]::text[]`),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  check("commerce_store_currency_ck", sql`${table.defaultCurrency} in ('KES', 'USD', 'EUR', 'GBP', 'CAD', 'AUD', 'NZD', 'CHF', 'SGD', 'ZAR', 'NGN', 'GHS', 'INR', 'AED', 'BRL', 'MXN', 'SAR', 'CNY', 'HKD', 'SEK', 'NOK', 'DKK', 'PLN', 'THB', 'PHP')`),
+  check("commerce_store_supported_currencies_ck", sql`cardinality(${table.supportedCurrencies}) > 0 and ${table.defaultCurrency} = any(${table.supportedCurrencies})`),
 ]);
 
 export const carts = pgTable("carts", {
@@ -51,7 +78,7 @@ export const carts = pgTable("carts", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
-  check("carts_currency_ck", sql`${table.currency} in ('KES', 'USD', 'EUR', 'GBP')`),
+  check("carts_currency_ck", sql`${table.currency} in ('KES', 'USD', 'EUR', 'GBP', 'CAD', 'AUD', 'NZD', 'CHF', 'SGD', 'ZAR', 'NGN', 'GHS', 'INR', 'AED', 'BRL', 'MXN', 'SAR', 'CNY', 'HKD', 'SEK', 'NOK', 'DKK', 'PLN', 'THB', 'PHP')`),
   check("carts_status_ck", sql`${table.status} in ('open', 'converted', 'expired')`),
   uniqueIndex("carts_id_tenant_uq").on(table.id, table.tenantId),
   index("carts_tenant_status_idx").on(table.tenantId, table.status),
@@ -96,7 +123,7 @@ export const orders = pgTable("orders", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
   check("orders_status_ck", sql`${table.status} in ('pending_payment', 'paid', 'cancelled', 'fulfilled', 'refunded')`),
-  check("orders_currency_ck", sql`${table.currency} in ('KES', 'USD', 'EUR', 'GBP')`),
+  check("orders_currency_ck", sql`${table.currency} in ('KES', 'USD', 'EUR', 'GBP', 'CAD', 'AUD', 'NZD', 'CHF', 'SGD', 'ZAR', 'NGN', 'GHS', 'INR', 'AED', 'BRL', 'MXN', 'SAR', 'CNY', 'HKD', 'SEK', 'NOK', 'DKK', 'PLN', 'THB', 'PHP')`),
   check("orders_money_safe_ck", sql`${table.subtotalMinor} between 0 and 9007199254740991 and ${table.discountMinor} between 0 and 9007199254740991 and ${table.shippingMinor} between 0 and 9007199254740991 and ${table.taxMinor} between 0 and 9007199254740991 and ${table.totalMinor} between 0 and 9007199254740991`),
   check("orders_total_consistency_ck", sql`${table.discountMinor} <= ${table.subtotalMinor} and ${table.totalMinor} = ${table.subtotalMinor} - ${table.discountMinor} + ${table.shippingMinor} + ${table.taxMinor}`),
   uniqueIndex("orders_tenant_number_uq").on(table.tenantId, table.orderNumber),
@@ -147,7 +174,7 @@ export const paymentAttempts = pgTable("payment_attempts", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
   check("payment_attempts_status_ck", sql`${table.status} in ('created', 'requires_action', 'processing', 'succeeded', 'failed', 'cancelled')`),
-  check("payment_attempts_currency_ck", sql`${table.currency} in ('KES', 'USD', 'EUR', 'GBP')`),
+  check("payment_attempts_currency_ck", sql`${table.currency} in ('KES', 'USD', 'EUR', 'GBP', 'CAD', 'AUD', 'NZD', 'CHF', 'SGD', 'ZAR', 'NGN', 'GHS', 'INR', 'AED', 'BRL', 'MXN', 'SAR', 'CNY', 'HKD', 'SEK', 'NOK', 'DKK', 'PLN', 'THB', 'PHP')`),
   check("payment_attempts_amount_safe_ck", sql`${table.amountMinor} between 0 and 9007199254740991`),
   uniqueIndex("payment_attempts_id_tenant_uq").on(table.id, table.tenantId),
   uniqueIndex("payment_attempts_tenant_idem_uq").on(table.tenantId, table.idempotencyKey),
