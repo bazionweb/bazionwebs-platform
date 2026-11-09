@@ -1,5 +1,22 @@
 import { describe, expect, it } from "vitest";
-import { calculateTotals, DomainError } from "./index.js";
+import { calculateTotals, DomainError, productSlug } from "./index.js";
+
+describe("productSlug", () => {
+  it("normalizes case, accents, whitespace and punctuation", () => {
+    expect(productSlug("  Crème & Miel — édition spéciale!  ")).toBe("creme-miel-edition-speciale");
+  });
+
+  it("uses a safe fallback when a name has no ASCII letters or numbers", () => {
+    expect(productSlug("你好")).toBe("product");
+  });
+
+  it("limits generated slugs to 180 characters", () => {
+    const slug = productSlug("a ".repeat(120));
+    expect(slug.length).toBeLessThanOrEqual(180);
+    expect(slug.length).toBeGreaterThan(0);
+    expect(slug).not.toMatch(/-$/);
+  });
+});
 
 describe("calculateTotals", () => {
   it("uses integer minor units and calculates a KES total", () => {

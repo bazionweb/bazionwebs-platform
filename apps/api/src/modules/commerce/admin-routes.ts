@@ -3,11 +3,12 @@ import { and, count, desc, eq, ilike, inArray, or } from "drizzle-orm";
 import { requireActiveTenantPermission } from "@bazion/auth";
 import { PostgresAuditEventWriter } from "@bazion/audit";
 import { commerceStoreSettings, orderItems, orders, products } from "@bazion/database";
+import { productSlug } from "@bazion/commerce-domain";
 import { pool, withTenantTransaction } from "../../lib/database.js";
 import { isTenantModuleEnabled } from "../../lib/tenant-modules.js";
 import {
   orderListQuerySchema, orderStatusInputSchema, productInputSchema, productListQuerySchema,
-  productPatchSchema, productSlug, storeSettingsInputSchema,
+  productPatchSchema, storeSettingsInputSchema,
 } from "./admin-policy.js";
 
 const auditWriter = new PostgresAuditEventWriter(pool);

@@ -32,7 +32,7 @@ A modular monolith keeps transactions, local development, deployment and debuggi
 - `apps/admin`: Bazion platform-owner control plane; the current client workspace admin is /admin inside apps/storefront.
 - `packages/platform-contracts`: cross-cutting tenant/principal types.
 - `packages/api-contracts`: Zod schemas shared by clients and server.
-- `packages/commerce-domain`: pure cart/order rules; no database or HTTP dependencies.
+- `packages/commerce-domain`: pure commerce rules such as money totals and product slug generation; no database or HTTP dependencies.
 - `packages/database`: Drizzle schema, SQL migrations, seed and database helpers.
 - `packages/payments`: payment-provider port and normalized result types.
 - `packages/auth`: Better Auth runtime, sessions, organization membership, platform/client role checks and trusted tenant context.

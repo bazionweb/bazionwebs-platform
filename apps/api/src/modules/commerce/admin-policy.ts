@@ -94,8 +94,3 @@ export const orderListQuerySchema = z.object({
 }).strict();
 
 export const orderStatusInputSchema = z.object({ status: z.literal("fulfilled") }).strict();
-
-export function productSlug(name: string): string {
-  return name.toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 180) || "product";
-}

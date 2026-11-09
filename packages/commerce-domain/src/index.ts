@@ -15,6 +15,12 @@ export interface MoneyTotals {
   totalMinor: number;
 }
 
+export function productSlug(name: string): string {
+  const slug = name.toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 180).replace(/-+$/g, "");
+  return slug || "product";
+}
+
 export class DomainError extends Error {
   constructor(
     public readonly code: string,
