@@ -10,8 +10,11 @@ describe("platform permission contract", () => {
     expect(getPlatformPermissions("platform_owner")).toEqual(platformPermissions);
   });
 
-  it("keeps platform administrators away from owner-only destructive and ownership actions", () => {
-    expect(canAccessPlatformPermission("platform_admin", "tenant.create")).toBe(true);
+  it("keeps global platform operations exclusive to the owner", () => {
+    expect(canAccessPlatformPermission("platform_admin", "tenant.create")).toBe(false);
+    expect(canAccessPlatformPermission("platform_admin", "platform.overview.read")).toBe(false);
+    expect(canAccessPlatformPermission("platform_admin", "module.catalog.read")).toBe(false);
+    expect(canAccessPlatformPermission("platform_admin", "tenant.modules.read")).toBe(true);
     expect(canAccessPlatformPermission("platform_admin", "tenant.suspend")).toBe(true);
     expect(canAccessPlatformPermission("platform_admin", "tenant.close")).toBe(false);
     expect(canAccessPlatformPermission("platform_admin", "tenant.owner.assign")).toBe(false);
@@ -23,6 +26,7 @@ describe("platform permission contract", () => {
     expect(canAccessPlatformPermission("platform_support", "tenant.update")).toBe(false);
     expect(canAccessPlatformPermission("platform_support", "tenant.suspend")).toBe(false);
     expect(canAccessPlatformPermission("platform_support", "tenant.modules.update")).toBe(false);
+    expect(canAccessPlatformPermission("platform_support", "tenant.modules.read")).toBe(true);
     expect(canAccessPlatformPermission("platform_admin", "tenant.domain.verify")).toBe(true);
     expect(canAccessPlatformPermission("platform_support", "tenant.domain.verify")).toBe(false);
   });

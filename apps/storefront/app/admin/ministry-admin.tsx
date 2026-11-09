@@ -6,6 +6,7 @@ import { SiteSettingsEditor } from "./site-settings-editor";
 import { MediaUploadField } from "./media-upload-field";
 import { apiErrorMessage } from "../../lib/api-error";
 import { globalMissionConfig } from "../../../../templates/global-mission.config";
+import { slugifyContentTitle } from "@bazion/api-contracts";
 
 type Tab = "overview" | "site" | "sermons" | "events" | "campaigns" | "registrations" | "donations" | "messages" | "prayers" | "newsletter";
 type Sermon = { id: string; title: string; slug: string; speaker: string; status: string; publishedAt: string | null };
@@ -44,9 +45,9 @@ export function MinistryAdminDashboard() {
   const [notice, setNotice] = useState("");
   const [reloadKey, setReloadKey] = useState(0);
   const [busy, setBusy] = useState(false);
-  const [sermonForm, setSermonForm] = useState({ title: "", slug: "", speaker: "", description: "", scriptureReference: "", youtubeVideoId: "", thumbnailUrl: "", status: "draft" as "draft" | "published" });
-  const [eventForm, setEventForm] = useState({ title: "", slug: "", description: "", startsAt: "", endsAt: "", venue: "", address: "", posterUrl: "", registrationCapacity: "", registrationEnabled: true });
-  const [campaignForm, setCampaignForm] = useState({ title: "", slug: "", description: "", targetAmountKsh: "", startsAt: "", endsAt: "" });
+  const [sermonForm, setSermonForm] = useState({ title: "", speaker: "", description: "", scriptureReference: "", youtubeVideoId: "", thumbnailUrl: "", status: "draft" as "draft" | "published" });
+  const [eventForm, setEventForm] = useState({ title: "", description: "", startsAt: "", endsAt: "", venue: "", address: "", posterUrl: "", registrationCapacity: "", registrationEnabled: true });
+  const [campaignForm, setCampaignForm] = useState({ title: "", description: "", targetAmountKsh: "", startsAt: "", endsAt: "" });
 
   useEffect(() => {
     if (!session.data || !activeOrganization.data?.id) return;
@@ -97,13 +98,14 @@ export function MinistryAdminDashboard() {
     try {
       await apiRequest("/v1/admin/church/sermons", { method: "POST", body: JSON.stringify({
         ...sermonForm,
+        slug: slugifyContentTitle(sermonForm.title, "sermon"),
         thumbnailUrl: sermonForm.thumbnailUrl.trim() || undefined,
         youtubeVideoId: sermonForm.youtubeVideoId || undefined,
         scriptureReference: sermonForm.scriptureReference || undefined,
         status: sermonForm.status,
       }) });
       const savedStatus = sermonForm.status;
-      setSermonForm({ title: "", slug: "", speaker: "", description: "", scriptureReference: "", youtubeVideoId: "", thumbnailUrl: "", status: "draft" });
+      setSermonForm({ title: "", speaker: "", description: "", scriptureReference: "", youtubeVideoId: "", thumbnailUrl: "", status: "draft" });
       setReloadKey((value) => value + 1); setNotice(savedStatus === "published" ? "Sermon published." : "Sermon saved as a draft.");
     } catch (reason) { setNotice(reason instanceof Error ? reason.message : "Could not save the sermon."); }
     finally { setBusy(false); }
@@ -112,16 +114,17 @@ export function MinistryAdminDashboard() {
   async function createEvent(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault(); setBusy(true); setNotice("");
     try {
-      await apiRequest("/v1/admin/church/events", { method: "POST", body: JSON.stringify({
+      const result = await apiRequest<{ event: { slug: string } }>("/v1/admin/church/events", { method: "POST", body: JSON.stringify({
         ...eventForm,
+        slug: slugifyContentTitle(eventForm.title, "event"),
         description: eventForm.description.trim() || undefined,
         posterUrl: eventForm.posterUrl.trim() || undefined,
         startsAt: new Date(eventForm.startsAt).toISOString(),
         endsAt: eventForm.endsAt ? new Date(eventForm.endsAt).toISOString() : undefined,
         registrationCapacity: eventForm.registrationCapacity ? Number(eventForm.registrationCapacity) : undefined,
       }) });
-      setEventForm({ title: "", slug: "", description: "", startsAt: "", endsAt: "", venue: "", address: "", posterUrl: "", registrationCapacity: "", registrationEnabled: true });
-      setReloadKey((value) => value + 1); setNotice("Event created.");
+      setEventForm({ title: "", description: "", startsAt: "", endsAt: "", venue: "", address: "", posterUrl: "", registrationCapacity: "", registrationEnabled: true });
+      setReloadKey((value) => value + 1); setNotice(`Event created. Its page link is /events/${result.event.slug}.`);
     } catch (reason) { setNotice(reason instanceof Error ? reason.message : "Could not create the event."); }
     finally { setBusy(false); }
   }
@@ -131,11 +134,12 @@ export function MinistryAdminDashboard() {
     try {
       await apiRequest("/v1/admin/church/campaigns", { method: "POST", body: JSON.stringify({
         ...campaignForm,
+        slug: slugifyContentTitle(campaignForm.title, "campaign"),
         targetAmountKsh: Number(campaignForm.targetAmountKsh),
         startsAt: campaignForm.startsAt ? new Date(campaignForm.startsAt).toISOString() : undefined,
         endsAt: campaignForm.endsAt ? new Date(campaignForm.endsAt).toISOString() : undefined,
       }) });
-      setCampaignForm({ title: "", slug: "", description: "", targetAmountKsh: "", startsAt: "", endsAt: "" });
+      setCampaignForm({ title: "", description: "", targetAmountKsh: "", startsAt: "", endsAt: "" });
       setReloadKey((value) => value + 1); setNotice("Giving campaign created.");
     } catch (reason) { setNotice(reason instanceof Error ? reason.message : "Could not create this campaign."); }
     finally { setBusy(false); }
@@ -274,8 +278,7 @@ export function MinistryAdminDashboard() {
       {tab === "site" && <SiteSettingsEditor />}
       {tab === "sermons" && <>
         <form onSubmit={createSermon} className="ch-grid-2" style={{ marginBottom: 24 }}>
-          <label style={{ display: "grid", gap: 6 }}>Title<input required minLength={3} maxLength={200} value={sermonForm.title} onChange={(e) => setSermonForm({ ...sermonForm, title: e.target.value })} /></label>
-          <label style={{ display: "grid", gap: 6 }}>URL slug<input required minLength={3} maxLength={140} pattern="[a-z0-9-]+" value={sermonForm.slug} onChange={(e) => setSermonForm({ ...sermonForm, slug: e.target.value })} /></label>
+          <label style={{ display: "grid", gap: 6 }}>Title<input required minLength={3} maxLength={200} value={sermonForm.title} onChange={(e) => setSermonForm({ ...sermonForm, title: e.target.value })} /><small className="admin-muted">Page link: /sermons/{slugifyContentTitle(sermonForm.title, "sermon")} · generated automatically</small></label>
           <label style={{ display: "grid", gap: 6 }}>Speaker<input required minLength={2} maxLength={160} value={sermonForm.speaker} onChange={(e) => setSermonForm({ ...sermonForm, speaker: e.target.value })} /></label>
           <label style={{ display: "grid", gap: 6 }}>Scripture reference<input maxLength={160} value={sermonForm.scriptureReference} onChange={(e) => setSermonForm({ ...sermonForm, scriptureReference: e.target.value })} /></label>
           <label style={{ display: "grid", gap: 6 }}>YouTube video ID<input minLength={5} maxLength={64} value={sermonForm.youtubeVideoId} onChange={(e) => setSermonForm({ ...sermonForm, youtubeVideoId: e.target.value })} /></label>
@@ -288,8 +291,7 @@ export function MinistryAdminDashboard() {
       </>}
       {tab === "events" && <>
         <form onSubmit={createEvent} className="ch-grid-2" style={{ marginBottom: 24 }}>
-          <label style={{ display: "grid", gap: 6 }}>Event title<input required minLength={3} maxLength={200} value={eventForm.title} onChange={(e) => setEventForm({ ...eventForm, title: e.target.value })} /></label>
-          <label style={{ display: "grid", gap: 6 }}>URL slug<input required minLength={3} maxLength={140} pattern="[a-z0-9-]+" value={eventForm.slug} onChange={(e) => setEventForm({ ...eventForm, slug: e.target.value })} /></label>
+          <label style={{ display: "grid", gap: 6 }}>Event title<input required minLength={3} maxLength={200} value={eventForm.title} onChange={(e) => setEventForm({ ...eventForm, title: e.target.value })} /><small className="admin-muted">Page link: /events/{slugifyContentTitle(eventForm.title, "event")} · generated automatically</small></label>
           <label style={{ display: "grid", gap: 6 }}>Starts at<input required type="datetime-local" value={eventForm.startsAt} onChange={(e) => setEventForm({ ...eventForm, startsAt: e.target.value })} /></label>
           <label style={{ display: "grid", gap: 6 }}>Ends at (optional)<input type="datetime-local" value={eventForm.endsAt} onChange={(e) => setEventForm({ ...eventForm, endsAt: e.target.value })} /></label>
           <label style={{ display: "grid", gap: 6 }}>Venue<input maxLength={180} value={eventForm.venue} onChange={(e) => setEventForm({ ...eventForm, venue: e.target.value })} /></label>
@@ -305,8 +307,7 @@ export function MinistryAdminDashboard() {
       {tab === "campaigns" && <>
         <p className="admin-muted">Create a giving campaign or pause one. Progress increases only after a payment provider confirms a donation.</p>
         <form onSubmit={createCampaign} className="ch-grid-2" style={{ marginBottom: 24 }}>
-          <input required minLength={3} maxLength={180} aria-label="Campaign title" placeholder="Campaign title" value={campaignForm.title} onChange={(event) => setCampaignForm({ ...campaignForm, title: event.target.value })} />
-          <input required minLength={3} maxLength={120} pattern="[a-z0-9-]+" aria-label="Campaign URL slug" placeholder="url-slug" value={campaignForm.slug} onChange={(event) => setCampaignForm({ ...campaignForm, slug: event.target.value })} />
+          <label style={{ display: "grid", gap: 6 }}>Campaign title<input required minLength={3} maxLength={180} placeholder="Campaign title" value={campaignForm.title} onChange={(event) => setCampaignForm({ ...campaignForm, title: event.target.value })} /><small className="admin-muted">Campaign link: /give#{slugifyContentTitle(campaignForm.title, "campaign")} · generated automatically</small></label>
           <input required type="number" min={1} max={500000000} aria-label="Campaign target amount in KES" placeholder="Target amount (KES)" value={campaignForm.targetAmountKsh} onChange={(event) => setCampaignForm({ ...campaignForm, targetAmountKsh: event.target.value })} />
           <input type="datetime-local" aria-label="Campaign starts at" value={campaignForm.startsAt} onChange={(event) => setCampaignForm({ ...campaignForm, startsAt: event.target.value })} />
           <input type="datetime-local" aria-label="Campaign ends at" value={campaignForm.endsAt} onChange={(event) => setCampaignForm({ ...campaignForm, endsAt: event.target.value })} />

@@ -8,27 +8,19 @@ export interface LeadershipCardProps {
 
 export function LeadershipCard({ name, role, bio, photoUrl }: LeadershipCardProps) {
   return (
-    <article className="ch-card">
-      <div
-        className="ch-card-media ch-leadership-card-media"
-      >
+    <article className="ch-card ch-leadership-card">
+      <div className="ch-card-media ch-leadership-card-media">
         <img
           src={photoUrl || "/images/leader-placeholder.jpg"}
           alt={name}
           loading="lazy"
         />
       </div>
-      <div className="ch-card-body" style={{ textAlign: "center" }}>
-        <h3 style={{ fontSize: "18px", fontWeight: 700, margin: "0 0 6px 0", color: "var(--church-primary)" }}>
-          {name}
-        </h3>
-        <div style={{ fontSize: "13px", fontWeight: 600, color: "var(--church-accent)", marginBottom: "12px" }}>
-          {role}
-        </div>
+      <div className="ch-card-body ch-leadership-card-body">
+        <h3 className="ch-leadership-card-name">{name}</h3>
+        <div className="ch-leadership-card-role">{role}</div>
         {bio && (
-          <p style={{ fontSize: "14px", color: "var(--church-text-muted)", lineHeight: 1.6, margin: 0 }}>
-            {bio}
-          </p>
+          <p className="ch-leadership-card-bio">{bio}</p>
         )}
       </div>
     </article>

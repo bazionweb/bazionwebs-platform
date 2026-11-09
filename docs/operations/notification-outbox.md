@@ -15,7 +15,16 @@ A successful auth callback therefore means the notification was durably queued, 
 
 ## Runtime commands
 
-Build and run the worker as a process separate from the HTTP API:
+Local development entrypoints start the notification worker with the rest of the platform stack:
+
+```powershell
+pnpm dev
+pnpm dev:gmfc
+```
+
+`pnpm dev` includes every workspace with a `dev` task. `pnpm dev:gmfc` starts the GMFC API, storefront and notification worker. Keep the terminal open; verification, reset and invitation emails remain queued until the worker reports that it is polling the outbox.
+
+For a standalone supervised deployment, build and run the worker separately from the HTTP API:
 
 ```sh
 pnpm --filter @bazion/notifications build

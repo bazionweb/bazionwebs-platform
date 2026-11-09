@@ -118,6 +118,19 @@
 .ministry-media-preview{display:flex;align-items:center;gap:10px;color:var(--church-text-muted);font-size:10px}
 .ministry-media-preview img{width:72px;height:54px;object-fit:cover;border:1px solid var(--church-border);border-radius:8px;background:var(--church-bg-alt)}
 .ministry-media-error{margin:0;color:#a43e31;font-size:11px;line-height:1.5}
+
+.workspace-platform-card{display:flex;align-items:center;justify-content:space-between;gap:22px;margin:0 0 22px;padding:22px 24px;border:1px solid #284c3d;border-radius:8px;background:#19392f;color:#fff}
+.workspace-platform-card .eyebrow{margin:0 0 8px;color:#dfba7b}
+.workspace-platform-card strong{display:block;font-size:16px}
+.workspace-platform-card p:last-child{margin:6px 0 0;color:#d2ddd5;font-size:12px;line-height:1.5}
+.workspace-platform-card a{flex:none;padding:11px 14px;border:1px solid #d5b477;border-radius:5px;color:#fff;font-size:11px;font-weight:700;text-decoration:none}
+.workspace-platform-card a:hover{background:rgba(255,255,255,.1)}
+.workspace-tenant-area{margin-top:22px}
+.workspace-tenant-heading{display:flex;align-items:end;justify-content:space-between;gap:20px;margin:0 0 12px}
+.workspace-tenant-heading .eyebrow{margin:0 0 6px}
+.workspace-tenant-heading h2{margin:0;color:#223a30;font-size:19px}
+.workspace-tenant-heading>p{max-width:300px;margin:0;color:var(--muted);font-size:11px;line-height:1.5}
+@media(max-width:620px){.workspace-platform-card,.workspace-tenant-heading{align-items:flex-start;flex-direction:column}.workspace-platform-card a{width:100%;text-align:center}}
 .ministry-media-library{display:grid;gap:14px;padding:15px;border:1px solid var(--church-border);border-radius:12px;background:var(--church-bg-alt)}
 .ministry-media-library-heading,.ministry-content-list-heading{display:flex;align-items:center;justify-content:space-between;gap:14px}
 .ministry-media-library-heading strong,.ministry-media-library-heading small,.ministry-content-list-heading strong,.ministry-content-list-heading small{display:block}

@@ -44,6 +44,10 @@ export const platformTenantOwnerTransferInputSchema = z.object({
   targetUserId: z.string().trim().min(1).max(128),
 }).strict();
 
+export const platformTenantInitialAdminInputSchema = z.object({
+  email: z.string().trim().email().max(254),
+}).strict();
+
 
 export const platformTenantOwnerCandidatesQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(50),

@@ -33,11 +33,12 @@ export function AuthPanel() {
       if (mode === "sign-up") {
         const result = await authClient.signUp.email({ name, email, password, callbackURL: getSafeCallbackUrl() });
         if (result.error) throw new Error(result.error.message ?? "Account creation failed.");
-        setMessage("Account created. Follow the verification link sent by email or printed in the local API console.");
+        setMessage("Account created. We’re sending a verification link; check your inbox and spam folder.");
       } else {
-        const result = await authClient.signIn.email({ email, password, callbackURL: "/" });
+        const callbackURL = getSafeCallbackUrl();
+        const result = await authClient.signIn.email({ email, password, callbackURL });
         if (result.error) throw new Error(result.error.message ?? "Sign-in failed.");
-        setMessage("Signed in. Your session is held in an HttpOnly cookie.");
+        window.location.assign(callbackURL);
       }
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Authentication request failed.");

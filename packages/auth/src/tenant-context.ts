@@ -6,7 +6,7 @@ import {
   resolveTenantByOrganizationId,
 } from "./server.js";
 import { parseOrganizationRoles } from "./permissions.js";
-import { canAccessPlatformPermission, type PlatformPermission } from "./security-policy.js";
+import { canAccessPlatformPermission, canAccessPlatformTenantScope, type PlatformPermission } from "./security-policy.js";
 
 export interface ActiveTenantContext {
   userId: string;
@@ -100,7 +100,7 @@ export async function requireActiveTenantPermission(headers: IncomingHttpHeaders
   return context;
 }
 
-export async function requirePlatformPermission(headers: IncomingHttpHeaders, permission: PlatformPermission) {
+export async function requirePlatformPermission(headers: IncomingHttpHeaders, permission: PlatformPermission, targetTenantId?: string) {
   const identity = await getCurrentIdentity(headers);
   if (!identity?.platformRole || !canAccessPlatformPermission(identity.platformRole, permission)) {
     throw Object.assign(new Error("You do not have permission to perform this platform operation."), {
@@ -108,7 +108,37 @@ export async function requirePlatformPermission(headers: IncomingHttpHeaders, pe
       code: "PLATFORM_PERMISSION_DENIED",
     });
   }
-  return { userId: identity.user.id, email: identity.user.email, role: identity.platformRole };
+  if (identity.platformRole === "platform_owner") {
+    return { userId: identity.user.id, email: identity.user.email, role: identity.platformRole, tenantId: targetTenantId ?? null };
+  }
+
+  const activeTenant = identity.organization && identity.tenant?.status === "active"
+    ? {
+        userId: identity.user.id,
+        email: identity.user.email,
+        name: identity.user.name,
+        organizationId: identity.organization.id,
+        tenantId: identity.tenant.id,
+        tenantSlug: identity.tenant.slug,
+        tenantName: identity.tenant.name,
+        currency: identity.tenant.currency,
+        roles: parseOrganizationRoles(identity.organization.role),
+      }
+    : null;
+  const effectiveTargetTenantId = targetTenantId ?? (permission === "tenant.list" ? activeTenant?.tenantId : undefined);
+  if (!effectiveTargetTenantId) {
+    throw Object.assign(new Error("A tenant-scoped workspace is required for this platform operation."), {
+      statusCode: 403,
+      code: "PLATFORM_TENANT_SCOPE_REQUIRED",
+    });
+  }
+  if (!canAccessPlatformTenantScope(identity.platformRole, activeTenant?.tenantId, effectiveTargetTenantId)) {
+    throw Object.assign(new Error("This platform account is not assigned to the requested tenant."), {
+      statusCode: 403,
+      code: "PLATFORM_TENANT_SCOPE_DENIED",
+    });
+  }
+  return { userId: identity.user.id, email: identity.user.email, role: identity.platformRole, tenantId: effectiveTargetTenantId };
 }
 
 export async function requirePlatformRole(

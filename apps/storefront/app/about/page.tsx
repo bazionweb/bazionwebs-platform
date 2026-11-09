@@ -185,7 +185,7 @@ export default function AboutPage() {
               </p>
             </div>
 
-            <div className="ch-grid-3">
+            <div className="ch-grid-3 ch-leadership-grid">
               {site.leadership.map((leader) => (
                 <LeadershipCard
                   key={leader.id}

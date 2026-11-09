@@ -30,6 +30,19 @@ export type CheckoutInput = z.infer<typeof checkoutSchema>;
 
 // ─── Church & Ministry Domain Schemas ──────────────────────────────────────────
 
+export function slugifyContentTitle(title: string, fallback = "content"): string {
+  const slug = title
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/&/g, " and ")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 140)
+    .replace(/-+$/g, "");
+  return slug.length >= 3 ? slug : fallback;
+}
+
 const publicHttpsUrlSchema = z.string().trim().max(2048).refine((value) => {
   if (value.startsWith("/") && !value.startsWith("//")) return true;
   try { return new URL(value).protocol === "https:"; } catch { return false; }
@@ -37,7 +50,7 @@ const publicHttpsUrlSchema = z.string().trim().max(2048).refine((value) => {
 
 export const sermonInputSchema = z.object({
   title: z.string().trim().min(3).max(200),
-  slug: z.string().trim().min(3).max(140).regex(/^[a-z0-9-]+$/),
+  slug: z.string().trim().min(3).max(140).regex(/^[a-z0-9-]+$/).optional(),
   speaker: z.string().trim().min(2).max(160),
   description: z.string().trim().max(5000).optional(),
   categoryId: z.string().uuid().optional(),
@@ -51,7 +64,7 @@ export type SermonInput = z.infer<typeof sermonInputSchema>;
 
 export const eventInputSchema = z.object({
   title: z.string().trim().min(3).max(200),
-  slug: z.string().trim().min(3).max(140).regex(/^[a-z0-9-]+$/),
+  slug: z.string().trim().min(3).max(140).regex(/^[a-z0-9-]+$/).optional(),
   description: z.string().trim().max(5000).optional(),
   posterUrl: publicHttpsUrlSchema.optional(),
   venue: z.string().trim().max(180).optional(),
@@ -91,7 +104,7 @@ export type DonationInitiateInput = z.infer<typeof donationInitiateSchema>;
 
 export const donationCampaignInputSchema = z.object({
   title: z.string().trim().min(3).max(180),
-  slug: z.string().trim().min(3).max(120).regex(/^[a-z0-9-]+$/),
+  slug: z.string().trim().min(3).max(120).regex(/^[a-z0-9-]+$/).optional(),
   description: z.string().trim().max(5000).optional(),
   targetAmountKsh: z.number().int().min(1).max(500_000_000),
   startsAt: z.string().datetime().optional(),

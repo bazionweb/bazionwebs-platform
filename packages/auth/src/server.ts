@@ -142,7 +142,11 @@ async function beforeCreateOrganization({ organization: org, user }: {
 
   const result = await tenantProvisionerPool.query(
     `INSERT INTO public.tenants (slug, name, default_currency, status)
-     VALUES ($1, $2, $3, 'provisioning')`,
+     VALUES ($1, $2, $3, 'provisioning')
+     ON CONFLICT (slug) DO UPDATE
+       SET name = EXCLUDED.name, updated_at = now()
+       WHERE tenants.status = 'active' AND tenants.auth_organization_id IS NULL
+     RETURNING id`,
     [slug, name, process.env.DEFAULT_TENANT_CURRENCY ?? "KES"],
   );
   if (result.rowCount !== 1) throw new Error("Could not reserve the client tenant slug.");
@@ -159,8 +163,10 @@ async function afterCreateOrganization({ organization: org }: {
   }
   const result = await tenantProvisionerPool.query(
     `UPDATE public.tenants
-        SET auth_organization_id = $1, name = $2, status = 'active'
-      WHERE slug = $3 AND status = 'provisioning'`,
+        SET auth_organization_id = $1, name = $2, status = 'active', updated_at = now()
+      WHERE slug = $3
+        AND status IN ('provisioning', 'active')
+        AND (auth_organization_id IS NULL OR auth_organization_id = $1)`,
     [organizationId, name, slug],
   );
   if (result.rowCount !== 1) {
@@ -515,24 +521,34 @@ export interface PlatformTenantRecord {
   created_at: string;
   suspended_at: string | null;
   closed_at: string | null;
+  auth_workspace_linked?: boolean;
 }
 
-/** Read-only platform directory; caller must enforce tenant.list permission. */
-export async function listPlatformTenants(input: { limit: number; offset: number; status?: string | undefined }) {
+/** Read-only platform directory; caller must enforce global or tenant-scoped tenant.list permission. */
+export async function listPlatformTenants(input: { limit: number; offset: number; status?: string | undefined; tenantId?: string | undefined }) {
   const values: unknown[] = [];
-  const where = input.status ? (values.push(input.status), "WHERE status = $1") : "";
-  values.push(input.limit, input.offset);
+  const predicates: string[] = [];
+  if (input.tenantId) {
+    values.push(input.tenantId);
+    predicates.push(`id = $${values.length}`);
+  }
+  if (input.status) {
+    values.push(input.status);
+    predicates.push(`status = $${values.length}`);
+  }
+  const where = predicates.length ? `WHERE ${predicates.join(" AND ")}` : "";
+  const pageValues = [...values, input.limit, input.offset];
   const result = await tenantResolverPool.query<PlatformTenantRecord>(
-    `SELECT id, slug, name, default_currency, status, created_at, suspended_at, closed_at
+    `SELECT id, slug, name, default_currency, status, created_at, suspended_at, closed_at,
+            auth_organization_id IS NOT NULL AS auth_workspace_linked
        FROM public.tenants ${where}
       ORDER BY created_at DESC, id ASC
-      LIMIT $${values.length - 1} OFFSET $${values.length}`,
-    values,
+      LIMIT $${pageValues.length - 1} OFFSET $${pageValues.length}`,
+    pageValues,
   );
-  const countValues = input.status ? [input.status] : [];
   const countResult = await tenantResolverPool.query<{ total: string }>(
     `SELECT count(*)::text AS total FROM public.tenants ${where}`,
-    countValues,
+    values,
   );
   return { items: result.rows, total: Number(countResult.rows[0]?.total ?? 0), limit: input.limit, offset: input.offset };
 }
@@ -646,6 +662,164 @@ export async function listPlatformTenantOwnerCandidates(
     total: Number(countResult.rows[0]?.total ?? 0),
     limit: input.limit,
     offset: input.offset,
+  };
+}
+
+export type TenantAdminAssignmentResult =
+  | { kind: "tenant_not_found" }
+  | { kind: "tenant_not_active" }
+  | { kind: "tenant_workspace_setup_required" }
+  | { kind: "verified_account_required" }
+  | { kind: "already_admin"; userId: string; email: string; organizationId: string; role: string }
+  | { kind: "assigned"; userId: string; email: string; organizationId: string; role: "admin" };
+
+/** Called only by the audited platform-owner recovery route. */
+export async function assignVerifiedTenantAdminByEmail(
+  tenantId: string,
+  email: string,
+  platformOwnerUserId: string,
+): Promise<TenantAdminAssignmentResult> {
+  const tenantResult = await tenantProvisionerPool.query<{
+    id: string; slug: string; name: string; auth_organization_id: string | null; status: string;
+  }>(
+    "SELECT id, slug, name, auth_organization_id, status FROM public.tenants WHERE id = $1 LIMIT 1",
+    [tenantId],
+  );
+  const tenant = tenantResult.rows[0];
+  if (!tenant) return { kind: "tenant_not_found" };
+  if (tenant.status !== "active") return { kind: "tenant_not_active" };
+
+  const normalizedEmail = email.trim().toLowerCase();
+  const userResult = await authPool.query<{ id: string; email: string; email_verified: boolean }>(
+    'SELECT id, email, "emailVerified" AS email_verified FROM "user" WHERE lower(email) = $1 LIMIT 1',
+    [normalizedEmail],
+  );
+  const user = userResult.rows[0];
+  if (!user?.email_verified) return { kind: "verified_account_required" };
+
+  let organizationId = tenant.auth_organization_id;
+  if (organizationId) {
+    const organizationResult = await authPool.query<{ id: string }>(
+      'SELECT id FROM "organization" WHERE id = $1 LIMIT 1',
+      [organizationId],
+    );
+    if (!organizationResult.rows[0]) return { kind: "tenant_workspace_setup_required" };
+  } else {
+    const organizationsBySlug = await authPool.query<{ id: string }>(
+      'SELECT id FROM "organization" WHERE slug = $1 LIMIT 2',
+      [tenant.slug],
+    );
+    if (organizationsBySlug.rows.length > 1) return { kind: "tenant_workspace_setup_required" };
+    let organization = organizationsBySlug.rows[0];
+
+    if (!organization) {
+      try {
+        await auth.api.createOrganization({
+          body: { name: tenant.name, slug: tenant.slug, userId: platformOwnerUserId },
+        });
+      } catch (error) {
+        // Another owner request may have created the same organization first.
+        // Re-read by the exact tenant slug and continue only if it now exists.
+        const concurrentResult = await authPool.query<{ id: string }>(
+          'SELECT id FROM "organization" WHERE slug = $1 LIMIT 2',
+          [tenant.slug],
+        );
+        if (concurrentResult.rows.length !== 1) throw error;
+        organization = concurrentResult.rows[0];
+      }
+      if (!organization) {
+        const createdResult = await authPool.query<{ id: string }>(
+          'SELECT id FROM "organization" WHERE slug = $1 LIMIT 2',
+          [tenant.slug],
+        );
+        if (createdResult.rows.length !== 1) return { kind: "tenant_workspace_setup_required" };
+        organization = createdResult.rows[0];
+      }
+    }
+    if (!organization) return { kind: "tenant_workspace_setup_required" };
+    const organizationIdCandidate = organization.id;
+
+    const existingTenantLink = await tenantProvisionerPool.query<{ id: string }>(
+      "SELECT id FROM public.tenants WHERE auth_organization_id = $1 AND id <> $2 LIMIT 1",
+      [organizationIdCandidate, tenant.id],
+    );
+    if (existingTenantLink.rows[0]) return { kind: "tenant_workspace_setup_required" };
+
+    const linkedTenant = await tenantProvisionerPool.query(
+      `UPDATE public.tenants
+          SET auth_organization_id = $1, status = 'active', updated_at = now()
+        WHERE id = $2 AND status = 'active' AND auth_organization_id IS NULL
+        RETURNING id`,
+      [organizationIdCandidate, tenant.id],
+    );
+    if (linkedTenant.rowCount !== 1) {
+      const currentTenantResult = await tenantProvisionerPool.query<{ auth_organization_id: string | null; status: string }>(
+        "SELECT auth_organization_id, status FROM public.tenants WHERE id = $1 LIMIT 1",
+        [tenant.id],
+      );
+      const currentTenant = currentTenantResult.rows[0];
+      if (currentTenant?.status !== "active") return { kind: "tenant_not_active" };
+      if (currentTenant?.auth_organization_id !== organizationIdCandidate) return { kind: "tenant_workspace_setup_required" };
+    }
+    organizationId = organizationIdCandidate;
+  }
+
+  const existingMemberResult = await authPool.query<{ id: string; role: string }>(
+    'SELECT id, role FROM "member" WHERE "organizationId" = $1 AND "userId" = $2 LIMIT 1',
+    [organizationId, user.id],
+  );
+  const existingMember = existingMemberResult.rows[0];
+  if (existingMember) {
+    const roles = parseOrganizationRoles(existingMember.role);
+    if (roles.includes("admin") || roles.includes("owner")) {
+      return {
+        kind: "already_admin",
+        userId: user.id,
+        email: user.email,
+        organizationId,
+        role: existingMember.role,
+      };
+    }
+    const client = await authPool.connect();
+    try {
+      await client.query("BEGIN");
+      const lockedMember = await client.query<{ id: string; role: string }>(
+        'SELECT id, role FROM "member" WHERE "organizationId" = $1 AND "userId" = $2 FOR UPDATE',
+        [organizationId, user.id],
+      );
+      const current = lockedMember.rows[0];
+      if (!current) {
+        await client.query("ROLLBACK");
+        return { kind: "verified_account_required" };
+      }
+      const updatedRoles = parseOrganizationRoles(current.role);
+      if (!updatedRoles.includes("admin")) updatedRoles.push("admin");
+      await client.query('UPDATE "member" SET role = $1 WHERE id = $2', [updatedRoles.join(","), current.id]);
+      await client.query("COMMIT");
+      return {
+        kind: "assigned",
+        userId: user.id,
+        email: user.email,
+        organizationId,
+        role: "admin",
+      };
+    } catch (error) {
+      await client.query("ROLLBACK").catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  await auth.api.addMember({
+    body: { organizationId, userId: user.id, role: "admin" },
+  });
+  return {
+    kind: "assigned",
+    userId: user.id,
+    email: user.email,
+    organizationId,
+    role: "admin",
   };
 }
 
