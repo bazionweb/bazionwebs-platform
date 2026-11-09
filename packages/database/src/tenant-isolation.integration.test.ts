@@ -7,6 +7,10 @@ type TenantFixture = {
   productId: string;
   cartId: string;
   orderId: string;
+  ministryName: string;
+  publicSiteSetting: string;
+  sermonTitle: string;
+  ministryModuleEnabled: boolean;
   hostname: string;
   pendingHostname: string;
 };
@@ -51,14 +55,20 @@ describe.skipIf(!enabled)("PostgreSQL tenant isolation (real roles and RLS)", ()
       [`rls-${label}-${unique.slice(0, 8)}`, `RLS test ${label}`],
     );
     const tenantId = tenantResult.rows[0]!.id;
+    const suffix = unique.slice(0, 8);
     const fixture: TenantFixture = {
       tenantId,
       productId: "",
       cartId: "",
       orderId: "",
-      hostname: `${label}-${unique.slice(0, 8)}.verified.example.test`,
-      pendingHostname: `${label}-${unique.slice(0, 8)}.pending.example.test`,
+      ministryName: `RLS ${label} ministry ${suffix}`,
+      publicSiteSetting: JSON.stringify({ ministryName: `RLS ${label} ministry ${suffix}`, heroTitle: `Welcome ${label}` }),
+      sermonTitle: `RLS ${label} sermon ${suffix}`,
+      ministryModuleEnabled: label === "alpha",
+      hostname: `${label}-${suffix}.verified.example.test`,
+      pendingHostname: `${label}-${suffix}.pending.example.test`,
     };
+    fixtures.push(fixture);
     await withTenant(migrationPool, tenantId, async (client) => {
       await client.query(
         "INSERT INTO public.commerce_store_settings (tenant_id, store_name) VALUES ($1, $2)",
@@ -98,6 +108,22 @@ describe.skipIf(!enabled)("PostgreSQL tenant isolation (real roles and RLS)", ()
       fixture.orderId = order.rows[0]!.id;
 
       await client.query(
+        `INSERT INTO public.ministry_profiles (tenant_id, ministry_name, email, vision, mission)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [tenantId, fixture.ministryName, `${label}-${suffix}@ministry.example.test`, `Vision ${label}`, `Mission ${label}`],
+      );
+      await client.query(
+        `INSERT INTO public.ministry_settings (tenant_id, setting_key, setting_value)
+         VALUES ($1, 'public_site', $2)`,
+        [tenantId, fixture.publicSiteSetting],
+      );
+      await client.query(
+        `INSERT INTO public.sermons (tenant_id, title, slug, speaker, description)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [tenantId, fixture.sermonTitle, `rls-${label}-${suffix}`, `Pastor ${label}`, `Message for ${label}`],
+      );
+
+      await client.query(
         `INSERT INTO public.order_items
           (tenant_id, order_id, product_id, sku_snapshot, name_snapshot, quantity,
            reserved_quantity, unit_price_minor, line_total_minor)
@@ -126,6 +152,11 @@ describe.skipIf(!enabled)("PostgreSQL tenant isolation (real roles and RLS)", ()
     });
 
     await migrationPool.query(
+      `INSERT INTO public.tenant_module_entitlements (tenant_id, module_id, enabled, updated_by)
+       VALUES ($1, 'church-ministry', $2, $3)`,
+      [tenantId, fixture.ministryModuleEnabled, `tenant-isolation-test:${unique}`],
+    );
+    await migrationPool.query(
       `INSERT INTO public.tenant_domains (tenant_id, hostname, verification_token_hash, status, verified_at)
        VALUES ($1, $2, $3, 'active', now()), ($1, $4, $5, 'pending', NULL)`,
       [tenantId, fixture.hostname, "b".repeat(64), fixture.pendingHostname, "c".repeat(64)],
@@ -143,14 +174,17 @@ describe.skipIf(!enabled)("PostgreSQL tenant isolation (real roles and RLS)", ()
     await migrationPool.query("SELECT 1");
     await appPool.query("SELECT 1");
     await resolverPool.query("SELECT 1");
-    fixtures.push(await seedTenant("alpha"));
-    fixtures.push(await seedTenant("beta"));
+    await seedTenant("alpha");
+    await seedTenant("beta");
   });
 
   afterAll(async () => {
     for (const fixture of fixtures) {
       try {
         await withTenant(migrationPool, fixture.tenantId, async (client) => {
+          await client.query("DELETE FROM public.sermons WHERE tenant_id = $1", [fixture.tenantId]);
+          await client.query("DELETE FROM public.ministry_settings WHERE tenant_id = $1", [fixture.tenantId]);
+          await client.query("DELETE FROM public.ministry_profiles WHERE tenant_id = $1", [fixture.tenantId]);
           await client.query("DELETE FROM public.idempotency_records WHERE tenant_id = $1", [fixture.tenantId]);
           await client.query("DELETE FROM public.webhook_events WHERE tenant_id = $1", [fixture.tenantId]);
           await client.query("DELETE FROM public.payment_attempts WHERE tenant_id = $1", [fixture.tenantId]);
@@ -161,6 +195,7 @@ describe.skipIf(!enabled)("PostgreSQL tenant isolation (real roles and RLS)", ()
           await client.query("DELETE FROM public.products WHERE tenant_id = $1", [fixture.tenantId]);
         });
         await migrationPool.query("DELETE FROM public.tenant_domains WHERE tenant_id = $1", [fixture.tenantId]);
+        await migrationPool.query("DELETE FROM public.tenant_module_entitlements WHERE tenant_id = $1", [fixture.tenantId]);
         await migrationPool.query("DELETE FROM public.tenants WHERE id = $1", [fixture.tenantId]);
       } catch {
         // Preserve the original failing test result; disposable CI databases are reset per run.
@@ -174,7 +209,7 @@ describe.skipIf(!enabled)("PostgreSQL tenant isolation (real roles and RLS)", ()
   });
 
   it("forces RLS on every tenant-owned table and keeps the runtime role unprivileged", async () => {
-    const tables = ["products", "commerce_store_settings", "carts", "cart_items", "orders", "order_items", "payment_attempts", "webhook_events", "idempotency_records"];
+    const tables = ["products", "commerce_store_settings", "carts", "cart_items", "orders", "order_items", "payment_attempts", "webhook_events", "idempotency_records", "ministry_profiles", "ministry_settings", "sermons"];
     const flags = await migrationPool.query<{ relname: string; relrowsecurity: boolean; relforcerowsecurity: boolean }>(
       `SELECT c.relname, c.relrowsecurity, c.relforcerowsecurity
          FROM pg_class c
@@ -200,7 +235,7 @@ describe.skipIf(!enabled)("PostgreSQL tenant isolation (real roles and RLS)", ()
   it("isolates reads across all tenant-owned business tables", async () => {
     const alpha = fixtures[0]!;
     const beta = fixtures[1]!;
-    const tables = ["products", "commerce_store_settings", "carts", "cart_items", "orders", "order_items", "payment_attempts", "webhook_events", "idempotency_records"];
+    const tables = ["products", "commerce_store_settings", "carts", "cart_items", "orders", "order_items", "payment_attempts", "webhook_events", "idempotency_records", "ministry_profiles", "ministry_settings", "sermons"];
     const result = await withTenant(appPool, alpha.tenantId, async (client) => {
       const counts: Record<string, number> = {};
       for (const table of tables) {
@@ -214,9 +249,48 @@ describe.skipIf(!enabled)("PostgreSQL tenant isolation (real roles and RLS)", ()
     for (const table of tables) expect(result[table]).toBe(1);
   });
 
+  it("keeps ministry identity, saved public content, sermons, and module overrides tenant-specific", async () => {
+    const alpha = fixtures[0]!;
+    const beta = fixtures[1]!;
+    const content = await withTenant(appPool, alpha.tenantId, async (client) => {
+      const profile = await client.query<{ ministry_name: string }>(
+        "SELECT ministry_name FROM public.ministry_profiles",
+      );
+      const settings = await client.query<{ setting_value: string }>(
+        "SELECT setting_value FROM public.ministry_settings WHERE setting_key = 'public_site'",
+      );
+      const sermons = await client.query<{ title: string }>("SELECT title FROM public.sermons");
+      return {
+        profile: profile.rows.map((row) => row.ministry_name),
+        settings: settings.rows.map((row) => row.setting_value),
+        sermons: sermons.rows.map((row) => row.title),
+      };
+    });
+
+    expect(content).toEqual({
+      profile: [alpha.ministryName],
+      settings: [alpha.publicSiteSetting],
+      sermons: [alpha.sermonTitle],
+    });
+    expect(JSON.stringify(content)).not.toContain(beta.ministryName);
+    expect(JSON.stringify(content)).not.toContain(beta.sermonTitle);
+
+    const entitlements = await resolverPool.query<{ tenant_id: string; enabled: boolean }>(
+      `SELECT tenant_id, enabled FROM public.tenant_module_entitlements
+        WHERE tenant_id = ANY($1::uuid[]) AND module_id = 'church-ministry'`,
+      [[alpha.tenantId, beta.tenantId]],
+    );
+    expect(new Map(entitlements.rows.map((row) => [row.tenant_id, row.enabled]))).toEqual(new Map([
+      [alpha.tenantId, true],
+      [beta.tenantId, false],
+    ]));
+  });
+
   it("returns no tenant rows when the runtime role has no transaction-local tenant context", async () => {
     const result = await appPool.query<{ count: string }>("SELECT count(*)::text AS count FROM public.products");
     expect(result.rows[0]?.count).toBe("0");
+    const ministryProfiles = await appPool.query<{ count: string }>("SELECT count(*)::text AS count FROM public.ministry_profiles");
+    expect(ministryProfiles.rows[0]?.count).toBe("0");
   });
 
   it("prevents tenant-id spoofing on writes and silently scopes updates to the current tenant", async () => {
@@ -230,6 +304,10 @@ describe.skipIf(!enabled)("PostgreSQL tenant isolation (real roles and RLS)", ()
       client.query("UPDATE public.commerce_store_settings SET store_name = 'cross-tenant mutation' WHERE tenant_id = $1 RETURNING tenant_id", [beta.tenantId]),
     );
     expect(settingsUpdated.rowCount).toBe(0);
+    const ministryUpdated = await withTenant(appPool, alpha.tenantId, (client) =>
+      client.query("UPDATE public.ministry_profiles SET ministry_name = 'cross-tenant mutation' WHERE tenant_id = $1 RETURNING tenant_id", [beta.tenantId]),
+    );
+    expect(ministryUpdated.rowCount).toBe(0);
 
     const client = await appPool.connect();
     try {
