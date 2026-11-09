@@ -9,4 +9,5 @@ export * from "./scripture-quote.js";
 export * from "./category-filter.js";
 export * from "./church-nav.js";
 export * from "./church-footer.js";
+export * from "./whatsapp-button.js";
 export * from "./modal.js";

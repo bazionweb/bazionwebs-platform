@@ -38,6 +38,14 @@ export function PageHero({
           : undefined
       }
     >
+      <div className="ch-hero-particles" aria-hidden="true">
+        <span />
+        <span />
+        <span />
+        <span />
+        <span />
+        <span />
+      </div>
       <div className="ch-container">
         <div className="ch-hero-content">
           {eyebrow && <span className="ch-eyebrow">{eyebrow}</span>}

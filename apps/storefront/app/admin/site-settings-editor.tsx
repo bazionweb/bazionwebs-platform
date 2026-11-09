@@ -157,7 +157,7 @@ export function SiteSettingsEditor() {
         <label style={labelStyle}>Community outreach<textarea style={textareaStyle} value={profile.outreach} onChange={(event) => setProfile({ ...profile, outreach: event.target.value })} /></label>
       </div>
       <h3 style={{ marginTop: 20 }}>Social links</h3>
-      <div className="ch-site-settings-grid">{(["youtube", "facebook", "instagram", "twitter", "whatsapp"] as const).map((key) => <label key={key} style={labelStyle}>{key[0].toUpperCase() + key.slice(1)}<input type="url" style={fieldStyle} value={profile.social[key] ?? ""} onChange={(event) => setSocial(key, event.target.value)} placeholder="https://…" /></label>)}</div>
+      <div className="ch-site-settings-grid">{(["youtube", "facebook", "instagram", "twitter", "whatsapp"] as const).map((key) => <label key={key} style={labelStyle}>{key[0].toUpperCase() + key.slice(1)}<input type="url" style={fieldStyle} value={profile.social[key] ?? ""} onChange={(event) => setSocial(key, event.target.value)} placeholder={key === "whatsapp" ? "https://wa.me/254…" : "https://…"} />{key === "whatsapp" && <small style={{ fontWeight: 400, lineHeight: 1.5 }}>Add a wa.me link to show the floating WhatsApp button on public pages.</small>}</label>)}</div>
     </section>
 
     <section style={sectionStyle}>

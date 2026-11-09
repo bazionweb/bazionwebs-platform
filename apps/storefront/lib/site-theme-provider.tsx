@@ -2,11 +2,27 @@
 
 import { useEffect } from "react";
 import { usePathname } from "next/navigation";
+import { ChurchWhatsAppButton } from "@bazion/ui";
 import { useMinistrySite } from "./use-ministry-site";
+
+const PUBLIC_MINISTRY_PATHS = new Set([
+  "/",
+  "/about",
+  "/visit",
+  "/ministries",
+  "/sermons",
+  "/events",
+  "/gallery",
+  "/give",
+  "/contact",
+  "/privacy",
+  "/terms",
+]);
 
 export function SiteThemeProvider() {
   const site = useMinistrySite();
   const pathname = usePathname();
+  const isPublicMinistryPage = PUBLIC_MINISTRY_PATHS.has(pathname) || pathname.startsWith("/events/") || pathname.startsWith("/sermons/");
 
   useEffect(() => {
     const root = document.documentElement;
@@ -39,5 +55,7 @@ export function SiteThemeProvider() {
     descriptionTag.content = description;
   }, [pathname, site.branding.primaryColor, site.branding.secondaryColor, site.branding.accentColor, site.metadata.title, site.metadata.description, site.ministryName, site.tagline]);
 
-  return null;
+  return isPublicMinistryPage
+    ? <ChurchWhatsAppButton href={site.social.whatsapp} ministryName={site.ministryName} />
+    : null;
 }
