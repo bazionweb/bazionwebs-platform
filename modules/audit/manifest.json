@@ -7,6 +7,7 @@
   "entrypoints": {
     "domain": "packages/audit"
   },
+  "implementation": { "mode": "workspace-package", "packageName": "@bazion/audit" },
   "tenantModel": "mixed",
   "permissions": [],
   "dependencies": [

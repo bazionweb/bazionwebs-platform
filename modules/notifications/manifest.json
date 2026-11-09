@@ -8,6 +8,7 @@
     "domain": "packages/notifications",
     "worker": "packages/notifications/src/worker.ts"
   },
+  "implementation": { "mode": "workspace-package", "packageName": "@bazion/notifications" },
   "tenantModel": "mixed",
   "permissions": [],
   "dependencies": [

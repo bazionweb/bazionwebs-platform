@@ -8,6 +8,7 @@
     "domain": "packages/commerce-domain",
     "api": "apps/api/src/modules/commerce"
   },
+  "implementation": { "mode": "hybrid", "packageName": "@bazion/commerce-domain" },
   "tenantModel": "tenant-owned",
   "permissions": [
     {

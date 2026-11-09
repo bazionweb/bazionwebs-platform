@@ -63,6 +63,9 @@ importers:
       '@bazion/auth':
         specifier: workspace:*
         version: link:../../packages/auth
+      '@bazion/church-ministry-domain':
+        specifier: workspace:*
+        version: link:../../packages/church-ministry-domain
       '@bazion/commerce-domain':
         specifier: workspace:*
         version: link:../../packages/commerce-domain
@@ -224,6 +227,15 @@ importers:
       typescript:
         specifier: ^5.9.3
         version: 5.9.3
+
+  packages/church-ministry-domain:
+    devDependencies:
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^5.1.0
+        version: 5.1.0(@types/node@26.6.6)(vite@8.3.6(@types/node@26.6.6)(esbuild@0.28.2)(tsx@4.23.15))
 
   packages/commerce-domain:
     devDependencies:

@@ -5,9 +5,11 @@
   "owner": "church-ministry",
   "status": "partial",
   "entrypoints": {
+    "domain": "packages/church-ministry-domain",
     "api": "apps/api/src/modules/church",
     "ui": "apps/storefront/app"
   },
+  "implementation": { "mode": "hybrid", "packageName": "@bazion/church-ministry-domain" },
   "tenantModel": "tenant-owned",
   "permissions": [
     {
@@ -41,6 +43,9 @@
   },
   "events": [],
   "jobs": [],
-  "tests": ["apps/api/src/modules/church"],
+  "tests": [
+    "apps/api/src/modules/church/routes.test.ts",
+    "packages/church-ministry-domain/src/index.test.ts"
+  ],
   "docs": ["docs/church-ministry-platform.md"]
 }

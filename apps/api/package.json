@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@bazion/api-contracts": "workspace:*",
+    "@bazion/church-ministry-domain": "workspace:*",
     "@bazion/commerce-domain": "workspace:*",
     "@bazion/database": "workspace:*",
     "@bazion/payments": "workspace:*",

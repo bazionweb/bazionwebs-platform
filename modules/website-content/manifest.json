@@ -5,6 +5,7 @@
   "owner": "content",
   "status": "planned",
   "entrypoints": {},
+  "implementation": { "mode": "manifest-only" },
   "tenantModel": "tenant-owned",
   "permissions": [
     {

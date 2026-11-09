@@ -29,7 +29,7 @@ A modular monolith keeps transactions, local development, deployment and debuggi
 
 - `apps/api`: server-side HTTP API and application orchestration.
 - `apps/storefront`: customer-facing Next.js example.
-- `apps/admin`: reserved for the Bazion platform-owner control plane; the current client workspace admin is /admin inside apps/storefront.
+- `apps/admin`: Bazion platform-owner control plane; the current client workspace admin is /admin inside apps/storefront.
 - `packages/platform-contracts`: cross-cutting tenant/principal types.
 - `packages/api-contracts`: Zod schemas shared by clients and server.
 - `packages/commerce-domain`: pure cart/order rules; no database or HTTP dependencies.
@@ -44,6 +44,7 @@ A modular monolith keeps transactions, local development, deployment and debuggi
 - `packages/analytics`: initial privacy-aware event/sink contract; ingestion and tenant reports remain planned.
 - `mcp`: MCP server design. MCP adapters call the same API/domain capabilities; MCP is not the website's cart implementation.
 - `templates`: per-client configuration examples, not copies of business logic.
+- `modules`: versioned module manifests; runtime source currently lives in workspace packages and app adapters. See the [module development contract](module-development-contract.md).
 
 ## Dependency direction
 

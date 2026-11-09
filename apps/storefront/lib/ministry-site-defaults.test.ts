@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createNeutralMinistrySite, neutralMinistrySite } from "./ministry-site-defaults";
+import { createNeutralMinistrySite, getMinistrySiteFallback, neutralMinistrySite } from "./ministry-site-defaults";
 
 describe("neutral ministry site defaults", () => {
   it("does not inherit Global Mission identity, contact details, or branding", () => {
@@ -25,5 +25,24 @@ describe("neutral ministry site defaults", () => {
     expect(site.ministryName).toBe("New Church");
     expect(site.hero.title).toBe("A place to");
     expect(site.contact.phones).toEqual([]);
+  });
+
+  it("keeps Global Mission and a second ministry on separate defaults", () => {
+    const globalMission = getMinistrySiteFallback({
+      slug: "global-mission-fc",
+      name: "Global Mission for Christ International",
+    });
+    const secondMinistry = getMinistrySiteFallback({
+      slug: "new-light-church",
+      name: "Global Mission for Christ International",
+    });
+
+    expect(globalMission.branding.logoUrl).toBe("/images/gmfc-logo.png");
+    expect(globalMission.contact.email).toBe("globalmissionfc@gmail.com");
+    expect(secondMinistry.tenantSlug).toBe("new-light-church");
+    expect(secondMinistry.branding.logoUrl).toBe("");
+    expect(secondMinistry.contact.email).toBe("");
+    expect(secondMinistry.hero.title).toBe("A place to");
+    expect(secondMinistry.vision.statement).toBe("");
   });
 });

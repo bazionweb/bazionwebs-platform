@@ -12,7 +12,9 @@ import {
   newsletterSubscribeSchema,
   prayerRequestSchema,
   sermonInputSchema,
+  slugifyContentTitle,
 } from "@bazion/api-contracts";
+import { uniqueTenantSlug } from "@bazion/church-ministry-domain";
 import {
   churchContactMessages,
   churchDonations,
@@ -43,6 +45,7 @@ interface RouteOptions {
 }
 
 const MEDIA_UPLOAD_LIMIT_BYTES = 8 * 1024 * 1024;
+
 const mediaTypeExtension: Record<string, string> = {
   "image/avif": ".avif",
   "image/jpeg": ".jpg",
@@ -933,10 +936,15 @@ export async function churchRoutes(app: FastifyInstance, options: RouteOptions) 
 
     try {
       return await withTenantTransaction(context.tenantId, async (tx) => {
+        const slug = await uniqueTenantSlug(parsed.data.slug ?? slugifyContentTitle(parsed.data.title, "campaign"), 120, async (candidate) => {
+          const [existing] = await tx.select({ id: donationCampaigns.id }).from(donationCampaigns)
+            .where(and(eq(donationCampaigns.tenantId, context.tenantId), eq(donationCampaigns.slug, candidate))).limit(1);
+          return Boolean(existing);
+        });
         const [campaign] = await tx.insert(donationCampaigns).values({
           tenantId: context.tenantId,
           title: parsed.data.title,
-          slug: parsed.data.slug,
+          slug,
           description: parsed.data.description,
           targetAmountMinor: parsed.data.targetAmountKsh * 100,
           currency: "KES",
@@ -1057,12 +1065,17 @@ export async function churchRoutes(app: FastifyInstance, options: RouteOptions) 
 
     try {
       return await withTenantTransaction(context.tenantId, async (tx) => {
+        const slug = await uniqueTenantSlug(parsed.data.slug ?? slugifyContentTitle(parsed.data.title, "sermon"), 140, async (candidate) => {
+          const [existing] = await tx.select({ id: sermons.id }).from(sermons)
+            .where(and(eq(sermons.tenantId, context.tenantId), eq(sermons.slug, candidate))).limit(1);
+          return Boolean(existing);
+        });
         const [newSermon] = await tx
           .insert(sermons)
           .values({
             tenantId: context.tenantId,
             title: parsed.data.title,
-            slug: parsed.data.slug,
+            slug,
             description: parsed.data.description,
             speaker: parsed.data.speaker,
             youtubeVideoId: parsed.data.youtubeVideoId,
@@ -1139,12 +1152,17 @@ export async function churchRoutes(app: FastifyInstance, options: RouteOptions) 
 
     try {
       return await withTenantTransaction(context.tenantId, async (tx) => {
+        const slug = await uniqueTenantSlug(parsed.data.slug ?? slugifyContentTitle(parsed.data.title, "event"), 140, async (candidate) => {
+          const [existing] = await tx.select({ id: churchEvents.id }).from(churchEvents)
+            .where(and(eq(churchEvents.tenantId, context.tenantId), eq(churchEvents.slug, candidate))).limit(1);
+          return Boolean(existing);
+        });
         const [newEvent] = await tx
           .insert(churchEvents)
           .values({
             tenantId: context.tenantId,
             title: parsed.data.title,
-            slug: parsed.data.slug,
+            slug,
             description: parsed.data.description,
             venue: parsed.data.venue,
             address: parsed.data.address,

@@ -1,4 +1,5 @@
 import type { MinistryConfig } from "../../../templates/church.types";
+import { globalMissionConfig } from "../../../templates/global-mission.config";
 
 /** Neutral defaults for a ministry tenant that has not configured its public site yet. */
 export const neutralMinistrySite: MinistryConfig = {
@@ -46,4 +47,13 @@ export function createNeutralMinistrySite(
     tenantSlug: tenant?.slug || "tenant",
     ministryName: tenant?.name?.trim() || "Ministry",
   };
+}
+
+/** A tenant slug is the stable identity for choosing tenant-specific defaults. */
+export function getMinistrySiteFallback(
+  tenant?: { slug?: string | null; name?: string | null } | null,
+): MinistryConfig {
+  return tenant?.slug === globalMissionConfig.tenantSlug
+    ? globalMissionConfig
+    : createNeutralMinistrySite(tenant);
 }

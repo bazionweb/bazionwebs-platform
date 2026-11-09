@@ -7,6 +7,7 @@ An ownership-first, modular platform for building and operating reusable website
 ## Product catalogue and roadmap
 
 - [Product architecture](docs/product-architecture.md): module boundaries and intended project structure.
+- [Reusable module contract](docs/module-development-contract.md): package ownership, app adapters, manifest rules and release criteria.
 - [Product catalogue](products/catalog.json): 111 advertised capabilities mapped to 37 reusable modules.
 - [Commercial offerings](products/commercial-offerings.json): website/ecommerce/custom-system/hosting/care packages and add-ons mapped to their modules.
 - [Solution packs](solutions/): nine initial tenant solution manifests.

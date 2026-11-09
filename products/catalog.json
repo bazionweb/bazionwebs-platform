@@ -345,6 +345,7 @@
       "id": "church-ministry",
       "name": "Church and ministry public content and operations",
       "sourcePath": [
+        "packages/church-ministry-domain",
         "apps/api/src/modules/church",
         "apps/storefront/app",
         "packages/database"

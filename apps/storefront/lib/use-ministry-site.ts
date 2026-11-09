@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import type { ChurchPublicSiteSettings } from "@bazion/api-contracts";
 import { globalMissionConfig } from "../../../templates/global-mission.config";
 import type { MinistryConfig } from "../../../templates/church.types";
-import { createNeutralMinistrySite, neutralMinistrySite } from "./ministry-site-defaults";
+import { getMinistrySiteFallback, neutralMinistrySite } from "./ministry-site-defaults";
 
 interface SiteResponse {
   tenant?: { slug: string; name: string } | null;
@@ -94,12 +94,8 @@ export function useMinistrySite(): MinistryConfig {
       if (!active || !data) return;
       const profile = data.profile;
       const settings = data.siteSettings;
-      const isGlobalMission = data.tenant?.slug === globalMissionConfig.tenantSlug
-        || profile?.ministryName?.trim().toLowerCase() === globalMissionConfig.ministryName.toLowerCase()
-        || data.tenant?.name?.trim().toLowerCase() === globalMissionConfig.ministryName.toLowerCase();
-      const fallback = isGlobalMission
-        ? globalMissionConfig
-        : createNeutralMinistrySite(data.tenant);
+      const isGlobalMission = data.tenant?.slug === globalMissionConfig.tenantSlug;
+      const fallback = getMinistrySiteFallback(data.tenant);
       const phones = Array.isArray(profile?.telephoneNumbers)
         ? profile.telephoneNumbers.filter((phone): phone is string => typeof phone === "string" && phone.trim().length > 0)
         : fallback.contact.phones;
