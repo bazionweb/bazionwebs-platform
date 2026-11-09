@@ -22,6 +22,10 @@ const envSchema = z.object({
   PORT: z.coerce.number().int().min(1).max(65535).default(4000),
   LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"]).default("info"),
   DATABASE_URL: z.string().min(1),
+  TENANT_DATABASE_SCHEMA_VERSION: z.preprocess(
+    (value) => value === "" ? undefined : value,
+    z.string().trim().regex(/^\d+_[a-z0-9_-]+\.sql$/i).optional(),
+  ),
   DEFAULT_TENANT_ID: z.string().uuid().optional(),
   TENANT_RESOLUTION_MODE: z.enum(["static", "verified_domain"]).default("static"),
   CORS_ORIGINS: z.string().default("http://localhost:3000,http://localhost:4000"),

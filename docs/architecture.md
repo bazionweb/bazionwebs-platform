@@ -64,7 +64,13 @@ Avoid: domain packages importing apps, database packages importing storefronts, 
 
 ## Deployment topology
 
-Start with one API deployment and one Postgres database for the Bazion demo environment. For actual client work, choose per-client database/schema/deployment boundaries according to risk, scale and budget. Static sites can deploy independently to Cloudflare Pages or another host. Do not force all clients into one deployment.
+Use a shared Postgres database with tenant predicates and RLS as the default economical tier. Offer a dedicated business-data database tier for tenants whose contracts, risk or scale justify its cost. Keep identity, tenant registry, release assignments and platform audit in a protected control plane; store secret references there, never database credentials. The current deployment keeps logical control-plane and shared business tables in the same PostgreSQL database under separate runtime roles; it does not yet run a physically separate control-plane database. Dedicated bindings are unavailable until provisioned, migrated, schema-verified and marked ready.
+
+Build runtime artifacts once, identify them by immutable image digest, and record the source revision and schema version. Promote artifacts through staging, canary and stable release rings; allow explicit per-tenant pins where a client must remain on an older release. Roll back by routing traffic to the last known-good artifact. Keep database changes additive and backward-compatible so the old and candidate application versions can coexist during promotion. Use feature flags for controlled module activation; existing tenant module entitlements are the module-level gate.
+
+Data isolation and software-release isolation are separate controls. A shared API deployment still runs one code version for all tenants. Per-tenant release pins require separate runtime targets and an ingress/deployment adapter that routes a tenant to the selected immutable artifact. Until a provider adapter is configured, release contracts and health metadata are informational; they do not change routing. Do not force all clients into one deployment, and do not claim a tenant is pinned based only on a database setting.
+
+The current repository has a local shared PostgreSQL Compose service and CI validation, but no production deployment provider or tenant deployment adapter. Runtime database routing honors central shared/dedicated bindings, and production dedicated connections fail closed until the host installs a secret-manager adapter. Use provider-neutral ports first, then implement the selected host's deployment adapter without changing tenant business logic.
 
 ## Extension points
 

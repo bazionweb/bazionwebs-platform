@@ -4,6 +4,71 @@ export type UserId = string & { readonly __brand: "UserId" };
 export type PlatformRole = "platform_owner" | "platform_admin" | "support";
 export type TenantRole = "tenant_owner" | "tenant_admin" | "staff" | "customer";
 
+/** Shared RLS is the default; dedicated databases are activated only after provisioning and schema verification. */
+export type TenantDatabaseIsolationTier = "shared" | "dedicated";
+
+/** Release rings let tenant groups adopt the same immutable artifact at different times. */
+export type TenantReleaseRing = "staging" | "canary" | "stable" | "pinned";
+
+export type ImmutableImageDigest = `sha256:${string}`;
+
+export interface TenantDatabaseBinding {
+  tenantId: TenantId;
+  tier: TenantDatabaseIsolationTier;
+  state: "shared" | "provisioning" | "ready" | "failed" | "draining";
+  /** Secret-manager identifier only. Never store a DSN, password or token in the tenant registry. */
+  runtimeSecretRef: string | null;
+  /** Migration credential is separate from the application runtime credential. */
+  migrationSecretRef: string | null;
+  schemaVersion: string | null;
+}
+
+/** Control-plane lookup, implemented using an explicitly read-only directory credential. */
+export interface TenantDatabaseBindingResolver {
+  resolve(tenantId: TenantId): Promise<TenantDatabaseBinding | null>;
+}
+
+/** Adapter for a managed secret store. Database credentials are never persisted in tenant metadata. */
+export interface TenantDatabaseSecretResolver {
+  resolveDatabaseUrl(secretReference: string): Promise<string>;
+}
+
+export interface TenantReleaseArtifact {
+  sourceRevision: string;
+  apiImageDigest: ImmutableImageDigest;
+  storefrontImageDigest: ImmutableImageDigest;
+  schemaVersion: string;
+}
+
+export interface TenantReleaseAssignment {
+  tenantId: TenantId;
+  ring: TenantReleaseRing;
+  active: TenantReleaseArtifact | null;
+  candidate: TenantReleaseArtifact | null;
+  state: "stable" | "staging" | "canary" | "promoting" | "failed" | "rolling_back";
+  updatedAt: string;
+}
+
+export function parseImmutableImageDigest(value: string): ImmutableImageDigest {
+  if (!/^sha256:[a-f0-9]{64}$/.test(value)) throw new Error("INVALID_IMAGE_DIGEST");
+  return value as ImmutableImageDigest;
+}
+
+export interface TenantDatabaseProvisioner {
+  provision(input: { tenantId: TenantId }): Promise<TenantDatabaseBinding>;
+  applyMigrations(input: { tenantId: TenantId; targetSchemaVersion: string }): Promise<void>;
+  verify(input: { tenantId: TenantId; expectedSchemaVersion: string }): Promise<void>;
+  backup(input: { tenantId: TenantId }): Promise<{ backupReference: string }>;
+  restore(input: { tenantId: TenantId; backupReference: string }): Promise<void>;
+}
+
+export interface TenantDeploymentProvider {
+  stage(input: { tenantId: TenantId; artifact: TenantReleaseArtifact; ring: TenantReleaseRing }): Promise<{ deploymentReference: string }>;
+  shiftTraffic(input: { deploymentReference: string; percentage: number }): Promise<void>;
+  promote(input: { tenantId: TenantId; deploymentReference: string }): Promise<void>;
+  rollback(input: { tenantId: TenantId; deploymentReference: string }): Promise<void>;
+}
+
 export interface TenantContext {
   tenantId: TenantId;
   tenantSlug: string;

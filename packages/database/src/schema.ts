@@ -16,6 +16,22 @@ export const tenants = pgTable("tenants", {
   closedAt: timestamp("closed_at", { withTimezone: true }),
 });
 
+/** Control-plane routing metadata. This table stores secret references, never credentials. */
+export const tenantDatabaseBindings = pgTable("tenant_database_bindings", {
+  tenantId: uuid("tenant_id").primaryKey().references(() => tenants.id, { onDelete: "restrict" }),
+  tier: varchar("tier", { length: 16 }).notNull().default("shared"),
+  state: varchar("state", { length: 16 }).notNull().default("shared"),
+  runtimeSecretRef: varchar("runtime_secret_ref", { length: 512 }),
+  migrationSecretRef: varchar("migration_secret_ref", { length: 512 }),
+  schemaVersion: varchar("schema_version", { length: 255 }),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  check("tenant_database_bindings_tier_ck", sql`${table.tier} in ('shared', 'dedicated')`),
+  check("tenant_database_bindings_state_ck", sql`${table.state} in ('shared', 'provisioning', 'ready', 'failed', 'draining')`),
+  check("tenant_database_bindings_shared_ck", sql`${table.tier} <> 'shared' or (${table.state} = 'shared' and ${table.runtimeSecretRef} is null and ${table.migrationSecretRef} is null and ${table.schemaVersion} is null)`),
+  check("tenant_database_bindings_ready_ck", sql`${table.state} <> 'ready' or (${table.tier} = 'dedicated' and ${table.runtimeSecretRef} is not null and ${table.migrationSecretRef} is not null and ${table.schemaVersion} is not null)`),
+]);
+
 export const products = pgTable("products", {
   id: uuid("id").defaultRandom().primaryKey(),
   tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
