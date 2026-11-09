@@ -305,44 +305,34 @@ body { background: var(--church-bg); color: var(--church-text); font-family: var
 .ch-hero-particles span {
   position: absolute;
   display: block;
-  width: 6px;
-  height: 6px;
+  top: var(--particle-y);
+  left: var(--particle-x);
+  width: var(--particle-size);
+  height: var(--particle-size);
   border-radius: 50%;
   background: rgba(255, 239, 207, 0.9);
   opacity: 0.55;
-  animation: ch-hero-particle-drift var(--particle-duration, 17s) ease-in-out var(--particle-delay, 0s) infinite alternate;
+  animation: ch-hero-particle-drift var(--particle-duration) ease-in-out var(--particle-delay) infinite alternate;
 }
 
-.ch-hero-particles span:nth-child(1) { top: 17%; left: 10%; width: 8px; height: 8px; --particle-duration: 15s; --particle-delay: -6s; }
-.ch-hero-particles span:nth-child(2) { top: 34%; left: 78%; width: 6px; height: 6px; --particle-duration: 13s; --particle-delay: -11s; }
-.ch-hero-particles span:nth-child(3) { top: 76%; left: 24%; width: 5px; height: 5px; --particle-duration: 19s; --particle-delay: -9s; }
-.ch-hero-particles span:nth-child(4) { top: 68%; left: 88%; width: 9px; height: 9px; --particle-duration: 14s; --particle-delay: -3s; }
-.ch-hero-particles span:nth-child(5) { top: 15%; left: 53%; width: 4px; height: 4px; --particle-duration: 21s; --particle-delay: -15s; }
-.ch-hero-particles span:nth-child(6) { top: 52%; left: 44%; width: 7px; height: 7px; --particle-duration: 16s; --particle-delay: -8s; }
-.ch-hero-particles span:nth-child(7) { top: 84%; left: 64%; width: 5px; height: 5px; --particle-duration: 18s; --particle-delay: -12s; }
-.ch-hero-particles span:nth-child(8) { top: 24%; left: 91%; width: 7px; height: 7px; --particle-duration: 14s; --particle-delay: -5s; }
-.ch-hero-particles span:nth-child(9) { top: 59%; left: 9%; width: 6px; height: 6px; --particle-duration: 20s; --particle-delay: -13s; }
-.ch-hero-particles span:nth-child(10) { top: 88%; left: 42%; width: 8px; height: 8px; --particle-duration: 15s; --particle-delay: -2s; }
-.ch-hero-particles span:nth-child(11) { top: 43%; left: 61%; width: 4px; height: 4px; --particle-duration: 22s; --particle-delay: -17s; }
-.ch-hero-particles span:nth-child(12) { top: 9%; left: 31%; width: 6px; height: 6px; --particle-duration: 17s; --particle-delay: -10s; }
-
-.ch-hero-particles span:nth-child(2n) {
-  border-radius: 1px;
+.ch-hero-particle--diamond {
   clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
 }
 
-.ch-hero-particles span:nth-child(3n) {
+.ch-hero-particle--triangle {
   clip-path: polygon(50% 0, 100% 100%, 0 100%);
 }
 
-.ch-hero-particles span:nth-child(4n) {
+.ch-hero-particle--sparkle {
   clip-path: polygon(50% 0, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
 }
 
-.ch-hero-particles span:nth-child(5n) {
+.ch-hero-particle--ring {
   border: 1px solid rgba(255, 239, 207, 0.95);
   background: transparent;
 }
+
+.ch-hero-particle--square { border-radius: 1px; }
 
 @keyframes ch-hero-particle-drift {
   0% { opacity: 0.32; transform: translate3d(0, 0, 0) scale(0.72); }
@@ -761,7 +751,7 @@ button:disabled { cursor: not-allowed; opacity: 0.65; }
   .ch-whatsapp-float span { display: none; }
 }
 @media (max-width: 760px) {
-  .ch-hero-particles span:nth-child(n + 9) { display: none; }
+  .ch-hero-particles span:nth-child(n + 33) { display: none; }
 }
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
