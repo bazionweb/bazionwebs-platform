@@ -326,6 +326,24 @@ body { background: var(--church-bg); color: var(--church-text); font-family: var
 .ch-hero-particles span:nth-child(11) { top: 43%; left: 61%; width: 4px; height: 4px; --particle-duration: 22s; --particle-delay: -17s; }
 .ch-hero-particles span:nth-child(12) { top: 9%; left: 31%; width: 6px; height: 6px; --particle-duration: 17s; --particle-delay: -10s; }
 
+.ch-hero-particles span:nth-child(2n) {
+  border-radius: 1px;
+  clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+}
+
+.ch-hero-particles span:nth-child(3n) {
+  clip-path: polygon(50% 0, 100% 100%, 0 100%);
+}
+
+.ch-hero-particles span:nth-child(4n) {
+  clip-path: polygon(50% 0, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
+}
+
+.ch-hero-particles span:nth-child(5n) {
+  border: 1px solid rgba(255, 239, 207, 0.95);
+  background: transparent;
+}
+
 @keyframes ch-hero-particle-drift {
   0% { opacity: 0.32; transform: translate3d(0, 0, 0) scale(0.72); }
   50% { opacity: 0.82; transform: translate3d(22px, -28px, 0) scale(1.2); }

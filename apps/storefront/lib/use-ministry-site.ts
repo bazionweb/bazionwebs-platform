@@ -71,6 +71,38 @@ function stringRecord(value: unknown): Record<string, string> {
   }));
 }
 
+function safeWhatsAppLink(value: string | undefined): string | undefined {
+  if (!value) return undefined;
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" && ["wa.me", "api.whatsapp.com"].includes(url.hostname)
+      ? url.toString()
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function phoneToWhatsAppLink(phone: string): string | undefined {
+  const trimmed = phone.trim();
+  const digits = trimmed.replace(/\D/g, "");
+  let internationalNumber = "";
+
+  if (trimmed.startsWith("+")) {
+    internationalNumber = digits;
+  } else if (digits.startsWith("00")) {
+    internationalNumber = digits.slice(2);
+  } else if (/^0[17]\d{8}$/.test(digits)) {
+    internationalNumber = `254${digits.slice(1)}`;
+  } else if (/^[17]\d{8}$/.test(digits)) {
+    internationalNumber = `254${digits}`;
+  } else if (/^[1-9]\d{10,14}$/.test(digits)) {
+    internationalNumber = digits;
+  }
+
+  return internationalNumber ? `https://wa.me/${internationalNumber}` : undefined;
+}
+
 function safeImageUrl(value: string | null | undefined): string | undefined {
   if (!value) return undefined;
   if (value.startsWith("/") && !value.startsWith("//")) return value;
@@ -89,7 +121,9 @@ export function useMinistrySite(): MinistryConfig {
       if (!active || !data) return;
       const profile = data.profile;
       const settings = data.siteSettings;
-      const isGlobalMission = data.tenant?.slug === globalMissionConfig.tenantSlug;
+      const isGlobalMission = data.tenant?.slug === globalMissionConfig.tenantSlug
+        || profile?.ministryName?.trim().toLowerCase() === globalMissionConfig.ministryName.toLowerCase()
+        || data.tenant?.name?.trim().toLowerCase() === globalMissionConfig.ministryName.toLowerCase();
       const fallback = isGlobalMission
         ? globalMissionConfig
         : { ...neutralSite, tenantSlug: data.tenant?.slug ?? "tenant", ministryName: data.tenant?.name?.trim() || "Ministry" };
@@ -97,6 +131,9 @@ export function useMinistrySite(): MinistryConfig {
         ? profile.telephoneNumbers.filter((phone): phone is string => typeof phone === "string" && phone.trim().length > 0)
         : fallback.contact.phones;
       const social = stringRecord(profile?.socialLinks);
+      const whatsapp = safeWhatsAppLink(social.whatsapp)
+        ?? safeWhatsAppLink(fallback.social.whatsapp)
+        ?? phones.map(phoneToWhatsAppLink).find((link): link is string => Boolean(link));
       const leaders = (data.leaders ?? []).map((leader) => ({
         id: leader.id,
         name: leader.name,
@@ -123,7 +160,7 @@ export function useMinistrySite(): MinistryConfig {
           email: profile?.email?.trim() || fallback.contact.email,
           address: profile?.address?.trim() || fallback.contact.address,
         },
-        social: { ...fallback.social, ...social },
+        social: { ...fallback.social, ...social, ...(whatsapp ? { whatsapp } : {}) },
         giving: settings ? settings.giving : fallback.giving,
         serviceTimes: settings?.serviceTimes ?? fallback.serviceTimes,
         locations: settings?.locations ?? fallback.locations,
