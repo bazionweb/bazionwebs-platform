@@ -10,8 +10,7 @@ export function LeadershipCard({ name, role, bio, photoUrl }: LeadershipCardProp
   return (
     <article className="ch-card">
       <div
-        className="ch-card-media"
-        style={{ aspectRatio: "1 / 1", backgroundColor: "var(--church-bg-muted)" }}
+        className="ch-card-media ch-leadership-card-media"
       >
         <img
           src={photoUrl || "/images/leader-placeholder.jpg"}

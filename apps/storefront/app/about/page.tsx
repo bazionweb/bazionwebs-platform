@@ -36,11 +36,9 @@ export default function AboutPage() {
           <div className="ch-container">
             <div className="ch-grid-2" style={{ alignItems: "center" }}>
               <div>
-                {lead?.photoUrl && <img
-                  src={lead.photoUrl}
-                  alt={lead.name}
-                  style={{ width: "100%", maxHeight: "480px", objectFit: "cover", borderRadius: "var(--church-radius-lg)", boxShadow: "var(--church-shadow-lg)" }}
-                />}
+                {lead?.photoUrl && <div className="ch-lead-portrait">
+                  <img src={lead.photoUrl} alt={lead.name} />
+                </div>}
               </div>
               <div>
                 <span className="ch-eyebrow">{lead ? "A Message from Ministry Leadership" : "Our story"}</span>
