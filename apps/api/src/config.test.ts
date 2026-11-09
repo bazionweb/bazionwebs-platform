@@ -34,6 +34,20 @@ describe("API runtime configuration", () => {
     expect(loadConfig().NOTIFICATION_ENCRYPTION_KEY).toBe(testKey);
   });
 
+  it("defaults media uploads to the local development adapter", () => {
+    expect(loadConfig().mediaStorage.driver).toBe("local");
+  });
+
+  it("rejects partially configured S3 media storage", () => {
+    vi.stubEnv("MEDIA_STORAGE_ENDPOINT", "https://account.r2.cloudflarestorage.com");
+    expect(() => loadConfig()).toThrow(/Configure all MEDIA_STORAGE_ENDPOINT/);
+  });
+
+  it("requires S3-compatible media storage in production", () => {
+    vi.stubEnv("NODE_ENV", "production");
+    expect(() => loadConfig()).toThrow(/configure S3-compatible object storage/);
+  });
+
   it("rejects a malformed or non-32-byte notification key", () => {
     vi.stubEnv("NOTIFICATION_ENCRYPTION_KEY", Buffer.from("too-short").toString("base64"));
     expect(() => loadConfig()).toThrow(/canonical Base64-encoded 32-byte key/);

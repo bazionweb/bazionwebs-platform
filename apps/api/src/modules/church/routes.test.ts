@@ -1,5 +1,9 @@
 import Fastify from "fastify";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { buildTenantObjectKey, LocalObjectStorage, type ObjectStorage } from "@bazion/storage";
 import { churchRoutes } from "./routes.js";
 
 const mocks = vi.hoisted(() => ({
@@ -35,14 +39,28 @@ describe("Church & Ministry Module Routes", () => {
     mocks.isTenantModuleEnabled.mockResolvedValue(true);
   });
 
-  async function buildTestApp() {
+  function createTestStorage(): ObjectStorage {
+    return {
+      putObject: vi.fn(async () => undefined),
+      listObjects: vi.fn(async () => []),
+      getObject: vi.fn(async () => null),
+      deleteObject: vi.fn(async () => undefined),
+      publicUrl: vi.fn((key) => `https://media.example.test/${key}`),
+    };
+  }
+
+  async function buildTestApp(storage: ObjectStorage = createTestStorage()) {
     const app = Fastify();
+    app.addContentTypeParser("application/octet-stream", { parseAs: "buffer", bodyLimit: 8 * 1024 * 1024 }, (_request, body, done) => {
+      done(null, body);
+    });
     await app.register(churchRoutes, {
       prefix: "/v1",
       config: {
         NODE_ENV: "test",
         TENANT_RESOLUTION_MODE: "dynamic",
       } as any,
+      storage,
     });
     return app;
   }
@@ -250,6 +268,87 @@ describe("Church & Ministry Module Routes", () => {
   });
 
   describe("Admin Church Routes", () => {
+    it("stores valid image bytes under the active tenant and returns a public asset URL", async () => {
+      mocks.requireActiveTenantPermission.mockResolvedValue({ tenantId, userId: "user-admin", roles: ["admin"] });
+      const storage = createTestStorage();
+      const app = await buildTestApp(storage);
+      const png = Buffer.from("89504e470d0a1a0a0000000049454e44", "hex");
+      const response = await app.inject({
+        method: "POST",
+        url: "/v1/admin/church/media?filename=revival-hero.png&contentType=image%2Fpng",
+        headers: { host: "gmfc.test", "content-type": "application/octet-stream", authorization: "Bearer mock-token" },
+        payload: png,
+      });
+
+      expect(response.statusCode).toBe(201);
+      const { asset } = response.json();
+      expect(asset.contentType).toBe("image/png");
+      expect(asset.sizeBytes).toBe(png.byteLength);
+      expect(asset.url).toMatch(/^https:\/\/media\.example\.test\//);
+      expect(storage.putObject).toHaveBeenCalledWith(expect.objectContaining({
+        tenantId,
+        key: expect.stringContaining(`${tenantId}/`),
+        body: png,
+        contentType: "image/png",
+      }));
+      expect(mocks.requireActiveTenantPermission).toHaveBeenCalledWith(expect.any(Object), { store: ["update"] });
+    });
+
+    it("rejects unsupported or mismatched image content before writing to storage", async () => {
+      mocks.requireActiveTenantPermission.mockResolvedValue({ tenantId, userId: "user-admin", roles: ["admin"] });
+      const storage = createTestStorage();
+      const app = await buildTestApp(storage);
+      const response = await app.inject({
+        method: "POST",
+        url: "/v1/admin/church/media?filename=not-an-image.png&contentType=image%2Fpng",
+        headers: { host: "gmfc.test", "content-type": "application/octet-stream" },
+        payload: Buffer.from("not an image"),
+      });
+
+      expect(response.statusCode).toBe(415);
+      expect(response.json().error).toBe("UNSUPPORTED_MEDIA_TYPE");
+      expect(storage.putObject).not.toHaveBeenCalled();
+    });
+
+    it("rejects uploads larger than the configured image limit", async () => {
+      mocks.requireActiveTenantPermission.mockResolvedValue({ tenantId, userId: "user-admin", roles: ["admin"] });
+      const storage = createTestStorage();
+      const app = await buildTestApp(storage);
+      const response = await app.inject({
+        method: "POST",
+        url: "/v1/admin/church/media?filename=too-large.png&contentType=image%2Fpng",
+        headers: { host: "gmfc.test", "content-type": "application/octet-stream" },
+        payload: Buffer.alloc(8 * 1024 * 1024 + 1),
+      });
+
+      expect(response.statusCode).toBe(413);
+      expect(storage.putObject).not.toHaveBeenCalled();
+    });
+
+    it("lists media using only the active tenant identifier", async () => {
+      mocks.requireActiveTenantPermission.mockResolvedValue({ tenantId, userId: "user-admin", roles: ["admin"] });
+      const storage = createTestStorage();
+      const app = await buildTestApp(storage);
+      const response = await app.inject({ method: "GET", url: "/v1/admin/church/media", headers: { host: "gmfc.test" } });
+
+      expect(response.statusCode).toBe(200);
+      expect(storage.listObjects).toHaveBeenCalledWith({ tenantId, limit: 100 });
+    });
+
+    it("does not serve a local asset through a different tenant host", async () => {
+      const storage = createTestStorage();
+      const app = await buildTestApp(storage);
+      const response = await app.inject({
+        method: "GET",
+        url: "/v1/public/church/media/another-tenant/asset/image.png",
+        headers: { host: "gmfc.test" },
+      });
+
+      expect(response.statusCode).toBe(404);
+      expect(response.json().error).toBe("MEDIA_NOT_FOUND");
+      expect(storage.getObject).not.toHaveBeenCalled();
+    });
+
     it("returns church overview metrics for authorized users", async () => {
       mocks.requireActiveTenantPermission.mockResolvedValue({
         tenantId,
@@ -357,5 +456,34 @@ describe("Church & Ministry Module Routes", () => {
       expect(response.statusCode).toBe(409);
       expect(response.json().error).toBe(expectedError);
     });
+  });
+});
+
+describe("Tenant media storage", () => {
+  const tenantId = "11111111-1111-1111-1111-111111111111";
+
+  it("generates object keys beneath a tenant-owned directory", () => {
+    expect(buildTenantObjectKey("tenant-a", "asset-id", "revival hero?.png")).toBe("tenant-a/asset-id/revival_hero_.png");
+  });
+
+  it("stores, lists, reads, and removes local development assets within the tenant prefix", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "bazion-media-test-"));
+    try {
+      const storage = new LocalObjectStorage(directory);
+      const key = buildTenantObjectKey(tenantId, "asset-id", "gallery.webp");
+      const body = Buffer.from("image fixture");
+      await storage.putObject({ tenantId, key, body, contentType: "image/webp" });
+
+      const [asset] = await storage.listObjects({ tenantId });
+      expect(asset).toMatchObject({ key, contentType: "image/webp", sizeBytes: body.byteLength });
+      expect(asset?.url).toBe(`/v1/public/church/media/${key}`);
+      await expect(storage.getObject({ tenantId, key })).resolves.toMatchObject({ body, contentType: "image/webp" });
+      await expect(storage.getObject({ tenantId: "another-tenant", key })).rejects.toThrow(/outside the active tenant/);
+
+      await storage.deleteObject({ tenantId, key });
+      await expect(storage.getObject({ tenantId, key })).resolves.toBeNull();
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
   });
 });
