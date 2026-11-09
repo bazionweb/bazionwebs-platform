@@ -108,6 +108,12 @@ try {
       [tenantId, globalMissionConfig.tenantSlug, globalMissionConfig.ministryName],
     );
   }
+  await client.query(
+    `INSERT INTO public.tenant_module_entitlements (tenant_id, module_id, enabled, updated_by)
+     VALUES ($1, 'commerce', false, 'system:gmfc-baseline')
+     ON CONFLICT (tenant_id, module_id) DO NOTHING`,
+    [tenantId],
+  );
   const entitlement = await client.query<{ enabled: boolean }>(
     "SELECT enabled FROM public.tenant_module_entitlements WHERE tenant_id = $1 AND module_id = 'church-ministry'",
     [tenantId],

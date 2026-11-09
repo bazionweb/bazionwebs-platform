@@ -1,14 +1,16 @@
 # Bazion Superadmin Application
 
-The superadmin application is the platform operator control plane, separate from tenant workspaces and storefront sessions.
+The superadmin application is the platform operator control plane, with its own root URL separate from tenant workspaces.
 
 ## Run locally
 
-- Admin UI: `pnpm --filter @bazion/admin dev` (port 3001).
+- Platform control plane: `pnpm dev:platform` (port 3001), or start it with the GMFC environment using `pnpm dev:gmfc`.
+- Platform dashboard root: `http://localhost:3001/`.
+- Tenant website and tenant admin: `http://localhost:3100/` and `http://localhost:3100/admin`.
 - API: `pnpm --filter @bazion/api dev` (port 4000).
 - Configure `API_BASE_URL=http://localhost:4000` for the admin app.
 
-The Next.js app proxies `/v1/*` and `/api/auth/*` to the API. Server-rendered platform reads forward the incoming session cookie server-to-server; browser mutations use same-origin requests. Do not expose API secrets to browser code. In each environment, include the admin origin (for example, `https://admin.bazionweb.com`) in both `CORS_ORIGINS` and `BETTER_AUTH_TRUSTED_ORIGINS`; otherwise the API's origin and Better Auth checks will reject sign-in or lifecycle mutations.
+The Next.js app proxies `/v1/*` and `/api/auth/*` to the API. Server-rendered platform reads forward the incoming session cookie server-to-server; browser mutations use same-origin requests. Do not expose API secrets to browser code. In production, deploy this app separately at a platform-owned host such as `https://platform.bazionweb.com`, set `PLATFORM_CONSOLE_URL` to that origin in the storefront, and include it in both `CORS_ORIGINS` and `BETTER_AUTH_TRUSTED_ORIGINS`. Tenant websites and their admin paths remain on their own tenant hosts. The platform dashboard must not be mounted under a tenant's domain.
 
 ## Implemented
 

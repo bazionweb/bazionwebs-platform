@@ -1,0 +1,187 @@
+.tenant-admin-shell {
+  min-height: 100vh;
+  background: #f6f4ef;
+  color: #19392f;
+  font-family: var(--church-font, Inter, ui-sans-serif, system-ui, sans-serif);
+}
+
+.tenant-admin-header {
+  position: sticky;
+  z-index: 30;
+  top: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  min-height: 72px;
+  padding: 10px clamp(18px, 4vw, 64px);
+  border-bottom: 1px solid #e2ded4;
+  background: rgba(255, 255, 255, .97);
+  backdrop-filter: blur(12px);
+}
+
+.tenant-admin-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 18px;
+  color: inherit;
+  text-decoration: none;
+}
+
+.tenant-admin-brand-name {
+  color: #203d32;
+  font-size: 16px;
+  font-weight: 850;
+  letter-spacing: -.5px;
+  white-space: nowrap;
+}
+
+.tenant-admin-context {
+  display: grid;
+  gap: 3px;
+  padding-left: 17px;
+  border-left: 1px solid #e3dfd5;
+}
+
+.tenant-admin-context strong {
+  max-width: 290px;
+  overflow: hidden;
+  color: #283c32;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tenant-admin-context small {
+  color: #8c6737;
+  font-size: 9px;
+  font-weight: 750;
+  letter-spacing: 1.1px;
+}
+
+.tenant-admin-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.tenant-admin-link,
+.tenant-admin-platform-link,
+.tenant-admin-public-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  padding: 0 13px;
+  border: 1px solid #ddd8ce;
+  border-radius: 7px;
+  color: #355747;
+  font-size: 11px;
+  font-weight: 650;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.tenant-admin-platform-link {
+  border-color: #284c3d;
+  background: #284c3d;
+  color: #fff;
+}
+
+.tenant-admin-public-link {
+  gap: 7px;
+  border-color: #a87939;
+  background: #a87939;
+  color: #fff;
+}
+
+.tenant-admin-actions a:hover { filter: brightness(.96); }
+.tenant-admin-actions a:focus-visible,
+.tenant-admin-section-nav button:focus-visible {
+  outline: 3px solid #c99750;
+  outline-offset: 3px;
+}
+
+.tenant-admin-nav-wrap {
+  border-bottom: 1px solid #e4e0d7;
+  background: #fff;
+}
+
+.tenant-admin-section-nav {
+  display: flex;
+  gap: 8px;
+  max-width: 1500px;
+  margin: 0 auto;
+  padding: 0 clamp(18px, 4vw, 64px);
+}
+
+.tenant-admin-section-nav button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 0 15px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: #6a746d;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.tenant-admin-section-nav button[aria-pressed="true"] {
+  border-bottom-color: #a87939;
+  color: #254a3a;
+}
+
+.tenant-admin-section-nav small {
+  padding: 3px 6px;
+  border-radius: 10px;
+  background: #edf2eb;
+  color: #5c7162;
+  font-size: 8px;
+  font-weight: 600;
+}
+
+.tenant-admin-content {
+  max-width: 1500px;
+  margin: 0 auto;
+  padding: clamp(18px, 3vw, 38px) clamp(18px, 4vw, 64px);
+}
+
+.tenant-admin-notice {
+  margin: 0 0 18px;
+  padding: 13px 16px;
+  border: 1px solid #dfcfaa;
+  border-radius: 9px;
+  background: #fff9eb;
+  color: #684d23;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.tenant-admin-footer {
+  padding: 24px 18px 30px;
+  border-top: 1px solid #e2ded4;
+  color: #758077;
+  font-size: 10px;
+  text-align: center;
+}
+
+@media (max-width: 900px) {
+  .tenant-admin-header { align-items: flex-start; flex-direction: column; gap: 12px; }
+  .tenant-admin-actions { justify-content: flex-start; flex-wrap: wrap; }
+}
+
+@media (max-width: 560px) {
+  .tenant-admin-header { position: static; padding: 14px 16px; }
+  .tenant-admin-brand { align-items: flex-start; flex-direction: column; gap: 7px; }
+  .tenant-admin-context { padding-left: 0; border-left: 0; }
+  .tenant-admin-actions { width: 100%; }
+  .tenant-admin-actions a { flex: 1 1 auto; min-height: 38px; padding: 0 9px; font-size: 10px; }
+  .tenant-admin-section-nav { padding: 0 12px; }
+  .tenant-admin-section-nav button { padding: 0 9px; font-size: 10px; }
+}

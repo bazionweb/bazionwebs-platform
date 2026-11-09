@@ -1,6 +1,6 @@
 # Global Mission tenant migration
 
-Global Mission is migrated as a tenant instance. The shared church template, its demo seed, and the generic storefront are left unchanged. The importer only targets a local PostgreSQL database and only creates or updates the `global-mission-fc` tenant's public site profile/settings and public events.
+Global Mission is migrated as a tenant instance. The shared church template, its demo seed, and the generic storefront are left unchanged. The importer only targets a local PostgreSQL database and only creates or updates the `global-mission-fc` tenant's public site profile/settings, public events, and initial optional-module entitlement defaults.
 
 ## Source data included
 
@@ -46,13 +46,13 @@ The importer is transactional, preserves existing same-slug events, and will sto
 
 ## Open the local site
 
-Port 3000 is the reusable demo storefront; the separate GMFC preview uses ports 3100/4100. From the repo root, start the GMFC API and storefront together:
+Port 3000 is the reusable demo storefront; the separate GMFC preview uses storefront port 3100, platform console port 3001, and API port 4100. From the repo root, start the GMFC API, storefront, platform console, and notification worker together:
 
 ```powershell
 pnpm dev:gmfc
 ```
 
-Then visit [http://localhost:3100](http://localhost:3100). The ministry admin portal is at [http://localhost:3100/admin](http://localhost:3100/admin); it requires a signed-in user who belongs to the GMFC tenant workspace. The generic tenant seed is intentionally not changed by this migration.
+Then visit [http://localhost:3100](http://localhost:3100). The GMFC ministry admin portal is at [http://localhost:3100/admin](http://localhost:3100/admin); it requires a signed-in user who belongs to the GMFC tenant workspace. The Bazion platform control plane has its own root at [http://localhost:3001](http://localhost:3001) and is limited by platform API permissions. After applying the new database migration with `pnpm db:migrate`, GMFC's optional Commerce module is disabled and its admin link is hidden. The generic tenant seed is intentionally not changed by this migration.
 
 ## Public launch
 

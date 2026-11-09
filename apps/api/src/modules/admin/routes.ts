@@ -83,6 +83,18 @@ async function requirePermission(
 }
 
 export async function adminRoutes(app: FastifyInstance): Promise<void> {
+  app.get("/admin/tenant/modules", async (request, reply) => {
+    const context = await requireActiveTenantPermission(request.headers, { store: ["read"] });
+    const modules = await Promise.all(platformModuleCatalog
+      .filter((module) => module.tenantAssignable)
+      .map(async (module) => ({
+        id: module.id,
+        name: module.name,
+        enabled: await isTenantModuleEnabled(context.tenantId, module.id),
+      })));
+    return reply.send({ modules });
+  });
+
   // Platform-level recovery operation. Client tenant roles cannot invoke it.
   app.post("/admin/platform/tenants/reconcile-provisioning", async (request, reply) => {
     const parsed = provisioningReconciliationInputSchema.safeParse(request.body ?? {});
