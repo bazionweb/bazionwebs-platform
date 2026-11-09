@@ -66,6 +66,22 @@ describe("Church & Ministry Module Routes", () => {
   }
 
   describe("Public Routes", () => {
+    it("does not serve ministry content when church-ministry is disabled for the tenant", async () => {
+      mocks.isTenantModuleEnabled.mockResolvedValue(false);
+      const app = await buildTestApp();
+      const response = await app.inject({
+        method: "GET",
+        url: "/v1/public/church/site",
+        headers: { host: "new-ministry.test" },
+      });
+
+      expect(response.statusCode).toBe(404);
+      expect(response.json().message).toBe("The church ministry module is not enabled for this tenant.");
+      expect(mocks.isTenantModuleEnabled).toHaveBeenCalledWith(tenantId, "church-ministry");
+      expect(mocks.withTenantTransaction).not.toHaveBeenCalled();
+      await app.close();
+    });
+
     it("returns public site profile and active leaders", async () => {
       const mockProfile = {
         ministryName: "Global Mission for Christ International",
