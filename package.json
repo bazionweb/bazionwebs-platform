@@ -23,7 +23,7 @@
     "catalog:validate": "node scripts/validate-product-catalog.mjs && node scripts/validate-module-manifests.mjs",
     "modules:validate": "node scripts/validate-module-manifests.mjs",
     "production:preflight": "node scripts/production-preflight.mjs",
-    "platform:create-admin": "pnpm --filter @bazion/auth exec dotenv -e ../../.env -- tsx ../../scripts/create-platform-admin.ts"
+    "platform:create-admin": "dotenv -e .env -- pnpm --filter @bazion/auth run platform:create-admin"
   },
   "devDependencies": {
     "dotenv-cli": "^10.0.0",
