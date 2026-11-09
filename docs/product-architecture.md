@@ -12,7 +12,7 @@ Keep these three things separate:
 2. Module: a cohesive domain boundary that owns business rules and public interfaces.
 3. Offer/solution: a configuration, entitlement, template and delivery scope composed from modules.
 
-The repository now registers 111 advertised capabilities, 36 reusable module boundaries, 35 commercial offer IDs and nine initial solution manifests. It intentionally does not create one package for each capability.
+The repository now registers 111 advertised capabilities, 37 reusable module boundaries, 35 commercial offer IDs and nine initial solution manifests. It intentionally does not create one package for each capability.
 
 ## 2. Target repository layout
 
@@ -20,7 +20,7 @@ The repository now registers 111 advertised capabilities, 36 reusable module bou
 apps/
   api/                    Fastify HTTP API and module orchestration
   storefront/             Tenant-facing websites, portals and client workspace UI
-  admin/                  Platform-owner control plane (reserved; distinct from client admin)
+  admin/                  Platform-owner control plane (implemented foundation; distinct from client admin)
   worker/                 One supervised process for durable jobs and notification delivery (planned)
 
 packages/
@@ -36,8 +36,8 @@ packages/
   booking/                 Booking domain rules
   analytics/               Tenant-aware event/sink contracts
 
-  module-registry/         Module manifests, dependencies and tenant entitlements (planned)
-  audit/                   Append-only audit domain (planned)
+  module-registry/         Runtime manifest catalogue and tenant entitlements (partial; currently in apps/api and apps/admin)
+  audit/                   Append-only audit domain and permissioned history reader (partial)
   content/                 Tenant-scoped pages and publishing (planned)
   page-builder/            Visual composition and safe block schemas (planned)
   forms/                   Forms, submissions, spam protection and consent (planned)

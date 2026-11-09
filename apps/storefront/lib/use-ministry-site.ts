@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import type { ChurchPublicSiteSettings } from "@bazion/api-contracts";
 import { globalMissionConfig } from "../../../templates/global-mission.config";
 import type { MinistryConfig } from "../../../templates/church.types";
+import { createNeutralMinistrySite, neutralMinistrySite } from "./ministry-site-defaults";
 
 interface SiteResponse {
   tenant?: { slug: string; name: string } | null;
@@ -22,34 +23,6 @@ interface SiteResponse {
   leaders?: Array<{ id: string; name: string; position: string; biography?: string | null; photoUrl?: string | null }>;
   siteSettings?: ChurchPublicSiteSettings | null;
 }
-
-const neutralSite: MinistryConfig = {
-  ...globalMissionConfig,
-  tenantSlug: "unknown",
-  ministryName: "Ministry",
-  tagline: "Welcome to our ministry.",
-  branding: { ...globalMissionConfig.branding, logoUrl: "", heroBgUrl: undefined },
-  hero: { ...globalMissionConfig.hero, subtitle: "Welcome to our ministry." },
-  contact: { phones: [], email: "", address: "" },
-  social: {},
-  statistics: [],
-  giving: { mpesaPaybill: "", accountName: "", instructions: "", suggestedAmounts: [] },
-  serviceTimes: [],
-  locations: [],
-  visitorInfo: { arrival: "", children: "", accessibility: "", parking: "" },
-  online: { description: "" },
-  scripture: { verse: "", reference: "", version: "" },
-  ministries: [],
-  galleryImages: [],
-  faqs: [],
-  metadata: { title: "", description: "" },
-  vision: { title: "Our Vision", statement: "" },
-  mission: { title: "Our Mission", statement: "" },
-  outreach: { title: "Community Outreach", statement: "" },
-  coreValues: [],
-  statementOfFaith: [],
-  leadership: [],
-};
 
 let siteRequest: Promise<SiteResponse | null> | null = null;
 
@@ -114,7 +87,7 @@ function safeColor(value: string | undefined, fallback: string): string {
 }
 
 export function useMinistrySite(): MinistryConfig {
-  const [site, setSite] = useState(neutralSite);
+  const [site, setSite] = useState(neutralMinistrySite);
   useEffect(() => {
     let active = true;
     void loadMinistrySite().then((data) => {
@@ -126,7 +99,7 @@ export function useMinistrySite(): MinistryConfig {
         || data.tenant?.name?.trim().toLowerCase() === globalMissionConfig.ministryName.toLowerCase();
       const fallback = isGlobalMission
         ? globalMissionConfig
-        : { ...neutralSite, tenantSlug: data.tenant?.slug ?? "tenant", ministryName: data.tenant?.name?.trim() || "Ministry" };
+        : createNeutralMinistrySite(data.tenant);
       const phones = Array.isArray(profile?.telephoneNumbers)
         ? profile.telephoneNumbers.filter((phone): phone is string => typeof phone === "string" && phone.trim().length > 0)
         : fallback.contact.phones;

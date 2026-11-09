@@ -4,7 +4,7 @@ import { createOutboxPayloadCodec, PostgresNotificationOutbox } from "@bazion/no
 import { organization } from "better-auth/plugins";
 import { Pool } from "pg";
 import { reconcileTenantProvisioning } from "./tenant-reconciliation.js";
-import { ac, organizationRoles } from "./permissions.js";
+import { ac, organizationRoles, parseOrganizationRoles } from "./permissions.js";
 import {
   canCreateClientOrganization,
   canGrantClientOwner,

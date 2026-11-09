@@ -21,16 +21,18 @@
         "apps/admin"
       ],
       "status": "partial",
-      "scope": "Tenant registry, membership mapping and client workspace exist. Add platform-owner administration, recovery UI, domain verification and tenant settings."
+      "scope": "Tenant registry, organization provisioning, lifecycle controls, owner assignment, tenant settings, audited platform administration, and DNS TXT challenge/verification controls exist. Finish recovery UX, production domain routing and TLS lifecycle."
     },
     {
       "id": "module-entitlements",
       "name": "Module registry, plans, feature gates and quotas",
       "sourcePath": [
-        "packages/module-registry"
+        "apps/admin",
+        "apps/api/src/modules/admin",
+        "packages/database"
       ],
-      "status": "planned",
-      "scope": "Tenant-level enablement, dependencies, plan entitlements and safe module migrations."
+      "status": "partial",
+      "scope": "Manifest-backed tenant module overrides, dependency checks, and audited enable/disable controls exist. Extend enforcement to supported module APIs and add plan quotas, usage metering, and safe module migrations."
     },
     {
       "id": "design-system",
@@ -105,7 +107,7 @@
         "packages/storage"
       ],
       "status": "partial",
-      "scope": "Storage port exists. Add R2/S3 adapters, signed uploads, variants, metadata, retention and deletion."
+      "scope": "Tenant-scoped media uploads and library controls use local and S3-compatible storage adapters. Add image variants/transforms, storage usage metering, retention, and guarded deletion."
     },
     {
       "id": "document-management",

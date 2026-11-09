@@ -17,6 +17,7 @@ The Next.js app proxies `/v1/*` and `/api/auth/*` to the API. Server-rendered pl
 - `GET /v1/admin/platform/tenants/:tenantId/owner-candidates` and `POST /v1/admin/platform/tenants/:tenantId/owner` — platform-owner-only verified member selection, initial assignment and atomic audited transfer.
 - `GET /v1/admin/platform/modules` and tenant module endpoints — manifest-backed catalogue, effective tenant entitlements and audited enable/disable overrides.
 - Tenant settings GET/PATCH endpoints — validated, versioned configuration with optimistic concurrency.
+- Tenant domain endpoints — issue/rotate a DNS TXT challenge, verify ownership, list domains and disable a domain; the tenant detail UI shows challenge instructions and verification state.
 - Tenant audit history and usage endpoints — append-only audit reads and live member/product/order counters.
 - Superadmin tenant directory, tenant detail, lifecycle, ownership, module, configuration, audit and usage interfaces.
 - Better Auth email/password sign-in and server-side session forwarding.
@@ -36,4 +37,4 @@ The module catalogue is currently a runtime snapshot of the checked-in manifests
 - Add full API-request, storage, bandwidth, deployment and job usage metering.
 - Add audit-history pagination/action filters in the UI.
 - Integrate entitlements into future modules as their APIs are implemented.
-- Add tenant domain verification management and platform billing when those foundations are ready.
+- Complete production domain routing, TLS issuance/renewal, redirects and handover/removal with the chosen hosting provider; add platform billing when those foundations are ready.

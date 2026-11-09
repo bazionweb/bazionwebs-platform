@@ -206,17 +206,17 @@ Mandatory rules:
 # H. Recommended implementation sequence
 
 ## Gate 1 — finish the shared platform shell
-- [ ] Build the platform-owner dashboard and tenant lifecycle.
-- [ ] Complete tenant provisioning reconciliation and custom-domain verification.
-- [~] Implement the module registry, tenant entitlements and tenant settings; expand manifest loading and feature gates across all modules.
-- [~] Add platform audit logs and API keys/service accounts; tenant-scoped audit read UI/API is in place.
-- [ ] Update README/architecture docs to reflect merged authentication, lockfile, migrations and client dashboard.
+- [~] Platform superadmin, tenant lifecycle, owner assignment and tenant settings are implemented; finish recovery workflows and operator review.
+- [~] Provisioning reconciliation and DNS TXT challenge/verification controls exist; finish production domain routing, TLS, redirects and handover.
+- [~] Manifest-backed module catalogue, tenant entitlements and dependency checks exist; enforce entitlements across all supported modules and add quotas/metering.
+- [~] Append-only platform audit and tenant audit history are implemented; finish retention, filters, broader event coverage and service identities.
+- [~] README and implementation status now reflect current modules and migration range; keep these snapshots updated with each release.
 
 ## Gate 2 — reusable delivery primitives
-- [ ] Durable notification outbox and worker.
-- [ ] Media library and storage adapter.
+- [~] Durable notification outbox and SMTP worker are implemented; finish production configuration, supervision evidence and alerting.
+- [~] Tenant-scoped media library and local/S3-compatible storage adapters are implemented; add transforms, metering, retention and guarded deletion.
 - [ ] CMS, page/block builder and template manifests.
-- [ ] Shared UI/design system and admin shell.
+- [~] Shared UI and platform/tenant admin shells exist; expand design tokens, reusable controls and accessibility coverage.
 - [ ] Forms and lead capture.
 - [ ] Workflow/job scheduling and event contracts.
 - [ ] Search and analytics integrations.
