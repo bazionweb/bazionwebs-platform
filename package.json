@@ -19,7 +19,8 @@
     "auth:check": "pnpm --filter @bazion/auth typecheck && pnpm --filter @bazion/auth test",
     "catalog:validate": "node scripts/validate-product-catalog.mjs && node scripts/validate-module-manifests.mjs",
     "modules:validate": "node scripts/validate-module-manifests.mjs",
-    "production:preflight": "node scripts/production-preflight.mjs"
+    "production:preflight": "node scripts/production-preflight.mjs",
+    "platform:create-admin": "pnpm --filter @bazion/auth exec dotenv -e ../../.env -- tsx ../../scripts/create-platform-admin.ts"
   },
   "devDependencies": {
     "dotenv-cli": "^10.0.0",

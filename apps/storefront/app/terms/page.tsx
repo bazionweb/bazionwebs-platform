@@ -1,25 +1,28 @@
+"use client";
+
 import {
   ChurchNav,
   ChurchFooter,
   PageHero,
 } from "@bazion/ui";
-import { globalMissionConfig } from "../../../../templates/global-mission.config";
+import { useMinistrySite } from "../../lib/use-ministry-site";
 
 export default function TermsPage() {
+  const site = useMinistrySite();
   return (
     <>
       <ChurchNav
-        ministryName={globalMissionConfig.ministryName}
-        logoUrl={globalMissionConfig.branding.logoUrl}
+        ministryName={site.ministryName}
+        logoUrl={site.branding.logoUrl}
         currentPath="/terms"
         giveHref="/give"
       />
 
-      <main>
+      <main id="main-content">
         <PageHero
           eyebrow="LEGAL & USAGE"
           title="Terms of Use"
-          subtitle="Terms governing the use of the Global Mission for Christ International website and digital services."
+          subtitle={`Terms governing the use of the ${site.ministryName} website and digital services.`}
         />
 
         <article className="ch-section">
@@ -33,7 +36,7 @@ export default function TermsPage() {
             <h2 style={{ color: "var(--church-primary)", marginBottom: "16px" }}>2. Ministry Media & Content</h2>
             <p style={{ lineHeight: 1.8, color: "var(--church-text)", marginBottom: "24px" }}>
               All sermons, audio messages, video recordings, photographs, and logos published on this
-              website are the intellectual property of Global Mission for Christ International. You
+              website are the intellectual property of the ministry or its respective rights holders. You
               are encouraged to share links and sermon videos for personal spiritual edification and
               evangelism, provided proper attribution is maintained and content is not sold or modified.
             </p>
@@ -49,10 +52,11 @@ export default function TermsPage() {
       </main>
 
       <ChurchFooter
-        ministryName={globalMissionConfig.ministryName}
-        phoneNumbers={globalMissionConfig.contact.phones}
-        email={globalMissionConfig.contact.email}
-        address={globalMissionConfig.contact.address}
+        ministryName={site.ministryName}
+        tagline={site.tagline}
+        phoneNumbers={site.contact.phones}
+        email={site.contact.email}
+        address={site.contact.address}
       />
     </>
   );

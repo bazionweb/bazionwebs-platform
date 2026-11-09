@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ChurchNav,
   ChurchFooter,
@@ -9,24 +9,71 @@ import {
   CategoryFilter,
   Modal,
 } from "@bazion/ui";
-import { globalMissionConfig } from "../../../../templates/global-mission.config";
-import { sampleEvents, type EventItem } from "../../../../templates/church-sample-data";
+import { useMinistrySite } from "../../lib/use-ministry-site";
+
+interface PublicEvent {
+  id: string;
+  slug: string;
+  title: string;
+  description: string | null;
+  posterUrl: string | null;
+  venue: string | null;
+  address: string | null;
+  startsAt: string;
+  endsAt: string | null;
+  registrationEnabled: boolean;
+  registrationCapacity: number | null;
+  status: "upcoming" | "in_progress" | "completed" | "cancelled";
+}
+
+function eventDisplay(event: PublicEvent) {
+  const date = new Date(event.startsAt);
+  return {
+    dateStr: date.toLocaleDateString("en-KE", { dateStyle: "long", timeZone: "Africa/Nairobi" }),
+    dayBadge: date.toLocaleDateString("en-KE", { day: "2-digit", timeZone: "Africa/Nairobi" }),
+    monthBadge: date.toLocaleDateString("en-KE", { month: "short", timeZone: "Africa/Nairobi" }).toUpperCase(),
+    time: date.toLocaleTimeString("en-KE", { hour: "numeric", minute: "2-digit", timeZone: "Africa/Nairobi" }),
+    location: event.address ?? "",
+    upcoming: event.status === "upcoming" && date.getTime() > Date.now(),
+    registrationOpen: event.registrationEnabled && event.status === "upcoming" && date.getTime() > Date.now(),
+  };
+}
 
 const CATEGORIES = ["All", "Upcoming", "Past Events"];
 
 export default function EventsPage() {
+  const site = useMinistrySite();
   const [filter, setFilter] = useState("All");
-  const [registeringEvent, setRegisteringEvent] = useState<EventItem | null>(null);
+  const [registeringEvent, setRegisteringEvent] = useState<PublicEvent | null>(null);
   const [regSuccess, setRegSuccess] = useState<string | null>(null);
+  const [registrationError, setRegistrationError] = useState<string | null>(null);
+  const [eventsError, setEventsError] = useState<string | null>(null);
+  const [events, setEvents] = useState<PublicEvent[]>([]);
+  const [eventsLoading, setEventsLoading] = useState(true);
   const [regName, setRegName] = useState("");
   const [regEmail, setRegEmail] = useState("");
   const [regPhone, setRegPhone] = useState("");
+  const [privacyConsent, setPrivacyConsent] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    fetch("/v1/public/church/events?filter=all")
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Could not load this ministry's events.");
+        return response.json() as Promise<{ events: PublicEvent[] }>;
+      })
+      .then((data) => { if (active) setEvents(data.events); })
+      .catch((error: unknown) => { if (active) setEventsError(error instanceof Error ? error.message : "Could not load events."); })
+      .finally(() => { if (active) setEventsLoading(false); });
+    return () => { active = false; };
+  }, []);
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!registeringEvent) return;
     setIsSubmitting(true);
+    setRegistrationError(null);
     try {
       const res = await fetch(`/v1/public/church/events/${registeringEvent.id}/register`, {
         method: "POST",
@@ -35,46 +82,49 @@ export default function EventsPage() {
           fullName: regName,
           email: regEmail,
           telephone: regPhone,
+          privacyConsent: true,
         }),
       });
       const data = await res.json().catch(() => null);
-      if (data?.registrationReference) {
+      if (res.ok && data?.success === true && typeof data.registrationReference === "string") {
         setRegSuccess(data.registrationReference);
       } else {
-        setRegSuccess(`GMFC-REG-${Math.floor(100000 + Math.random() * 900000)}`);
+        setRegistrationError(typeof data?.message === "string" ? data.message : "Registration could not be confirmed. Please try again.");
       }
-    } catch {
-      setRegSuccess(`GMFC-REG-${Math.floor(100000 + Math.random() * 900000)}`);
+    } catch (error) {
+      setRegistrationError(error instanceof Error ? error.message : "Registration could not be confirmed. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const filteredEvents = sampleEvents.filter((evt) => {
-    if (filter === "Upcoming") return evt.registrationOpen;
-    if (filter === "Past Events") return !evt.registrationOpen;
-    return true;
+  const filteredEvents = events.filter((event) => {
+    const display = eventDisplay(event);
+    if (filter === "Upcoming") return display.upcoming;
+    if (filter === "Past Events") return event.status === "completed" || new Date(event.startsAt).getTime() < Date.now();
+    return event.status !== "cancelled";
   });
 
-  const featuredEvent = sampleEvents[0];
+  const featuredEvent = events.find((event) => eventDisplay(event).upcoming);
+  const featuredDisplay = featuredEvent ? eventDisplay(featuredEvent) : null;
 
   return (
     <>
       <ChurchNav
-        ministryName={globalMissionConfig.ministryName}
-        logoUrl={globalMissionConfig.branding.logoUrl}
+        ministryName={site.ministryName}
+        logoUrl={site.branding.logoUrl}
         currentPath="/events"
         giveHref="/give"
       />
 
-      <main>
+      <main id="main-content">
         {/* 1. Page Hero */}
         <PageHero
           eyebrow="MINISTRY CALENDAR & PROGRAMMES"
-          title="Events, Crusades &"
-          highlightedTitle="Conferences"
-          subtitle="Be part of life-changing encounters. Register for upcoming revivals, leadership summits, and free community medical outreaches."
-          bgImageUrl={globalMissionConfig.branding.heroBgUrl}
+          title="Events &"
+          highlightedTitle="Programmes"
+          subtitle="Browse events published by this ministry and register when registration is open."
+          bgImageUrl={site.branding.heroBgUrl}
         />
 
         {/* 2. Featured Event Spotlight */}
@@ -85,8 +135,7 @@ export default function EventsPage() {
                 <span className="ch-eyebrow">Major Upcoming Event</span>
                 <h2 className="ch-title">{featuredEvent.title}</h2>
                 <p className="ch-subtitle">
-                  📅 {featuredEvent.dateStr} • ⏰ {featuredEvent.time} • 📍 {featuredEvent.venue},{" "}
-                  {featuredEvent.location}
+                  📅 {featuredDisplay?.dateStr} • ⏰ {featuredDisplay?.time} • 📍 {featuredEvent.venue ?? "Venue to be announced"}{featuredDisplay?.location ? `, ${featuredDisplay.location}` : ""}
                 </p>
               </div>
 
@@ -104,11 +153,11 @@ export default function EventsPage() {
                 }}
               >
                 <div style={{ height: "340px", backgroundColor: "var(--church-primary)" }}>
-                  <img
-                    src={featuredEvent.posterUrl}
-                    alt={featuredEvent.title}
-                    style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                  />
+                  {featuredEvent.posterUrl ? <img
+                      src={featuredEvent.posterUrl}
+                      alt={featuredEvent.title}
+                      style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                    /> : <div className="ch-event-placeholder" aria-hidden="true"><span>Event details</span></div>}
                 </div>
                 <div style={{ padding: "32px", display: "flex", flexDirection: "column", justifyContent: "center" }}>
                   <span className="ch-eyebrow">Featured Gathering</span>
@@ -119,13 +168,11 @@ export default function EventsPage() {
                     {featuredEvent.description}
                   </p>
                   <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
-                    <button
+                    {featuredDisplay?.registrationOpen && <button
                       type="button"
                       className="ch-btn ch-btn-accent"
-                      onClick={() => setRegisteringEvent(featuredEvent)}
-                    >
-                      Register Online (Free)
-                    </button>
+                      onClick={() => { setRegistrationError(null); setPrivacyConsent(false); setRegisteringEvent(featuredEvent); }}
+                    >Register Online (Free)</button>}
                     <a href={`/events/${featuredEvent.slug}`} className="ch-btn ch-btn-outline">
                       Full Programme Details →
                     </a>
@@ -139,6 +186,8 @@ export default function EventsPage() {
         {/* 3. Filter Bar & Event Grid */}
         <section className="ch-section">
           <div className="ch-container">
+            {eventsLoading && <p role="status">Loading events…</p>}
+            {eventsError && <p role="alert">{eventsError}</p>}
             <CategoryFilter
               categories={CATEGORIES}
               activeCategory={filter}
@@ -146,33 +195,36 @@ export default function EventsPage() {
             />
 
             <div className="ch-grid-3">
-              {filteredEvents.map((evt) => (
-                <EventCard
+              {filteredEvents.map((evt) => {
+                const display = eventDisplay(evt);
+                return <EventCard
                   key={evt.id}
                   id={evt.id}
                   title={evt.title}
-                  dateStr={evt.dateStr}
-                  dayBadge={evt.dayBadge}
-                  monthBadge={evt.monthBadge}
-                  time={evt.time}
-                  venue={evt.venue}
-                  location={evt.location}
+                  dateStr={display.dateStr}
+                  dayBadge={display.dayBadge}
+                  monthBadge={display.monthBadge}
+                  time={display.time}
+                  venue={evt.venue ?? "Venue to be announced"}
+                  location={display.location}
                   slug={evt.slug}
-                  posterUrl={evt.posterUrl}
-                  registrationOpen={evt.registrationOpen}
-                  onRegister={() => setRegisteringEvent(evt)}
-                />
-              ))}
+                  posterUrl={evt.posterUrl ?? undefined}
+                  registrationOpen={display.registrationOpen}
+                  onRegister={() => { setRegistrationError(null); setPrivacyConsent(false); setRegisteringEvent(evt); }}
+                />;
+              })}
+              {!eventsLoading && !eventsError && filteredEvents.length === 0 && <p>No events are available for this filter.</p>}
             </div>
           </div>
         </section>
       </main>
 
       <ChurchFooter
-        ministryName={globalMissionConfig.ministryName}
-        phoneNumbers={globalMissionConfig.contact.phones}
-        email={globalMissionConfig.contact.email}
-        address={globalMissionConfig.contact.address}
+        ministryName={site.ministryName}
+        tagline={site.tagline}
+        phoneNumbers={site.contact.phones}
+        email={site.contact.email}
+        address={site.contact.address}
       />
 
       {/* Registration Modal */}
@@ -181,6 +233,8 @@ export default function EventsPage() {
         onClose={() => {
           setRegisteringEvent(null);
           setRegSuccess(null);
+          setRegistrationError(null);
+          setPrivacyConsent(false);
         }}
         title={registeringEvent ? `Register for ${registeringEvent.title}` : undefined}
       >
@@ -227,11 +281,13 @@ export default function EventsPage() {
             onSubmit={handleRegister}
             style={{ display: "grid", gap: "16px" }}
           >
+            {registrationError && <p role="alert" style={{ color: "#b91c1c" }}>{registrationError}</p>}
             <div>
-              <label style={{ display: "block", fontSize: "13px", fontWeight: 600, marginBottom: "6px" }}>
+              <label htmlFor="event-reg-name" style={{ display: "block", fontSize: "13px", fontWeight: 600, marginBottom: "6px" }}>
                 Full Name *
               </label>
               <input
+                id="event-reg-name"
                 type="text"
                 required
                 value={regName}
@@ -246,10 +302,11 @@ export default function EventsPage() {
               />
             </div>
             <div>
-              <label style={{ display: "block", fontSize: "13px", fontWeight: 600, marginBottom: "6px" }}>
+              <label htmlFor="event-reg-email" style={{ display: "block", fontSize: "13px", fontWeight: 600, marginBottom: "6px" }}>
                 Email Address *
               </label>
               <input
+                id="event-reg-email"
                 type="email"
                 required
                 value={regEmail}
@@ -264,10 +321,11 @@ export default function EventsPage() {
               />
             </div>
             <div>
-              <label style={{ display: "block", fontSize: "13px", fontWeight: 600, marginBottom: "6px" }}>
+              <label htmlFor="event-reg-phone" style={{ display: "block", fontSize: "13px", fontWeight: 600, marginBottom: "6px" }}>
                 Telephone / WhatsApp Number *
               </label>
               <input
+                id="event-reg-phone"
                 type="tel"
                 required
                 value={regPhone}
@@ -281,6 +339,10 @@ export default function EventsPage() {
                 }}
               />
             </div>
+            <label style={{ display: "flex", alignItems: "flex-start", gap: 10, fontSize: 13, lineHeight: 1.6 }}>
+              <input type="checkbox" required checked={privacyConsent} onChange={(event) => setPrivacyConsent(event.target.checked)} style={{ marginTop: 3, minWidth: 18, minHeight: 18 }} />
+              <span>I agree that the ministry may use these details to manage this event registration. Read the <a href="/privacy">privacy notice</a>.</span>
+            </label>
             <button
               type="submit"
               disabled={isSubmitting}

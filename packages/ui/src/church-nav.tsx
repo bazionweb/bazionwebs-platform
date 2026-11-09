@@ -18,8 +18,9 @@ export interface ChurchNavProps {
 
 const DEFAULT_LINKS: NavLinkItem[] = [
   { label: "Home", href: "/" },
+  { label: "Visit", href: "/visit" },
+  { label: "Ministries", href: "/ministries" },
   { label: "About", href: "/about" },
-  { label: "Gallery", href: "/gallery" },
   { label: "Sermons", href: "/sermons" },
   { label: "Events", href: "/events" },
   { label: "Contact", href: "/contact" },
@@ -37,6 +38,7 @@ export function ChurchNav({
 
   return (
     <header className="ch-nav-header">
+      <a href="#main-content" className="ch-skip-link">Skip to main content</a>
       <div className="ch-container">
         <div className="ch-nav-inner">
           <a href="/" className="ch-nav-brand">
@@ -44,7 +46,7 @@ export function ChurchNav({
             <span className="ch-nav-title">{ministryName}</span>
           </a>
 
-          <nav aria-label="Main Navigation">
+          <nav aria-label="Main navigation" id="main-navigation">
             <ul className="ch-nav-links">
               {links.map((link) => {
                 const isActive =
@@ -55,6 +57,7 @@ export function ChurchNav({
                     <a
                       href={link.href}
                       className={`ch-nav-link ${isActive ? "active" : ""}`}
+                      aria-current={currentPath === link.href ? "page" : undefined}
                     >
                       {link.label}
                     </a>
@@ -73,6 +76,7 @@ export function ChurchNav({
               className="ch-nav-mobile-toggle"
               aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
               aria-expanded={mobileMenuOpen}
+              aria-controls="mobile-main-navigation"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             >
               {mobileMenuOpen ? "✕" : "☰"}
@@ -82,7 +86,7 @@ export function ChurchNav({
       </div>
 
       {mobileMenuOpen && (
-        <div className="ch-nav-mobile-menu">
+        <nav className="ch-nav-mobile-menu" id="mobile-main-navigation" aria-label="Mobile navigation">
           {links.map((link) => {
             const isActive =
               currentPath === link.href ||
@@ -92,6 +96,7 @@ export function ChurchNav({
                 key={link.href}
                 href={link.href}
                 className={`ch-nav-link ${isActive ? "active" : ""}`}
+                aria-current={currentPath === link.href ? "page" : undefined}
                 style={{ fontSize: "16px", padding: "10px 0" }}
                 onClick={() => setMobileMenuOpen(false)}
               >
@@ -107,7 +112,7 @@ export function ChurchNav({
           >
             {giveLabel}
           </a>
-        </div>
+        </nav>
       )}
     </header>
   );

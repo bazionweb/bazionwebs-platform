@@ -115,6 +115,9 @@ importers:
 
   apps/storefront:
     dependencies:
+      '@bazion/api-contracts':
+        specifier: workspace:*
+        version: link:../../packages/api-contracts
       '@bazion/auth':
         specifier: workspace:*
         version: link:../../packages/auth

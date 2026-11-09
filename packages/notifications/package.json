@@ -16,7 +16,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run",
+    "test": "vitest run src",
     "dev:worker": "tsx watch src/worker.ts",
     "start:worker": "node dist/worker.js",
     "preflight:smtp": "tsx src/smtp-preflight.ts"

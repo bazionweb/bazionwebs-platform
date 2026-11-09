@@ -34,11 +34,7 @@ export function EventCard({
   return (
     <article className="ch-card">
       <div className="ch-card-media">
-        <img
-          src={posterUrl || "/images/event-placeholder.jpg"}
-          alt={title}
-          loading="lazy"
-        />
+        {posterUrl ? <img src={posterUrl} alt={title} loading="lazy" /> : <div className="ch-event-placeholder" aria-hidden="true"><span>{title}</span></div>}
         {(dayBadge || monthBadge) && (
           <div className="ch-event-date-badge">
             {dayBadge && <div className="ch-event-date-day">{dayBadge}</div>}
@@ -78,7 +74,7 @@ export function EventCard({
               className="ch-btn ch-btn-outline"
               style={{ flexGrow: 1, cursor: "default", opacity: 0.7 }}
             >
-              Past Event
+              Registration Closed
             </span>
           )}
           {detailUrl && (

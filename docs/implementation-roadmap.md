@@ -108,7 +108,7 @@ Deliver:
 - Pricing rules, promotion schedules, coupons, discounts, bundles and multi-currency precision.
 - Tax calculation interface with market-specific rules and invoice snapshots.
 - Shipping zones/rates, courier adapters, shipment tracking and delivery proof.
-- Real payment adapters: begin with Safaricom Daraja sandbox and one card provider; add PayPal/Paystack based on customer demand.
+- Validate the existing Safaricom Daraja STK Push in sandbox and with a live merchant, add callback-loss reconciliation and reversals, then add a card provider based on customer demand.
 - Verify signatures, amount, currency, merchant account and event identity on webhooks; implement idempotent inbox, reconciliation, refunds and dispute state.
 - Abandoned-cart messages and order notifications through the durable outbox.
 - B2B/marketplace and recurring subscriptions only after ordinary single-merchant commerce is stable.

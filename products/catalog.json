@@ -133,7 +133,7 @@
         "packages/payments"
       ],
       "status": "partial",
-      "scope": "Provider interface and development mock exist. Add verified M-Pesa, card and PayPal adapters, callbacks, reconciliation and refunds."
+      "scope": "Development mock and Daraja M-Pesa STK Push with token-protected callbacks exist. Validate sandbox/live merchant flows and add callback-loss reconciliation, refunds, reversals and card/PayPal adapters."
     },
     {
       "id": "inventory-pricing",
@@ -338,6 +338,17 @@
       ],
       "status": "partial",
       "scope": "Append-only actor/action/resource audit event contract and PostgreSQL writer are implemented; add permissioned audit reading, retention policy and wider application coverage."
+    },
+    {
+      "id": "church-ministry",
+      "name": "Church and ministry public content and operations",
+      "sourcePath": [
+        "apps/api/src/modules/church",
+        "apps/storefront/app",
+        "packages/database"
+      ],
+      "status": "partial",
+      "scope": "Tenant-scoped public site profile, sermons, events, registrations, campaigns, donation records, prayer requests and enquiries exist. Member management, attendance, volunteer workflows, settings UI and production payment reconciliation remain incomplete."
     }
   ],
   "capabilities": [

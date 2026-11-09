@@ -14,7 +14,9 @@ export async function buildApp(config: AppConfig) {
   const app = Fastify({
     logger: {
       level: config.LOG_LEVEL,
-      redact: ["req.headers.authorization", "req.headers.cookie", "req.headers.x-cart-token", "req.headers.x-dev-secret", "req.headers['set-cookie']"],
+      // Daraja carries its unguessable callback capability in the query string.
+      // Redact the URL at the request logger boundary so access logs cannot leak it.
+      redact: ["req.url", "req.headers.authorization", "req.headers.cookie", "req.headers.x-cart-token", "req.headers.x-dev-secret", "req.headers.x-donation-status-token", "req.headers.x-payment-status-token", "req.headers['set-cookie']"],
     },
     bodyLimit: 1_048_576,
     // Enable only when the API is reachable exclusively through a trusted
@@ -47,7 +49,7 @@ export async function buildApp(config: AppConfig) {
     },
     credentials: true,
     methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization", "Idempotency-Key", "X-Requested-With"],
+    allowedHeaders: ["Content-Type", "Authorization", "Idempotency-Key", "X-Donation-Status-Token", "X-Payment-Status-Token", "X-Requested-With"],
   });
   await app.register(rateLimit, { max: 120, timeWindow: "1 minute" });
 

@@ -1,25 +1,28 @@
+"use client";
+
 import {
   ChurchNav,
   ChurchFooter,
   PageHero,
 } from "@bazion/ui";
-import { globalMissionConfig } from "../../../../templates/global-mission.config";
+import { useMinistrySite } from "../../lib/use-ministry-site";
 
 export default function PrivacyPolicyPage() {
+  const site = useMinistrySite();
   return (
     <>
       <ChurchNav
-        ministryName={globalMissionConfig.ministryName}
-        logoUrl={globalMissionConfig.branding.logoUrl}
+        ministryName={site.ministryName}
+        logoUrl={site.branding.logoUrl}
         currentPath="/privacy"
         giveHref="/give"
       />
 
-      <main>
+      <main id="main-content">
         <PageHero
           eyebrow="LEGAL & DATA PROTECTION"
           title="Privacy Policy"
-          subtitle="How Global Mission for Christ International protects your personal information and prayer requests."
+          subtitle={`How ${site.ministryName} handles personal information submitted through this site.`}
         />
 
         <article className="ch-section">
@@ -31,36 +34,66 @@ export default function PrivacyPolicyPage() {
               number, email address, and optional prayer request details.
             </p>
 
-            <h2 style={{ color: "var(--church-primary)", marginBottom: "16px" }}>2. Confidentiality of Prayer Requests</h2>
+            <h2 style={{ color: "var(--church-primary)", marginBottom: "16px" }}>2. Who handles your information</h2>
             <p style={{ lineHeight: 1.8, color: "var(--church-text)", marginBottom: "24px" }}>
-              We treat prayer requests with the highest level of pastoral confidentiality. Your
-              spiritual burdens are shared strictly with our verified pastoral intercession team and
-              are never published, monetized, or shared with third parties.
+              {site.ministryName} receives and decides how to use information sent through this site.
+              Bazion Web Platform processes it to operate the website and ministry tools. For questions,
+              access, correction, deletion, or withdrawal requests, contact the ministry at{" "}
+              {site.contact.email ? <a href={`mailto:${site.contact.email}`} style={{ color: "var(--church-secondary)" }}>{site.contact.email}</a> : <a href="/contact" style={{ color: "var(--church-secondary)" }}>the contact page</a>}.
             </p>
 
-            <h2 style={{ color: "var(--church-primary)", marginBottom: "16px" }}>3. Financial & Donation Data</h2>
+            <h2 style={{ color: "var(--church-primary)", marginBottom: "16px" }}>3. Prayer requests</h2>
             <p style={{ lineHeight: 1.8, color: "var(--church-text)", marginBottom: "24px" }}>
-              Mobile money transactions (M-Pesa) are processed securely through regulated payment
-              gateways (Safaricom Daraja and Equity Bank). We never store PIN numbers, mobile money
-              passwords, or sensitive banking credentials on our servers.
+              A prayer request can reveal religious belief and other sensitive information. It is not
+              displayed publicly. Access is limited to authorized ministry owners and administrators;
+              only include details you want to share with that team. Ask the ministry to correct or
+              remove a request you previously submitted.
             </p>
 
-            <h2 style={{ color: "var(--church-primary)", marginBottom: "16px" }}>4. Contact Us</h2>
+            <h2 style={{ color: "var(--church-primary)", marginBottom: "16px" }}>4. How information is used and shared</h2>
             <p style={{ lineHeight: 1.8, color: "var(--church-text)", marginBottom: "24px" }}>
-              If you have any questions regarding your personal information, please contact us at{" "}
-              <a href={`mailto:${globalMissionConfig.contact.email}`} style={{ color: "var(--church-secondary)" }}>
-                {globalMissionConfig.contact.email}
-              </a>.
+              Contact details are used to respond to your enquiry, event details to manage your
+              registration, prayer details for the prayer request you chose to share, and newsletter
+              addresses only when you opt in. Website hosting and service providers process information
+              needed to operate these features. We do not display enquiries, registrations, donations,
+              or prayer requests publicly.
+            </p>
+
+            <h2 style={{ color: "var(--church-primary)", marginBottom: "16px" }}>5. Financial and donation data</h2>
+            <p style={{ lineHeight: 1.8, color: "var(--church-text)", marginBottom: "24px" }}>
+              When online M-Pesa giving is enabled, the site sends a payment request through the
+              configured Safaricom Daraja integration. The site does not request or store M-Pesa PINs.
+              Direct Paybill transfers are initiated by the donor and are not automatically verified
+              by this site. Donation and transaction records may need to be kept for financial
+              reconciliation or other legal obligations, even when other submitted personal details
+              can be removed.
+            </p>
+
+            <h2 style={{ color: "var(--church-primary)", marginBottom: "16px" }}>6. Retention and security</h2>
+            <p style={{ lineHeight: 1.8, color: "var(--church-text)", marginBottom: "24px" }}>
+              The ministry should keep information only as long as needed for the purpose it was
+              collected, then securely remove or anonymize it, subject to financial recordkeeping
+              duties. Access to private requests and enquiries is restricted to authorized accounts.
+              Contact the ministry if you need its retention period for a particular record.
+            </p>
+
+            <h2 style={{ color: "var(--church-primary)", marginBottom: "16px" }}>7. Your choices and contact</h2>
+            <p style={{ lineHeight: 1.8, color: "var(--church-text)", marginBottom: "24px" }}>
+              You may ask the ministry for access to, correction of, or deletion of information you
+              submitted, or withdraw consent for future processing where consent is the basis. You may
+              also raise a concern with the <a href="https://www.odpc.go.ke/rights-of-a-data-subject/index.html" target="_blank" rel="noopener noreferrer" style={{ color: "var(--church-secondary)" }}>Office of the Data Protection Commissioner</a>. Contact the ministry at{" "}
+              {site.contact.email ? <a href={`mailto:${site.contact.email}`} style={{ color: "var(--church-secondary)" }}>{site.contact.email}</a> : <a href="/contact" style={{ color: "var(--church-secondary)" }}>the contact page</a>}.
             </p>
           </div>
         </article>
       </main>
 
       <ChurchFooter
-        ministryName={globalMissionConfig.ministryName}
-        phoneNumbers={globalMissionConfig.contact.phones}
-        email={globalMissionConfig.contact.email}
-        address={globalMissionConfig.contact.address}
+        ministryName={site.ministryName}
+        tagline={site.tagline}
+        phoneNumbers={site.contact.phones}
+        email={site.contact.email}
+        address={site.contact.address}
       />
     </>
   );

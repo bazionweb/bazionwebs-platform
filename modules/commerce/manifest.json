@@ -44,7 +44,8 @@
   ],
   "jobs": [],
   "providers": [
-    "Mock payment provider"
+    "Development-only mock payment provider",
+    "Safaricom Daraja M-Pesa STK Push with token-protected callback verification"
   ],
   "tests": [
     "apps/api/src/modules/commerce",

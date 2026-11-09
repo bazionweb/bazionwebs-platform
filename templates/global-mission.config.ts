@@ -6,10 +6,16 @@ export const globalMissionConfig: MinistryConfig = {
   tagline: "Revive the Nations. Preach the Gospel. Win Souls.",
   branding: {
     logoUrl: "/images/gmfc-logo.png",
-    primaryColor: "#0a192f",
-    secondaryColor: "#1d4ed8",
-    accentColor: "#d97706",
+    primaryColor: "#193a31",
+    secondaryColor: "#315e50",
+    accentColor: "#8b5b29",
     heroBgUrl: "/images/hero-bg-optimized.jpg",
+  },
+  hero: {
+    eyebrow: "Welcome",
+    title: "A place to belong",
+    highlightedTitle: "and grow in faith",
+    subtitle: "Revive the Nations. Preach the Gospel. Win Souls.",
   },
   contact: {
     phones: ["+1 (512) 785 6994", "+254 721 341793", "+254 710 642 232"],
@@ -25,18 +31,22 @@ export const globalMissionConfig: MinistryConfig = {
     twitter: "https://twitter.com/globalmissionfc",
     whatsapp: "https://wa.me/254721341793",
   },
-  statistics: [
-    { label: "Souls Reached", value: 34200, suffix: "+" },
-    { label: "Annual Conferences", value: 5, suffix: "" },
-    { label: "Years of Ministry", value: 6, suffix: "+" },
-    { label: "Nations Touched", value: 10, suffix: "+" },
-  ],
+  statistics: [],
   giving: {
     mpesaPaybill: "247247",
     accountName: "0721341793",
     instructions: "Go to M-Pesa > Lipa na M-Pesa > Paybill > Business No: 247247 (Equity Bank) > Account No: 0721341793",
     suggestedAmounts: [500, 1000, 2500, 5000],
   },
+  serviceTimes: [],
+  locations: [],
+  visitorInfo: { arrival: "", children: "", accessibility: "", parking: "" },
+  online: { description: "" },
+  scripture: { verse: "", reference: "", version: "" },
+  ministries: [],
+  galleryImages: [],
+  faqs: [],
+  metadata: { title: "", description: "" },
   vision: {
     title: "Our Vision",
     statement:

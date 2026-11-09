@@ -77,6 +77,7 @@ export type TenantPermissionRequest = {
   order?: Array<"read" | "update" | "refund">;
   customer?: Array<"read" | "update">;
   store?: Array<"read" | "update">;
+  churchprivate?: Array<"read" | "update">;
   analytics?: Array<"read">;
   organization?: Array<"update">;
   member?: Array<"create" | "update" | "delete">;

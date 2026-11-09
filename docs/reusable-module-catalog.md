@@ -73,7 +73,7 @@ The repository has an early Bazion-owned commerce implementation. Extend it deli
 | [~] | Product catalogue | Product listing and records exist. Add editor, categories, variants, attributes, images, publication, bulk actions and import/export. |
 | [~] | Cart and checkout | Guest cart, cart items, order creation and idempotency foundation exist. Add authenticated carts, promotions, tax/shipping calculation and checkout recovery. |
 | [~] | Orders | Order/order-item persistence exists. Add lifecycle, fulfilment status, admin actions, cancellation, returns/refunds and customer history. |
-| [~] | Payments | Provider contract and mock flow exist. Add real adapters, verified callbacks/webhooks, reconciliation, refunds and failure handling. |
+| [~] | Payments | Mock and Daraja STK Push paths exist with token-protected callback checks. Validate sandbox/live merchant flows and add missing-callback reconciliation, refunds and reversals. |
 | [ ] | Inventory | Stock locations, availability/reservations, adjustments, transfers, expiry and reconciliation. |
 | [ ] | Pricing and promotions | Price lists, scheduled prices, coupons, discounts, bundles and promotion rules. |
 | [ ] | Tax | Jurisdiction/rate setup, inclusive/exclusive rules and invoice snapshots. |

@@ -4,40 +4,47 @@
    ========================================================================== */
 
 :root {
-  --church-primary: #0a192f;
-  --church-primary-light: #112240;
-  --church-primary-dark: #020c1b;
-  --church-secondary: #1d4ed8;
-  --church-secondary-light: #3b82f6;
-  --church-accent: #d97706;
-  --church-accent-hover: #b45309;
-  --church-accent-light: #fef3c7;
-  --church-bg: #ffffff;
-  --church-bg-alt: #f8fafc;
-  --church-bg-muted: #f1f5f9;
-  --church-text: #1e293b;
-  --church-text-muted: #64748b;
-  --church-text-light: #94a3b8;
-  --church-border: #e2e8f0;
-  --church-border-dark: #cbd5e1;
+  --church-primary: #193a31;
+  --church-primary-light: #28574b;
+  --church-primary-dark: #102820;
+  --church-secondary: #315e50;
+  --church-secondary-light: #648575;
+  --church-accent: #8b5b29;
+  --church-accent-hover: #71471f;
+  --church-accent-light: #f5eadb;
+  --church-bg: #fffdf9;
+  --church-bg-alt: #f7f4ee;
+  --church-bg-muted: #eee9df;
+  --church-text: #27312b;
+  --church-text-muted: #66716a;
+  --church-text-light: #b8c4bd;
+  --church-border: #e6dfd3;
+  --church-border-dark: #cfc5b6;
   --church-success: #16a34a;
   --church-warning: #f59e0b;
-  --church-radius: 8px;
-  --church-radius-lg: 14px;
-  --church-shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-  --church-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
-  --church-shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+  --church-radius: 12px;
+  --church-radius-lg: 22px;
+  --church-font: Inter, ui-sans-serif, system-ui, sans-serif;
+  --church-serif: Georgia, "Times New Roman", serif;
+  --church-shadow-sm: 0 2px 10px rgba(38, 44, 38, 0.045);
+  --church-shadow: 0 12px 32px rgba(38, 44, 38, 0.075);
+  --church-shadow-lg: 0 22px 48px rgba(38, 44, 38, 0.12);
 }
+
+html { scroll-behavior: smooth; }
+body { background: var(--church-bg); color: var(--church-text); font-family: var(--church-font); }
+::selection { background: var(--church-accent-light); color: var(--church-primary-dark); }
+:focus-visible { outline: 3px solid var(--church-accent); outline-offset: 3px; }
 
 /* ── Container & Layout ────────────────────────────────────────── */
 .ch-container {
-  max-width: 1200px;
+  max-width: 1280px;
   margin: 0 auto;
   padding: 0 24px;
 }
 
 .ch-section {
-  padding: 72px 0;
+  padding: 88px 0;
 }
 
 .ch-section-alt {
@@ -68,7 +75,8 @@
 
 .ch-title {
   font-size: clamp(28px, 4vw, 40px);
-  font-weight: 800;
+  font-family: var(--church-serif);
+  font-weight: 600;
   color: var(--church-primary);
   line-height: 1.2;
   margin: 0 0 16px 0;
@@ -77,6 +85,8 @@
 .ch-section-dark .ch-title {
   color: #ffffff;
 }
+.ch-section-dark .ch-eyebrow,
+.ch-hero-wrap .ch-eyebrow { color: #f0c98f; }
 
 .ch-subtitle {
   font-size: 17px;
@@ -98,11 +108,12 @@
   font-size: 14px;
   font-weight: 600;
   padding: 12px 24px;
-  border-radius: var(--church-radius);
+  min-height: 44px;
+  border-radius: 999px;
   text-decoration: none;
   cursor: pointer;
   border: 1px solid transparent;
-  transition: all 0.2s ease;
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, transform 0.2s ease;
   line-height: 1.4;
 }
 
@@ -117,7 +128,7 @@
 
 .ch-btn-accent {
   background-color: var(--church-accent);
-  color: #ffffff;
+  color: #fffdf9;
 }
 
 .ch-btn-accent:hover {
@@ -159,9 +170,9 @@
   position: sticky;
   top: 0;
   z-index: 50;
-  background-color: #ffffff;
+  background-color: rgba(255, 253, 249, 0.96);
   border-bottom: 1px solid var(--church-border);
-  box-shadow: var(--church-shadow-sm);
+  backdrop-filter: blur(14px);
 }
 
 .ch-nav-inner {
@@ -187,7 +198,8 @@
 
 .ch-nav-title {
   font-size: 18px;
-  font-weight: 800;
+  font-family: var(--church-serif);
+  font-weight: 700;
   letter-spacing: -0.5px;
   line-height: 1.2;
 }
@@ -213,7 +225,7 @@
 
 .ch-nav-link:hover,
 .ch-nav-link.active {
-  color: var(--church-secondary);
+  color: var(--church-primary);
 }
 
 .ch-nav-link.active::after {
@@ -223,7 +235,7 @@
   left: 0;
   right: 0;
   height: 2px;
-  background-color: var(--church-secondary);
+  background-color: var(--church-accent);
 }
 
 .ch-nav-mobile-toggle {
@@ -231,11 +243,13 @@
   background: none;
   border: 0;
   cursor: pointer;
+  min-width: 44px;
+  min-height: 44px;
   padding: 8px;
   color: var(--church-primary);
 }
 
-@media (max-width: 900px) {
+@media (max-width: 1120px) {
   .ch-nav-links {
     display: none;
   }
@@ -255,9 +269,9 @@
 /* ── Hero Banner ──────────────────────────────────────────────── */
 .ch-hero-wrap {
   position: relative;
-  background: linear-gradient(135deg, var(--church-primary-dark) 0%, var(--church-primary) 60%, #172554 100%);
+  background: radial-gradient(ellipse at 82% 24%, rgba(185, 132, 72, 0.25), transparent 32%), linear-gradient(135deg, var(--church-primary-dark) 0%, var(--church-primary) 66%, #2b594b 100%);
   color: #ffffff;
-  padding: 100px 0 120px 0;
+  padding: clamp(76px, 11vw, 144px) 0 clamp(82px, 11vw, 140px);
   overflow: hidden;
 }
 
@@ -269,14 +283,15 @@
 
 .ch-hero-title {
   font-size: clamp(38px, 6vw, 64px);
-  font-weight: 900;
+  font-family: var(--church-serif);
+  font-weight: 600;
   line-height: 1.1;
-  letter-spacing: -1px;
+  letter-spacing: -1.8px;
   margin: 16px 0 24px 0;
 }
 
 .ch-hero-title span {
-  color: var(--church-accent);
+  color: #f0c98f;
 }
 
 .ch-hero-subtitle {
@@ -296,19 +311,19 @@
 /* ── Cards & Grids ────────────────────────────────────────────── */
 .ch-grid-3 {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
   gap: 28px;
 }
 
 .ch-grid-4 {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
   gap: 24px;
 }
 
 .ch-grid-2 {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr));
   gap: 32px;
 }
 
@@ -318,14 +333,15 @@
   border: 1px solid var(--church-border);
   overflow: hidden;
   box-shadow: var(--church-shadow-sm);
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
   display: flex;
   flex-direction: column;
 }
 
 .ch-card:hover {
-  transform: translateY(-4px);
+  transform: translateY(-2px);
   box-shadow: var(--church-shadow-lg);
+  border-color: var(--church-border-dark);
 }
 
 .ch-card-body {
@@ -347,6 +363,20 @@
   height: 100%;
   object-fit: cover;
 }
+.ch-event-placeholder {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  min-height: 180px;
+  padding: 24px;
+  background: radial-gradient(ellipse at 75% 22%, rgba(185, 132, 72, 0.24), transparent 30%), linear-gradient(135deg, var(--church-primary), var(--church-primary-light));
+  color: #fffdf9;
+  text-align: center;
+  font-family: var(--church-serif);
+  font-size: 23px;
+}
+.ch-card-media .ch-event-placeholder { position: absolute; inset: 0; }
 
 /* ── Sermon Card ──────────────────────────────────────────────── */
 .ch-sermon-badge {
@@ -365,7 +395,8 @@
 
 .ch-sermon-title {
   font-size: 19px;
-  font-weight: 700;
+  font-family: var(--church-serif);
+  font-weight: 600;
   color: var(--church-primary);
   margin: 0 0 8px 0;
   line-height: 1.3;
@@ -415,7 +446,8 @@
 
 .ch-event-title {
   font-size: 19px;
-  font-weight: 700;
+  font-family: var(--church-serif);
+  font-weight: 600;
   color: var(--church-primary);
   margin: 0 0 10px 0;
 }
@@ -484,7 +516,7 @@
   font-size: 14px;
   font-weight: 700;
   letter-spacing: 1px;
-  color: var(--church-accent);
+  color: #f0c98f;
   text-transform: uppercase;
 }
 
@@ -498,6 +530,7 @@
 }
 
 .ch-filter-btn {
+  min-height: 44px;
   padding: 8px 18px;
   border-radius: 999px;
   border: 1px solid var(--church-border-dark);
@@ -549,8 +582,8 @@
   right: 16px;
   background: var(--church-bg-muted);
   border: 0;
-  width: 36px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
   cursor: pointer;
   font-size: 18px;
@@ -566,6 +599,50 @@
   color: #cbd5e1;
   padding: 64px 0 24px 0;
   font-size: 14px;
+}
+
+.ch-skip-link {
+  position: absolute;
+  z-index: 200;
+  top: 8px;
+  left: 8px;
+  transform: translateY(-150%);
+  padding: 12px 16px;
+  background: var(--church-bg);
+  color: var(--church-primary-dark);
+  border-radius: var(--church-radius);
+}
+.ch-skip-link:focus { transform: translateY(0); }
+.ch-site-settings-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+}
+.ch-form-error { color: #9f3029; background: #fff5f3; border: 1px solid #e8c7c1; padding: 12px 14px; border-radius: var(--church-radius); }
+.ch-form-success { color: #20563f; background: #eef8f2; border: 1px solid #bad8c4; padding: 12px 14px; border-radius: var(--church-radius); }
+.ch-prose p { color: var(--church-text-muted); line-height: 1.8; }
+.ch-info-card { border: 1px solid var(--church-border); border-radius: var(--church-radius-lg); background: var(--church-bg); padding: 24px; box-shadow: var(--church-shadow-sm); }
+.ch-info-card h3 { margin: 0 0 10px; color: var(--church-primary); font-family: var(--church-serif); font-size: 22px; }
+.ch-info-card p { margin: 0; color: var(--church-text-muted); line-height: 1.7; }
+.ch-gallery-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 290px), 1fr)); gap: 20px; }
+.ch-gallery-item { margin: 0; }
+.ch-gallery-item img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; display: block; }
+.ch-gallery-item figcaption { padding: 16px 18px; color: var(--church-text-muted); font-size: 13px; line-height: 1.6; }
+
+input, textarea, select { font-family: inherit; }
+button:disabled { cursor: not-allowed; opacity: 0.65; }
+
+@media (max-width: 760px) {
+  .ch-container { padding-inline: 18px; }
+  .ch-section { padding: 64px 0; }
+  .ch-site-settings-grid { grid-template-columns: minmax(0, 1fr); }
+  .ch-hero-title { letter-spacing: -1px; }
+  .ch-heading-wrap { margin-bottom: 32px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
 }
 
 .ch-footer-grid {
@@ -600,7 +677,7 @@
 }
 
 .ch-footer-col a:hover {
-  color: var(--church-accent);
+  color: #f0c98f;
 }
 
 .ch-footer-bottom {
@@ -612,5 +689,5 @@
   flex-wrap: wrap;
   gap: 16px;
   font-size: 13px;
-  color: #64748b;
+  color: #b8c4bd;
 }

@@ -137,6 +137,11 @@ export const paymentAttempts = pgTable("payment_attempts", {
   amountMinor: bigint("amount_minor", { mode: "number" }).notNull(),
   currency: varchar("currency", { length: 3 }).notNull(),
   checkoutUrl: text("checkout_url"),
+  callbackTokenHash: varchar("callback_token_hash", { length: 64 }),
+  statusTokenHash: varchar("status_token_hash", { length: 64 }),
+  checkoutRequestId: varchar("checkout_request_id", { length: 160 }),
+  merchantRequestId: varchar("merchant_request_id", { length: 160 }),
+  verifiedAt: timestamp("verified_at", { withTimezone: true }),
   idempotencyKey: varchar("idempotency_key", { length: 160 }).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
@@ -146,6 +151,10 @@ export const paymentAttempts = pgTable("payment_attempts", {
   check("payment_attempts_amount_safe_ck", sql`${table.amountMinor} between 0 and 9007199254740991`),
   uniqueIndex("payment_attempts_id_tenant_uq").on(table.id, table.tenantId),
   uniqueIndex("payment_attempts_tenant_idem_uq").on(table.tenantId, table.idempotencyKey),
+  uniqueIndex("payment_attempts_callback_token_uq").on(table.callbackTokenHash).where(sql`${table.callbackTokenHash} is not null`),
+  uniqueIndex("payment_attempts_status_token_uq").on(table.statusTokenHash).where(sql`${table.statusTokenHash} is not null`),
+  uniqueIndex("payment_attempts_checkout_request_uq").on(table.checkoutRequestId).where(sql`${table.checkoutRequestId} is not null`),
+  uniqueIndex("payment_attempts_provider_receipt_uq").on(table.provider, table.providerReference).where(sql`${table.providerReference} is not null`),
   foreignKey({ columns: [table.orderId, table.tenantId], foreignColumns: [orders.id, orders.tenantId], name: "payment_attempts_order_fk" }),
   index("payment_attempts_tenant_order_idx").on(table.tenantId, table.orderId),
 ]);
@@ -285,6 +294,7 @@ export const sermonCategories = pgTable("sermon_categories", {
   name: varchar("name", { length: 80 }).notNull(),
   slug: varchar("slug", { length: 80 }).notNull(),
 }, (table) => [
+  uniqueIndex("sermon_categories_id_tenant_uq").on(table.id, table.tenantId),
   uniqueIndex("sermon_categories_tenant_slug_uq").on(table.tenantId, table.slug),
 ]);
 
@@ -305,6 +315,7 @@ export const sermons = pgTable("sermons", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
+  foreignKey({ columns: [table.categoryId, table.tenantId], foreignColumns: [sermonCategories.id, sermonCategories.tenantId], name: "sermons_category_tenant_fk" }),
   uniqueIndex("sermons_tenant_slug_uq").on(table.tenantId, table.slug),
   index("sermons_tenant_status_pub_idx").on(table.tenantId, table.status, table.publishedAt),
 ]);
@@ -326,22 +337,28 @@ export const churchEvents = pgTable("church_events", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
+  uniqueIndex("church_events_id_tenant_uq").on(table.id, table.tenantId),
   uniqueIndex("church_events_tenant_slug_uq").on(table.tenantId, table.slug),
+  check("church_events_capacity_positive_ck", sql`${table.registrationCapacity} is null or ${table.registrationCapacity} > 0`),
+  check("church_events_time_order_ck", sql`${table.endsAt} is null or ${table.endsAt} >= ${table.startsAt}`),
   index("church_events_tenant_starts_idx").on(table.tenantId, table.startsAt),
 ]);
 
 export const churchEventRegistrations = pgTable("church_event_registrations", {
   id: uuid("id").defaultRandom().primaryKey(),
   tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
-  eventId: uuid("event_id").notNull().references(() => churchEvents.id),
+  eventId: uuid("event_id").notNull(),
   fullName: varchar("full_name", { length: 160 }).notNull(),
   email: varchar("email", { length: 254 }).notNull(),
   telephone: varchar("telephone", { length: 30 }).notNull(),
   registrationReference: varchar("registration_reference", { length: 40 }).notNull(),
   status: varchar("status", { length: 24 }).notNull().default("confirmed"),
+  consentAt: timestamp("consent_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
+  uniqueIndex("church_event_registrations_id_tenant_uq").on(table.id, table.tenantId),
   uniqueIndex("church_event_reg_tenant_ref_uq").on(table.tenantId, table.registrationReference),
+  foreignKey({ columns: [table.eventId, table.tenantId], foreignColumns: [churchEvents.id, churchEvents.tenantId], name: "church_event_registrations_event_tenant_fk" }),
   index("church_event_reg_tenant_event_idx").on(table.tenantId, table.eventId),
 ]);
 
@@ -360,8 +377,11 @@ export const donationCampaigns = pgTable("donation_campaigns", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
+  uniqueIndex("donation_campaigns_id_tenant_uq").on(table.id, table.tenantId),
   uniqueIndex("donation_campaigns_tenant_slug_uq").on(table.tenantId, table.slug),
-  check("donation_campaigns_currency_ck", sql`${table.currency} in ('KES', 'USD', 'EUR', 'GBP')`),
+  check("donation_campaigns_target_amount_minor_check", sql`${table.targetAmountMinor} >= 0`),
+  check("donation_campaigns_raised_amount_minor_check", sql`${table.raisedAmountMinor} >= 0`),
+  check("donation_campaigns_currency_check", sql`${table.currency} in ('KES', 'USD', 'EUR', 'GBP')`),
 ]);
 
 export const churchDonations = pgTable("church_donations", {
@@ -377,17 +397,21 @@ export const churchDonations = pgTable("church_donations", {
   paymentMethod: varchar("payment_method", { length: 40 }).notNull(),
   paymentStatus: varchar("payment_status", { length: 32 }).notNull().default("pending"),
   anonymous: boolean("anonymous").notNull().default(false),
+  consentAt: timestamp("consent_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
-  check("church_donations_currency_ck", sql`${table.currency} in ('KES', 'USD', 'EUR', 'GBP')`),
-  check("church_donations_status_ck", sql`${table.paymentStatus} in ('pending', 'verified', 'failed')`),
+  uniqueIndex("church_donations_id_tenant_uq").on(table.id, table.tenantId),
+  foreignKey({ columns: [table.campaignId, table.tenantId], foreignColumns: [donationCampaigns.id, donationCampaigns.tenantId], name: "church_donations_campaign_tenant_fk" }),
+  check("church_donations_amount_minor_check", sql`${table.amountMinor} > 0`),
+  check("church_donations_currency_check", sql`${table.currency} in ('KES', 'USD', 'EUR', 'GBP')`),
+  check("church_donations_payment_status_check", sql`${table.paymentStatus} in ('pending', 'verified', 'failed')`),
   index("church_donations_tenant_created_idx").on(table.tenantId, table.createdAt),
 ]);
 
 export const churchPaymentTransactions = pgTable("church_payment_transactions", {
   id: uuid("id").defaultRandom().primaryKey(),
   tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
-  donationId: uuid("donation_id").notNull().references(() => churchDonations.id),
+  donationId: uuid("donation_id").notNull(),
   provider: varchar("provider", { length: 40 }).notNull(),
   providerReference: varchar("provider_reference", { length: 160 }),
   checkoutRequestId: varchar("checkout_request_id", { length: 160 }),
@@ -396,9 +420,19 @@ export const churchPaymentTransactions = pgTable("church_payment_transactions", 
   currency: varchar("currency", { length: 3 }).notNull().default("KES"),
   transactionStatus: varchar("transaction_status", { length: 32 }).notNull().default("pending"),
   verifiedAt: timestamp("verified_at", { withTimezone: true }),
+  callbackTokenHash: varchar("callback_token_hash", { length: 64 }),
+  statusTokenHash: varchar("status_token_hash", { length: 64 }),
+  idempotencyKey: varchar("idempotency_key", { length: 160 }),
   rawCallbackJson: jsonb("raw_callback_json"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
+  uniqueIndex("church_payment_transactions_id_tenant_uq").on(table.id, table.tenantId),
+  uniqueIndex("church_payment_callback_token_uq").on(table.callbackTokenHash).where(sql`${table.callbackTokenHash} is not null`),
+  uniqueIndex("church_payment_status_token_uq").on(table.statusTokenHash).where(sql`${table.statusTokenHash} is not null`),
+  uniqueIndex("church_payment_idempotency_uq").on(table.tenantId, table.idempotencyKey).where(sql`${table.idempotencyKey} is not null`),
+  foreignKey({ columns: [table.donationId, table.tenantId], foreignColumns: [churchDonations.id, churchDonations.tenantId], name: "church_payment_transactions_donation_tenant_fk" }),
+  check("church_payment_transactions_amount_minor_check", sql`${table.amountMinor} > 0`),
+  check("church_payment_transactions_status_ck", sql`${table.transactionStatus} in ('pending', 'succeeded', 'failed')`),
   index("church_payment_tx_tenant_donation_idx").on(table.tenantId, table.donationId),
 ]);
 
@@ -413,6 +447,7 @@ export const churchContactMessages = pgTable("church_contact_messages", {
   category: varchar("category", { length: 60 }).notNull().default("General Enquiry"),
   status: varchar("status", { length: 24 }).notNull().default("new"),
   assignedTo: varchar("assigned_to", { length: 128 }),
+  consentAt: timestamp("consent_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
   index("church_contact_msg_tenant_status_idx").on(table.tenantId, table.status),
@@ -427,6 +462,7 @@ export const churchPrayerRequests = pgTable("church_prayer_requests", {
   requestText: text("request_text").notNull(),
   privacyPreference: varchar("privacy_preference", { length: 30 }).notNull().default("confidential"),
   status: varchar("status", { length: 24 }).notNull().default("received"),
+  consentAt: timestamp("consent_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
   index("church_prayer_req_tenant_status_idx").on(table.tenantId, table.status),

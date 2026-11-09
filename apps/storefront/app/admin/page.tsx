@@ -23,7 +23,7 @@ export default function AdminPage() {
       >
         <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
           <Link href="/" style={{ color: "#ffffff", textDecoration: "none", fontWeight: 800, fontSize: "16px", display: "flex", alignItems: "center", gap: "8px" }}>
-            <span style={{ color: "var(--church-gold)" }}>✝</span> GLOBAL MISSION FC
+            <span style={{ color: "var(--church-gold)" }}>✝</span> BAZION WEB
           </Link>
           <span style={{ fontSize: "11px", textTransform: "uppercase", letterSpacing: "1px", background: "rgba(217, 119, 6, 0.2)", color: "var(--church-gold)", padding: "3px 8px", borderRadius: "10px", fontWeight: 700 }}>
             Admin Portal
@@ -62,7 +62,7 @@ export default function AdminPage() {
                 color: view === "platform" ? "#0a192f" : "#ffffff",
               }}
             >
-              Platform Tenants
+              Workspace Team
             </button>
           </div>
           <Link
@@ -92,7 +92,7 @@ export default function AdminPage() {
       </div>
 
       <footer style={{ padding: "24px", textAlign: "center", fontSize: "12px", color: "var(--church-muted)", borderTop: "1px solid var(--church-border)", marginTop: "40px" }}>
-        <span>GLOBAL MISSION FOR CHRIST INTERNATIONAL · POWERED BY BAZION WEB MULTI-TENANT ARCHITECTURE</span>
+        <span>MINISTRY OPERATIONS · POWERED BY BAZION WEB</span>
       </footer>
     </main>
   );

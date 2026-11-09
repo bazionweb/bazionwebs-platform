@@ -28,7 +28,7 @@ Existing platform primitives include:
 - Client workspace administration inside the storefront; this is distinct from the platform-owner control plane.
 
 Current release constraints:
-- Production preflight deliberately blocks the mock-only payment configuration.
+- Production preflight blocks `PAYMENT_PROVIDER=mock`; production checkout requires live Daraja credentials and an HTTPS callback endpoint, with merchant validation still outstanding.
 - The platform-owner UI, tenant lifecycle API, module entitlements, tenant settings, full domain verification/TLS lifecycle and usage metering are not implemented.
 - `main` currently has branch protection disabled.
 - PR #16 is open and its latest observed GitHub Actions validation run passed all 12 validation steps. Do not treat an open PR as merged or include its changes in the `main` baseline.
@@ -189,7 +189,7 @@ Required tests before Phase 1 sign-off:
 - Do not migrate production workloads to VPS until deployment, backups, monitoring, rollback and operational ownership are tested.
 - Keep PostgreSQL backups encrypted and off-host; perform restore drills before onboarding paying customers.
 - Keep object storage, SMTP, payment credentials and tenant-specific secrets outside Git and browser bundles.
-- Production sign-off remains blocked until notification worker restart/recovery, production preflight, backup restore, verified tenant-domain routing and a real payment adapter/webhook flow have been demonstrated.
+- Production sign-off remains blocked until notification worker restart/recovery, production preflight, backup restore, verified tenant-domain routing, and Daraja sandbox/live callback behavior have been demonstrated. Payment callback-loss reconciliation and refunds also remain open.
 
 ## 6. Suggested pull-request breakdown
 

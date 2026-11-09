@@ -1,221 +1,81 @@
 "use client";
 
-import { useState } from "react";
-import {
-  ChurchNav,
-  ChurchFooter,
-  PageHero,
-  SermonCard,
-  CategoryFilter,
-  Modal,
-} from "@bazion/ui";
-import { globalMissionConfig } from "../../../../templates/global-mission.config";
-import { sampleSermons } from "../../../../templates/church-sample-data";
+import { useEffect, useMemo, useState } from "react";
+import { ChurchFooter, ChurchNav, CategoryFilter, PageHero, SermonCard, Modal } from "@bazion/ui";
+import { useMinistrySite } from "../../lib/use-ministry-site";
 
-const CATEGORIES = [
-  "All",
-  "Revival",
-  "Prayer",
-  "Holy Spirit",
-  "Evangelism",
-  "Faith",
-  "Salvation",
-];
+interface PublicSermon {
+  id: string;
+  slug: string;
+  title: string;
+  description: string | null;
+  speaker: string;
+  youtubeVideoId: string | null;
+  thumbnailUrl: string | null;
+  scriptureReference: string | null;
+  category: string | null;
+  publishedAt: string | null;
+  createdAt: string;
+}
+
+function sermonDate(sermon: PublicSermon) {
+  return new Date(sermon.publishedAt ?? sermon.createdAt).toLocaleDateString("en-KE", { dateStyle: "long", timeZone: "Africa/Nairobi" });
+}
 
 export default function SermonsPage() {
+  const site = useMinistrySite();
+  const [sermons, setSermons] = useState<PublicSermon[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
-  const [activeVideo, setActiveVideo] = useState<{ title: string; youtubeVideoId?: string } | null>(
-    null
-  );
+  const [activeVideo, setActiveVideo] = useState<{ title: string; youtubeVideoId?: string } | null>(null);
 
-  const featuredSermon = sampleSermons[0];
+  useEffect(() => {
+    let active = true;
+    fetch("/v1/public/church/sermons?limit=100")
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Could not load this ministry's sermons.");
+        return response.json() as Promise<{ items: PublicSermon[] }>;
+      })
+      .then((data) => { if (active) setSermons(data.items); })
+      .catch((reason: unknown) => { if (active) setError(reason instanceof Error ? reason.message : "Could not load sermons."); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, []);
 
-  const filteredSermons = sampleSermons.filter((sermon) => {
-    const matchesCategory =
-      selectedCategory === "All" ||
-      sermon.category.toLowerCase() === selectedCategory.toLowerCase();
-    const matchesSearch =
-      sermon.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      sermon.speaker.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      sermon.scriptureReference.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      sermon.description.toLowerCase().includes(searchQuery.toLowerCase());
+  const categories = useMemo(() => ["All", ...Array.from(new Set(sermons.map((sermon) => sermon.category).filter((category): category is string => Boolean(category))))], [sermons]);
+  const filteredSermons = sermons.filter((sermon) => {
+    const query = searchQuery.trim().toLowerCase();
+    const matchesCategory = selectedCategory === "All" || sermon.category === selectedCategory;
+    const matchesSearch = !query || [sermon.title, sermon.speaker, sermon.scriptureReference, sermon.description]
+      .some((value) => value?.toLowerCase().includes(query));
     return matchesCategory && matchesSearch;
   });
+  const featuredSermon = sermons[0];
 
-  return (
-    <>
-      <ChurchNav
-        ministryName={globalMissionConfig.ministryName}
-        logoUrl={globalMissionConfig.branding.logoUrl}
-        currentPath="/sermons"
-        giveHref="/give"
-      />
-
-      <main>
-        {/* 1. Page Hero */}
-        <PageHero
-          eyebrow="ONLINE MINISTRY ARCHIVE"
-          title="Sermons & Spiritual"
-          highlightedTitle="Teachings"
-          subtitle="Listen to powerful, Bible-based messages that equip you for spiritual warfare, persistent prayer, and Holy Ghost revival."
-          bgImageUrl={globalMissionConfig.branding.heroBgUrl}
-        />
-
-        {/* 2. Featured Sermon Highlight */}
-        <section className="ch-section ch-section-alt">
-          <div className="ch-container">
-            <div className="ch-heading-wrap">
-              <span className="ch-eyebrow">Featured Message</span>
-              <h2 className="ch-title">{featuredSermon.title}</h2>
-              <p className="ch-subtitle">
-                By {featuredSermon.speaker} • {featuredSermon.date} • 📖 {featuredSermon.scriptureReference}
-              </p>
-            </div>
-
-            <div style={{ maxWidth: "800px", margin: "0 auto" }}>
-              <div
-                style={{
-                  position: "relative",
-                  paddingBottom: "56.25%",
-                  height: 0,
-                  borderRadius: "var(--church-radius-lg)",
-                  overflow: "hidden",
-                  boxShadow: "var(--church-shadow-lg)",
-                  marginBottom: "20px",
-                }}
-              >
-                <iframe
-                  src={`https://www.youtube.com/embed/${featuredSermon.youtubeVideoId}`}
-                  title={featuredSermon.title}
-                  style={{
-                    position: "absolute",
-                    top: 0,
-                    left: 0,
-                    width: "100%",
-                    height: "100%",
-                    border: 0,
-                  }}
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                  allowFullScreen
-                />
-              </div>
-
-              <p style={{ fontSize: "16px", lineHeight: 1.7, color: "var(--church-text)", textAlign: "center" }}>
-                {featuredSermon.description}
-              </p>
-            </div>
-          </div>
-        </section>
-
-        {/* 3. Search Bar & Category Filters */}
-        <section className="ch-section">
-          <div className="ch-container">
-            <div style={{ maxWidth: "600px", margin: "0 auto 32px auto" }}>
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search messages by title, speaker, scripture, or topic..."
-                style={{
-                  width: "100%",
-                  padding: "14px 20px",
-                  fontSize: "15px",
-                  borderRadius: "var(--church-radius)",
-                  border: "1px solid var(--church-border)",
-                  backgroundColor: "#ffffff",
-                  boxShadow: "var(--church-shadow-sm)",
-                }}
-              />
-            </div>
-
-            <CategoryFilter
-              categories={CATEGORIES}
-              activeCategory={selectedCategory}
-              onSelectCategory={(cat: string) => setSelectedCategory(cat)}
-            />
-
-            {/* 4. Sermon Library Grid */}
-            <div className="ch-grid-3">
-              {filteredSermons.map((sermon) => (
-                <SermonCard
-                  key={sermon.id}
-                  id={sermon.id}
-                  title={sermon.title}
-                  speaker={sermon.speaker}
-                  date={sermon.date}
-                  scriptureReference={sermon.scriptureReference}
-                  category={sermon.category}
-                  youtubeVideoId={sermon.youtubeVideoId}
-                  slug={sermon.slug}
-                  onWatch={(s: { id: string; title: string; youtubeVideoId?: string }) => setActiveVideo(s)}
-                />
-              ))}
-            </div>
-
-            {filteredSermons.length === 0 && (
-              <div style={{ textAlign: "center", padding: "48px 0", color: "var(--church-text-muted)" }}>
-                No sermons found matching &ldquo;{searchQuery}&rdquo;. Try another topic or speaker name.
-              </div>
-            )}
-          </div>
-        </section>
-
-        {/* 5. YouTube Channel CTA */}
-        <section className="ch-section ch-section-dark">
-          <div className="ch-container" style={{ textAlign: "center", maxWidth: "680px" }}>
-            <span className="ch-eyebrow">Stay Connected Online</span>
-            <h2 className="ch-title" style={{ color: "#ffffff" }}>
-              Subscribe to Global Mission on YouTube
-            </h2>
-            <p className="ch-subtitle" style={{ color: "#cbd5e1", marginBottom: "32px" }}>
-              Never miss a live revival service, prophetic broadcast, or Sunday teaching. Subscribe
-              today and enable notifications.
-            </p>
-            <a
-              href={globalMissionConfig.social.youtube}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="ch-btn ch-btn-accent"
-              style={{ padding: "16px 32px", fontSize: "16px" }}
-            >
-              Subscribe on YouTube ↗
-            </a>
-          </div>
-        </section>
-      </main>
-
-      <ChurchFooter
-        ministryName={globalMissionConfig.ministryName}
-        phoneNumbers={globalMissionConfig.contact.phones}
-        email={globalMissionConfig.contact.email}
-        address={globalMissionConfig.contact.address}
-      />
-
-      <Modal
-        isOpen={Boolean(activeVideo)}
-        onClose={() => setActiveVideo(null)}
-        title={activeVideo?.title}
-      >
-        {activeVideo?.youtubeVideoId && (
-          <div style={{ position: "relative", paddingBottom: "56.25%", height: 0 }}>
-            <iframe
-              src={`https://www.youtube.com/embed/${activeVideo.youtubeVideoId}?autoplay=1`}
-              title={activeVideo.title}
-              style={{
-                position: "absolute",
-                top: 0,
-                left: 0,
-                width: "100%",
-                height: "100%",
-                border: 0,
-              }}
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen
-            />
-          </div>
-        )}
-      </Modal>
-    </>
-  );
+  return <>
+    <ChurchNav ministryName={site.ministryName} logoUrl={site.branding.logoUrl} currentPath="/sermons" giveHref="/give" />
+    <main id="main-content">
+      <PageHero eyebrow="ONLINE MINISTRY ARCHIVE" title="Sermons & Spiritual" highlightedTitle="Teachings" subtitle="Browse messages published by this ministry." bgImageUrl={site.branding.heroBgUrl} />
+      {featuredSermon && <section className="ch-section ch-section-alt"><div className="ch-container">
+        <div className="ch-heading-wrap"><span className="ch-eyebrow">Latest Message</span><h2 className="ch-title">{featuredSermon.title}</h2><p className="ch-subtitle">By {featuredSermon.speaker} • {sermonDate(featuredSermon)}{featuredSermon.scriptureReference ? ` • ${featuredSermon.scriptureReference}` : ""}</p></div>
+        {featuredSermon.youtubeVideoId ? <div style={{ maxWidth: 800, margin: "0 auto" }}>
+          <div style={{ position: "relative", paddingBottom: "56.25%", height: 0, borderRadius: "var(--church-radius-lg)", overflow: "hidden" }}><iframe src={`https://www.youtube.com/embed/${encodeURIComponent(featuredSermon.youtubeVideoId)}`} title={featuredSermon.title} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", border: 0 }} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen /></div>
+          {featuredSermon.description && <p style={{ textAlign: "center", lineHeight: 1.7 }}>{featuredSermon.description}</p>}
+        </div> : <p className="ch-container">Video details have not been published for this message.</p>}
+      </div></section>}
+      <section className="ch-section"><div className="ch-container">
+        <div style={{ maxWidth: 600, margin: "0 auto 28px" }}><input type="search" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search by title, speaker or scripture…" aria-label="Search sermons" style={{ width: "100%", padding: 14, borderRadius: "var(--church-radius)", border: "1px solid var(--church-border)" }} /></div>
+        {categories.length > 1 && <CategoryFilter categories={categories} activeCategory={selectedCategory} onSelectCategory={setSelectedCategory} />}
+        {loading && <p role="status">Loading sermons…</p>}
+        {error && <p role="alert">{error}</p>}
+        <div className="ch-grid-3">{filteredSermons.map((sermon) => <SermonCard key={sermon.id} id={sermon.id} title={sermon.title} speaker={sermon.speaker} date={sermonDate(sermon)} scriptureReference={sermon.scriptureReference ?? undefined} category={sermon.category ?? undefined} thumbnailUrl={sermon.thumbnailUrl ?? undefined} youtubeVideoId={sermon.youtubeVideoId ?? undefined} slug={sermon.slug} onWatch={setActiveVideo} />)}</div>
+        {!loading && !error && filteredSermons.length === 0 && <p style={{ textAlign: "center", padding: "48px 0" }}>{sermons.length ? "No sermons match your search." : "No sermons have been published yet."}</p>}
+      </div></section>
+      {site.social.youtube && <section className="ch-section ch-section-dark"><div className="ch-container" style={{ textAlign: "center" }}><span className="ch-eyebrow">Stay Connected</span><h2 className="ch-title" style={{ color: "#fff" }}>Follow the ministry online</h2><a href={site.social.youtube} target="_blank" rel="noopener noreferrer" className="ch-btn ch-btn-accent">Visit YouTube ↗</a></div></section>}
+    </main>
+    <ChurchFooter ministryName={site.ministryName} tagline={site.tagline} phoneNumbers={site.contact.phones} email={site.contact.email} address={site.contact.address} />
+    <Modal isOpen={Boolean(activeVideo)} onClose={() => setActiveVideo(null)} title={activeVideo?.title}>{activeVideo?.youtubeVideoId && <div style={{ position: "relative", paddingBottom: "56.25%", height: 0 }}><iframe src={`https://www.youtube.com/embed/${encodeURIComponent(activeVideo.youtubeVideoId)}?autoplay=1`} title={activeVideo.title} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", border: 0 }} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen /></div>}</Modal>
+  </>;
 }

@@ -8,11 +8,11 @@
 - Order and order-item snapshots.
 - Inventory reservation during payment pending state.
 - Idempotent checkout key storage.
-- Payment provider port and development-only mock.
+- Payment adapter boundary, development-only mock and Daraja M-Pesa STK Push with token-protected callback validation. Refunds and missed-callback reconciliation are not implemented.
 
 ## Deliberately deferred
 
-Customer accounts, catalog administration, variants/options, coupons/promotions, shipping-rate quotes, tax engines, multiple warehouses, subscription commerce, refunds/chargebacks, real M-Pesa/Stripe adapters, webhook retry queue, reservation expiry worker and production reconciliation.
+Customer accounts, catalog administration, variants/options, coupons/promotions, shipping-rate quotes, tax engines, multiple warehouses, subscription commerce, refunds/chargebacks, card/PayPal adapters, callback-loss reconciliation, reservation expiry worker and production merchant validation.
 
 ## Money and quantities
 
@@ -24,9 +24,9 @@ Prices are integer minor units (`priceMinor`). KES 1.00 is represented as 100 mi
 2. Browser sends the HttpOnly per-cart cookie automatically for cart operations.
 3. Checkout requires an `Idempotency-Key` and valid cart token.
 4. In one transaction, API serializes same idempotency key, validates cart, locks products, recalculates prices, checks stock, creates immutable order item snapshots, reserves inventory, creates payment attempt and stores idempotency record.
-5. Payment provider session creation happens outside the DB transaction. Retries reuse the order/payment intent and provider-side idempotency key.
+5. Daraja STK Push initiation happens outside the DB transaction. A same-key retry reuses the persisted order/payment attempt; a conditional state claim prevents the API from issuing a second provider request for that attempt.
 6. Only verified server-to-server provider events transition an order to paid and consume stock reservations.
-7. Failed/expired payment releases reservations through an idempotent state transition/worker (not yet implemented in this MVP).
+7. A failed provider callback releases reservations. An expiry worker and callback-loss reconciliation are still needed for attempts that never receive a callback.
 
 ## Current API routes
 
@@ -50,8 +50,8 @@ Prices are integer minor units (`priceMinor`). KES 1.00 is represented as 100 mi
 ## Next commerce milestones
 
 1. Add automated integration tests against ephemeral PostgreSQL and test RLS with two tenants.
-2. Add a payment attempt state machine and real provider adapter (Daraja for M-Pesa and/or Stripe).
-3. Add webhook signature verification, durable webhook inbox, retry/reconciliation and idempotent fulfillment.
+2. Validate Daraja in sandbox and with the live merchant; add callback-loss reconciliation, refunds/reversals and tenant-specific merchant credentials.
+3. Add a durable provider callback inbox, retries/reconciliation and idempotent fulfillment. Add provider-signature verification for future providers that support signed webhooks.
 4. Add tax/shipping/discount ports and immutable pricing snapshots.
 5. Add admin catalog/order management, customer accounts and order history.
 6. Add inventory reservation expiry, audit trail and operational metrics.

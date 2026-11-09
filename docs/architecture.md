@@ -137,7 +137,7 @@ sequenceDiagram
   API->>DB: Idempotently mark paid and consume reservation
 ```
 
-The running starter currently implements the cart/order path and a development-only mock payment. The real provider callback, webhook signature verification, reconciliation and reservation expiry steps are production milestones, not yet complete.
+The running starter implements the cart/order path, a development-only mock and a Safaricom Daraja M-Pesa STK Push path. Daraja callbacks use per-attempt random capabilities and validate the provider request IDs, amount, currency and phone before order settlement. Callback-loss reconciliation, refunds/reversals and live merchant validation remain production milestones.
 
 ## Authentication and tenant identity
 

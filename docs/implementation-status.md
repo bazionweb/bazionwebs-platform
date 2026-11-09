@@ -1,67 +1,38 @@
-# Bazion Web implementation status
+# Implementation status
 
-Reviewed 6 November 2026 against `main` after PRs #7–#12 were merged. Phase 0 repository foundations are implemented and CI-validated; production infrastructure verification and the real payment adapter remain outstanding.
+This status describes the repository snapshot and its current release limits. A compiled interface or sandbox callback is not evidence of live production readiness.
 
 ## Implemented foundations
 
-- pnpm/Turborepo monorepo with frozen lockfile and GitHub Actions CI.
-- Better Auth 1.7.17 email/password authentication, sessions, email verification and password reset flows.
-- Organization membership, invitations, tenant roles and separately stored platform roles.
-- Tenant registry and mapping from verified Better Auth organization IDs to Bazion tenant IDs.
-- Permission-gated tenant provisioning reconciliation route; unmatched and conflicting reservations remain available for manual inspection.
-- Trusted server-side tenant context and verified custom-host lookup.
-- PostgreSQL forced RLS, tenant-aware foreign keys, least-privilege roles and integration tests for tenant isolation.
-- Client workspace administration in the storefront: tenant-scoped metrics, member listing, invitations, role updates and removal.
-- Commerce starter: product listing, guest cart, cart items, checkout order creation and development-only mock payments.
-- Durable auth notifications: awaited Better Auth password-reset, verification and invitation enqueue; AES-256-GCM PostgreSQL outbox; separate enqueue/worker roles; standalone SMTP worker with lease recovery, retry/backoff and dead letters (PR #10).
-- Production preflight command validates PostgreSQL migration/role grants, audit protections, Better Auth schema, production environment values and SMTP TLS/authentication. Production API configuration rejects the example encryption key; local PostgreSQL binds to loopback only.
-- Basic ports/interfaces for payments, storage, booking and analytics.
-- Product/solution capability catalogue, nine initial solution manifests and strict CI catalogue validation.
-- Append-only audit-event contract/writer with database mutation protection and initial audit coverage for platform provisioning reconciliation and sensitive client team administration (PR #11).
-- Versioned module-owned permission registry (18 declarations) and seven module manifests, validated in CI and checked against Better Auth's static role adapter (PR #11).
+- pnpm/Turborepo monorepo with workspace CI and product/module manifest validation.
+- Better Auth email/password, sessions, verification/reset flows, organization membership and distinct platform roles.
+- Tenant registry, verified-host resolution, forced PostgreSQL RLS and tenant-aware foreign keys.
+- Client workspace administration for membership and invitations; a separate platform-owner tenant-control path.
+- Encrypted PostgreSQL notification outbox connected to Better Auth callbacks, plus a separately supervised SMTP worker.
+- Append-only audit storage and initial audit coverage for platform and client team operations.
+- Commerce product/cart/order flow with stock reservations. Development uses the mock payment path; Daraja M-Pesa STK Push and token-protected callbacks are available when configured.
+- Partial church website and ministry module for tenant profiles, editable site settings, visit planning, ministries/FAQs, curated gallery, sermons, events, campaigns, registrations, giving attempts, contact/prayer intake and newsletter opt-ins. Research and remaining public site boundaries are documented in church-ministry-website-research.md.
+- Owner/admin-only access to private ministry records. Public event/sermon pages and giving campaigns use tenant API data. Some branding and brochureware content still comes from the GMFC reference template.
 
 ## Partial modules
 
-| Module | Existing foundation | Still required |
+| Area | Implemented | Remaining work |
 |---|---|---|
-| Auth and tenant platform | Better Auth, organizations, memberships, tenant registry, tenant/platform roles and RLS; 18 module-owned permission declarations checked against Better Auth's static statement and role map | Broader platform/service permissions, platform-owner dashboard, service identities and full tenant lifecycle |
-| Client provisioning | Tenant reservation/mapping, reconciliation route and role-gated recovery | Platform configuration UI, DNS ownership proof, full custom-domain/TLS lifecycle and tenant settings |
-| Notifications | Auth callbacks await durable encrypted enqueue; enqueue and worker DB roles are separated; standalone SMTP worker and PostgreSQL role/idempotency/lease-recovery tests are merged in PR #10 | Provision roles on existing databases, generate/store production encryption key, configure verified SMTP and supervise the worker; perform live restart/recovery test; add SMS adapter, dead-letter operator UI and queue-age/dead-letter alerting |
-| Commerce | Product/cart/order foundation and mock payment flow | Product editor/variants, inventory ledger, real payments/webhooks, taxes, shipping, promotions, returns/refunds and customer portal |
-| Payments | Provider contract and mock implementation | Real Safaricom Daraja, card and optional PayPal/Paystack adapters; signature verification, reconciliation and refunds |
-| Storage | Provider-neutral storage interface and tenant object-key helper | R2/S3 adapter, media metadata, signed uploads, validation, transformations and retention |
-| Booking | Basic type and booking-window validation | Availability, resources, time zones, conflict prevention, recurring rules, reminders and cancellation |
-| Analytics | Event/sink contract and initial permission declaration | Privacy controls, event ingestion, dashboards, conversion reporting, exports and retention |
-| Audit | Append-only event contract, PostgreSQL writer, UPDATE/DELETE trigger and API INSERT-only grants; initial sensitive admin-action coverage | Permissioned audit reader, approved retention/archive policy, monitoring and wider coverage of security-sensitive actions |
-| UI | Shared Button component | Design tokens, complete component system, forms, tables, navigation, admin shell and tenant theming |
+| Tenant control plane | Tenant registry, memberships, domain challenge and reconciliation paths, owner bootstrap | Complete settings, recovery UX, domain/TLS lifecycle and production operational review |
+| Notifications | Durable auth enqueue, encrypted payloads, SMTP delivery worker and lease recovery | Configure production SMTP and key, supervise worker, prove delivery and restart recovery, add alerting and SMS |
+| Commerce and payments | Cart/order persistence, inventory reservations, local mock, Daraja STK Push, callback verification and status polling | Apply migrations 0010, validate sandbox and live merchant callbacks, reconcile missing callbacks, refunds/reversals, shipping/tax/returns |
+| Church and ministry | Tenant website profile/settings editor, service/visit details, ministry/FAQ content, curated gallery, sermons/events/campaigns, privacy acknowledgements, owner/admin private data views and event capacity checks | Newsletter delivery and user unsubscribe, uploads/media library, full CMS and sermon editing/scheduling, member/attendance/volunteer workflows, fine-grained finance/pastoral roles, tenant merchant credentials and payment reconciliation |
+| Audit | Append-only event contract/storage and initial privileged-action coverage | Permissioned reader, retention and monitoring policy, broader coverage including ministry administration |
+| Content and UI | Responsive church pages, tenant palette/hero settings, visit and ministry pages, accessible focus/form status patterns, server-rendered tenant metadata, tenant-specific robots/sitemap and published content URLs | Full page builder, automated image optimization, media storage and manual visual review across target devices |
 
-## Not yet implemented
+## Production release gates
 
-- Platform-owner admin application and complete tenant control plane.
-- Tenant module registry, dependencies, per-tenant entitlements, quotas and feature flags.
-- CMS, page builder, block library, versioned templates and visual editor.
-- Forms/lead management, contacts/CRM, newsletter campaigns and customer support desk.
-- Document vault/generation, search, SEO automation and localization.
-- Complete school, church, clinic, NGO, professional-services and ERP solution packs.
-- Production hosting/deployment provisioning, backup orchestration, restore drills and operational monitoring.
-- Commercial quote/project delivery workflows and platform subscription billing.
-- Permission-checked MCP/AI integration.
+- Set `PAYMENT_PROVIDER=mpesa`, use live Daraja credentials and `MPESA_ENVIRONMENT=production`; production startup rejects the mock and sandbox settings.
+- Apply migrations 0001–0011 with the migration role, provision the least-privilege database roles and run the production preflight.
+- Complete Safaricom sandbox checkout and donation flows, including callback retries, failed transactions and verified receipts. Confirm the callback URL and merchant setup with the live account before accepting real payments.
+- Add an operator reconciliation process for provider callbacks that never arrive. Do not treat a pending order or donation as paid.
+- Provision production notification roles, secrets and authenticated TLS SMTP; verify delivery and expired-lease recovery with the worker.
+- Complete tenant-domain verification, backup/restore exercises, observability, incident response and hosting-proxy review.
+- Review private-record access and audit coverage before onboarding ministry data.
 
-## Phase 0 status
-
-**Repository Phase 0 implementation is complete; production sign-off remains blocked.** PR #10 delivered durable authentication notification enqueue and the separately supervised worker; PR #11 delivered append-only audit storage, initial privileged-action audit coverage, the permission registry and manifest validation. PR #11's full CI run passed install, catalogue/module validation, PostgreSQL and Better Auth migrations, workspace typecheck, all unit/auth/tenant tests and full build. Before production sign-off, provision the two notification roles on the target persistent database, apply migrations 0004/0005, provide unique production secrets, configure SMTP with authentication and TLS, deploy the worker under systemd or an equivalent supervisor, and demonstrate delivery plus expired-lease recovery after a worker interruption. Review audit event coverage and approve retention/monitoring policy. Additionally, the current API contains only the mock payment adapter and intentionally refuses production startup with it; a real payment provider and verified webhook/reconciliation flow must be implemented before the full API can be released. Run `pnpm production:preflight` to verify the configured database roles/migrations and SMTP settings; it will report any remaining blockers. A green CI result does not prove production delivery or disaster recovery.
-
-## CI verification
-
-- PR #7 merged the encrypted outbox foundation.
-- PR #8 merged the permission-gated tenant provisioning reconciliation route and its tests.
-- PR #9 merged the product/solution catalogue, roadmap and read-only/non-cancelling CI hardening.
-- PR #10 merged durable authentication notifications; the final PR revision passed all CI steps including PostgreSQL migrations, Better Auth migration, typecheck, tests and full build.
-- PR #11 merged append-only audit tests, module manifest validation and role-registry consistency tests. Full CI run 42111950897 passed all 12 validation steps, including the full build.
-- PR #12 merged the release runbook/status refresh and worker timeout/batch hardening; full CI run 42112889945 passed all validation stages.
-- PR #10 adds a PostgreSQL integration suite for enqueue-role restrictions, idempotency, encrypted-at-rest payloads, concurrent claims and expired-lease recovery.
-- PR #11 tests audit serialization/redaction and verifies Better Auth role maps against module-owned permission definitions.
-
-## Production release rule
-
-A module is not production-ready because its types or interface exist. Require implementation, API/UI as appropriate, tenant/RLS proof, permission tests, operational monitoring, retention/recovery, provider failure handling and documentation. Never use the development mock payment route or development credentials for live customers.
+No production sign-off is claimed by this document. Local mock payment routes and sample template content must not be presented as live transactions or tenant-configured records.

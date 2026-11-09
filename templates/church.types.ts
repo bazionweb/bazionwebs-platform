@@ -9,6 +9,12 @@ export interface MinistryConfig {
     accentColor: string;
     heroBgUrl?: string;
   };
+  hero: {
+    eyebrow: string;
+    title: string;
+    highlightedTitle: string;
+    subtitle: string;
+  };
   contact: {
     phones: string[];
     email: string;
@@ -35,6 +41,15 @@ export interface MinistryConfig {
     instructions: string;
     suggestedAmounts: number[];
   };
+  serviceTimes: Array<{ label: string; day: string; time: string; note?: string }>;
+  locations: Array<{ name: string; address: string; mapUrl?: string }>;
+  visitorInfo: { arrival: string; children: string; accessibility: string; parking: string };
+  online: { liveStreamUrl?: string; description: string };
+  scripture: { verse: string; reference: string; version: string };
+  ministries: Array<{ title: string; description: string; audience?: string }>;
+  galleryImages: Array<{ imageUrl: string; alt: string; caption?: string }>;
+  faqs: Array<{ question: string; answer: string }>;
+  metadata: { title: string; description: string };
   vision: {
     title: string;
     statement: string;
@@ -49,7 +64,7 @@ export interface MinistryConfig {
   };
   coreValues: Array<{
     title: string;
-    icon: string;
+    icon?: string;
     description: string;
   }>;
   statementOfFaith: Array<{

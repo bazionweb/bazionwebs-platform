@@ -65,7 +65,7 @@ Fastify defaults to `TRUST_PROXY=false`. When the API runs behind a reverse prox
 
 ## Production gates
 
-Production startup requires a non-mock payment adapter, verified-domain tenant resolution, email verification, SMTP and a non-development Better Auth secret. Authentication and tenant code still require integration testing under the actual hosting proxy, email domain, cookie origin and database privileges before client data is onboarded.
+Production startup requires `PAYMENT_PROVIDER=mpesa` with live Safaricom Daraja credentials and an HTTPS callback URL, verified-domain tenant resolution, email verification, SMTP and a non-development Better Auth secret. Authentication and tenant code still require integration testing under the actual hosting proxy, email domain, cookie origin and database privileges before client data is onboarded.
 
 
 ### Better Auth schema migration version note

@@ -1,9 +1,12 @@
-import { randomBytes, randomUUID } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import type { FastifyInstance, FastifyRequest } from "fastify";
-import { and, desc, eq, ilike, sql } from "drizzle-orm";
+import { and, desc, eq, getTableColumns, ilike, or, sql } from "drizzle-orm";
 import {
   contactMessageSchema,
+  churchPublicSiteSettingsSchema,
+  churchSiteSettingsInputSchema,
   donationInitiateSchema,
+  donationCampaignInputSchema,
   eventInputSchema,
   eventRegistrationSchema,
   newsletterSubscribeSchema,
@@ -22,6 +25,8 @@ import {
   leadershipProfiles,
   ministryProfiles,
   ministrySettings,
+  tenants,
+  sermonCategories,
   sermons,
 } from "@bazion/database";
 import { requireActiveTenantPermission } from "@bazion/auth";
@@ -29,9 +34,59 @@ import type { AppConfig } from "../../config.js";
 import { withTenantTransaction, type TenantTransaction } from "../../lib/database.js";
 import { resolveTenantId } from "../../lib/tenant-resolution.js";
 import { isTenantModuleEnabled } from "../../lib/tenant-modules.js";
+import { DarajaClient, normalizeKenyanPhoneNumber } from "@bazion/payments";
 
 interface RouteOptions {
   config: AppConfig;
+}
+
+function sha256(value: string): string {
+  return createHash("sha256").update(value).digest("hex");
+}
+
+function isUuid(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+}
+
+function objectValue(value: unknown): Record<string, unknown> | null {
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null;
+}
+
+function isUniqueConstraintViolation(error: unknown, depth = 0): boolean {
+  if (depth > 4) return false;
+  const record = objectValue(error);
+  if (!record) return false;
+  return record.code === "23505" || isUniqueConstraintViolation(record.cause, depth + 1);
+}
+
+function safePublicImageUrl(value: string | null | undefined): string {
+  if (!value) return "";
+  if (value.startsWith("/") && !value.startsWith("//")) return value;
+  try { return new URL(value).protocol === "https:" ? value : ""; } catch { return ""; }
+}
+
+function safeSocialLinks(value: unknown): Record<string, string> {
+  const source = objectValue(value);
+  if (!source) return {};
+  const allowed = new Set(["youtube", "facebook", "instagram", "twitter", "whatsapp"]);
+  const links: Array<[string, string]> = [];
+  for (const [key, link] of Object.entries(source)) {
+    if (!allowed.has(key) || typeof link !== "string") continue;
+    try { if (new URL(link).protocol === "https:") links.push([key, link]); } catch { /* Ignore unsafe or malformed links. */ }
+  }
+  return Object.fromEntries(links);
+}
+
+function parseStoredSiteSettings(value: string | null | undefined) {
+  if (!value) return churchPublicSiteSettingsSchema.parse({});
+  try {
+    const parsed = churchPublicSiteSettingsSchema.safeParse(JSON.parse(value) as unknown);
+    return parsed.success ? parsed.data : churchPublicSiteSettingsSchema.parse({});
+  } catch {
+    return churchPublicSiteSettingsSchema.parse({});
+  }
 }
 
 async function assertChurchEnabled(tenantId: string): Promise<void> {
@@ -45,6 +100,7 @@ async function assertChurchEnabled(tenantId: string): Promise<void> {
 
 export async function churchRoutes(app: FastifyInstance, options: RouteOptions) {
   const { config } = options;
+  const daraja = config.mpesa ? new DarajaClient(config.mpesa) : null;
 
   // ─────────────────────────────────────────────────────────────────────────────
   // PUBLIC CHURCH ROUTES
@@ -56,6 +112,11 @@ export async function churchRoutes(app: FastifyInstance, options: RouteOptions) 
     await assertChurchEnabled(tenantId);
 
     return withTenantTransaction(tenantId, async (tx) => {
+      const [tenant] = await tx
+        .select({ slug: tenants.slug, name: tenants.name })
+        .from(tenants)
+        .where(eq(tenants.id, tenantId))
+        .limit(1);
       const [profile] = await tx
         .select()
         .from(ministryProfiles)
@@ -68,16 +129,27 @@ export async function churchRoutes(app: FastifyInstance, options: RouteOptions) 
         .where(and(eq(leadershipProfiles.tenantId, tenantId), eq(leadershipProfiles.status, "active")))
         .orderBy(leadershipProfiles.displayOrder);
 
+      const [storedSiteSettings] = await tx
+        .select({ settingValue: ministrySettings.settingValue })
+        .from(ministrySettings)
+        .where(and(eq(ministrySettings.tenantId, tenantId), eq(ministrySettings.settingKey, "public_site")))
+        .limit(1);
+      const siteSettings = storedSiteSettings?.settingValue
+        ? parseStoredSiteSettings(storedSiteSettings.settingValue)
+        : null;
+
       return reply.send({
+        tenant: tenant ?? null,
         profile: profile ?? null,
         leaders,
+        siteSettings,
       });
     });
   });
 
   // GET /v1/public/church/sermons
   app.get<{
-    Querystring: { search?: string; category?: string; limit?: string; offset?: string };
+      Querystring: { search?: string; category?: string; limit?: string; offset?: string };
   }>("/public/church/sermons", async (request, reply) => {
     const tenantId = await resolveTenantId(request.hostname, config);
     await assertChurchEnabled(tenantId);
@@ -94,10 +166,17 @@ export async function churchRoutes(app: FastifyInstance, options: RouteOptions) 
           sql`(${ilike(sermons.title, `%${search}%`)} or ${ilike(sermons.speaker, `%${search}%`)})`
         );
       }
+      if (request.query.category?.trim()) {
+        conditions = and(conditions, ilike(sermonCategories.name, request.query.category.trim()))!;
+      }
 
       const items = await tx
-        .select()
+        .select({ ...getTableColumns(sermons), category: sermonCategories.name })
         .from(sermons)
+        .leftJoin(sermonCategories, and(
+          eq(sermonCategories.id, sermons.categoryId),
+          eq(sermonCategories.tenantId, tenantId),
+        ))
         .where(conditions)
         .orderBy(desc(sermons.publishedAt), desc(sermons.createdAt))
         .limit(limit)
@@ -106,6 +185,10 @@ export async function churchRoutes(app: FastifyInstance, options: RouteOptions) 
       const countRows = await tx
         .select({ total: sql<number>`count(*)::int` })
         .from(sermons)
+        .leftJoin(sermonCategories, and(
+          eq(sermonCategories.id, sermons.categoryId),
+          eq(sermonCategories.tenantId, tenantId),
+        ))
         .where(conditions);
 
       const total = countRows[0]?.total ?? 0;
@@ -163,13 +246,13 @@ export async function churchRoutes(app: FastifyInstance, options: RouteOptions) 
       const filter = request.query.filter ?? "all";
 
       return withTenantTransaction(tenantId, async (tx) => {
-        const conditions = [eq(churchEvents.tenantId, tenantId)];
+        const conditions = [eq(churchEvents.tenantId, tenantId), sql`${churchEvents.status} <> 'cancelled'`];
         const now = new Date();
 
         if (filter === "upcoming") {
-          conditions.push(sql`${churchEvents.startsAt} >= ${now}`);
+          conditions.push(and(eq(churchEvents.status, "upcoming"), sql`${churchEvents.startsAt} >= ${now}`)!);
         } else if (filter === "past") {
-          conditions.push(sql`${churchEvents.startsAt} < ${now}`);
+          conditions.push(or(eq(churchEvents.status, "completed"), sql`${churchEvents.startsAt} < ${now}`)!);
         }
 
         const events = await tx
@@ -193,7 +276,11 @@ export async function churchRoutes(app: FastifyInstance, options: RouteOptions) 
       const [event] = await tx
         .select()
         .from(churchEvents)
-        .where(and(eq(churchEvents.tenantId, tenantId), eq(churchEvents.slug, request.params.slug)))
+        .where(and(
+          eq(churchEvents.tenantId, tenantId),
+          eq(churchEvents.slug, request.params.slug),
+          sql`${churchEvents.status} <> 'cancelled'`,
+        ))
         .limit(1);
 
       if (!event) {
@@ -221,20 +308,34 @@ export async function churchRoutes(app: FastifyInstance, options: RouteOptions) 
           .select()
           .from(churchEvents)
           .where(and(eq(churchEvents.tenantId, tenantId), eq(churchEvents.id, request.params.eventId)))
+          .for("update")
           .limit(1);
 
         if (!event) {
           return reply.code(404).send({ error: "EVENT_NOT_FOUND", message: "Event not found." });
         }
 
-        if (!event.registrationEnabled) {
+        if (!event.registrationEnabled || event.status !== "upcoming" || event.startsAt <= new Date()) {
           return reply
-            .code(400)
-            .send({ error: "REGISTRATION_CLOSED", message: "Registration is not enabled for this event." });
+            .code(409)
+            .send({ error: "REGISTRATION_CLOSED", message: "Registration is closed for this event." });
         }
 
-        // Generate clean unique confirmation reference
-        const refCode = `GMFC-REG-${randomBytes(3).toString("hex").toUpperCase()}`;
+        if (event.registrationCapacity !== null) {
+          const [registrationCount] = await tx
+            .select({ total: sql<number>`count(*)::int` })
+            .from(churchEventRegistrations)
+            .where(and(
+              eq(churchEventRegistrations.tenantId, tenantId),
+              eq(churchEventRegistrations.eventId, event.id),
+              eq(churchEventRegistrations.status, "confirmed"),
+            ));
+          if ((registrationCount?.total ?? 0) >= event.registrationCapacity) {
+            return reply.code(409).send({ error: "EVENT_FULL", message: "Registration capacity has been reached." });
+          }
+        }
+
+        const refCode = `REG-${randomBytes(8).toString("hex").toUpperCase()}`;
 
         const [regRecord] = await tx
           .insert(churchEventRegistrations)
@@ -246,6 +347,7 @@ export async function churchRoutes(app: FastifyInstance, options: RouteOptions) 
             telephone: parsed.data.telephone,
             registrationReference: refCode,
             status: "confirmed",
+            consentAt: new Date(),
           })
           .returning();
 
@@ -272,7 +374,12 @@ export async function churchRoutes(app: FastifyInstance, options: RouteOptions) 
       const items = await tx
         .select()
         .from(donationCampaigns)
-        .where(and(eq(donationCampaigns.tenantId, tenantId), eq(donationCampaigns.status, "active")))
+        .where(and(
+          eq(donationCampaigns.tenantId, tenantId),
+          eq(donationCampaigns.status, "active"),
+          or(sql`${donationCampaigns.startsAt} is null`, sql`${donationCampaigns.startsAt} <= now()`),
+          or(sql`${donationCampaigns.endsAt} is null`, sql`${donationCampaigns.endsAt} > now()`),
+        ))
         .orderBy(desc(donationCampaigns.createdAt));
 
       return reply.send({ campaigns: items });
@@ -283,57 +390,251 @@ export async function churchRoutes(app: FastifyInstance, options: RouteOptions) 
   app.post("/public/church/donations/mpesa-stk", async (request, reply) => {
     const tenantId = await resolveTenantId(request.hostname, config);
     await assertChurchEnabled(tenantId);
-
-    const parsed = donationInitiateSchema.safeParse(request.body);
-    if (!parsed.success) {
-      return reply.code(400).send({ error: "VALIDATION_ERROR", details: parsed.error.issues });
+    if (!daraja) {
+      return reply.code(503).send({ error: "PAYMENT_PROVIDER_UNAVAILABLE", message: "Online M-Pesa giving is not configured. Use the displayed Paybill instructions instead." });
     }
 
-    const amountMinor = Math.round(parsed.data.amount * 100);
-    const checkoutRequestId = `ws_CO_${Date.now()}_${randomBytes(4).toString("hex")}`;
-    const merchantRequestId = `MERCH_${randomBytes(4).toString("hex")}`;
+    const parsed = donationInitiateSchema.safeParse(request.body);
+    if (!parsed.success) return reply.code(400).send({ error: "VALIDATION_ERROR", details: parsed.error.issues });
+    const idempotencyKey = request.headers["idempotency-key"];
+    const statusToken = request.headers["x-donation-status-token"];
+    if (typeof idempotencyKey !== "string" || !/^[A-Za-z0-9_-]{16,160}$/.test(idempotencyKey) ||
+        typeof statusToken !== "string" || !/^[A-Za-z0-9_-]{32,160}$/.test(statusToken)) {
+      return reply.code(400).send({ error: "INVALID_PAYMENT_REFERENCE", message: "A valid payment idempotency key and status token are required." });
+    }
 
-    return withTenantTransaction(tenantId, async (tx) => {
-      const [donation] = await tx
-        .insert(churchDonations)
-        .values({
-          tenantId,
-          campaignId: parsed.data.campaignId,
-          donorName: parsed.data.donorName,
-          donorEmail: parsed.data.donorEmail,
-          donorPhone: parsed.data.phoneNumber,
-          amountMinor,
-          currency: "KES",
-          givingCategory: parsed.data.givingCategory,
-          paymentMethod: "M-Pesa",
-          paymentStatus: "pending",
-        })
-        .returning();
+    let phoneNumber: string;
+    try {
+      phoneNumber = normalizeKenyanPhoneNumber(parsed.data.phoneNumber);
+    } catch (error) {
+      return reply.code(400).send({ error: "INVALID_PHONE_NUMBER", message: error instanceof Error ? error.message : "Enter a valid Kenyan mobile number." });
+    }
 
-      if (!donation) {
-        throw Object.assign(new Error("Failed to initiate donation record."), { statusCode: 500 });
+    const amountMinor = parsed.data.amount * 100;
+    const callbackToken = randomBytes(32).toString("base64url");
+    const callbackTokenHash = sha256(callbackToken);
+    const statusTokenHash = sha256(statusToken);
+    const persisted = await withTenantTransaction(tenantId, async (tx) => {
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`donation-init:${tenantId}:${idempotencyKey}`}, 0))`);
+      const [existing] = await tx
+        .select({ donationId: churchPaymentTransactions.donationId, transactionStatus: churchPaymentTransactions.transactionStatus, statusTokenHash: churchPaymentTransactions.statusTokenHash })
+        .from(churchPaymentTransactions)
+        .where(and(eq(churchPaymentTransactions.tenantId, tenantId), eq(churchPaymentTransactions.idempotencyKey, idempotencyKey)))
+        .limit(1);
+      if (existing) return { ...existing, created: false };
+
+      if (parsed.data.campaignId) {
+        const [campaign] = await tx.select({ id: donationCampaigns.id }).from(donationCampaigns).where(and(
+          eq(donationCampaigns.tenantId, tenantId),
+          eq(donationCampaigns.id, parsed.data.campaignId),
+          eq(donationCampaigns.status, "active"),
+          or(sql`${donationCampaigns.startsAt} is null`, sql`${donationCampaigns.startsAt} <= now()`),
+          or(sql`${donationCampaigns.endsAt} is null`, sql`${donationCampaigns.endsAt} > now()`),
+        )).for("update").limit(1);
+        if (!campaign) throw Object.assign(new Error("This giving campaign is no longer active."), { statusCode: 400, code: "CAMPAIGN_NOT_ACTIVE" });
       }
+
+      const [donation] = await tx.insert(churchDonations).values({
+        tenantId,
+        campaignId: parsed.data.campaignId,
+        donorName: parsed.data.anonymous ? null : parsed.data.donorName ?? null,
+        donorEmail: parsed.data.anonymous ? null : parsed.data.donorEmail ?? null,
+        donorPhone: `+${phoneNumber}`,
+        amountMinor,
+        currency: "KES",
+        givingCategory: parsed.data.givingCategory,
+        paymentMethod: "M-Pesa",
+        paymentStatus: "pending",
+        anonymous: parsed.data.anonymous,
+        consentAt: new Date(),
+      }).returning({ id: churchDonations.id });
+      if (!donation) throw Object.assign(new Error("Could not create the donation record."), { statusCode: 500 });
 
       await tx.insert(churchPaymentTransactions).values({
         tenantId,
         donationId: donation.id,
-        provider: "mpesa-equity",
-        checkoutRequestId,
-        merchantRequestId,
+        provider: "mpesa-daraja",
         amountMinor,
         currency: "KES",
         transactionStatus: "pending",
+        callbackTokenHash,
+        statusTokenHash,
+        idempotencyKey,
       });
-
-      return reply.send({
-        success: true,
-        checkoutRequestId,
-        merchantRequestId,
-        donationId: donation.id,
-        status: "pending",
-        message: "M-Pesa STK push initiated. Please check your phone to enter your PIN.",
-      });
+      return { donationId: donation.id, transactionStatus: "pending", statusTokenHash, created: true };
     });
+
+    if (persisted.statusTokenHash !== statusTokenHash) {
+      return reply.code(409).send({ error: "IDEMPOTENCY_KEY_REUSED", message: "This payment key belongs to another attempt." });
+    }
+    if (!persisted.created) {
+      return reply.code(200).send({ success: true, donationId: persisted.donationId, status: persisted.transactionStatus, reused: true });
+    }
+
+    const callbackUrl = new URL(config.mpesa!.callbackUrl);
+    callbackUrl.pathname = "/v1/public/church/donations/mpesa-callback";
+    callbackUrl.search = "";
+    callbackUrl.hash = "";
+    callbackUrl.searchParams.set("tenantId", tenantId);
+    callbackUrl.searchParams.set("token", callbackToken);
+    try {
+      const providerResult = await daraja.initiateStkPush({
+        amountKes: parsed.data.amount,
+        phoneNumber,
+        accountReference: persisted.donationId.replace(/-/g, "").slice(0, 12),
+        transactionDescription: parsed.data.givingCategory,
+        callbackUrl: callbackUrl.toString(),
+      });
+      await withTenantTransaction(tenantId, async (tx) => {
+        await tx.update(churchPaymentTransactions).set({
+          checkoutRequestId: providerResult.checkoutRequestId,
+          merchantRequestId: providerResult.merchantRequestId,
+        }).where(and(
+          eq(churchPaymentTransactions.tenantId, tenantId),
+          eq(churchPaymentTransactions.donationId, persisted.donationId),
+          eq(churchPaymentTransactions.idempotencyKey, idempotencyKey),
+        ));
+      });
+      return reply.code(202).send({
+        success: true,
+        donationId: persisted.donationId,
+        status: "pending",
+        message: "Safaricom accepted the payment request. Approve it on your phone; the donation is not confirmed until the callback arrives.",
+      });
+    } catch (error) {
+      if (error && typeof error === "object" && "deliveryState" in error && error.deliveryState === "not_sent") {
+        await withTenantTransaction(tenantId, async (tx) => {
+          await tx.update(churchPaymentTransactions).set({ transactionStatus: "failed", callbackTokenHash: null })
+            .where(and(eq(churchPaymentTransactions.tenantId, tenantId), eq(churchPaymentTransactions.donationId, persisted.donationId)));
+          await tx.update(churchDonations).set({ paymentStatus: "failed" })
+            .where(and(eq(churchDonations.tenantId, tenantId), eq(churchDonations.id, persisted.donationId)));
+        });
+        return reply.code(502).send({ error: "PAYMENT_REQUEST_REJECTED", message: error instanceof Error ? error.message : "Safaricom rejected the payment request." });
+      }
+      return reply.code(202).send({
+        success: true,
+        donationId: persisted.donationId,
+        status: "pending",
+        message: "The provider response is delayed. Check your phone and use the payment status check before trying again.",
+      });
+    }
+  });
+
+  // Provider callback. The per-attempt capability token is stored only as a hash.
+  app.post<{ Querystring: { tenantId?: string; token?: string } }>("/public/church/donations/mpesa-callback", async (request, reply) => {
+    const tenantId = request.query.tenantId ?? "";
+    const token = request.query.token ?? "";
+    if (!isUuid(tenantId) || !/^[A-Za-z0-9_-]{40,64}$/.test(token)) return reply.code(404).send({ error: "CALLBACK_NOT_FOUND" });
+    const body = objectValue(request.body);
+    const stkCallback = objectValue(objectValue(body?.Body)?.stkCallback);
+    const checkoutRequestId = stkCallback?.CheckoutRequestID;
+    const merchantRequestId = stkCallback?.MerchantRequestID;
+    const rawResultCode = stkCallback?.ResultCode;
+    const resultCode = typeof rawResultCode === "number" ? rawResultCode
+      : typeof rawResultCode === "string" && /^-?\d+$/.test(rawResultCode) ? Number(rawResultCode) : Number.NaN;
+    if (typeof checkoutRequestId !== "string" || typeof merchantRequestId !== "string" || !Number.isInteger(resultCode)) {
+      return reply.code(400).send({ error: "INVALID_PAYMENT_CALLBACK" });
+    }
+    const items = objectValue(stkCallback?.CallbackMetadata)?.Item;
+    const metadata = new Map<string, unknown>();
+    if (Array.isArray(items)) {
+      for (const item of items) {
+        const entry = objectValue(item);
+        if (typeof entry?.Name === "string") metadata.set(entry.Name, entry.Value);
+      }
+    }
+
+    return withTenantTransaction(tenantId, async (tx) => {
+      const [payment] = await tx.select({
+        donationId: churchPaymentTransactions.donationId,
+        campaignId: churchDonations.campaignId,
+        transactionStatus: churchPaymentTransactions.transactionStatus,
+        checkoutRequestId: churchPaymentTransactions.checkoutRequestId,
+        merchantRequestId: churchPaymentTransactions.merchantRequestId,
+        amountMinor: churchPaymentTransactions.amountMinor,
+        donorPhone: churchDonations.donorPhone,
+      }).from(churchPaymentTransactions)
+        .innerJoin(churchDonations, and(
+          eq(churchDonations.id, churchPaymentTransactions.donationId),
+          eq(churchDonations.tenantId, churchPaymentTransactions.tenantId),
+        ))
+        .where(and(
+          eq(churchPaymentTransactions.tenantId, tenantId),
+          eq(churchPaymentTransactions.callbackTokenHash, sha256(token)),
+        ))
+        .for("update")
+        .limit(1);
+      if (!payment) return reply.code(404).send({ error: "CALLBACK_NOT_FOUND" });
+      if ((payment.checkoutRequestId && payment.checkoutRequestId !== checkoutRequestId) ||
+          (payment.merchantRequestId && payment.merchantRequestId !== merchantRequestId)) {
+        return reply.code(409).send({ error: "CALLBACK_REFERENCE_MISMATCH" });
+      }
+      if (payment.transactionStatus !== "pending") return reply.send({ ResultCode: 0, ResultDesc: "Already processed" });
+
+      if (resultCode === 0) {
+        const amountMinor = Math.round(Number(metadata.get("Amount")) * 100);
+        const callbackPhone = metadata.get("PhoneNumber");
+        const receipt = metadata.get("MpesaReceiptNumber");
+        let normalizedCallbackPhone = "";
+        try { normalizedCallbackPhone = normalizeKenyanPhoneNumber(String(callbackPhone ?? "")); } catch { /* checked below */ }
+        const expectedPhone = payment.donorPhone ? normalizeKenyanPhoneNumber(payment.donorPhone) : "";
+        if (!Number.isSafeInteger(amountMinor) || amountMinor !== payment.amountMinor ||
+            normalizedCallbackPhone !== expectedPhone || typeof receipt !== "string" || !receipt.trim()) {
+          return reply.code(400).send({ error: "PAYMENT_CALLBACK_VALIDATION_FAILED" });
+        }
+        await tx.update(churchPaymentTransactions).set({
+          transactionStatus: "succeeded",
+          providerReference: receipt.trim().slice(0, 160),
+          verifiedAt: new Date(),
+          checkoutRequestId,
+          merchantRequestId,
+          rawCallbackJson: { resultCode, amountMinor, receipt: receipt.trim().slice(0, 160) },
+        }).where(and(eq(churchPaymentTransactions.tenantId, tenantId), eq(churchPaymentTransactions.donationId, payment.donationId)));
+        await tx.update(churchDonations).set({ paymentStatus: "verified" })
+          .where(and(eq(churchDonations.tenantId, tenantId), eq(churchDonations.id, payment.donationId)));
+        if (payment.campaignId) {
+          await tx.update(donationCampaigns).set({
+            raisedAmountMinor: sql`${donationCampaigns.raisedAmountMinor} + ${payment.amountMinor}`,
+            updatedAt: new Date(),
+          }).where(and(eq(donationCampaigns.tenantId, tenantId), eq(donationCampaigns.id, payment.campaignId)));
+        }
+      } else {
+        await tx.update(churchPaymentTransactions).set({
+          transactionStatus: "failed",
+          checkoutRequestId,
+          merchantRequestId,
+          rawCallbackJson: { resultCode },
+        }).where(and(eq(churchPaymentTransactions.tenantId, tenantId), eq(churchPaymentTransactions.donationId, payment.donationId)));
+        await tx.update(churchDonations).set({ paymentStatus: "failed" })
+          .where(and(eq(churchDonations.tenantId, tenantId), eq(churchDonations.id, payment.donationId)));
+      }
+      return reply.send({ ResultCode: 0, ResultDesc: "Accepted" });
+    });
+  });
+
+  // Status lookup uses a client-held capability token and returns no donor data.
+  app.get("/public/church/donations/status", async (request, reply) => {
+    const tenantId = await resolveTenantId(request.hostname, config);
+    await assertChurchEnabled(tenantId);
+    const token = request.headers["x-donation-status-token"];
+    if (typeof token !== "string" || !/^[A-Za-z0-9_-]{32,160}$/.test(token)) return reply.code(400).send({ error: "INVALID_STATUS_TOKEN" });
+    const [payment] = await withTenantTransaction(tenantId, (tx) => tx.select({
+      donationId: churchPaymentTransactions.donationId,
+      status: churchPaymentTransactions.transactionStatus,
+      paymentStatus: churchDonations.paymentStatus,
+      providerReference: churchPaymentTransactions.providerReference,
+    }).from(churchPaymentTransactions)
+      .innerJoin(churchDonations, and(
+        eq(churchDonations.id, churchPaymentTransactions.donationId),
+        eq(churchDonations.tenantId, churchPaymentTransactions.tenantId),
+      ))
+      .where(and(
+        eq(churchPaymentTransactions.tenantId, tenantId),
+        eq(churchPaymentTransactions.statusTokenHash, sha256(token)),
+      ))
+      .limit(1));
+    if (!payment) return reply.code(404).send({ error: "PAYMENT_STATUS_NOT_FOUND" });
+    return reply.send({ donationId: payment.donationId, status: payment.status, paymentStatus: payment.paymentStatus, providerReference: payment.providerReference });
   });
 
   // POST /v1/public/church/contact
@@ -356,6 +657,7 @@ export async function churchRoutes(app: FastifyInstance, options: RouteOptions) 
         message: parsed.data.message,
         category: parsed.data.category ?? "General Enquiry",
         status: "new",
+        consentAt: new Date(),
       });
 
       return reply.code(201).send({
@@ -384,6 +686,7 @@ export async function churchRoutes(app: FastifyInstance, options: RouteOptions) 
         requestText: parsed.data.requestText,
         privacyPreference: parsed.data.privacyPreference ?? "confidential",
         status: "received",
+        consentAt: new Date(),
       });
 
       return reply.code(201).send({
@@ -415,7 +718,7 @@ export async function churchRoutes(app: FastifyInstance, options: RouteOptions) 
 
       return reply.send({
         success: true,
-        message: "You are successfully subscribed to Global Mission updates and devotionals.",
+        message: "Your email preference has been saved for ministry updates.",
       });
     });
   });
@@ -423,6 +726,161 @@ export async function churchRoutes(app: FastifyInstance, options: RouteOptions) 
   // ─────────────────────────────────────────────────────────────────────────────
   // PROTECTED CHURCH ADMIN ROUTES
   // ─────────────────────────────────────────────────────────────────────────────
+
+  // GET /v1/admin/church/site-settings
+  app.get("/admin/church/site-settings", async (request, reply) => {
+    const context = await requireActiveTenantPermission(request.raw.headers, { store: ["read"] });
+    await assertChurchEnabled(context.tenantId);
+
+    return withTenantTransaction(context.tenantId, async (tx) => {
+      const [tenant] = await tx.select({ name: tenants.name }).from(tenants).where(eq(tenants.id, context.tenantId)).limit(1);
+      const [profile] = await tx.select().from(ministryProfiles).where(eq(ministryProfiles.tenantId, context.tenantId)).limit(1);
+      const [storedSettings] = await tx.select({ settingValue: ministrySettings.settingValue }).from(ministrySettings)
+        .where(and(eq(ministrySettings.tenantId, context.tenantId), eq(ministrySettings.settingKey, "public_site"))).limit(1);
+      const leaders = await tx.select().from(leadershipProfiles)
+        .where(and(eq(leadershipProfiles.tenantId, context.tenantId), eq(leadershipProfiles.status, "active")))
+        .orderBy(leadershipProfiles.displayOrder);
+      const settings = parseStoredSiteSettings(storedSettings?.settingValue);
+      if (!storedSettings?.settingValue) {
+        settings.leadership = leaders.map((leader) => ({
+          name: leader.name,
+          role: leader.position,
+          bio: leader.biography ?? undefined,
+          photoUrl: safePublicImageUrl(leader.photoUrl) || undefined,
+        }));
+      }
+
+      return reply.send({
+        profile: {
+          ministryName: profile?.ministryName ?? tenant?.name ?? context.tenantName,
+          tagline: profile?.description ?? "",
+          logoUrl: safePublicImageUrl(profile?.logoAssetUrl),
+          vision: profile?.vision ?? "",
+          mission: profile?.mission ?? "",
+          outreach: profile?.outreach ?? "",
+          contact: {
+            address: profile?.address ?? "",
+            email: profile?.email ?? "",
+            phones: Array.isArray(profile?.telephoneNumbers) ? profile.telephoneNumbers.filter((phone): phone is string => typeof phone === "string") : [],
+          },
+          social: safeSocialLinks(profile?.socialLinks),
+        },
+        settings,
+      });
+    });
+  });
+
+  // PUT /v1/admin/church/site-settings
+  app.put("/admin/church/site-settings", async (request, reply) => {
+    const context = await requireActiveTenantPermission(request.raw.headers, { store: ["update"] });
+    await assertChurchEnabled(context.tenantId);
+
+    const parsed = churchSiteSettingsInputSchema.safeParse(request.body);
+    if (!parsed.success) return reply.code(400).send({ error: "VALIDATION_ERROR", details: parsed.error.issues });
+    const { profile, settings } = parsed.data;
+    const updatedAt = new Date();
+
+    await withTenantTransaction(context.tenantId, async (tx) => {
+      await tx.insert(ministryProfiles).values({
+        tenantId: context.tenantId,
+        ministryName: profile.ministryName,
+        logoAssetUrl: profile.logoUrl || null,
+        description: profile.tagline,
+        vision: profile.vision,
+        mission: profile.mission,
+        outreach: profile.outreach,
+        address: profile.contact.address,
+        email: profile.contact.email || null,
+        telephoneNumbers: profile.contact.phones,
+        socialLinks: profile.social,
+        updatedAt,
+      }).onConflictDoUpdate({
+        target: ministryProfiles.tenantId,
+        set: {
+          ministryName: profile.ministryName,
+          logoAssetUrl: profile.logoUrl || null,
+          description: profile.tagline,
+          vision: profile.vision,
+          mission: profile.mission,
+          outreach: profile.outreach,
+          address: profile.contact.address,
+          email: profile.contact.email || null,
+          telephoneNumbers: profile.contact.phones,
+          socialLinks: profile.social,
+          updatedAt,
+        },
+      });
+
+      const settingValue = JSON.stringify(settings);
+      await tx.insert(ministrySettings).values({
+        tenantId: context.tenantId,
+        settingKey: "public_site",
+        settingValue,
+        updatedAt,
+      }).onConflictDoUpdate({
+        target: [ministrySettings.tenantId, ministrySettings.settingKey],
+        set: { settingValue, updatedAt },
+      });
+    });
+
+    return reply.send({ success: true, updatedAt: updatedAt.toISOString() });
+  });
+
+  // GET /v1/admin/church/campaigns
+  app.get("/admin/church/campaigns", async (request, reply) => {
+    const context = await requireActiveTenantPermission(request.raw.headers, { store: ["read"] });
+    await assertChurchEnabled(context.tenantId);
+    return withTenantTransaction(context.tenantId, async (tx) => {
+      const campaigns = await tx.select().from(donationCampaigns)
+        .where(eq(donationCampaigns.tenantId, context.tenantId))
+        .orderBy(desc(donationCampaigns.createdAt));
+      return reply.send({ campaigns });
+    });
+  });
+
+  // POST /v1/admin/church/campaigns
+  app.post("/admin/church/campaigns", async (request, reply) => {
+    const context = await requireActiveTenantPermission(request.raw.headers, { store: ["update"] });
+    await assertChurchEnabled(context.tenantId);
+    const parsed = donationCampaignInputSchema.safeParse(request.body);
+    if (!parsed.success) return reply.code(400).send({ error: "VALIDATION_ERROR", details: parsed.error.issues });
+
+    try {
+      return await withTenantTransaction(context.tenantId, async (tx) => {
+        const [campaign] = await tx.insert(donationCampaigns).values({
+          tenantId: context.tenantId,
+          title: parsed.data.title,
+          slug: parsed.data.slug,
+          description: parsed.data.description,
+          targetAmountMinor: parsed.data.targetAmountKsh * 100,
+          currency: "KES",
+          startsAt: parsed.data.startsAt ? new Date(parsed.data.startsAt) : null,
+          endsAt: parsed.data.endsAt ? new Date(parsed.data.endsAt) : null,
+          status: parsed.data.status,
+        }).returning();
+        return reply.code(201).send({ campaign });
+      });
+    } catch (error) {
+      if (isUniqueConstraintViolation(error)) return reply.code(409).send({ error: "CAMPAIGN_SLUG_EXISTS", message: "A campaign with this URL slug already exists. Choose another slug." });
+      throw error;
+    }
+  });
+
+  // PATCH /v1/admin/church/campaigns/:id/status
+  app.patch<{ Params: { id: string }; Body: { status: "active" | "paused" | "completed" } }>("/admin/church/campaigns/:id/status", async (request, reply) => {
+    const context = await requireActiveTenantPermission(request.raw.headers, { store: ["update"] });
+    await assertChurchEnabled(context.tenantId);
+    const status = request.body?.status;
+    if (!status || !["active", "paused", "completed"].includes(status)) {
+      return reply.code(400).send({ error: "INVALID_STATUS", message: "Choose active, paused, or completed." });
+    }
+    const [updated] = await withTenantTransaction(context.tenantId, (tx) => tx.update(donationCampaigns)
+      .set({ status, updatedAt: new Date() })
+      .where(and(eq(donationCampaigns.tenantId, context.tenantId), eq(donationCampaigns.id, request.params.id)))
+      .returning({ id: donationCampaigns.id }));
+    if (!updated) return reply.code(404).send({ error: "CAMPAIGN_NOT_FOUND", message: "Campaign not found." });
+    return reply.send({ success: true });
+  });
 
   // GET /v1/admin/church/overview
   app.get("/admin/church/overview", async (request, reply) => {
@@ -451,7 +909,7 @@ export async function churchRoutes(app: FastifyInstance, options: RouteOptions) 
           totalRaisedMinor: sql<number>`coalesce(sum(${churchDonations.amountMinor}), 0)::bigint`,
         })
         .from(churchDonations)
-        .where(eq(churchDonations.tenantId, context.tenantId));
+        .where(and(eq(churchDonations.tenantId, context.tenantId), eq(churchDonations.paymentStatus, "verified")));
 
       const [prayerRow] = await tx
         .select({ pendingPrayers: sql<number>`count(*)::int` })
@@ -511,25 +969,30 @@ export async function churchRoutes(app: FastifyInstance, options: RouteOptions) 
       return reply.code(400).send({ error: "VALIDATION_ERROR", details: parsed.error.issues });
     }
 
-    return withTenantTransaction(context.tenantId, async (tx) => {
-      const [newSermon] = await tx
-        .insert(sermons)
-        .values({
-          tenantId: context.tenantId,
-          title: parsed.data.title,
-          slug: parsed.data.slug,
-          description: parsed.data.description,
-          speaker: parsed.data.speaker,
-          youtubeVideoId: parsed.data.youtubeVideoId,
-          thumbnailUrl: parsed.data.thumbnailUrl,
-          scriptureReference: parsed.data.scriptureReference,
-          publishedAt: parsed.data.publishedAt ? new Date(parsed.data.publishedAt) : new Date(),
-          status: parsed.data.status ?? "published",
-        })
-        .returning();
+    try {
+      return await withTenantTransaction(context.tenantId, async (tx) => {
+        const [newSermon] = await tx
+          .insert(sermons)
+          .values({
+            tenantId: context.tenantId,
+            title: parsed.data.title,
+            slug: parsed.data.slug,
+            description: parsed.data.description,
+            speaker: parsed.data.speaker,
+            youtubeVideoId: parsed.data.youtubeVideoId,
+            thumbnailUrl: parsed.data.thumbnailUrl,
+            scriptureReference: parsed.data.scriptureReference,
+            publishedAt: parsed.data.publishedAt ? new Date(parsed.data.publishedAt) : new Date(),
+            status: parsed.data.status ?? "published",
+          })
+          .returning();
 
-      return reply.code(201).send({ sermon: newSermon });
-    });
+        return reply.code(201).send({ sermon: newSermon });
+      });
+    } catch (error) {
+      if (isUniqueConstraintViolation(error)) return reply.code(409).send({ error: "SERMON_SLUG_EXISTS", message: "A sermon with this URL slug already exists. Choose another slug." });
+      throw error;
+    }
   });
 
   // DELETE /v1/admin/church/sermons/:id
@@ -544,6 +1007,22 @@ export async function churchRoutes(app: FastifyInstance, options: RouteOptions) 
 
       return reply.send({ success: true });
     });
+  });
+
+  // PATCH /v1/admin/church/sermons/:id/status
+  app.patch<{ Params: { id: string }; Body: { status: "draft" | "published" | "archived" } }>("/admin/church/sermons/:id/status", async (request, reply) => {
+    const context = await requireActiveTenantPermission(request.raw.headers, { store: ["update"] });
+    await assertChurchEnabled(context.tenantId);
+    const status = request.body?.status;
+    if (!status || !["draft", "published", "archived"].includes(status)) {
+      return reply.code(400).send({ error: "INVALID_STATUS", message: "Choose draft, published, or archived." });
+    }
+    const [updated] = await withTenantTransaction(context.tenantId, (tx) => tx.update(sermons)
+      .set({ status, publishedAt: status === "published" ? new Date() : null, updatedAt: new Date() })
+      .where(and(eq(sermons.tenantId, context.tenantId), eq(sermons.id, request.params.id)))
+      .returning({ id: sermons.id }));
+    if (!updated) return reply.code(404).send({ error: "SERMON_NOT_FOUND", message: "Sermon not found." });
+    return reply.send({ success: true });
   });
 
   // GET /v1/admin/church/events
@@ -572,26 +1051,31 @@ export async function churchRoutes(app: FastifyInstance, options: RouteOptions) 
       return reply.code(400).send({ error: "VALIDATION_ERROR", details: parsed.error.issues });
     }
 
-    return withTenantTransaction(context.tenantId, async (tx) => {
-      const [newEvent] = await tx
-        .insert(churchEvents)
-        .values({
-          tenantId: context.tenantId,
-          title: parsed.data.title,
-          slug: parsed.data.slug,
-          description: parsed.data.description,
-          venue: parsed.data.venue,
-          address: parsed.data.address,
-          startsAt: new Date(parsed.data.startsAt),
-          endsAt: parsed.data.endsAt ? new Date(parsed.data.endsAt) : null,
-          registrationCapacity: parsed.data.registrationCapacity,
-          registrationEnabled: parsed.data.registrationEnabled ?? true,
-          status: parsed.data.status ?? "upcoming",
-        })
-        .returning();
+    try {
+      return await withTenantTransaction(context.tenantId, async (tx) => {
+        const [newEvent] = await tx
+          .insert(churchEvents)
+          .values({
+            tenantId: context.tenantId,
+            title: parsed.data.title,
+            slug: parsed.data.slug,
+            description: parsed.data.description,
+            venue: parsed.data.venue,
+            address: parsed.data.address,
+            startsAt: new Date(parsed.data.startsAt),
+            endsAt: parsed.data.endsAt ? new Date(parsed.data.endsAt) : null,
+            registrationCapacity: parsed.data.registrationCapacity,
+            registrationEnabled: parsed.data.registrationEnabled ?? true,
+            status: parsed.data.status ?? "upcoming",
+          })
+          .returning();
 
-      return reply.code(201).send({ event: newEvent });
-    });
+        return reply.code(201).send({ event: newEvent });
+      });
+    } catch (error) {
+      if (isUniqueConstraintViolation(error)) return reply.code(409).send({ error: "EVENT_SLUG_EXISTS", message: "An event with this URL slug already exists. Choose another slug." });
+      throw error;
+    }
   });
 
   // DELETE /v1/admin/church/events/:id
@@ -608,9 +1092,25 @@ export async function churchRoutes(app: FastifyInstance, options: RouteOptions) 
     });
   });
 
+  // PATCH /v1/admin/church/events/:id/status
+  app.patch<{ Params: { id: string }; Body: { status: "upcoming" | "in_progress" | "completed" | "cancelled" } }>("/admin/church/events/:id/status", async (request, reply) => {
+    const context = await requireActiveTenantPermission(request.raw.headers, { store: ["update"] });
+    await assertChurchEnabled(context.tenantId);
+    const status = request.body?.status;
+    if (!status || !["upcoming", "in_progress", "completed", "cancelled"].includes(status)) {
+      return reply.code(400).send({ error: "INVALID_STATUS", message: "Choose a valid event status." });
+    }
+    const [updated] = await withTenantTransaction(context.tenantId, (tx) => tx.update(churchEvents)
+      .set({ status, updatedAt: new Date() })
+      .where(and(eq(churchEvents.tenantId, context.tenantId), eq(churchEvents.id, request.params.id)))
+      .returning({ id: churchEvents.id }));
+    if (!updated) return reply.code(404).send({ error: "EVENT_NOT_FOUND", message: "Event not found." });
+    return reply.send({ success: true });
+  });
+
   // GET /v1/admin/church/registrations
   app.get("/admin/church/registrations", async (request, reply) => {
-    const context = await requireActiveTenantPermission(request.raw.headers, { store: ["read"] });
+    const context = await requireActiveTenantPermission(request.raw.headers, { churchprivate: ["read"] });
     await assertChurchEnabled(context.tenantId);
 
     return withTenantTransaction(context.tenantId, async (tx) => {
@@ -634,9 +1134,20 @@ export async function churchRoutes(app: FastifyInstance, options: RouteOptions) 
     });
   });
 
+  // DELETE /v1/admin/church/registrations/:id allows the ministry to fulfill removal requests.
+  app.delete<{ Params: { id: string } }>("/admin/church/registrations/:id", async (request, reply) => {
+    const context = await requireActiveTenantPermission(request.raw.headers, { churchprivate: ["update"] });
+    await assertChurchEnabled(context.tenantId);
+    const [deleted] = await withTenantTransaction(context.tenantId, (tx) => tx.delete(churchEventRegistrations)
+      .where(and(eq(churchEventRegistrations.tenantId, context.tenantId), eq(churchEventRegistrations.id, request.params.id)))
+      .returning({ id: churchEventRegistrations.id }));
+    if (!deleted) return reply.code(404).send({ error: "REGISTRATION_NOT_FOUND", message: "Registration not found." });
+    return reply.send({ success: true });
+  });
+
   // GET /v1/admin/church/donations
   app.get("/admin/church/donations", async (request, reply) => {
-    const context = await requireActiveTenantPermission(request.raw.headers, { store: ["read"] });
+    const context = await requireActiveTenantPermission(request.raw.headers, { churchprivate: ["read"] });
     await assertChurchEnabled(context.tenantId);
 
     return withTenantTransaction(context.tenantId, async (tx) => {
@@ -652,7 +1163,7 @@ export async function churchRoutes(app: FastifyInstance, options: RouteOptions) 
 
   // GET /v1/admin/church/prayers
   app.get("/admin/church/prayers", async (request, reply) => {
-    const context = await requireActiveTenantPermission(request.raw.headers, { store: ["read"] });
+    const context = await requireActiveTenantPermission(request.raw.headers, { churchprivate: ["read"] });
     await assertChurchEnabled(context.tenantId);
 
     return withTenantTransaction(context.tenantId, async (tx) => {
@@ -670,7 +1181,7 @@ export async function churchRoutes(app: FastifyInstance, options: RouteOptions) 
   app.patch<{ Params: { id: string }; Body: { status: "received" | "prayed_for" } }>(
     "/admin/church/prayers/:id/status",
     async (request, reply) => {
-      const context = await requireActiveTenantPermission(request.raw.headers, { store: ["update"] });
+      const context = await requireActiveTenantPermission(request.raw.headers, { churchprivate: ["update"] });
       await assertChurchEnabled(context.tenantId);
 
       const status = request.body?.status;
@@ -694,9 +1205,20 @@ export async function churchRoutes(app: FastifyInstance, options: RouteOptions) 
     }
   );
 
+  // DELETE /v1/admin/church/prayers/:id allows the ministry to fulfill removal requests.
+  app.delete<{ Params: { id: string } }>("/admin/church/prayers/:id", async (request, reply) => {
+    const context = await requireActiveTenantPermission(request.raw.headers, { churchprivate: ["update"] });
+    await assertChurchEnabled(context.tenantId);
+    const [deleted] = await withTenantTransaction(context.tenantId, (tx) => tx.delete(churchPrayerRequests)
+      .where(and(eq(churchPrayerRequests.tenantId, context.tenantId), eq(churchPrayerRequests.id, request.params.id)))
+      .returning({ id: churchPrayerRequests.id }));
+    if (!deleted) return reply.code(404).send({ error: "PRAYER_REQUEST_NOT_FOUND", message: "Prayer request not found." });
+    return reply.send({ success: true });
+  });
+
   // GET /v1/admin/church/messages
   app.get("/admin/church/messages", async (request, reply) => {
-    const context = await requireActiveTenantPermission(request.raw.headers, { store: ["read"] });
+    const context = await requireActiveTenantPermission(request.raw.headers, { churchprivate: ["read"] });
     await assertChurchEnabled(context.tenantId);
 
     return withTenantTransaction(context.tenantId, async (tx) => {
@@ -714,7 +1236,7 @@ export async function churchRoutes(app: FastifyInstance, options: RouteOptions) 
   app.patch<{ Params: { id: string }; Body: { status: "new" | "reviewed" | "archived" } }>(
     "/admin/church/messages/:id/status",
     async (request, reply) => {
-      const context = await requireActiveTenantPermission(request.raw.headers, { store: ["update"] });
+      const context = await requireActiveTenantPermission(request.raw.headers, { churchprivate: ["update"] });
       await assertChurchEnabled(context.tenantId);
 
       const status = request.body?.status;
@@ -737,4 +1259,39 @@ export async function churchRoutes(app: FastifyInstance, options: RouteOptions) 
       });
     }
   );
+
+  // DELETE /v1/admin/church/messages/:id allows the ministry to fulfill removal requests.
+  app.delete<{ Params: { id: string } }>("/admin/church/messages/:id", async (request, reply) => {
+    const context = await requireActiveTenantPermission(request.raw.headers, { churchprivate: ["update"] });
+    await assertChurchEnabled(context.tenantId);
+    const [deleted] = await withTenantTransaction(context.tenantId, (tx) => tx.delete(churchContactMessages)
+      .where(and(eq(churchContactMessages.tenantId, context.tenantId), eq(churchContactMessages.id, request.params.id)))
+      .returning({ id: churchContactMessages.id }));
+    if (!deleted) return reply.code(404).send({ error: "MESSAGE_NOT_FOUND", message: "Enquiry not found." });
+    return reply.send({ success: true });
+  });
+
+  // GET /v1/admin/church/newsletter
+  app.get("/admin/church/newsletter", async (request, reply) => {
+    const context = await requireActiveTenantPermission(request.raw.headers, { churchprivate: ["read"] });
+    await assertChurchEnabled(context.tenantId);
+    return withTenantTransaction(context.tenantId, async (tx) => {
+      const subscribers = await tx.select({ id: churchNewsletterSubscribers.id, email: churchNewsletterSubscribers.email, consentAt: churchNewsletterSubscribers.consentAt, status: churchNewsletterSubscribers.status })
+        .from(churchNewsletterSubscribers)
+        .where(eq(churchNewsletterSubscribers.tenantId, context.tenantId))
+        .orderBy(desc(churchNewsletterSubscribers.createdAt));
+      return reply.send({ subscribers });
+    });
+  });
+
+  // DELETE /v1/admin/church/newsletter/:id processes an email opt-out or deletion request.
+  app.delete<{ Params: { id: string } }>("/admin/church/newsletter/:id", async (request, reply) => {
+    const context = await requireActiveTenantPermission(request.raw.headers, { churchprivate: ["update"] });
+    await assertChurchEnabled(context.tenantId);
+    const [deleted] = await withTenantTransaction(context.tenantId, (tx) => tx.delete(churchNewsletterSubscribers)
+      .where(and(eq(churchNewsletterSubscribers.tenantId, context.tenantId), eq(churchNewsletterSubscribers.id, request.params.id)))
+      .returning({ id: churchNewsletterSubscribers.id }));
+    if (!deleted) return reply.code(404).send({ error: "NEWSLETTER_SUBSCRIBER_NOT_FOUND", message: "Subscriber not found." });
+    return reply.send({ success: true });
+  });
 }

@@ -1,0 +1,46 @@
+{
+  "id": "church-ministry",
+  "name": "Church and ministry public content and operations",
+  "version": "1.0.0",
+  "owner": "church-ministry",
+  "status": "partial",
+  "entrypoints": {
+    "api": "apps/api/src/modules/church",
+    "ui": "apps/storefront/app"
+  },
+  "tenantModel": "tenant-owned",
+  "permissions": [
+    {
+      "resource": "churchprivate",
+      "actions": ["read", "update"]
+    }
+  ],
+  "tables": [
+    { "name": "ministry_profiles", "owner": "church-ministry", "tenantScoped": true, "rls": "forced", "migration": "0008_church_ministry_domain.sql" },
+    { "name": "ministry_settings", "owner": "church-ministry", "tenantScoped": true, "rls": "forced", "migration": "0008_church_ministry_domain.sql" },
+    { "name": "leadership_profiles", "owner": "church-ministry", "tenantScoped": true, "rls": "forced", "migration": "0008_church_ministry_domain.sql" },
+    { "name": "sermon_categories", "owner": "church-ministry", "tenantScoped": true, "rls": "forced", "migration": "0008_church_ministry_domain.sql" },
+    { "name": "sermons", "owner": "church-ministry", "tenantScoped": true, "rls": "forced", "migration": "0008_church_ministry_domain.sql" },
+    { "name": "church_events", "owner": "church-ministry", "tenantScoped": true, "rls": "forced", "migration": "0008_church_ministry_domain.sql" },
+    { "name": "church_event_registrations", "owner": "church-ministry", "tenantScoped": true, "rls": "forced", "migration": "0008_church_ministry_domain.sql" },
+    { "name": "donation_campaigns", "owner": "church-ministry", "tenantScoped": true, "rls": "forced", "migration": "0008_church_ministry_domain.sql" },
+    { "name": "church_donations", "owner": "church-ministry", "tenantScoped": true, "rls": "forced", "migration": "0008_church_ministry_domain.sql" },
+    { "name": "church_payment_transactions", "owner": "church-ministry", "tenantScoped": true, "rls": "forced", "migration": "0009_church_integrity_and_payment_callbacks.sql" },
+    { "name": "church_contact_messages", "owner": "church-ministry", "tenantScoped": true, "rls": "forced", "migration": "0008_church_ministry_domain.sql" },
+    { "name": "church_prayer_requests", "owner": "church-ministry", "tenantScoped": true, "rls": "forced", "migration": "0008_church_ministry_domain.sql" },
+    { "name": "church_newsletter_subscribers", "owner": "church-ministry", "tenantScoped": true, "rls": "forced", "migration": "0008_church_ministry_domain.sql" }
+  ],
+  "providers": ["Safaricom Daraja M-Pesa STK Push for donations; requires merchant credentials and provider callback verification"],
+  "dependencies": ["platform-identity"],
+  "operations": {
+    "logs": true,
+    "metrics": false,
+    "retention": "Donation, attendee, contact and prayer-request retention requires a tenant policy aligned with applicable privacy and accounting requirements.",
+    "recovery": "Restore tenant-scoped records from verified backups; reconcile pending Daraja callbacks before treating donations as complete.",
+    "enableDisable": "Disable public forms and donation initiation before disabling this module; retain authorized export and retention controls."
+  },
+  "events": [],
+  "jobs": [],
+  "tests": ["apps/api/src/modules/church"],
+  "docs": ["docs/church-ministry-platform.md"]
+}

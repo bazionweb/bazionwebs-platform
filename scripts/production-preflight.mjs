@@ -32,5 +32,5 @@ if (failed) {
   process.stderr.write("\nProduction preflight is BLOCKED. Correct every reported issue before enabling production traffic.\n");
   process.exitCode = 1;
 } else {
-  process.stdout.write("\nProduction environment, database and SMTP preflight passed. This does not replace a real payment-provider implementation or a staged worker-interruption recovery test.\n");
+  process.stdout.write("\nProduction environment, database and SMTP preflight passed. This does not replace a staged Daraja checkout/callback validation, a worker-interruption recovery test or a backup restore exercise.\n");
 }

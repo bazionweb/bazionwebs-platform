@@ -6,9 +6,10 @@ import {
   ChurchFooter,
   PageHero,
 } from "@bazion/ui";
-import { globalMissionConfig } from "../../../../templates/global-mission.config";
+import { useMinistrySite } from "../../lib/use-ministry-site";
 
 export default function ContactPage() {
+  const site = useMinistrySite();
   const [submitted, setSubmitted] = useState(false);
   const [category, setCategory] = useState("General Enquiry");
   const [name, setName] = useState("");
@@ -17,47 +18,54 @@ export default function ContactPage() {
   const [subject, setSubject] = useState("");
   const [message, setMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [privacyConsent, setPrivacyConsent] = useState(false);
+  const [submissionError, setSubmissionError] = useState("");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSubmissionError("");
     setIsSubmitting(true);
     try {
       const isPrayer = category === "Prayer Request";
       const endpoint = isPrayer ? "/v1/public/church/prayer-requests" : "/v1/public/church/contact";
       const payload = isPrayer
-        ? { fullName: name, email, telephone: phone, requestText: message, privacyPreference: "confidential" }
-        : { fullName: name, email, telephone: phone, subject, message, category };
+        ? { fullName: name, email: email.trim() || undefined, telephone: phone.trim() || undefined, requestText: message, privacyPreference: "confidential", privacyConsent: true }
+        : { fullName: name, email, telephone: phone, subject, message, category, privacyConsent: true };
 
-      await fetch(endpoint, {
+      const response = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-    } catch {
-      // Graceful offline fallback
+      const result = await response.json().catch(() => null);
+      if (!response.ok || result?.success !== true) {
+        throw new Error(typeof result?.message === "string" ? result.message : "Your message could not be submitted. Please try again.");
+      }
+      setSubmitted(true);
+    } catch (reason) {
+      setSubmissionError(reason instanceof Error ? reason.message : "Your message could not be submitted. Please try again.");
     } finally {
       setIsSubmitting(false);
-      setSubmitted(true);
     }
   };
 
   return (
     <>
       <ChurchNav
-        ministryName={globalMissionConfig.ministryName}
-        logoUrl={globalMissionConfig.branding.logoUrl}
+        ministryName={site.ministryName}
+        logoUrl={site.branding.logoUrl}
         currentPath="/contact"
         giveHref="/give"
       />
 
-      <main>
+      <main id="main-content">
         {/* 1. Page Hero */}
         <PageHero
           eyebrow="COMMUNICATION & PRAYER"
           title="Get in Touch with"
           highlightedTitle="Our Ministry"
           subtitle="Have a question, prayer request, testimony, or want to invite us for a mission? We would love to hear from you."
-          bgImageUrl={globalMissionConfig.branding.heroBgUrl}
+          bgImageUrl={site.branding.heroBgUrl}
         />
 
         {/* 2. Contact Details & Form */}
@@ -74,7 +82,7 @@ export default function ContactPage() {
                 </p>
 
                 <div style={{ display: "grid", gap: "20px" }}>
-                  <div
+                  {site.contact.phones.length > 0 && <div
                     style={{
                       background: "var(--church-bg-alt)",
                       padding: "20px",
@@ -85,14 +93,14 @@ export default function ContactPage() {
                     <div style={{ fontSize: "12px", fontWeight: 700, color: "var(--church-accent)", textTransform: "uppercase" }}>
                       Telephone & Hotlines
                     </div>
-                    {globalMissionConfig.contact.phones.map((phone) => (
+                    {site.contact.phones.map((phone) => (
                       <div key={phone} style={{ fontSize: "16px", fontWeight: 600, marginTop: "6px" }}>
                         📞 <a href={`tel:${phone}`} style={{ color: "var(--church-primary)", textDecoration: "none" }}>{phone}</a>
                       </div>
                     ))}
-                  </div>
+                  </div>}
 
-                  <div
+                  {site.contact.email && <div
                     style={{
                       background: "var(--church-bg-alt)",
                       padding: "20px",
@@ -104,13 +112,13 @@ export default function ContactPage() {
                       Email Address
                     </div>
                     <div style={{ fontSize: "16px", fontWeight: 600, marginTop: "6px" }}>
-                      ✉️ <a href={`mailto:${globalMissionConfig.contact.email}`} style={{ color: "var(--church-primary)", textDecoration: "none" }}>
-                        {globalMissionConfig.contact.email}
+                      ✉️ <a href={`mailto:${site.contact.email}`} style={{ color: "var(--church-primary)", textDecoration: "none" }}>
+                        {site.contact.email}
                       </a>
                     </div>
-                  </div>
+                  </div>}
 
-                  <div
+                  {site.contact.address && <div
                     style={{
                       background: "var(--church-bg-alt)",
                       padding: "20px",
@@ -122,20 +130,21 @@ export default function ContactPage() {
                       Postal & Physical Address
                     </div>
                     <div style={{ fontSize: "15px", color: "var(--church-text)", marginTop: "6px" }}>
-                      📍 {globalMissionConfig.contact.address}
+                      📍 {site.contact.address}
                     </div>
-                  </div>
+                  </div>}
 
                   {/* Direct WhatsApp Action */}
-                  <a
-                    href={globalMissionConfig.social.whatsapp}
+                  {site.social.whatsapp && <a
+                    href={site.social.whatsapp}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="ch-btn ch-btn-accent"
                     style={{ padding: "16px", fontSize: "16px", justifyContent: "center" }}
                   >
                     Chat With Us on WhatsApp 💬
-                  </a>
+                  </a>}
+                  {!site.contact.phones.length && !site.contact.email && !site.contact.address && !site.social.whatsapp && <p>Direct contact details have not been published yet. Use the message form and the ministry team will receive your enquiry.</p>}
                 </div>
               </div>
 
@@ -156,14 +165,15 @@ export default function ContactPage() {
                       Thank You!
                     </h3>
                     <p style={{ fontSize: "15px", color: "var(--church-text-muted)", lineHeight: 1.6 }}>
-                      Your message / prayer request has been received. Our intercessors and ministry
-                      team will pray over it and respond promptly if requested.
+                      {category === "Prayer Request"
+                        ? "Your request has been received and will be available to authorized ministry prayer staff."
+                        : "Your message has been received by the ministry team."}
                     </p>
                     <button
                       type="button"
                       className="ch-btn ch-btn-outline"
                       style={{ marginTop: "20px" }}
-                      onClick={() => setSubmitted(false)}
+                      onClick={() => { setSubmitted(false); setPrivacyConsent(false); }}
                     >
                       Send Another Message
                     </button>
@@ -179,12 +189,13 @@ export default function ContactPage() {
                     </h3>
 
                     <div>
-                      <label style={{ display: "block", fontSize: "13px", fontWeight: 600, marginBottom: "6px" }}>
+                      <label htmlFor="contact-category" style={{ display: "block", fontSize: "13px", fontWeight: 600, marginBottom: "6px" }}>
                         Category *
                       </label>
                       <select
+                        id="contact-category"
                         value={category}
-                        onChange={(e) => setCategory(e.target.value)}
+                        onChange={(e) => { setCategory(e.target.value); setPrivacyConsent(false); setSubmissionError(""); }}
                         style={{
                           width: "100%",
                           padding: "10px 12px",
@@ -203,13 +214,18 @@ export default function ContactPage() {
                       </select>
                     </div>
 
+                    {submissionError && <p className="ch-form-error" role="alert">{submissionError}</p>}
+
                     <div>
-                      <label style={{ display: "block", fontSize: "13px", fontWeight: 600, marginBottom: "6px" }}>
+                      <label htmlFor="contact-name" style={{ display: "block", fontSize: "13px", fontWeight: 600, marginBottom: "6px" }}>
                         Full Name *
                       </label>
                       <input
+                        id="contact-name"
                         type="text"
                         required
+                        minLength={2}
+                        maxLength={160}
                         value={name}
                         onChange={(e) => setName(e.target.value)}
                         placeholder="e.g. John Doe"
@@ -223,14 +239,23 @@ export default function ContactPage() {
                       />
                     </div>
 
+                    <label style={{ display: "flex", alignItems: "flex-start", gap: 10, fontSize: 13, lineHeight: 1.6 }}>
+                      <input type="checkbox" required checked={privacyConsent} onChange={(event) => setPrivacyConsent(event.target.checked)} style={{ marginTop: 3, minWidth: 18, minHeight: 18 }} />
+                      <span>{category === "Prayer Request"
+                        ? "I agree to share this prayer request with authorized ministry prayer staff."
+                        : "I agree that the ministry may use these details to respond to my enquiry."} Read the <a href="/privacy">privacy notice</a>.</span>
+                    </label>
+
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
                       <div>
-                        <label style={{ display: "block", fontSize: "13px", fontWeight: 600, marginBottom: "6px" }}>
-                          Email Address *
+                        <label htmlFor="contact-email" style={{ display: "block", fontSize: "13px", fontWeight: 600, marginBottom: "6px" }}>
+                          {category === "Prayer Request" ? "Email Address (optional)" : "Email Address *"}
                         </label>
                         <input
+                          id="contact-email"
                           type="email"
-                          required
+                          required={category !== "Prayer Request"}
+                          maxLength={254}
                           value={email}
                           onChange={(e) => setEmail(e.target.value)}
                           placeholder="e.g. john@example.com"
@@ -244,10 +269,11 @@ export default function ContactPage() {
                         />
                       </div>
                       <div>
-                        <label style={{ display: "block", fontSize: "13px", fontWeight: 600, marginBottom: "6px" }}>
+                        <label htmlFor="contact-phone" style={{ display: "block", fontSize: "13px", fontWeight: 600, marginBottom: "6px" }}>
                           Telephone
                         </label>
                         <input
+                          id="contact-phone"
                           type="tel"
                           value={phone}
                           onChange={(e) => setPhone(e.target.value)}
@@ -263,13 +289,16 @@ export default function ContactPage() {
                       </div>
                     </div>
 
-                    <div>
-                      <label style={{ display: "block", fontSize: "13px", fontWeight: 600, marginBottom: "6px" }}>
+                    {category !== "Prayer Request" && <div>
+                      <label htmlFor="contact-subject" style={{ display: "block", fontSize: "13px", fontWeight: 600, marginBottom: "6px" }}>
                         Subject *
                       </label>
                       <input
+                        id="contact-subject"
                         type="text"
                         required
+                        minLength={2}
+                        maxLength={200}
                         value={subject}
                         onChange={(e) => setSubject(e.target.value)}
                         placeholder="Brief summary of your message..."
@@ -281,14 +310,17 @@ export default function ContactPage() {
                           fontSize: "14px",
                         }}
                       />
-                    </div>
+                    </div>}
 
                     <div>
-                      <label style={{ display: "block", fontSize: "13px", fontWeight: 600, marginBottom: "6px" }}>
+                      <label htmlFor="contact-message" style={{ display: "block", fontSize: "13px", fontWeight: 600, marginBottom: "6px" }}>
                         {category === "Prayer Request" ? "Your Prayer Request *" : "Message *"}
                       </label>
                       <textarea
+                        id="contact-message"
                         required
+                        minLength={10}
+                        maxLength={5000}
                         rows={5}
                         value={message}
                         onChange={(e) => setMessage(e.target.value)}
@@ -325,10 +357,11 @@ export default function ContactPage() {
       </main>
 
       <ChurchFooter
-        ministryName={globalMissionConfig.ministryName}
-        phoneNumbers={globalMissionConfig.contact.phones}
-        email={globalMissionConfig.contact.email}
-        address={globalMissionConfig.contact.address}
+        ministryName={site.ministryName}
+        tagline={site.tagline}
+        phoneNumbers={site.contact.phones}
+        email={site.contact.email}
+        address={site.contact.address}
       />
     </>
   );

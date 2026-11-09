@@ -2,7 +2,7 @@
 
 An ownership-first, modular platform for building and operating reusable websites and client applications. The repository is a **modular monorepo / modular monolith**: shared domain packages, a Fastify API, a Next.js tenant-facing application, PostgreSQL and provider adapters. It is deliberately not split into microservices before there is a measured need.
 
-> **Current maturity:** platform foundation and commerce starter. Authentication, organization membership, tenant isolation and the client workspace administration foundation are implemented. Commerce and integrations remain partial. The mock payment flow is development-only and must never process real money.
+> **Current maturity:** modular platform foundation with partial commerce and church modules. Tenant isolation, Better Auth, the client workspace and durable authentication notifications are implemented. Safaricom Daraja checkout and church donation callbacks are wired, but they still need sandbox and merchant-account validation; the storefront's GMFC branding and brochureware remain template-configured.
 
 ## Product catalogue and roadmap
 
@@ -21,9 +21,10 @@ Do not create one package per advertised capability. Build reusable domain modul
 - Tenant registry and organization-to-tenant mapping; trusted server-side tenant context and verified-host lookup.
 - PostgreSQL forced RLS, tenant-aware relationships, least-privilege application/auth/resolver/provisioner roles and cross-tenant integration tests.
 - Client workspace /admin with tenant-scoped metrics, member listing, invitations and membership management.
-- Foundational commerce domain and API: product listing, guest carts, checkout order creation and development-only mock payment.
+- Foundational commerce domain and API: product listing, guest carts, checkout order creation, a development-only mock adapter and a Daraja M-Pesa STK Push adapter with token-protected callbacks and inventory settlement.
 - Provider ports for payment, object storage, notifications, booking and analytics.
-- Encrypted PostgreSQL notification outbox foundation with idempotency, atomic claims, lease recovery, retry/backoff and dead-letter controls. The outbox is not yet connected to Better Auth callbacks or a supervised delivery worker.
+- Encrypted PostgreSQL notification outbox connected to Better Auth verification/reset/invitation callbacks, with idempotency, atomic claims, lease recovery, retry/backoff, dead-letter controls and a separate supervised SMTP worker.
+- Partial church module with tenant-scoped sermon, event, registration, campaign, donation, prayer-request and contact records, plus owner/admin-protected ministry operations.
 - pnpm 12 workspace, Turborepo, committed lockfile and GitHub Actions validation.
 
 ## Technology choices
@@ -87,9 +88,9 @@ The repository CI runs a frozen dependency install, starts PostgreSQL with least
 - Connect Better Auth verification, reset-password and invitation callbacks to the durable outbox; run a supervised worker and split notification DB roles.
 - Complete tenant provisioning reconciliation and custom-domain ownership verification (DNS challenge, TLS lifecycle, redirects and UI). See PR #8 for the reconciliation endpoint under review.
 - Build platform-owner administration, module registry, tenant entitlements, settings and audit tools. This is separate from the client workspace dashboard.
-- Replace mock payments with real provider adapters, authenticated callbacks/webhook inbox, reconciliation, refunds and failure handling.
+- Validate Daraja callbacks against the Safaricom sandbox and live merchant account; add callback-loss reconciliation, refunds and payment reversals. Production startup requires `PAYMENT_PROVIDER=mpesa`, live Daraja credentials and an HTTPS callback base URL; the mock remains development-only.
 - Complete product variants, stock ledger, shipping, taxes, promotions and returns.
-- Build the website/content/page-builder, forms, media library and solution packs in the roadmap.
+- Finish tenant-configured public branding/content, the website/page-builder, forms, media library and solution packs in the roadmap.
 - Add production backups/restore drills, observability, incident response and deployment automation.
 
 Do not use the mock payment endpoint, demo secrets or static development tenant settings for real customers or money.

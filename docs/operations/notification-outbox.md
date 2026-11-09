@@ -114,7 +114,7 @@ The database preflight connects as each declared role, verifies that the two num
 
 **A green preflight is not a substitute for a test message or a worker-interruption recovery test.** Send a controlled test email and prove the five-minute lease recovery in staging before production.
 
-The preflight also intentionally reports a blocker for the current API: only the mock payment provider is implemented, and the API rejects mock payments in production. A real payment adapter and authenticated webhook/reconciliation tests must be merged before the full production API can pass its production gate. Do not weaken that safeguard or claim production sign-off while it is reported as a blocker.
+The preflight also blocks production while `PAYMENT_PROVIDER=mock`. A Daraja adapter now exists; production requires live credentials and an HTTPS callback endpoint, and the sandbox/live callback lifecycle still needs staged validation. Callback-loss reconciliation and refunds remain incomplete. Do not weaken the mock safeguard or claim production sign-off without those checks.
 
 ## Production worker deployment (systemd example)
 
