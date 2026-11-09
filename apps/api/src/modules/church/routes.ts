@@ -35,9 +35,34 @@ import { withTenantTransaction, type TenantTransaction } from "../../lib/databas
 import { resolveTenantId } from "../../lib/tenant-resolution.js";
 import { isTenantModuleEnabled } from "../../lib/tenant-modules.js";
 import { DarajaClient, normalizeKenyanPhoneNumber } from "@bazion/payments";
+import { buildTenantObjectKey, createObjectStorage, type ObjectStorage } from "@bazion/storage";
 
 interface RouteOptions {
   config: AppConfig;
+  storage?: ObjectStorage;
+}
+
+const MEDIA_UPLOAD_LIMIT_BYTES = 8 * 1024 * 1024;
+const mediaTypeExtension: Record<string, string> = {
+  "image/avif": ".avif",
+  "image/jpeg": ".jpg",
+  "image/png": ".png",
+  "image/webp": ".webp",
+};
+
+function detectedImageType(bytes: Buffer): string | undefined {
+  if (bytes.length >= 8 && bytes.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return "image/png";
+  if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return "image/jpeg";
+  if (bytes.length >= 12 && bytes.toString("ascii", 0, 4) === "RIFF" && bytes.toString("ascii", 8, 12) === "WEBP") return "image/webp";
+  if (bytes.length >= 12 && bytes.toString("ascii", 4, 8) === "ftyp" && ["avif", "avis"].includes(bytes.toString("ascii", 8, 12))) return "image/avif";
+  return undefined;
+}
+
+function safeMediaFilename(value: string | undefined, extension: string): string {
+  const basename = (value ?? "image").replaceAll("\\", "/").split("/").pop() ?? "image";
+  const name = basename.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 100);
+  const stem = name.replace(/\.[^.]*$/, "").slice(0, 80) || "image";
+  return `${stem}${extension}`;
 }
 
 function sha256(value: string): string {
@@ -101,10 +126,32 @@ async function assertChurchEnabled(tenantId: string): Promise<void> {
 export async function churchRoutes(app: FastifyInstance, options: RouteOptions) {
   const { config } = options;
   const daraja = config.mpesa ? new DarajaClient(config.mpesa) : null;
+  const mediaStorageConfig = config.mediaStorage ?? { driver: "local" as const };
+  const storage = options.storage ?? createObjectStorage({
+    driver: mediaStorageConfig.driver,
+    ...(mediaStorageConfig.localDirectory ? { localDirectory: mediaStorageConfig.localDirectory } : {}),
+    ...(mediaStorageConfig.s3 ? { s3: mediaStorageConfig.s3 } : {}),
+  });
 
   // ─────────────────────────────────────────────────────────────────────────────
   // PUBLIC CHURCH ROUTES
   // ─────────────────────────────────────────────────────────────────────────────
+
+  // Local development media is served through the same tenant host and public API rewrite.
+  // In production, image URLs point to the configured public storage/CDN domain.
+  app.get<{ Params: { "*": string } }>("/public/church/media/*", async (request, reply) => {
+    const tenantId = await resolveTenantId(request.hostname, config);
+    const key = request.params["*"];
+    if (!key.startsWith(`${tenantId}/`)) return reply.code(404).send({ error: "MEDIA_NOT_FOUND" });
+    const stored = await storage.getObject({ tenantId, key });
+    if (!stored) return reply.code(404).send({ error: "MEDIA_NOT_FOUND" });
+    return reply
+      .header("Content-Type", stored.contentType)
+      .header("Content-Length", String(stored.sizeBytes))
+      .header("Cache-Control", "public, max-age=31536000, immutable")
+      .header("X-Content-Type-Options", "nosniff")
+      .send(stored.body);
+  });
 
   // GET /v1/public/church/site
   app.get("/public/church/site", async (request, reply) => {
@@ -726,6 +773,45 @@ export async function churchRoutes(app: FastifyInstance, options: RouteOptions) 
   // ─────────────────────────────────────────────────────────────────────────────
   // PROTECTED CHURCH ADMIN ROUTES
   // ─────────────────────────────────────────────────────────────────────────────
+
+  // GET /v1/admin/church/media
+  app.get("/admin/church/media", async (request, reply) => {
+    const context = await requireActiveTenantPermission(request.raw.headers, { store: ["read"] });
+    await assertChurchEnabled(context.tenantId);
+    const items = await storage.listObjects({ tenantId: context.tenantId, limit: 100 });
+    return reply.send({ items });
+  });
+
+  // POST /v1/admin/church/media
+  app.post<{ Querystring: { filename?: string; contentType?: string } }>("/admin/church/media", { bodyLimit: MEDIA_UPLOAD_LIMIT_BYTES }, async (request, reply) => {
+    const context = await requireActiveTenantPermission(request.raw.headers, { store: ["update"] });
+    await assertChurchEnabled(context.tenantId);
+    const bytes = request.body;
+    if (!Buffer.isBuffer(bytes) || bytes.byteLength === 0) {
+      return reply.code(400).send({ error: "MEDIA_EMPTY", message: "Choose an image file to upload." });
+    }
+    if (bytes.byteLength > MEDIA_UPLOAD_LIMIT_BYTES) {
+      return reply.code(413).send({ error: "MEDIA_TOO_LARGE", message: "Images must be 8 MB or smaller." });
+    }
+    const declaredType = request.query.contentType?.trim().toLowerCase() ?? "";
+    const actualType = detectedImageType(bytes);
+    if (!actualType || actualType !== declaredType || !mediaTypeExtension[actualType]) {
+      return reply.code(415).send({ error: "UNSUPPORTED_MEDIA_TYPE", message: "Upload a valid JPEG, PNG, WebP, or AVIF image." });
+    }
+
+    const filename = safeMediaFilename(request.query.filename, mediaTypeExtension[actualType]);
+    const key = buildTenantObjectKey(context.tenantId, randomBytes(16).toString("hex"), filename);
+    await storage.putObject({ tenantId: context.tenantId, key, body: bytes, contentType: actualType });
+    return reply.code(201).send({
+      asset: {
+        key,
+        url: storage.publicUrl(key),
+        contentType: actualType,
+        sizeBytes: bytes.byteLength,
+        lastModified: new Date().toISOString(),
+      },
+    });
+  });
 
   // GET /v1/admin/church/site-settings
   app.get("/admin/church/site-settings", async (request, reply) => {

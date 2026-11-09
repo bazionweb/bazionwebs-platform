@@ -16,6 +16,7 @@
     "@bazion/commerce-domain": "workspace:*",
     "@bazion/database": "workspace:*",
     "@bazion/payments": "workspace:*",
+    "@bazion/storage": "workspace:*",
     "@fastify/cors": "^11.4.0",
     "@fastify/helmet": "^13.2.0",
     "@fastify/rate-limit": "^11.2.1",

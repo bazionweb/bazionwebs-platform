@@ -30,6 +30,11 @@ export type CheckoutInput = z.infer<typeof checkoutSchema>;
 
 // ─── Church & Ministry Domain Schemas ──────────────────────────────────────────
 
+const publicHttpsUrlSchema = z.string().trim().max(2048).refine((value) => {
+  if (value.startsWith("/") && !value.startsWith("//")) return true;
+  try { return new URL(value).protocol === "https:"; } catch { return false; }
+}, "Use an HTTPS link or a site-relative path.");
+
 export const sermonInputSchema = z.object({
   title: z.string().trim().min(3).max(200),
   slug: z.string().trim().min(3).max(140).regex(/^[a-z0-9-]+$/),
@@ -37,7 +42,7 @@ export const sermonInputSchema = z.object({
   description: z.string().trim().max(5000).optional(),
   categoryId: z.string().uuid().optional(),
   youtubeVideoId: z.string().trim().min(5).max(64).optional(),
-  thumbnailUrl: z.string().url().optional(),
+  thumbnailUrl: publicHttpsUrlSchema.optional(),
   scriptureReference: z.string().trim().max(160).optional(),
   publishedAt: z.string().datetime().optional(),
   status: z.enum(["draft", "published", "archived"]).default("published"),
@@ -48,7 +53,7 @@ export const eventInputSchema = z.object({
   title: z.string().trim().min(3).max(200),
   slug: z.string().trim().min(3).max(140).regex(/^[a-z0-9-]+$/),
   description: z.string().trim().max(5000).optional(),
-  posterUrl: z.string().url().optional(),
+  posterUrl: publicHttpsUrlSchema.optional(),
   venue: z.string().trim().max(180).optional(),
   address: z.string().trim().max(500).optional(),
   startsAt: z.string().datetime(),
@@ -132,11 +137,6 @@ export const newsletterSubscribeSchema = z.object({
   consent: z.literal(true),
 });
 export type NewsletterSubscribeInput = z.infer<typeof newsletterSubscribeSchema>;
-
-const publicHttpsUrlSchema = z.string().trim().max(2048).refine((value) => {
-  if (value.startsWith("/") && !value.startsWith("//")) return true;
-  try { return new URL(value).protocol === "https:"; } catch { return false; }
-}, "Use an HTTPS link or a site-relative path.");
 
 const publicExternalUrlSchema = z.string().trim().max(2048).url().refine((value) => {
   try { return new URL(value).protocol === "https:"; } catch { return false; }

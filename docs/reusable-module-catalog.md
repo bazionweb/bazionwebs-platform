@@ -47,7 +47,7 @@ Build capabilities once and assemble client products with tenant configuration, 
 | [ ] | Page builder and block library | Schema-driven reusable sections, layouts, responsive variants, preview, validated configuration and safe custom fields. |
 | [ ] | Template catalogue | Versioned corporate, ecommerce, school, church and booking templates with manifests, previews, compatibility and upgrade strategy. |
 | [~] | Design system | A basic Button exists. Build tokens, typography, forms, tables, navigation, dashboard shell, accessibility states and tenant themes. |
-| [~] | Media and document storage | Storage interface and tenant object-key helper exist. Add provider adapters, metadata, signed uploads, MIME/size validation, transformations, retention and deletion. |
+| [~] | Media and document storage | Local development and S3-compatible adapters, tenant-scoped image upload/list APIs, file-signature checks and size limits exist. Add image transformations, durable asset metadata, retention/usage controls and guarded deletion. |
 | [ ] | SEO and site discovery | Metadata, canonical URLs, redirects, sitemap, robots, structured data, social previews and image alt text. |
 | [ ] | Forms and lead capture | Form schema/builder, validation, consent, spam protection, submissions, exports, autoresponders and routing. |
 | [ ] | Search | Tenant-filtered search, indexing/reindexing, ranking and autocomplete. Start with PostgreSQL before adding another service. |

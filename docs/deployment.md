@@ -8,7 +8,7 @@
 - **Full-stack Next.js:** choose a runtime that supports the app's server features. Cloudflare now recommends vinext for new Next.js-on-Workers work, but its documentation still labels vinext beta; the existing OpenNext path is documented as a maintenance/migration path. Do compatibility testing before adopting either for a client production workload. A conventional Node hosting target remains the portable default for this starter.
 - **Node API:** a managed Node/container target with outbound PostgreSQL connectivity and support for scheduled/background jobs. Avoid PHP-only shared hosting for this API.
 - **Database:** managed PostgreSQL with backups and a region chosen for latency and data requirements. A free tier is acceptable for learning, demos and temporary previews, not a production availability promise.
-- **Object files:** S3-compatible object storage or Cloudflare R2 behind the `storage` port.
+- **Object files:** S3-compatible object storage or Cloudflare R2 behind the `storage` port. Set `MEDIA_STORAGE_DRIVER=s3`, the endpoint, region, bucket, server-only access credentials and an HTTPS public CDN/custom domain. Use an access key limited to object read/write in the media bucket; do not expose credentials to the storefront. Local development defaults to a temporary filesystem adapter.
 - **Email/SMS:** provider adapters behind `notifications`.
 
 ## Verified free-tier caveats (5 November 2026)

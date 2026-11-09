@@ -38,3 +38,100 @@
 .admin-page{padding:42px 0 88px}.admin-dashboard{display:grid;gap:26px}.admin-heading{display:flex;justify-content:space-between;align-items:start;gap:22px}.admin-heading h1{font-size:clamp(34px,4vw,52px);letter-spacing:-2.8px;line-height:1.02;margin:10px 0}.admin-heading-actions{display:flex;align-items:center;gap:16px}.admin-secondary-link,.admin-quiet-button{font-size:12px;text-decoration:none;color:var(--green);border:1px solid var(--line);background:#fffefa;padding:11px 14px;cursor:pointer}.admin-quiet-button{color:var(--muted)}.admin-muted{color:var(--muted);font-size:12px;line-height:1.7}.admin-section-title{display:flex;justify-content:space-between;align-items:end;gap:20px}.admin-section-title h2,.admin-card h2{font-size:24px;letter-spacing:-1px;margin:6px 0 0}.admin-section-title>span{font:11px ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--muted)}.admin-metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}.admin-metrics article{background:#fffefa;border:1px solid var(--line);padding:20px;display:grid;gap:9px}.admin-metrics article>span{font:11px ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--muted);letter-spacing:.6px}.admin-metrics article>strong{font-size:36px;letter-spacing:-1.5px}.admin-metrics article>small{font-size:11px;color:var(--green)}.admin-team-title{margin-top:16px}.admin-table-wrap{border:1px solid var(--line);background:#fffefa;overflow-x:auto}.admin-table{width:100%;border-collapse:collapse;font-size:12px;text-align:left}.admin-table th{font:10px ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--muted);letter-spacing:.7px;text-transform:uppercase;background:#f2f0e9}.admin-table th,.admin-table td{padding:14px 16px;border-bottom:1px solid var(--line);white-space:nowrap}.admin-table td strong,.admin-table td small{display:block}.admin-table td small{font-size:10px;color:var(--muted);margin-top:5px}.admin-table select,.admin-invite-form input,.admin-invite-form select{padding:10px;border:1px solid var(--line);background:white;color:var(--ink);font:12px Inter,ui-sans-serif,system-ui,sans-serif;max-width:210px}.admin-danger-button{border:1px solid #e7c9c4;background:#fff8f6;color:#a43e31;padding:8px 10px;font-size:10px;cursor:pointer}.admin-danger-button:disabled,.admin-primary-button:disabled{opacity:.5;cursor:wait}.admin-empty{padding:20px!important;text-align:center;color:var(--muted);white-space:normal!important}.admin-invite-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px}.admin-card{border:1px solid var(--line);background:#fffefa;padding:22px}.admin-invite-card>h2{margin-bottom:8px}.admin-invite-form{display:grid;gap:13px;margin-top:20px}.admin-invite-form label{display:grid;gap:7px;font-size:11px;color:var(--muted)}.admin-invite-form input,.admin-invite-form select{width:100%;max-width:none}.admin-primary-button,.admin-primary-link{display:inline-flex;align-items:center;justify-content:center;padding:12px 16px;background:var(--ink);color:white;border:0;text-decoration:none;font-size:11px;cursor:pointer}.admin-invitation-card .admin-section-title{margin-bottom:14px}.admin-invitation-row{display:flex;align-items:center;justify-content:space-between;gap:12px;border-top:1px solid var(--line);padding:13px 0}.admin-invitation-row strong,.admin-invitation-row small{display:block}.admin-invitation-row strong{font-size:12px}.admin-invitation-row small{font-size:10px;color:var(--muted);margin-top:5px}.admin-feedback{border:1px solid #a6c8b7;background:#f1f8f3;color:#286349;padding:13px;font-size:12px}.admin-error{color:#a43e31;background:#fff8f6;border:1px solid #e7c9c4;padding:12px;font-size:12px}.admin-security-note{font-size:11px;line-height:1.6;color:var(--muted);border-top:1px solid var(--line);padding-top:18px}.workspace-admin-link{display:inline-block;margin-top:18px;background:var(--ink);color:#fff;text-decoration:none;padding:12px 16px;font-size:11px}
 @media(max-width:850px){.admin-invite-layout{grid-template-columns:1fr}}@media(max-width:760px){.admin-page{padding:28px 0 56px}.admin-heading{flex-direction:column}.admin-heading-actions{width:100%;justify-content:space-between}.admin-metrics{grid-template-columns:1fr}.admin-section-title h2,.admin-card h2{font-size:21px}.admin-table th,.admin-table td{padding:12px}.admin-invitation-row{align-items:start;flex-direction:column}}
 
+/* Ministry operations dashboard */
+.ministry-admin-layout{display:grid;grid-template-columns:minmax(210px,240px) minmax(0,1fr);gap:22px;align-items:start}
+.ministry-admin-sidebar{position:sticky;top:20px;border-radius:18px;background:var(--church-primary);border-color:var(--church-primary);color:#fff}
+.ministry-admin-sidebar .ch-card-body{padding:22px 16px}
+.ministry-admin-sidebar-eyebrow,.ministry-admin-kicker{margin:0;color:var(--church-accent);font-size:10px;font-weight:800;letter-spacing:1.4px;line-height:1.5}
+.ministry-admin-sidebar-eyebrow{padding:0 10px;color:#d6bd92}
+.ministry-admin-org-name{display:block;padding:8px 10px 0;font-family:var(--church-serif);font-size:19px;line-height:1.3}
+.ministry-admin-sidebar-caption{margin:5px 10px 20px;color:rgba(255,255,255,.68);font-size:12px}
+.ministry-admin-nav{display:grid;gap:4px}
+.ministry-admin-nav-item{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;min-height:42px;padding:9px 11px;border:1px solid transparent;border-radius:9px;background:transparent;color:rgba(255,255,255,.82);font:500 13px var(--church-font);text-align:left;cursor:pointer;transition:background-color .16s ease,color .16s ease,border-color .16s ease}
+.ministry-admin-nav-item span{font-size:19px;line-height:1;opacity:.55}
+.ministry-admin-nav-item:hover,.ministry-admin-nav-item.active{background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.08);color:#fff}
+.ministry-admin-nav-item.active{box-shadow:inset 3px 0 #d6bd92;font-weight:700}
+.ministry-admin-content{min-width:0;border-radius:18px}
+.ministry-admin-content>.ch-card-body{gap:16px;padding:clamp(18px,3vw,32px)}
+.ministry-admin-overview{display:grid;gap:24px}
+.ministry-admin-welcome{display:flex;justify-content:space-between;align-items:end;gap:20px;padding:4px 0 22px;border-bottom:1px solid var(--church-border)}
+.ministry-admin-welcome h1,.ministry-admin-section-heading h1{max-width:720px;margin:9px 0 8px;color:var(--church-primary);font:600 clamp(30px,4vw,46px)/1.08 var(--church-serif);letter-spacing:-1.2px}
+.ministry-admin-welcome>div>p:last-child,.ministry-admin-section-heading>p:last-child{margin:0;color:var(--church-text-muted);font-size:12px;line-height:1.6}
+.ministry-admin-welcome>div>p:last-child span{padding:0 5px;color:var(--church-accent)}
+.ministry-admin-site-link{display:inline-flex;align-items:center;justify-content:center;gap:9px;min-height:42px;padding:0 15px;border:1px solid var(--church-border-dark);border-radius:999px;color:var(--church-primary);font-size:12px;font-weight:700;text-decoration:none;white-space:nowrap;transition:background-color .16s ease,border-color .16s ease}
+.ministry-admin-site-link:hover{background:var(--church-bg-alt);border-color:var(--church-secondary)}
+.ministry-admin-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.ministry-admin-metric{position:relative;display:grid;justify-items:start;gap:8px;min-width:0;padding:18px;border:1px solid var(--church-border);border-radius:14px;background:linear-gradient(145deg,#fff 30%,var(--church-bg-alt));color:var(--church-text);text-align:left;cursor:pointer;transition:transform .16s ease,border-color .16s ease,box-shadow .16s ease}
+.ministry-admin-metric:hover{transform:translateY(-2px);border-color:var(--church-secondary-light);box-shadow:var(--church-shadow-sm)}
+.ministry-admin-metric-icon{display:grid;place-items:center;width:32px;height:32px;border-radius:10px;background:var(--church-accent-light);color:var(--church-primary);font-size:17px}
+.ministry-admin-metric-label{color:var(--church-text-muted);font-size:11px;line-height:1.4}
+.ministry-admin-metric strong{max-width:100%;overflow-wrap:anywhere;color:var(--church-primary);font-size:clamp(21px,2.5vw,29px);letter-spacing:-.8px;line-height:1.15}
+.ministry-admin-metric small{color:var(--church-text-muted);font-size:10px;line-height:1.4}
+.ministry-admin-overview-grid{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(260px,.8fr);gap:14px}
+.ministry-admin-panel{min-width:0;padding:20px;border:1px solid var(--church-border);border-radius:15px;background:#fff}
+.ministry-admin-panel-heading{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:16px}
+.ministry-admin-panel-heading h2{margin:4px 0 0;color:var(--church-primary);font:600 21px/1.2 var(--church-serif);letter-spacing:-.3px}
+.ministry-admin-panel-heading>span{display:grid;place-items:center;width:34px;height:34px;border-radius:50%;background:var(--church-bg-alt);color:var(--church-accent);font-size:17px}
+.ministry-admin-attention-row{display:grid;grid-template-columns:34px minmax(0,1fr) auto;align-items:center;gap:11px;width:100%;padding:12px 0;border:0;border-top:1px solid var(--church-border);background:transparent;color:var(--church-text);text-align:left;cursor:pointer}
+.ministry-admin-attention-row:hover strong,.ministry-admin-text-link:hover{color:var(--church-accent)}
+.ministry-admin-attention-icon{display:grid;place-items:center;width:32px;height:32px;border-radius:10px;background:var(--church-bg-alt);color:var(--church-secondary);font-size:16px}
+.ministry-admin-attention-row strong,.ministry-admin-attention-row small{display:block}
+.ministry-admin-attention-row strong{font-size:12px;line-height:1.4}
+.ministry-admin-attention-row small{margin-top:3px;color:var(--church-text-muted);font-size:10px;line-height:1.4}
+.ministry-admin-attention-row>b{display:grid;place-items:center;min-width:29px;height:29px;padding:0 7px;border-radius:99px;background:var(--church-accent-light);color:var(--church-primary);font-size:11px}
+.ministry-admin-event-date{margin:5px 0 8px;color:var(--church-accent);font-size:11px;font-weight:800;letter-spacing:.3px}
+.ministry-admin-next-event h3{margin:0;color:var(--church-primary);font:600 23px/1.25 var(--church-serif)}
+.ministry-admin-panel-muted{margin:8px 0 16px;color:var(--church-text-muted);font-size:11px;line-height:1.7}
+.ministry-admin-text-link{display:inline-flex;align-items:center;gap:8px;margin-top:8px;padding:0;border:0;background:transparent;color:var(--church-secondary);font-size:11px;font-weight:800;cursor:pointer}
+.ministry-admin-action-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+.ministry-admin-action-grid button{display:grid;justify-items:start;gap:5px;min-width:0;padding:13px;border:1px solid var(--church-border);border-radius:11px;background:var(--church-bg);color:var(--church-text);text-align:left;cursor:pointer;transition:background-color .16s ease,border-color .16s ease,transform .16s ease}
+.ministry-admin-action-grid button:hover{transform:translateY(-1px);border-color:var(--church-secondary-light);background:var(--church-bg-alt)}
+.ministry-admin-action-grid button>span{color:var(--church-accent);font-size:18px;font-weight:700}
+.ministry-admin-action-grid button strong{font-size:11px;line-height:1.4}
+.ministry-admin-action-grid button small{color:var(--church-text-muted);font-size:9px;line-height:1.4}
+.ministry-admin-campaign{display:grid;gap:9px;padding:12px 0;border-top:1px solid var(--church-border)}
+.ministry-admin-campaign>div:first-child{display:flex;justify-content:space-between;align-items:start;gap:12px}
+.ministry-admin-campaign strong{font-size:11px;line-height:1.4}
+.ministry-admin-campaign small{color:var(--church-text-muted);font-size:10px;text-align:right}
+.ministry-admin-progress{height:7px;overflow:hidden;border-radius:99px;background:var(--church-bg-muted)}
+.ministry-admin-progress span{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,var(--church-secondary),var(--church-accent));transition:width .35s ease}
+.ministry-admin-access-note{margin:0;color:var(--church-text-muted);font-size:10px;line-height:1.6}
+.ministry-admin-section-heading{padding-bottom:17px;border-bottom:1px solid var(--church-border)}
+.ministry-admin-section-heading h1{font-size:34px}
+@media(max-width:1050px){.ministry-admin-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.ministry-admin-overview-grid{grid-template-columns:1fr 1fr}}
+@media(max-width:760px){.ministry-admin-layout{grid-template-columns:minmax(0,1fr);gap:14px}.ministry-admin-sidebar{position:static}.ministry-admin-sidebar .ch-card-body{padding:15px}.ministry-admin-org-name{font-size:17px}.ministry-admin-sidebar-caption{margin-bottom:12px}.ministry-admin-nav{display:flex;overflow-x:auto;padding:1px 0 3px;scrollbar-width:thin}.ministry-admin-nav-item{flex:0 0 auto;width:auto;min-height:38px;padding:8px 11px;white-space:nowrap}.ministry-admin-nav-item span{display:none}.ministry-admin-nav-item.active{box-shadow:inset 0 -2px #d6bd92}.ministry-admin-welcome{align-items:start;flex-direction:column}.ministry-admin-site-link{min-height:38px}.ministry-admin-overview-grid{grid-template-columns:minmax(0,1fr)}.ministry-admin-panel{padding:17px}.ministry-admin-content>.ch-card-body{padding:18px}}
+@media(max-width:420px){.ministry-admin-metrics{grid-template-columns:minmax(0,1fr)}.ministry-admin-metric{grid-template-columns:34px minmax(0,1fr);align-items:center;column-gap:10px}.ministry-admin-metric-icon{grid-row:span 3}.ministry-admin-metric strong{font-size:23px}.ministry-admin-action-grid{grid-template-columns:minmax(0,1fr)}.ministry-admin-campaign>div:first-child{flex-direction:column;gap:4px}.ministry-admin-campaign small{text-align:left}}
+@media(prefers-reduced-motion:reduce){.ministry-admin-nav-item,.ministry-admin-metric,.ministry-admin-site-link,.ministry-admin-action-grid button,.ministry-admin-progress span{transition:none}.ministry-admin-metric:hover,.ministry-admin-action-grid button:hover{transform:none}}
+
+.ministry-media-field{display:grid;align-content:start;gap:7px;min-width:0}
+.ministry-media-label{font-size:13px;font-weight:600}
+.ministry-media-input-row{display:flex;gap:8px;min-width:0}
+.ministry-media-input-row>input[type=text]{flex:1;min-width:0;padding:11px 12px;border:1px solid var(--church-border);border-radius:10px;background:#fff;color:var(--church-text);font:inherit}
+.ministry-media-input-row>input[type=text]:focus-visible{outline:3px solid var(--church-accent);outline-offset:2px}
+.ministry-media-file-input{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;clip-path:inset(50%)}
+.ministry-media-button{display:inline-flex;align-items:center;justify-content:center;min-height:40px;padding:0 13px;border:1px solid var(--church-secondary);border-radius:9px;background:var(--church-secondary);color:#fff;font:700 11px var(--church-font);white-space:nowrap;cursor:pointer}
+.ministry-media-button:hover{background:var(--church-primary);border-color:var(--church-primary)}
+.ministry-media-button:disabled{opacity:.55;cursor:wait}
+.ministry-media-button-secondary{background:transparent;color:var(--church-primary);border-color:var(--church-border-dark)}
+.ministry-media-button-secondary:hover{background:var(--church-bg-alt);border-color:var(--church-secondary);color:var(--church-primary)}
+.ministry-media-help{color:var(--church-text-muted);font-size:10px;line-height:1.55}
+.ministry-media-preview{display:flex;align-items:center;gap:10px;color:var(--church-text-muted);font-size:10px}
+.ministry-media-preview img{width:72px;height:54px;object-fit:cover;border:1px solid var(--church-border);border-radius:8px;background:var(--church-bg-alt)}
+.ministry-media-error{margin:0;color:#a43e31;font-size:11px;line-height:1.5}
+.ministry-media-library{display:grid;gap:14px;padding:15px;border:1px solid var(--church-border);border-radius:12px;background:var(--church-bg-alt)}
+.ministry-media-library-heading,.ministry-content-list-heading{display:flex;align-items:center;justify-content:space-between;gap:14px}
+.ministry-media-library-heading strong,.ministry-media-library-heading small,.ministry-content-list-heading strong,.ministry-content-list-heading small{display:block}
+.ministry-media-library-heading strong,.ministry-content-list-heading strong{font-size:12px}
+.ministry-media-library-heading small,.ministry-content-list-heading small{margin-top:3px;color:var(--church-text-muted);font-size:10px;line-height:1.5}
+.ministry-media-library-heading>button{padding:7px 9px;border:1px solid var(--church-border-dark);border-radius:7px;background:#fff;color:var(--church-text);font:600 10px var(--church-font);cursor:pointer}
+.ministry-media-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(118px,1fr));gap:9px}
+.ministry-media-asset{display:grid;justify-items:start;gap:5px;min-width:0;padding:7px;border:1px solid var(--church-border);border-radius:9px;background:#fff;color:var(--church-text);text-align:left;cursor:pointer}
+.ministry-media-asset:hover{border-color:var(--church-secondary);box-shadow:var(--church-shadow-sm)}
+.ministry-media-asset img{width:100%;height:80px;object-fit:cover;border-radius:5px;background:var(--church-bg-alt)}
+.ministry-media-asset span,.ministry-media-asset small{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ministry-media-asset span{font-size:10px;font-weight:700}
+.ministry-media-asset small{color:var(--church-text-muted);font-size:9px}
+.ministry-content-list{display:grid;gap:12px}
+.ministry-content-entry{display:grid;gap:14px;padding:15px;border:1px solid var(--church-border);border-radius:12px;background:#fff}
+@media(max-width:500px){.ministry-media-input-row{flex-wrap:wrap}.ministry-media-input-row>input[type=text]{flex-basis:100%}.ministry-media-library-heading,.ministry-content-list-heading{align-items:flex-start}.ministry-media-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+

@@ -4,13 +4,18 @@
 
 The church module is **partial**. It provides tenant-scoped public ministry websites, profile and site settings, published sermons, events and registrations, giving campaigns and donation attempts, contact enquiries, prayer requests, and newsletter opt-ins. It is a reusable website template and starter content editor, not a complete church-management product. The research and public feature map are in [church-ministry-website-research.md](church-ministry-website-research.md).
 
-The storefront reads a tenant profile and validated `public_site` settings from `ministry_settings`. The signed-in editor can configure identity, logo, contact/social links, palette, hero, visitor information, service times, locations, online stream link, ministries, FAQs, leaders, gallery URLs, values, faith statement, giving instructions and search description. Public service, location and gallery content stays empty until a ministry publishes it. Site colors require a 4.5:1 contrast ratio against white. The profile editor writes profile columns and validated public settings in the same tenant-scoped transaction.
+The storefront reads a tenant profile and validated `public_site` settings from `ministry_settings`. The signed-in editor can configure identity, logo, contact/social links, palette, hero, visitor information, service times, locations, online stream link, ministries, FAQs, leaders, gallery, values, faith statement, giving instructions and search description. Public service, location and gallery content stays empty until a ministry publishes it. Site colors require a 4.5:1 contrast ratio against white. The profile editor writes profile columns and validated public settings in the same tenant-scoped transaction. All tenants share the same media library and upload controls for logos, hero images, leader portraits, gallery photos, sermon thumbnails and event posters.
+
+Uploads are sent to the authenticated API, which checks the file signature against its declared type and enforces an 8 MB limit for JPEG, PNG, WebP and AVIF. Object keys are generated under the active tenant's prefix; the browser cannot choose a tenant ID or storage key. The library is read-only after upload so deleting an asset cannot silently break a live page. Gallery descriptions are edited as required alt text; other image slots use the associated ministry, sermon or event title as their accessible text. Local development uses a temporary local adapter. Production must use an S3-compatible bucket with a public HTTPS CDN/custom domain configured through the `MEDIA_STORAGE_*` variables in `.env.example`.
 
 ## Implemented routes
 
 Public routes are mounted under `/v1/public/church`:
 
 - `GET /site` returns the tenant profile and active leaders.
+- `GET /admin/church/media` lists the active tenant's most recently uploaded image assets.
+- `POST /admin/church/media` validates and stores a tenant-scoped image upload.
+- `GET /public/church/media/:key` serves local-development assets; production assets are served from the configured CDN URL.
 - `GET /sermons` and `GET /sermons/:slug` return published messages.
 - `GET /events` and `GET /events/:slug` return non-cancelled events.
 - `POST /events/:eventId/register` creates a tenant-bound registration, checking event state and capacity under a row lock and recording consent time.
@@ -22,7 +27,7 @@ Public routes are mounted under `/v1/public/church`:
 
 The storefront event and sermon detail pages use these APIs. Their server-rendered titles, descriptions and social previews use published content, while tenant metadata and sitemap/robots origins follow the incoming verified domain. Registration references are shown only after the API records a registration. Giving campaign progress is increased only after a provider-confirmed donation.
 
-Protected routes are under `/v1/admin/church`. The signed-in ministry UI reads overview, website settings, sermons, events, campaigns, registrations, donations, enquiries, prayer requests and email opt-ins. It can save drafts or publish sermons, update event and campaign status, create events/campaigns, and remove private enquiries, registrations, prayer requests and email opt-ins. Donor, attendee, enquiry, prayer-request and subscriber records require `churchprivate`, granted to `owner` and `admin`. There is no separate finance or pastoral role yet. Newsletter opt-ins are stored with consent time, but scheduled delivery and user-facing unsubscribe links are not connected. Gallery entries point at existing HTTPS or site-relative images; media upload/storage is not implemented.
+Protected routes are under `/v1/admin/church`. The signed-in ministry UI reads overview, website settings, media, sermons, events, campaigns, registrations, donations, enquiries, prayer requests and email opt-ins. It can upload and reuse tenant-scoped images, save drafts or publish sermons, update event and campaign status, create events/campaigns, and remove private enquiries, registrations, prayer requests and email opt-ins. Donor, attendee, enquiry, prayer-request and subscriber records require `churchprivate`, granted to `owner` and `admin`. There is no separate finance or pastoral role yet. Newsletter opt-ins are stored with consent time, but scheduled delivery and user-facing unsubscribe links are not connected.
 
 ## M-Pesa configuration and release state
 
@@ -43,7 +48,7 @@ Migration `0008_church_ministry_domain.sql` adds the church data tables. `0009_c
 
 - Store provider credentials per tenant and route payment requests to that tenant's merchant account before onboarding ministries with separate settlement accounts.
 - Add newsletter delivery, preference center and secure user-facing unsubscribe.
-- Add media uploads/storage, sermon editing/scheduling, category management and a fuller page builder.
+- Add sermon editing/scheduling, category management and a fuller page builder.
 - Build member, household, attendance and volunteer workflows.
 - Add fine-grained finance and pastoral roles, data-retention automation and audit coverage for ministry administration.
 - Add callback-loss reconciliation, payment reversal/refund handling and operational alerts.

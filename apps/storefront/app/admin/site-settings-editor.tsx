@@ -7,9 +7,10 @@ import {
   type ChurchSiteSettingsInput,
 } from "@bazion/api-contracts";
 import { apiErrorMessage } from "../../lib/api-error";
+import { MediaUploadField } from "./media-upload-field";
 
 type SiteProfile = ChurchSiteSettingsInput["profile"];
-type RowName = "serviceTimes" | "locations" | "ministries" | "faqs" | "coreValues" | "statementOfFaith" | "leadership" | "galleryImages";
+type RowName = "serviceTimes" | "locations" | "ministries" | "faqs" | "coreValues" | "statementOfFaith";
 
 function parseRows<T>(value: string, convert: (parts: string[]) => T | null): T[] {
   return value.split(/\r?\n/).map((line) => line.trim()).filter(Boolean).flatMap((line) => {
@@ -29,10 +30,8 @@ function rowsText(settings: ChurchPublicSiteSettings, key: RowName): string {
   if (key === "serviceTimes") return settings.serviceTimes.map((row) => [row.label, row.day, row.time, row.note ?? ""].join(" | ")).join("\n");
   if (key === "locations") return settings.locations.map((row) => [row.name, row.address, row.mapUrl ?? ""].join(" | ")).join("\n");
   if (key === "ministries") return settings.ministries.map((row) => [row.title, row.description, row.audience ?? ""].join(" | ")).join("\n");
-  if (key === "galleryImages") return settings.galleryImages.map((row) => [row.imageUrl, row.alt, row.caption ?? ""].join(" | ")).join("\n");
   if (key === "faqs") return settings.faqs.map((row) => [row.question, row.answer].join(" | ")).join("\n");
   if (key === "coreValues") return settings.coreValues.map((row) => [row.title, row.description, row.icon ?? ""].join(" | ")).join("\n");
-  if (key === "leadership") return settings.leadership.map((row) => [row.name, row.role, row.bio ?? "", row.photoUrl ?? ""].join(" | ")).join("\n");
   return settings.statementOfFaith.map((row) => [row.topic, row.belief].join(" | ")).join("\n");
 }
 
@@ -54,7 +53,7 @@ export function SiteSettingsEditor() {
   const [profile, setProfile] = useState<SiteProfile | null>(null);
   const [settings, setSettings] = useState<ChurchPublicSiteSettings>(() => churchPublicSiteSettingsSchema.parse({}));
   const [rows, setRows] = useState<Record<RowName, string>>({
-    serviceTimes: "", locations: "", ministries: "", faqs: "", coreValues: "", statementOfFaith: "", leadership: "", galleryImages: "",
+    serviceTimes: "", locations: "", ministries: "", faqs: "", coreValues: "", statementOfFaith: "",
   });
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -72,11 +71,9 @@ export function SiteSettingsEditor() {
           serviceTimes: rowsText(result.settings, "serviceTimes"),
           locations: rowsText(result.settings, "locations"),
           ministries: rowsText(result.settings, "ministries"),
-          galleryImages: rowsText(result.settings, "galleryImages"),
           faqs: rowsText(result.settings, "faqs"),
           coreValues: rowsText(result.settings, "coreValues"),
           statementOfFaith: rowsText(result.settings, "statementOfFaith"),
-          leadership: rowsText(result.settings, "leadership"),
         });
       })
       .catch((reason: unknown) => { if (active) setError(reason instanceof Error ? reason.message : "Could not load website settings."); })
@@ -109,14 +106,12 @@ export function SiteSettingsEditor() {
           ? { name: parts[0], address: parts[1], mapUrl: parts[2] || undefined } : null),
         ministries: parseRows(rows.ministries, (parts) => parts.length >= 2 && parts[0] && parts[1]
           ? { title: parts[0], description: parts[1], audience: parts[2] || undefined } : null),
-        galleryImages: parseRows(rows.galleryImages, (parts) => parts.length >= 2 && parts[0] && parts[1]
-          ? { imageUrl: parts[0], alt: parts[1], caption: parts[2] || undefined } : null),
         faqs: parseRows(rows.faqs, (parts) => { const [question, answer] = splitPair(parts.join(" | ")); return question && answer ? { question, answer } : null; }),
         coreValues: parseRows(rows.coreValues, (parts) => parts.length >= 2 && parts[0] && parts[1]
           ? { title: parts[0], description: parts[1], icon: parts[2] || undefined } : null),
         statementOfFaith: parseRows(rows.statementOfFaith, (parts) => { const [topic, belief] = splitPair(parts.join(" | ")); return topic && belief ? { topic, belief } : null; }),
-        leadership: parseRows(rows.leadership, (parts) => parts.length >= 2 && parts[0] && parts[1]
-          ? { name: parts[0], role: parts[1], bio: parts[2] || undefined, photoUrl: parts[3] || undefined } : null),
+        galleryImages: settings.galleryImages.filter((item) => item.imageUrl.trim() || item.alt.trim() || item.caption?.trim()),
+        leadership: settings.leadership.filter((item) => item.name.trim() || item.role.trim() || item.bio?.trim() || item.photoUrl?.trim()),
         giving: { ...settings.giving, suggestedAmounts: settings.giving.suggestedAmounts },
       });
       await requestJson("/v1/admin/church/site-settings", {
@@ -148,7 +143,7 @@ export function SiteSettingsEditor() {
       <div className="ch-site-settings-grid">
         <label style={labelStyle}>Ministry name<input required maxLength={180} style={fieldStyle} value={profile.ministryName} onChange={(event) => setProfile({ ...profile, ministryName: event.target.value })} /></label>
         <label style={labelStyle}>Short introduction<input maxLength={500} style={fieldStyle} value={profile.tagline} onChange={(event) => setProfile({ ...profile, tagline: event.target.value })} /></label>
-        <label style={labelStyle}>Logo URL<input type="text" style={fieldStyle} value={profile.logoUrl ?? ""} onChange={(event) => setProfile({ ...profile, logoUrl: event.target.value })} placeholder="https://… or /images/logo.png" /></label>
+        <MediaUploadField label="Logo" value={profile.logoUrl ?? ""} onChange={(value) => setProfile({ ...profile, logoUrl: value })} />
         <label style={labelStyle}>Public email<input type="email" style={fieldStyle} value={profile.contact.email} onChange={(event) => setContact("email", event.target.value)} /></label>
         <label style={labelStyle}>Phone numbers (one per line)<textarea style={textareaStyle} value={profile.contact.phones.join("\n")} onChange={(event) => setContact("phones", event.target.value.split(/\r?\n/).map((item) => item.trim()).filter(Boolean))} /></label>
         <label style={labelStyle}>Address<textarea style={textareaStyle} value={profile.contact.address} onChange={(event) => setContact("address", event.target.value)} /></label>
@@ -166,7 +161,7 @@ export function SiteSettingsEditor() {
         <label style={labelStyle}>Hero eyebrow<input maxLength={100} style={fieldStyle} value={settings.hero.eyebrow} onChange={(event) => setSettings({ ...settings, hero: { ...settings.hero, eyebrow: event.target.value } })} /></label>
         <label style={labelStyle}>Hero title<input maxLength={120} style={fieldStyle} value={settings.hero.title} onChange={(event) => setSettings({ ...settings, hero: { ...settings.hero, title: event.target.value } })} /></label>
         <label style={labelStyle}>Highlighted title<input maxLength={120} style={fieldStyle} value={settings.hero.highlightedTitle} onChange={(event) => setSettings({ ...settings, hero: { ...settings.hero, highlightedTitle: event.target.value } })} /></label>
-        <label style={labelStyle}>Hero image URL<input type="text" style={fieldStyle} value={settings.branding.heroImageUrl ?? ""} onChange={(event) => setSettings({ ...settings, branding: { ...settings.branding, heroImageUrl: event.target.value } })} placeholder="https://… or /images/hero.jpg" /></label>
+        <MediaUploadField label="Homepage hero image" value={settings.branding.heroImageUrl ?? ""} onChange={(value) => setSettings({ ...settings, branding: { ...settings.branding, heroImageUrl: value } })} />
         <label style={labelStyle}>Hero introduction<textarea maxLength={500} style={textareaStyle} value={settings.hero.subtitle} onChange={(event) => setSettings({ ...settings, hero: { ...settings.hero, subtitle: event.target.value } })} /></label>
         <label style={labelStyle}>Live stream URL<input type="url" style={fieldStyle} value={settings.online.liveStreamUrl ?? ""} onChange={(event) => setSettings({ ...settings, online: { ...settings.online, liveStreamUrl: event.target.value } })} placeholder="https://…" /></label>
         <label style={labelStyle}>Online worship details<textarea maxLength={500} style={textareaStyle} value={settings.online.description} onChange={(event) => setSettings({ ...settings, online: { ...settings.online, description: event.target.value } })} /></label>
@@ -199,8 +194,29 @@ export function SiteSettingsEditor() {
         <label style={labelStyle}>FAQs (question | answer)<textarea style={textareaStyle} value={rows.faqs} onChange={(event) => setRows({ ...rows, faqs: event.target.value })} /></label>
         <label style={labelStyle}>Core values (title | description | icon)<textarea style={textareaStyle} value={rows.coreValues} onChange={(event) => setRows({ ...rows, coreValues: event.target.value })} /></label>
         <label style={labelStyle}>Statement of faith (topic | belief)<textarea style={textareaStyle} value={rows.statementOfFaith} onChange={(event) => setRows({ ...rows, statementOfFaith: event.target.value })} /></label>
-        <label style={labelStyle}>Leaders (name | role | biography | photo URL)<textarea style={textareaStyle} value={rows.leadership} onChange={(event) => setRows({ ...rows, leadership: event.target.value })} /></label>
-        <label style={labelStyle}>Gallery (image URL | descriptive alt text | caption)<textarea style={textareaStyle} value={rows.galleryImages} onChange={(event) => setRows({ ...rows, galleryImages: event.target.value })} placeholder="https://… | Volunteers serving lunch | Community meal, July 2026" /></label>
+        <div className="ministry-content-list">
+          <div className="ministry-content-list-heading"><div><strong>Leadership team</strong><small>Add names, roles, biographies, and optional portraits.</small></div><button type="button" className="ministry-media-button" disabled={settings.leadership.length >= 30} onClick={() => setSettings({ ...settings, leadership: [...settings.leadership, { name: "", role: "", bio: "", photoUrl: undefined }] })}>Add leader</button></div>
+          {settings.leadership.map((leader, index) => <article className="ministry-content-entry" key={`leader-${index}`}>
+            <div className="ch-site-settings-grid">
+              <label style={labelStyle}>Name<input maxLength={160} style={fieldStyle} value={leader.name} onChange={(event) => setSettings({ ...settings, leadership: settings.leadership.map((item, itemIndex) => itemIndex === index ? { ...item, name: event.target.value } : item) })} /></label>
+              <label style={labelStyle}>Role<input maxLength={120} style={fieldStyle} value={leader.role} onChange={(event) => setSettings({ ...settings, leadership: settings.leadership.map((item, itemIndex) => itemIndex === index ? { ...item, role: event.target.value } : item) })} /></label>
+              <label style={labelStyle}>Biography<textarea maxLength={1200} style={textareaStyle} value={leader.bio ?? ""} onChange={(event) => setSettings({ ...settings, leadership: settings.leadership.map((item, itemIndex) => itemIndex === index ? { ...item, bio: event.target.value } : item) })} /></label>
+              <MediaUploadField label={`Portrait for ${leader.name || "leader"}`} value={leader.photoUrl ?? ""} onChange={(value) => setSettings({ ...settings, leadership: settings.leadership.map((item, itemIndex) => itemIndex === index ? { ...item, photoUrl: value || undefined } : item) })} />
+            </div>
+            <button type="button" className="admin-danger-button" onClick={() => setSettings({ ...settings, leadership: settings.leadership.filter((_, itemIndex) => itemIndex !== index) })}>Remove leader</button>
+          </article>)}
+          {!settings.leadership.length && <p className="admin-muted">No leaders have been added yet.</p>}
+        </div>
+        <div className="ministry-content-list">
+          <div className="ministry-content-list-heading"><div><strong>Photo gallery</strong><small>Upload a photo, write meaningful alt text, and add an optional caption.</small></div><button type="button" className="ministry-media-button" disabled={settings.galleryImages.length >= 60} onClick={() => setSettings({ ...settings, galleryImages: [...settings.galleryImages, { imageUrl: "", alt: "", caption: "" }] })}>Add photo</button></div>
+          {settings.galleryImages.map((image, index) => <article className="ministry-content-entry" key={`gallery-${index}`}>
+            <MediaUploadField label={`Gallery photo ${index + 1}`} value={image.imageUrl} onChange={(value) => setSettings({ ...settings, galleryImages: settings.galleryImages.map((item, itemIndex) => itemIndex === index ? { ...item, imageUrl: value } : item) })} />
+            <label style={labelStyle}>Descriptive alt text<input maxLength={240} minLength={3} style={fieldStyle} value={image.alt} onChange={(event) => setSettings({ ...settings, galleryImages: settings.galleryImages.map((item, itemIndex) => itemIndex === index ? { ...item, alt: event.target.value } : item) })} placeholder="Describe what is happening in this image" /></label>
+            <label style={labelStyle}>Caption (optional)<input maxLength={400} style={fieldStyle} value={image.caption ?? ""} onChange={(event) => setSettings({ ...settings, galleryImages: settings.galleryImages.map((item, itemIndex) => itemIndex === index ? { ...item, caption: event.target.value } : item) })} /></label>
+            <button type="button" className="admin-danger-button" onClick={() => setSettings({ ...settings, galleryImages: settings.galleryImages.filter((_, itemIndex) => itemIndex !== index) })}>Remove photo</button>
+          </article>)}
+          {!settings.galleryImages.length && <p className="admin-muted">No gallery photos have been added yet.</p>}
+        </div>
       </div>
     </section>
 

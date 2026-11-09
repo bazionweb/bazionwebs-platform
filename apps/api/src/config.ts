@@ -26,6 +26,14 @@ const envSchema = z.object({
   TENANT_RESOLUTION_MODE: z.enum(["static", "verified_domain"]).default("static"),
   CORS_ORIGINS: z.string().default("http://localhost:3000,http://localhost:4000"),
   PUBLIC_STOREFRONT_URL: z.string().url().default("http://localhost:3000"),
+  MEDIA_STORAGE_DRIVER: z.enum(["local", "s3"]).default("local"),
+  MEDIA_STORAGE_LOCAL_DIRECTORY: optionalEnv,
+  MEDIA_STORAGE_ENDPOINT: optionalEnv,
+  MEDIA_STORAGE_REGION: z.string().trim().min(1).default("auto"),
+  MEDIA_STORAGE_BUCKET: optionalEnv,
+  MEDIA_STORAGE_ACCESS_KEY_ID: optionalEnv,
+  MEDIA_STORAGE_SECRET_ACCESS_KEY: optionalEnv,
+  MEDIA_STORAGE_PUBLIC_BASE_URL: optionalEnv,
   PAYMENT_PROVIDER: z.enum(["mock", "mpesa"]).default("mock"),
   MPESA_ENVIRONMENT: z.enum(["sandbox", "production"]).default("sandbox"),
   MPESA_CONSUMER_KEY: optionalEnv,
@@ -50,6 +58,23 @@ const envSchema = z.object({
 
 export function loadConfig() {
   const config = envSchema.parse(process.env);
+  const mediaStorageValues = [
+    config.MEDIA_STORAGE_ENDPOINT,
+    config.MEDIA_STORAGE_BUCKET,
+    config.MEDIA_STORAGE_ACCESS_KEY_ID,
+    config.MEDIA_STORAGE_SECRET_ACCESS_KEY,
+    config.MEDIA_STORAGE_PUBLIC_BASE_URL,
+  ];
+  const mediaStorageConfiguredCount = mediaStorageValues.filter(Boolean).length;
+  if (mediaStorageConfiguredCount !== 0 && mediaStorageConfiguredCount !== mediaStorageValues.length) {
+    throw new Error("Configure all MEDIA_STORAGE_ENDPOINT, MEDIA_STORAGE_BUCKET, MEDIA_STORAGE_ACCESS_KEY_ID, MEDIA_STORAGE_SECRET_ACCESS_KEY and MEDIA_STORAGE_PUBLIC_BASE_URL values together.");
+  }
+  if (config.MEDIA_STORAGE_DRIVER === "s3" && mediaStorageConfiguredCount !== mediaStorageValues.length) {
+    throw new Error("MEDIA_STORAGE_DRIVER=s3 requires endpoint, bucket, access key, secret key and public base URL settings.");
+  }
+  if (config.NODE_ENV === "production" && config.MEDIA_STORAGE_DRIVER !== "s3") {
+    throw new Error("Production startup blocked: configure S3-compatible object storage for tenant media uploads.");
+  }
   const darajaValues = [config.MPESA_CONSUMER_KEY, config.MPESA_CONSUMER_SECRET, config.MPESA_BUSINESS_SHORT_CODE, config.MPESA_PASSKEY, config.MPESA_CALLBACK_URL];
   const darajaConfiguredCount = darajaValues.filter(Boolean).length;
   if (darajaConfiguredCount !== 0 && darajaConfiguredCount !== darajaValues.length) {
@@ -115,6 +140,20 @@ export function loadConfig() {
     ...config,
     corsOrigins: config.CORS_ORIGINS.split(",").map((origin) => origin.trim()).filter(Boolean),
     trustedOrigins: config.BETTER_AUTH_TRUSTED_ORIGINS.split(",").map((origin) => origin.trim()).filter(Boolean),
+    mediaStorage: {
+      driver: config.MEDIA_STORAGE_DRIVER,
+      localDirectory: config.MEDIA_STORAGE_LOCAL_DIRECTORY,
+      ...(config.MEDIA_STORAGE_DRIVER === "s3" ? {
+        s3: {
+          endpoint: config.MEDIA_STORAGE_ENDPOINT!,
+          region: config.MEDIA_STORAGE_REGION,
+          bucket: config.MEDIA_STORAGE_BUCKET!,
+          accessKeyId: config.MEDIA_STORAGE_ACCESS_KEY_ID!,
+          secretAccessKey: config.MEDIA_STORAGE_SECRET_ACCESS_KEY!,
+          publicBaseUrl: config.MEDIA_STORAGE_PUBLIC_BASE_URL!,
+        },
+      } : {}),
+    },
     requireEmailVerification: config.AUTH_REQUIRE_EMAIL_VERIFICATION === "true",
     trustProxy: trustedProxyAddresses.length ? trustedProxyAddresses : false,
     mpesa: darajaConfiguredCount === darajaValues.length

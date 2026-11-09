@@ -39,7 +39,7 @@ A modular monolith keeps transactions, local development, deployment and debuggi
 - `packages/ui`: shared design-system components.
 - `packages/notifications`: durable authentication email outbox, enqueue-only and delivery-worker database roles, and a separately supervised SMTP worker; SMS and operator-facing dead-letter tooling remain planned.
 - `packages/audit`: append-only audit-event contract and PostgreSQL writer for privileged platform and tenant administration actions.
-- `packages/storage`: object-storage port and tenant object-key helper; provider adapters and media library remain planned.
+- `packages/storage`: tenant object-key helpers, local development adapter and S3-compatible object-storage adapter used by the shared church media library.
 - `packages/booking`: initial booking types and booking-window validation; availability/resources/conflict management remain planned.
 - `packages/analytics`: initial privacy-aware event/sink contract; ingestion and tenant reports remain planned.
 - `mcp`: MCP server design. MCP adapters call the same API/domain capabilities; MCP is not the website's cart implementation.

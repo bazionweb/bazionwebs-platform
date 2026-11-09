@@ -71,8 +71,7 @@ Deliver:
 - Form schema/builder, validation, conditional logic, uploads, spam controls, consent and submission records.
 - Contact/customer directory: individuals, organizations, household relationships, tags, notes and communication preferences.
 - Lead pipeline and assignment, import/export, deduplication and consent audit.
-- Media library and object storage adapter (R2 first if it fits; S3-compatible alternative behind same port).
-- Signed uploads, file/MIME/size validation, image transforms, metadata, retention and secure downloads.
+- Image transforms, durable metadata, retention/usage controls and guarded deletion for the shared media library; keep S3-compatible providers behind the storage adapter.
 - Document hub and permission-checked document vault.
 - Localization primitives for language, timezone, formatting, content translations and translated slugs.
 - Search begins with PostgreSQL full-text search; add Meilisearch only after measurement.

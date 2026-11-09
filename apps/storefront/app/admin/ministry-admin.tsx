@@ -3,7 +3,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { authClient } from "@bazion/auth/client";
 import { SiteSettingsEditor } from "./site-settings-editor";
+import { MediaUploadField } from "./media-upload-field";
 import { apiErrorMessage } from "../../lib/api-error";
+import { globalMissionConfig } from "../../../../templates/global-mission.config";
 
 type Tab = "overview" | "site" | "sermons" | "events" | "campaigns" | "registrations" | "donations" | "messages" | "prayers" | "newsletter";
 type Sermon = { id: string; title: string; slug: string; speaker: string; status: string; publishedAt: string | null };
@@ -169,15 +171,106 @@ export function MinistryAdminDashboard() {
   if (!session.data) return <section className="ch-card"><div className="ch-card-body"><h2>Sign in to manage ministry records.</h2><a className="ch-btn ch-btn-primary" href="/login?callbackURL=%2Fadmin">Sign in →</a></div></section>;
   if (!activeOrganization.data) return <section className="ch-card"><div className="ch-card-body"><h2>Select a client workspace.</h2><a className="ch-btn ch-btn-primary" href="/workspace">Choose workspace →</a></div></section>;
 
+  const organizationName = activeOrganization.data.name;
+  const isGlobalMission = activeOrganization.data.slug === globalMissionConfig.tenantSlug
+    || organizationName.trim().toLowerCase() === globalMissionConfig.ministryName.toLowerCase();
+  const formattedToday = new Intl.DateTimeFormat("en", { weekday: "long", month: "long", day: "numeric" }).format(new Date());
+  const upcomingEvent = events
+    .filter((event) => new Date(event.startsAt).getTime() >= Date.now() && !["cancelled", "completed"].includes(event.status))
+    .sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime())[0];
+  const dashboardMetrics = overview ? [
+    { label: "Sermons in library", value: overview.sermonCount, icon: "♪", detail: "Teachings and messages", tab: "sermons" as Tab },
+    { label: "Ministry events", value: overview.eventCount, icon: "✦", detail: "Gatherings and outreaches", tab: "events" as Tab },
+    { label: "Confirmed giving", value: `KES ${(overview.totalRaisedMinor / 100).toLocaleString()}`, icon: "♡", detail: `${overview.donationCount} verified gifts`, tab: "donations" as Tab },
+    { label: "New enquiries", value: overview.newMessages, icon: "✉", detail: "Messages to follow up", tab: "messages" as Tab },
+  ] : [];
   const tabs: Array<[Tab, string]> = [["overview", "Overview"], ["site", "Website settings"], ["sermons", "Sermons"], ["events", "Events"], ["campaigns", "Giving campaigns"], ["registrations", "Registrations"], ["donations", "Donations"], ["messages", "Enquiries"], ["prayers", "Prayer requests"], ["newsletter", "Email opt-ins"]];
-  return <div style={{ display: "grid", gridTemplateColumns: "220px minmax(0, 1fr)", gap: 24 }}>
-    <aside className="ch-card"><div className="ch-card-body"><strong>{activeOrganization.data.name}</strong><p>Ministry operations</p>{tabs.map(([id, label]) => <button key={id} type="button" className={`ch-filter-btn ${tab === id ? "active" : ""}`} style={{ display: "block", width: "100%", marginBottom: 6, textAlign: "left" }} onClick={() => setTab(id)}>{label}</button>)}</div></aside>
-    <section className="ch-card"><div className="ch-card-body">
-      <h1>{tabs.find(([id]) => id === tab)?.[1]}</h1>
-      <p>Signed in as {session.data.user.email}. Records are scoped to {activeOrganization.data.name}.</p>
+  return <div className="ministry-admin-layout">
+    <aside className="ch-card ministry-admin-sidebar">
+      <div className="ch-card-body">
+        <p className="ministry-admin-sidebar-eyebrow">{isGlobalMission ? "GLOBAL MISSION" : "MINISTRY WORKSPACE"}</p>
+        <strong className="ministry-admin-org-name">{organizationName}</strong>
+        <p className="ministry-admin-sidebar-caption">Ministry operations</p>
+        <nav className="ministry-admin-nav" aria-label="Ministry administration">
+          {tabs.map(([id, label]) => <button key={id} type="button" aria-current={tab === id ? "page" : undefined} className={`ministry-admin-nav-item ${tab === id ? "active" : ""}`} onClick={() => setTab(id)}>{label}<span aria-hidden="true">›</span></button>)}
+        </nav>
+      </div>
+    </aside>
+    <section className="ch-card ministry-admin-content"><div className="ch-card-body">
       {loading && <p role="status">Loading…</p>}{error && <p role="alert">{error}</p>}{notice && <p role="status">{notice}</p>}
       {!sensitiveAccess && <p role="status">Private registrations, donation details, enquiries, prayer requests and email opt-ins require an owner or administrator role.</p>}
-      {tab === "overview" && overview && <div className="ch-grid-3">{[["Published sermons", overview.sermonCount], ["Events", overview.eventCount], ["Registrations", overview.registrationCount], ["Verified donations", overview.donationCount], ["Confirmed giving", `KES ${(overview.totalRaisedMinor / 100).toLocaleString()}`], ["Pending prayer requests", overview.pendingPrayers], ["New enquiries", overview.newMessages]].map(([label, value]) => <article className="ch-card" key={String(label)}><div className="ch-card-body"><span>{label}</span><strong style={{ display: "block", fontSize: 24 }}>{value}</strong></div></article>)}</div>}
+      {tab === "overview" && <div className="ministry-admin-overview">
+        <header className="ministry-admin-welcome">
+          <div>
+            <p className="ministry-admin-kicker">{isGlobalMission ? "GLOBAL MISSION · MINISTRY DESK" : "MINISTRY OPERATIONS"}</p>
+            <h1>{isGlobalMission ? "Welcome to your mission desk" : `Welcome to ${organizationName}`}</h1>
+            <p>{formattedToday} <span aria-hidden="true">·</span> Signed in as {session.data.user.email}</p>
+          </div>
+          <a className="ministry-admin-site-link" href="/" target="_blank" rel="noreferrer">View public website <span aria-hidden="true">↗</span></a>
+        </header>
+
+        {overview && <div className="ministry-admin-metrics">
+          {dashboardMetrics.map((metric) => <button className="ministry-admin-metric" key={metric.label} type="button" onClick={() => setTab(metric.tab)}>
+            <span className="ministry-admin-metric-icon" aria-hidden="true">{metric.icon}</span>
+            <span className="ministry-admin-metric-label">{metric.label}</span>
+            <strong>{metric.value}</strong>
+            <small>{metric.detail}</small>
+          </button>)}
+        </div>}
+
+        <div className="ministry-admin-overview-grid">
+          <section className="ministry-admin-panel ministry-admin-attention">
+            <div className="ministry-admin-panel-heading"><div><p className="ministry-admin-kicker">CARE AND CONNECTION</p><h2>Needs your attention</h2></div><span aria-hidden="true">♡</span></div>
+            <button type="button" className="ministry-admin-attention-row" onClick={() => setTab("messages")}>
+              <span className="ministry-admin-attention-icon" aria-hidden="true">✉</span><span><strong>New enquiries</strong><small>Follow up with people who reached out</small></span><b>{overview?.newMessages ?? "—"}</b>
+            </button>
+            <button type="button" className="ministry-admin-attention-row" onClick={() => setTab("prayers")}>
+              <span className="ministry-admin-attention-icon" aria-hidden="true">✧</span><span><strong>Prayer requests</strong><small>Requests waiting for the prayer team</small></span><b>{overview?.pendingPrayers ?? "—"}</b>
+            </button>
+            <button type="button" className="ministry-admin-attention-row" onClick={() => setTab("registrations")}>
+              <span className="ministry-admin-attention-icon" aria-hidden="true">⌑</span><span><strong>Event registrations</strong><small>People signed up for ministry gatherings</small></span><b>{overview?.registrationCount ?? "—"}</b>
+            </button>
+          </section>
+
+          <section className="ministry-admin-panel ministry-admin-next-event">
+            <div className="ministry-admin-panel-heading"><div><p className="ministry-admin-kicker">UP NEXT</p><h2>Upcoming gathering</h2></div><span aria-hidden="true">✦</span></div>
+            {upcomingEvent ? <>
+              <p className="ministry-admin-event-date">{new Intl.DateTimeFormat("en", { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(new Date(upcomingEvent.startsAt))}</p>
+              <h3>{upcomingEvent.title}</h3>
+              <p className="ministry-admin-panel-muted">{upcomingEvent.venue || "Venue to be announced"}</p>
+              <button className="ministry-admin-text-link" type="button" onClick={() => setTab("events")}>Manage events <span aria-hidden="true">→</span></button>
+            </> : <>
+              <h3>Make room for the next gathering</h3>
+              <p className="ministry-admin-panel-muted">There are no upcoming events yet. Add a gathering, conference, or outreach to the calendar.</p>
+              <button className="ministry-admin-text-link" type="button" onClick={() => setTab("events")}>Create an event <span aria-hidden="true">→</span></button>
+            </>}
+          </section>
+
+          <section className="ministry-admin-panel ministry-admin-quick-actions">
+            <div className="ministry-admin-panel-heading"><div><p className="ministry-admin-kicker">KEEP THINGS MOVING</p><h2>Quick actions</h2></div></div>
+            <div className="ministry-admin-action-grid">
+              <button type="button" onClick={() => setTab("sermons")}><span aria-hidden="true">＋</span><strong>Add a sermon</strong><small>Share a new message</small></button>
+              <button type="button" onClick={() => setTab("events")}><span aria-hidden="true">＋</span><strong>Plan an event</strong><small>Schedule a gathering</small></button>
+              <button type="button" onClick={() => setTab("campaigns")}><span aria-hidden="true">＋</span><strong>Start a campaign</strong><small>Invite people to give</small></button>
+              <button type="button" onClick={() => setTab("site")}><span aria-hidden="true">↗</span><strong>Update the website</strong><small>Keep your information current</small></button>
+            </div>
+          </section>
+
+          <section className="ministry-admin-panel ministry-admin-giving">
+            <div className="ministry-admin-panel-heading"><div><p className="ministry-admin-kicker">GENEROSITY IN ACTION</p><h2>Giving campaigns</h2></div><span aria-hidden="true">♡</span></div>
+            {campaigns.slice(0, 2).map((campaign) => {
+              const progress = campaign.targetAmountMinor > 0 ? Math.min(100, Math.round(campaign.raisedAmountMinor / campaign.targetAmountMinor * 100)) : 0;
+              return <div className="ministry-admin-campaign" key={campaign.id}>
+                <div><strong>{campaign.title}</strong><small>{campaign.currency} {(campaign.raisedAmountMinor / 100).toLocaleString()} of {(campaign.targetAmountMinor / 100).toLocaleString()}</small></div>
+                <div className="ministry-admin-progress" role="progressbar" aria-label={`${campaign.title} campaign progress`} aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100}><span style={{ width: `${progress}%` }} /></div>
+              </div>;
+            })}
+            {!campaigns.length && <p className="ministry-admin-panel-muted">Campaigns you create will appear here, with confirmed giving progress.</p>}
+            <button className="ministry-admin-text-link" type="button" onClick={() => setTab("campaigns")}>Manage campaigns <span aria-hidden="true">→</span></button>
+          </section>
+        </div>
+      </div>}
+      {tab !== "overview" && <header className="ministry-admin-section-heading"><p className="ministry-admin-kicker">{isGlobalMission ? "GLOBAL MISSION · MINISTRY DESK" : organizationName}</p><h1>{tabs.find(([id]) => id === tab)?.[1]}</h1><p>Manage ministry records for {organizationName}.</p></header>}
       {tab === "site" && <SiteSettingsEditor />}
       {tab === "sermons" && <>
         <form onSubmit={createSermon} className="ch-grid-2" style={{ marginBottom: 24 }}>
@@ -186,7 +279,7 @@ export function MinistryAdminDashboard() {
           <label style={{ display: "grid", gap: 6 }}>Speaker<input required minLength={2} maxLength={160} value={sermonForm.speaker} onChange={(e) => setSermonForm({ ...sermonForm, speaker: e.target.value })} /></label>
           <label style={{ display: "grid", gap: 6 }}>Scripture reference<input maxLength={160} value={sermonForm.scriptureReference} onChange={(e) => setSermonForm({ ...sermonForm, scriptureReference: e.target.value })} /></label>
           <label style={{ display: "grid", gap: 6 }}>YouTube video ID<input minLength={5} maxLength={64} value={sermonForm.youtubeVideoId} onChange={(e) => setSermonForm({ ...sermonForm, youtubeVideoId: e.target.value })} /></label>
-          <label style={{ display: "grid", gap: 6 }}>Thumbnail image URL<input type="url" value={sermonForm.thumbnailUrl} onChange={(e) => setSermonForm({ ...sermonForm, thumbnailUrl: e.target.value })} /></label>
+          <MediaUploadField label="Sermon thumbnail" value={sermonForm.thumbnailUrl} onChange={(value) => setSermonForm({ ...sermonForm, thumbnailUrl: value })} />
           <label style={{ gridColumn: "1 / -1" }}>Description<textarea maxLength={5000} rows={4} value={sermonForm.description} onChange={(e) => setSermonForm({ ...sermonForm, description: e.target.value })} /></label>
           <label style={{ display: "grid", gap: 6 }}>Visibility<select aria-label="New sermon visibility" value={sermonForm.status} onChange={(e) => setSermonForm({ ...sermonForm, status: e.target.value as "draft" | "published" })}><option value="draft">Save as draft</option><option value="published">Publish now</option></select></label>
           <button className="ch-btn ch-btn-primary" disabled={busy}>Save sermon</button>
@@ -201,7 +294,7 @@ export function MinistryAdminDashboard() {
           <label style={{ display: "grid", gap: 6 }}>Ends at (optional)<input type="datetime-local" value={eventForm.endsAt} onChange={(e) => setEventForm({ ...eventForm, endsAt: e.target.value })} /></label>
           <label style={{ display: "grid", gap: 6 }}>Venue<input maxLength={180} value={eventForm.venue} onChange={(e) => setEventForm({ ...eventForm, venue: e.target.value })} /></label>
           <label style={{ display: "grid", gap: 6 }}>Address<input maxLength={500} value={eventForm.address} onChange={(e) => setEventForm({ ...eventForm, address: e.target.value })} /></label>
-          <label style={{ display: "grid", gap: 6 }}>Poster image URL<input type="url" value={eventForm.posterUrl} onChange={(e) => setEventForm({ ...eventForm, posterUrl: e.target.value })} /></label>
+          <MediaUploadField label="Event poster" value={eventForm.posterUrl} onChange={(value) => setEventForm({ ...eventForm, posterUrl: value })} />
           <label style={{ display: "grid", gap: 6 }}>Registration capacity (optional)<input type="number" min={1} value={eventForm.registrationCapacity} onChange={(e) => setEventForm({ ...eventForm, registrationCapacity: e.target.value })} /></label>
           <label style={{ gridColumn: "1 / -1" }}>Description<textarea maxLength={5000} rows={4} value={eventForm.description} onChange={(e) => setEventForm({ ...eventForm, description: e.target.value })} /></label>
           <label style={{ display: "flex", alignItems: "center", gap: 10 }}><input type="checkbox" checked={eventForm.registrationEnabled} onChange={(e) => setEventForm({ ...eventForm, registrationEnabled: e.target.checked })} />Enable event registration</label>

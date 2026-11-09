@@ -10,6 +10,8 @@ import { authRoutes } from "./modules/auth/routes.js";
 import { adminRoutes } from "./modules/admin/routes.js";
 import { churchRoutes } from "./modules/church/routes.js";
 
+const MEDIA_UPLOAD_LIMIT_BYTES = 8 * 1024 * 1024;
+
 export async function buildApp(config: AppConfig) {
   const app = Fastify({
     logger: {
@@ -22,6 +24,10 @@ export async function buildApp(config: AppConfig) {
     // Enable only when the API is reachable exclusively through a trusted
     // reverse proxy that strips client-supplied forwarded headers.
     trustProxy: config.trustProxy,
+  });
+
+  app.addContentTypeParser("application/octet-stream", { parseAs: "buffer", bodyLimit: MEDIA_UPLOAD_LIMIT_BYTES }, (_request, body, done) => {
+    done(null, body);
   });
 
   const configuredOrigins = new Set(config.corsOrigins);
