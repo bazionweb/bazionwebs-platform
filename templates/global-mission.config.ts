@@ -12,10 +12,10 @@ export const globalMissionConfig: MinistryConfig = {
     heroBgUrl: "/images/hero-bg-optimized.jpg",
   },
   hero: {
-    eyebrow: "Welcome",
-    title: "A place to belong",
-    highlightedTitle: "and grow in faith",
-    subtitle: "Revive the Nations. Preach the Gospel. Win Souls.",
+    eyebrow: "Global Mission for Christ International",
+    title: "Propagating Revival",
+    highlightedTitle: "to the Nations",
+    subtitle: "Revive the Nations. Preach the Gospel. Win Souls. — Propagating revival from Kenya to the ends of the earth.",
   },
   contact: {
     phones: ["+1 (512) 785 6994", "+254 721 341793", "+254 710 642 232"],
@@ -31,11 +31,16 @@ export const globalMissionConfig: MinistryConfig = {
     twitter: "https://twitter.com/globalmissionfc",
     whatsapp: "https://wa.me/254721341793",
   },
-  statistics: [],
+  statistics: [
+    { label: "Souls reached", value: 34200, suffix: "+" },
+    { label: "Annual conferences", value: 5 },
+    { label: "Years of ministry", value: 6, suffix: "+" },
+    { label: "Nations touched", value: 10, suffix: "+" },
+  ],
   giving: {
     mpesaPaybill: "247247",
-    accountName: "0721341793",
-    instructions: "Go to M-Pesa > Lipa na M-Pesa > Paybill > Business No: 247247 (Equity Bank) > Account No: 0721341793",
+    accountName: "GLOBAL · YINV",
+    instructions: "Go to M-Pesa > Lipa na M-Pesa > Paybill > Business No: 247247 (Equity Bank) > Account No: 262518",
     suggestedAmounts: [500, 1000, 2500, 5000],
   },
   serviceTimes: [],
@@ -46,7 +51,10 @@ export const globalMissionConfig: MinistryConfig = {
   ministries: [],
   galleryImages: [],
   faqs: [],
-  metadata: { title: "", description: "" },
+  metadata: {
+    title: "Global Mission for Christ International",
+    description: "Propagating revival to the nations through prayer, the Word of God, evangelism, and community outreach. From Kenya to the ends of the earth — Christ for every nation.",
+  },
   vision: {
     title: "Our Vision",
     statement:

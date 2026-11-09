@@ -9,7 +9,9 @@ import {
   SermonCard,
   EventCard,
   Modal,
+  StatsCounter,
 } from "@bazion/ui";
+import { globalMissionConfig } from "../../../templates/global-mission.config";
 import { useMinistrySite } from "../lib/use-ministry-site";
 
 interface PublicSermon {
@@ -36,6 +38,8 @@ function eventCardData(event: PublicEvent) {
 
 export default function ChurchHomePage() {
   const site = useMinistrySite();
+  const isGlobalMissionSite = site.tenantSlug === globalMissionConfig.tenantSlug
+    || site.ministryName.trim().toLowerCase() === globalMissionConfig.ministryName.toLowerCase();
   const [activeVideo, setActiveVideo] = useState<{ title: string; youtubeVideoId?: string } | null>(
     null
   );
@@ -112,12 +116,18 @@ export default function ChurchHomePage() {
           title={site.hero.title}
           highlightedTitle={site.hero.highlightedTitle}
           subtitle={site.hero.subtitle || site.tagline}
-          primaryCtaText="Plan your visit"
-          primaryCtaHref="/visit"
-          secondaryCtaText="Explore messages"
-          secondaryCtaHref="/sermons"
+          primaryCtaText={isGlobalMissionSite ? "Watch the latest sermon" : "Plan your visit"}
+          primaryCtaHref={isGlobalMissionSite ? "/sermons" : "/visit"}
+          secondaryCtaText={isGlobalMissionSite ? "Give to the mission" : "Explore messages"}
+          secondaryCtaHref={isGlobalMissionSite ? "/give" : "/sermons"}
           bgImageUrl={site.branding.heroBgUrl}
         />
+
+        {site.statistics.length > 0 && <StatsCounter
+          stats={site.statistics}
+          title="Our mission in action"
+          subtitle="Serving communities and carrying the Gospel from Kenya to the nations."
+        />}
 
         {/* 3. Ministry Introduction */}
         <section className="ch-section">
