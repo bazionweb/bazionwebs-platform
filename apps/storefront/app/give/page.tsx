@@ -7,6 +7,7 @@ import {
   PageHero,
   ScriptureQuote,
 } from "@bazion/ui";
+import { CopyGivingDetail } from "./copy-giving-detail";
 import { useMinistrySite } from "../../lib/use-ministry-site";
 
 interface PublicCampaign {
@@ -192,23 +193,8 @@ export default function GivePage() {
                   </div>
 
                   <div style={{ display: "grid", gap: "16px", marginBottom: "24px" }}>
-                    <div>
-                      <div style={{ fontSize: "11px", textTransform: "uppercase", letterSpacing: "1px", color: "#94a3b8" }}>
-                        Business / Paybill Number
-                      </div>
-                      <div style={{ fontSize: "32px", fontWeight: 900, letterSpacing: "1px", color: "#ffffff" }}>
-                        {site.giving.mpesaPaybill}
-                      </div>
-                    </div>
-
-                    <div>
-                      <div style={{ fontSize: "11px", textTransform: "uppercase", letterSpacing: "1px", color: "#94a3b8" }}>
-                        Account Number
-                      </div>
-                      <div style={{ fontSize: "28px", fontWeight: 800, color: "var(--church-accent)" }}>
-                        {site.giving.accountName}
-                      </div>
-                    </div>
+                    <CopyGivingDetail label="Business / Paybill Number" value={site.giving.mpesaPaybill} variant="paybill" />
+                    <CopyGivingDetail label="Account Number" value={site.giving.accountName} variant="account" />
                   </div>
 
                   <div

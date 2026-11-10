@@ -416,6 +416,22 @@ body { background: var(--church-bg); color: var(--church-text); font-family: var
   border-color: var(--church-border-dark);
 }
 
+#main-content .ch-reveal {
+  opacity: 0;
+  transform: translate3d(0, 14px, 0);
+  transition: opacity 420ms ease, transform 420ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+#main-content .ch-reveal.ch-reveal-visible {
+  opacity: 1;
+  transform: translate3d(0, 0, 0);
+}
+
+#main-content .ch-card.ch-reveal-visible:hover,
+#main-content .ch-card.ch-reveal-visible:focus-within {
+  transform: translate3d(0, -2px, 0);
+}
+
 .ch-gallery-trigger {
   position: relative;
   display: block;
@@ -853,6 +869,77 @@ body { background: var(--church-bg); color: var(--church-text); font-family: var
   outline-offset: 3px;
 }
 
+.ch-giving-detail-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.ch-giving-detail-label {
+  color: #cbd5e1;
+  font-size: 11px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.ch-giving-detail-value {
+  overflow-wrap: anywhere;
+}
+
+.ch-giving-detail-value--paybill {
+  color: #fff;
+  font-size: clamp(25px, 5vw, 32px);
+  font-weight: 900;
+  letter-spacing: 1px;
+}
+
+.ch-giving-detail-value--account {
+  color: var(--church-accent);
+  font-size: clamp(22px, 4.5vw, 28px);
+  font-weight: 800;
+}
+
+.ch-giving-copy-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-width: 78px;
+  min-height: 40px;
+  padding: 8px 11px;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  font: 600 12px var(--church-font);
+  cursor: pointer;
+  transition: background-color 180ms ease, border-color 180ms ease;
+}
+
+.ch-giving-copy-button svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.ch-giving-copy-button:hover {
+  border-color: #fff;
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.ch-giving-copy-status {
+  flex-basis: 100%;
+  min-height: 1.25em;
+  color: #d9f7df;
+  font-size: 12px;
+}
+
 .ch-event-title {
   font-size: 19px;
   font-family: var(--church-serif);
@@ -1092,6 +1179,11 @@ button:disabled { cursor: not-allowed; opacity: 0.65; }
   .ch-hero-particles span:nth-child(n + 33) { display: none; }
 }
 @media (prefers-reduced-motion: reduce) {
+  #main-content .ch-reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
   html { scroll-behavior: auto; }
   *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
   .ch-hero-particles { display: none; }
