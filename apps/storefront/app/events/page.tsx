@@ -9,6 +9,7 @@ import {
   CategoryFilter,
   Modal,
 } from "@bazion/ui";
+import { EventCalendarButton } from "./event-calendar-button";
 import { useMinistrySite } from "../../lib/use-ministry-site";
 
 interface PublicEvent {
@@ -210,6 +211,14 @@ export default function EventsPage() {
                   slug={evt.slug}
                   posterUrl={evt.posterUrl ?? undefined}
                   registrationOpen={display.registrationOpen}
+                  calendarAction={<EventCalendarButton event={{
+                    id: evt.id,
+                    title: evt.title,
+                    startsAt: evt.startsAt,
+                    endsAt: evt.endsAt,
+                    description: evt.description,
+                    location: [evt.venue, evt.address].filter(Boolean).join(", "),
+                  }} />}
                   onRegister={() => { setRegistrationError(null); setPrivacyConsent(false); setRegisteringEvent(evt); }}
                 />;
               })}

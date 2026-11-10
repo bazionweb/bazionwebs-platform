@@ -12,6 +12,7 @@ import {
   StatsCounter,
 } from "@bazion/ui";
 import { globalMissionConfig } from "../../../templates/global-mission.config";
+import { EventCalendarButton } from "./events/event-calendar-button";
 import { useMinistrySite } from "../lib/use-ministry-site";
 
 interface PublicSermon {
@@ -21,7 +22,7 @@ interface PublicSermon {
 }
 interface PublicEvent {
   id: string; slug: string; title: string; description: string | null; posterUrl: string | null;
-  venue: string | null; address: string | null; startsAt: string; registrationEnabled: boolean;
+  venue: string | null; address: string | null; startsAt: string; endsAt: string | null; registrationEnabled: boolean;
   registrationCapacity: number | null; status: "upcoming" | "in_progress" | "completed" | "cancelled";
 }
 
@@ -273,6 +274,14 @@ export default function ChurchHomePage() {
                   slug={evt.slug}
                   posterUrl={evt.posterUrl ?? undefined}
                   registrationOpen={display.registrationOpen}
+                  calendarAction={<EventCalendarButton event={{
+                    id: evt.id,
+                    title: evt.title,
+                    startsAt: evt.startsAt,
+                    endsAt: evt.endsAt,
+                    description: evt.description,
+                    location: [evt.venue, evt.address].filter(Boolean).join(", "),
+                  }} />}
                   onRegister={(e: { id: string; title: string }) => { setRegistrationPrivacyConsent(false); setSelectedEvent(e); }}
                 />
               );})}

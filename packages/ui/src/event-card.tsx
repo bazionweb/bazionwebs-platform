@@ -1,5 +1,7 @@
 "use client";
 
+import type { ReactNode } from "react";
+
 export interface EventCardProps {
   id: string;
   title: string;
@@ -13,6 +15,7 @@ export interface EventCardProps {
   slug?: string;
   registrationOpen?: boolean;
   onRegister?: (event: { id: string; title: string }) => void;
+  calendarAction?: ReactNode;
 }
 
 export function EventCard({
@@ -28,6 +31,7 @@ export function EventCard({
   slug,
   registrationOpen = true,
   onRegister,
+  calendarAction,
 }: EventCardProps) {
   const detailUrl = slug ? `/events/${slug}` : undefined;
 
@@ -83,6 +87,7 @@ export function EventCard({
             </a>
           )}
         </div>
+        {calendarAction && <div className="ch-event-calendar-action">{calendarAction}</div>}
       </div>
     </article>
   );
