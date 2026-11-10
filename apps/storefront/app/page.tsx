@@ -1,28 +1,34 @@
-import { Storefront } from "./storefront";
+import type { Metadata } from "next";
+import ChurchHomePage from "./church-home";
+import { fetchTenantPublicData } from "../lib/server-tenant-api";
+import { ShopStorefront } from "./shop/shop-storefront";
+import "./shop/shop.css";
 
-const apiBase = process.env.API_BASE_URL ?? "http://localhost:4000";
+type Currency = "KES" | "USD" | "EUR" | "GBP" | "CAD" | "AUD" | "NZD" | "CHF" | "SGD" | "ZAR" | "NGN" | "GHS" | "INR" | "AED" | "BRL" | "MXN" | "SAR" | "CNY" | "HKD" | "SEK" | "NOK" | "DKK" | "PLN" | "THB" | "PHP";
+type Store = {
+  storeName: string; tagline: string; supportEmail: string; isHomePage: boolean; locale: string; defaultCountryCode: string;
+  defaultCurrency: Currency; supportedCurrencies: Currency[];
+  shippingRates: Partial<Record<Currency, number>>; shippingCountries: string[];
+  paymentProvider: "mpesa" | "mock";
+};
+type Product = {
+  id: string; sku: string; slug: string; name: string; description: string | null; category: string;
+  imageUrl: string | null; imageAlt: string | null; featured: boolean; compareAtPriceMinor: number | null;
+  currency: Currency; priceMinor: number; stockAvailable: number | null;
+};
 
-async function getProducts() {
-  try {
-    const response = await fetch(`${apiBase}/v1/products`, { cache: "no-store" });
-    if (!response.ok) return [];
-    return await response.json() as Array<{ id: string; sku: string; name: string; description: string | null; currency: string; priceMinor: number; stockAvailable: number | null }>;
-  } catch { return []; }
+export async function generateMetadata(): Promise<Metadata> {
+  const response = await fetchTenantPublicData<{ store: Store }>("/v1/storefront");
+  if (response?.store?.isHomePage) return { title: response.store.storeName, description: response.store.tagline };
+  return {};
 }
 
 export default async function HomePage() {
-  const products = await getProducts();
-  return (
-    <main className="shell">
-      <nav className="nav"><a className="brand" href="/">BAZION<span>WEB</span></a><span className="nav-tag">PLATFORM DEMO</span><a className="cart-nav" href="/workspace">Workspace ↗</a><a className="cart-nav" href="/login">Sign in ↗</a><a className="cart-nav" href="#cart">Cart ↓</a></nav>
-      <section className="hero">
-        <p className="eyebrow">BUILD · HOST · GROW</p>
-        <h1>Reusable commerce.<br /><em>Ready for your brand.</em></h1>
-        <p className="intro">This demo storefront reads products from the Bazion commerce API. Its cart and checkout logic lives in shared server-side packages and can power independently branded client stores.</p>
-        <a className="cta" href="#products">Explore demo products <span>↘</span></a>
-      </section>
-      <Storefront products={products} apiBase="" />
-      <footer><span>BAZION WEB PLATFORM</span><span>Reusable blocks. Independent client experiences.</span></footer>
-    </main>
+  const response = await fetchTenantPublicData<{ store: Omit<Store, "paymentProvider">; paymentProvider: Store["paymentProvider"] }>("/v1/storefront");
+  if (!response?.store?.isHomePage) return <ChurchHomePage />;
+  const store = { ...response.store, paymentProvider: response.paymentProvider };
+  const catalog = await fetchTenantPublicData<{ items: Product[]; categories: string[] }>(
+    `/v1/products?limit=100&sort=featured&currency=${encodeURIComponent(store.paymentProvider === "mpesa" ? "KES" : store.defaultCurrency)}`,
   );
+  return <ShopStorefront initialProducts={catalog?.items ?? []} categories={catalog?.categories ?? []} store={store} homeHref="/" />;
 }

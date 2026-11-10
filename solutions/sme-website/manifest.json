@@ -1,6 +1,10 @@
 {
   "version": "1.0.0",
   "status": "planned",
+  "readiness": "roadmap",
+  "readinessNotes": [
+    "This solution is a roadmap composition. Its required modules must be implemented and contract-validated before provisioning."
+  ],
   "id": "sme-website",
   "name": "SME and Business Website",
   "description": "Reusable company website composed from the common content, design, lead-capture and discovery modules.",

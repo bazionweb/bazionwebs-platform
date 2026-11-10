@@ -1,6 +1,10 @@
 {
   "version": "1.0.0",
   "status": "planned",
+  "readiness": "roadmap",
+  "readinessNotes": [
+    "This solution is a roadmap composition. Its required modules must be implemented and contract-validated before provisioning."
+  ],
   "id": "enterprise-erp",
   "name": "Enterprise ERP",
   "description": "Composable enterprise workflow suite; individual domains are enabled only when required and separately security-reviewed.",

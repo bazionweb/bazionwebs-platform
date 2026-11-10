@@ -1,0 +1,77 @@
+{
+  "schemaVersion": "1.0.0",
+  "modules": [
+    {
+      "id": "platform-identity",
+      "displayName": "Platform identity and tenant access",
+      "description": "Authentication, tenant membership and access control. Required by the platform.",
+      "defaultEnabled": true,
+      "required": true,
+      "tenantAssignable": false,
+      "entitlementDependencies": []
+    },
+    {
+      "id": "commerce",
+      "displayName": "Commerce",
+      "description": "Product catalogue, guest carts, checkout, orders and payment boundary.",
+      "defaultEnabled": true,
+      "required": false,
+      "tenantAssignable": true,
+      "entitlementDependencies": ["platform-identity"]
+    },
+    {
+      "id": "analytics",
+      "displayName": "Analytics",
+      "description": "Tenant workspace metrics and analytics authorization surface.",
+      "defaultEnabled": true,
+      "required": false,
+      "tenantAssignable": true,
+      "entitlementDependencies": ["platform-identity"]
+    },
+    {
+      "id": "audit",
+      "displayName": "Audit trail",
+      "description": "Append-only platform security and administrative event history.",
+      "defaultEnabled": true,
+      "required": true,
+      "tenantAssignable": false,
+      "entitlementDependencies": ["platform-identity"]
+    },
+    {
+      "id": "notifications",
+      "displayName": "Notifications",
+      "description": "Transactional email/SMS outbox and supervised delivery worker.",
+      "defaultEnabled": true,
+      "required": true,
+      "tenantAssignable": false,
+      "entitlementDependencies": ["platform-identity"]
+    },
+    {
+      "id": "contacts-crm",
+      "displayName": "Contacts and customer directory",
+      "description": "Customer records, consent, notes, tags and relationships.",
+      "defaultEnabled": false,
+      "required": false,
+      "tenantAssignable": false,
+      "entitlementDependencies": ["platform-identity"]
+    },
+    {
+      "id": "website-content",
+      "displayName": "Website content",
+      "description": "Tenant pages, content models, revisions and publishing.",
+      "defaultEnabled": false,
+      "required": false,
+      "tenantAssignable": false,
+      "entitlementDependencies": ["platform-identity"]
+    },
+    {
+      "id": "church-ministry",
+      "displayName": "Church & Ministry Platform",
+      "description": "Tenant-scoped sermons, events, registrations, donations, enquiries and prayer requests; broader ministry operations remain in progress.",
+      "defaultEnabled": true,
+      "required": false,
+      "tenantAssignable": true,
+      "entitlementDependencies": ["platform-identity"]
+    }
+  ]
+}

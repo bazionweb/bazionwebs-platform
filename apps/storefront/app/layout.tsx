@@ -1,11 +1,64 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import "./recovery.css";
+import "@bazion/ui/church.css";
+import { SiteThemeProvider } from "../lib/site-theme-provider";
+import { fetchTenantPublicData, getTenantRequestContext } from "../lib/server-tenant-api";
 
-export const metadata: Metadata = {
-  title: "Bazion Demo Store",
-  description: "A starter storefront powered by the Bazion Web Platform.",
-};
+interface PublicSiteMetadataResponse {
+  tenant?: { name?: string | null } | null;
+  profile?: { ministryName?: string | null; description?: string | null } | null;
+  siteSettings?: { metadata?: { title?: string; description?: string }; branding?: { heroImageUrl?: string } } | null;
+}
 
-export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="en"><body>{children}</body></html>;
+export async function generateMetadata(): Promise<Metadata> {
+  const [site, tenantContext] = await Promise.all([
+    fetchTenantPublicData<PublicSiteMetadataResponse>("/v1/public/church/site"),
+    getTenantRequestContext(),
+  ]);
+  const ministryName = site?.profile?.ministryName?.trim() || site?.tenant?.name?.trim() || "Church & Ministry";
+  const title = site?.siteSettings?.metadata?.title?.trim() || ministryName;
+  const description = (site?.siteSettings?.metadata?.description?.trim() ||
+    site?.profile?.description?.trim() || "Service information, community, events, sermons and giving.").slice(0, 320);
+  const image = site?.siteSettings?.branding?.heroImageUrl;
+
+  return {
+    title: { default: title, template: `%s | ${title}` },
+    description,
+    ...(tenantContext ? { metadataBase: new URL(tenantContext.origin) } : {}),
+    openGraph: {
+      type: "website",
+      siteName: ministryName,
+      title,
+      description,
+      ...(tenantContext ? { url: tenantContext.origin } : {}),
+      ...(image ? { images: [image] } : {}),
+    },
+    twitter: {
+      card: image ? "summary_large_image" : "summary",
+      title,
+      description,
+      ...(image ? { images: [image] } : {}),
+    },
+  };
+}
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
+  return (
+    <html lang="en">
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap"
+          rel="stylesheet"
+        />
+      </head>
+      <body><SiteThemeProvider />{children}</body>
+    </html>
+  );
 }

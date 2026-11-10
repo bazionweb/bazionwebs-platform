@@ -35,3 +35,6 @@ export interface PaymentProvider {
   // A real adapter must verify authenticity using the provider's documented signature/authentication mechanism.
   verifyWebhook(rawBody: Buffer, headers: Record<string, string | string[] | undefined>): Promise<VerifiedPaymentEvent>;
 }
+
+export { DarajaClient, DarajaRequestError, normalizeKenyanPhoneNumber } from "./daraja.js";
+export type { DarajaConfig, DarajaStkPushInput, DarajaStkPushResult } from "./daraja.js";

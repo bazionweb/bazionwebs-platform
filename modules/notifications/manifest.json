@@ -5,10 +5,15 @@
   "owner": "platform",
   "status": "partial",
   "entrypoints": {
-    "domain": "packages/notifications",
+    "adapter": "packages/notifications",
     "worker": "packages/notifications/src/worker.ts"
   },
+  "implementation": { "mode": "workspace-package", "packageName": "@bazion/notifications" },
   "tenantModel": "mixed",
+  "tables": [
+    { "name": "notification_outbox", "owner": "notifications", "tenantScoped": false, "rls": "not-applicable", "migration": "0003_notification_outbox.sql" }
+  ],
+  "migrations": ["0003_notification_outbox.sql", "0004_notification_runtime_roles.sql"],
   "permissions": [],
   "dependencies": [
     "platform-identity"

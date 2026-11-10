@@ -11,6 +11,7 @@ export const platformPermissions = [
   "tenant.close",
   "tenant.owner.assign",
   "module.catalog.read",
+  "tenant.modules.read",
   "tenant.modules.update",
   "tenant.settings.read",
   "tenant.settings.update",
@@ -24,14 +25,12 @@ export type PlatformPermission = (typeof platformPermissions)[number];
 const platformRolePermissions: Readonly<Record<PlatformRole, readonly PlatformPermission[]>> = {
   platform_owner: platformPermissions,
   platform_admin: [
-    "platform.overview.read",
     "tenant.list",
     "tenant.read",
-    "tenant.create",
     "tenant.update",
     "tenant.suspend",
     "tenant.restore",
-    "module.catalog.read",
+    "tenant.modules.read",
     "tenant.modules.update",
     "tenant.settings.read",
     "tenant.settings.update",
@@ -40,17 +39,17 @@ const platformRolePermissions: Readonly<Record<PlatformRole, readonly PlatformPe
     "usage.read",
   ],
   platform_support: [
-    "platform.overview.read",
     "tenant.list",
     "tenant.read",
+    "tenant.modules.read",
     "tenant.settings.read",
     "audit.read",
     "usage.read",
   ],
 };
 
-export function isPlatformOrganizationCreator(role: string | null | undefined): role is "platform_owner" | "platform_admin" {
-  return role === "platform_owner" || role === "platform_admin";
+export function isPlatformOrganizationCreator(role: string | null | undefined): role is "platform_owner" {
+  return role === "platform_owner";
 }
 
 /** Platform permissions are independent of Better Auth organization roles. */
@@ -60,6 +59,16 @@ export function canAccessPlatformPermission(
 ): permission is PlatformPermission {
   if (role !== "platform_owner" && role !== "platform_admin" && role !== "platform_support") return false;
   return (platformRolePermissions[role] as readonly string[]).includes(permission);
+}
+
+/** Only the platform owner is global; other platform roles must match the active tenant context. */
+export function canAccessPlatformTenantScope(
+  platformRole: string | null | undefined,
+  activeTenantId: string | null | undefined,
+  targetTenantId: string | null | undefined,
+): boolean {
+  if (platformRole === "platform_owner") return true;
+  return Boolean(activeTenantId && targetTenantId && activeTenantId === targetTenantId);
 }
 
 export function getPlatformPermissions(role: string | null | undefined): readonly PlatformPermission[] {

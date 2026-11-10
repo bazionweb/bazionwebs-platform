@@ -30,7 +30,7 @@ Research baseline: **5 November 2026**. Versions change; re-check release and su
 - [OWASP Third-Party Payment Gateway Integration Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Third_Party_Payment_Gateway_Integration_Cheat_Sheet.html): server-side amount verification, callback validation, state handling and secure integration patterns.
 - [Stripe webhooks](https://docs.stripe.com/webhooks): asynchronous payment state notifications and server-side fulfillment.
 - [Stripe webhook signature verification](https://docs.stripe.com/webhooks/signature): verify signatures against the raw request body and endpoint secret.
-- [Safaricom Daraja developer portal](https://developer.safaricom.co.ke/): official M-Pesa API and sandbox starting point for a future adapter.
+- [Safaricom Daraja developer portal](https://developer.safaricom.co.ke/): official M-Pesa API reference and sandbox for validating the implemented STK Push adapter.
 
 ## AI integration
 

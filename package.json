@@ -7,19 +7,26 @@
     "node": ">=22.16.0 <27"
   },
   "scripts": {
-    "dev": "dotenv -e .env -- turbo run dev --parallel",
+    "dev": "dotenv -e .env -- turbo run dev",
+    "dev:gmfc": "dotenv -e .env -o -v DEFAULT_TENANT_ID=7a80eaae-6f8c-44c1-b22a-3dca458f0ec1 -v PORT=4100 -v API_BASE_URL=http://localhost:4100 -v PLATFORM_CONSOLE_URL=http://localhost:3001 -v NEXT_DIST_DIR=.next-gmfc -v BETTER_AUTH_URL=http://localhost:4100 -v AUTH_APP_URL=http://localhost:3100 -v PUBLIC_STOREFRONT_URL=http://localhost:3100 -v CORS_ORIGINS=http://localhost:3100,http://localhost:3001,http://localhost:4100 -v BETTER_AUTH_TRUSTED_ORIGINS=http://localhost:3100,http://localhost:3001,http://localhost:4100 -- turbo run dev:gmfc --filter=@bazion/api --filter=@bazion/storefront --filter=@bazion/notifications --filter=@bazion/admin",
+    "dev:platform": "dotenv -e .env -- pnpm --filter @bazion/admin dev",
     "build": "turbo run build",
     "typecheck": "turbo run typecheck",
-    "test": "turbo run test",
+    "test": "node --test scripts/product-manifests.test.mjs scripts/runtime-module-catalog.test.mjs scripts/ci-test-env.test.mjs && turbo run test --concurrency=4",
     "db:up": "docker compose up -d db",
     "db:down": "docker compose down",
     "db:migrate": "dotenv -e .env -- pnpm --filter @bazion/database migrate",
     "db:seed": "dotenv -e .env -- pnpm --filter @bazion/database seed",
     "db:auth:migrate": "dotenv -e .env -- pnpm --filter @bazion/auth migrate",
+    "gmfc:migrate": "dotenv -e .env -o -v GMFC_TENANT_ID=7a80eaae-6f8c-44c1-b22a-3dca458f0ec1 -v DEFAULT_TENANT_ID=7a80eaae-6f8c-44c1-b22a-3dca458f0ec1 -- pnpm --filter @bazion/database migrate:global-mission",
+    "gmfc:migrate:apply": "dotenv -e .env -o -v GMFC_TENANT_ID=7a80eaae-6f8c-44c1-b22a-3dca458f0ec1 -v DEFAULT_TENANT_ID=7a80eaae-6f8c-44c1-b22a-3dca458f0ec1 -- pnpm --filter @bazion/database migrate:global-mission --apply",
     "auth:check": "pnpm --filter @bazion/auth typecheck && pnpm --filter @bazion/auth test",
-    "catalog:validate": "node scripts/validate-product-catalog.mjs && node scripts/validate-module-manifests.mjs",
+    "catalog:validate": "node scripts/validate-product-catalog.mjs && node scripts/validate-module-manifests.mjs && node scripts/validate-product-manifests.mjs && node scripts/generate-runtime-module-catalog.mjs --check",
     "modules:validate": "node scripts/validate-module-manifests.mjs",
-    "production:preflight": "node scripts/production-preflight.mjs"
+    "modules:generate": "node scripts/generate-runtime-module-catalog.mjs",
+    "modules:check": "node scripts/generate-runtime-module-catalog.mjs --check",
+    "production:preflight": "node scripts/production-preflight.mjs",
+    "platform:create-admin": "dotenv -e .env -- pnpm --filter @bazion/auth run platform:create-admin"
   },
   "devDependencies": {
     "dotenv-cli": "^10.0.0",

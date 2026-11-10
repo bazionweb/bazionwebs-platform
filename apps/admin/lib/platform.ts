@@ -1,6 +1,38 @@
+import "server-only";
 import { headers } from "next/headers";
+import { redirect } from "next/navigation";
 
 const apiBase = (process.env.API_BASE_URL ?? "http://localhost:4000").replace(/\/$/, "");
+
+type PlatformIdentity = {
+  user: { id: string; email: string; name: string; emailVerified: boolean };
+  platformRole: "platform_owner" | "platform_admin" | "platform_support" | null;
+};
+
+/** The global control plane is reserved for the platform owner. Tenant and
+ * tenant-scoped support accounts use their own workspace dashboard. */
+export async function requirePlatformOwner(): Promise<PlatformIdentity> {
+  const cookie = (await headers()).get("cookie");
+  if (!cookie) redirect("/login?callbackURL=%2F");
+
+  let response: Response;
+  try {
+    response = await fetch(`${apiBase}/v1/auth/me`, {
+      cache: "no-store",
+      headers: { cookie },
+      signal: AbortSignal.timeout(5_000),
+    });
+  } catch {
+    throw new Error("Could not verify platform access. Check the identity API and try again.");
+  }
+
+  if (response.status === 401) redirect("/login?callbackURL=%2F");
+  if (!response.ok) throw new Error("Could not verify platform access. Try again shortly.");
+
+  const identity = await response.json() as PlatformIdentity;
+  if (identity.platformRole !== "platform_owner") redirect("/login?reason=platform-owner-required");
+  return identity;
+}
 
 export type Tenant = {
   id: string;

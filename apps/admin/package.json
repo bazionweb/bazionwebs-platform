@@ -4,11 +4,13 @@
   "private": true,
   "scripts": {
     "dev": "next dev -p 3001",
+    "dev:gmfc": "next dev -p 3001",
     "build": "next build",
     "start": "next start -p 3001",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@bazion/auth": "workspace:*",
     "next": "16.4.5",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"

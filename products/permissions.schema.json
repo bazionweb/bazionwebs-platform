@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bazionweb.com/schemas/permissions.schema.json",
+  "title": "Bazion module permission registry",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "roles", "permissions"],
+  "properties": {
+    "version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+    "roles": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+    "permissions": {
+      "type": "array", "minItems": 1,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["id", "moduleId", "scope", "resource", "action", "roles", "description"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z][a-z0-9.-]+$" },
+          "moduleId": { "type": "string", "pattern": "^[a-z][a-z0-9-]+$" },
+          "scope": { "enum": ["tenant", "platform", "mixed"] },
+          "resource": { "type": "string", "minLength": 1 },
+          "action": { "type": "string", "minLength": 1 },
+          "roles": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+          "description": { "type": "string", "minLength": 1 }
+        }
+      }
+    }
+  }
+}

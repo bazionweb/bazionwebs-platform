@@ -6,19 +6,29 @@ import { fromNodeHeaders } from "better-auth/node";
 import { auth, isVerifiedTenantHost } from "@bazion/auth/server";
 import type { AppConfig } from "./config.js";
 import { commerceRoutes } from "./modules/commerce/routes.js";
+import { commerceAdminRoutes } from "./modules/commerce/admin-routes.js";
 import { authRoutes } from "./modules/auth/routes.js";
 import { adminRoutes } from "./modules/admin/routes.js";
+import { churchRoutes } from "./modules/church/routes.js";
+
+const MEDIA_UPLOAD_LIMIT_BYTES = 8 * 1024 * 1024;
 
 export async function buildApp(config: AppConfig) {
   const app = Fastify({
     logger: {
       level: config.LOG_LEVEL,
-      redact: ["req.headers.authorization", "req.headers.cookie", "req.headers.x-cart-token", "req.headers.x-dev-secret", "req.headers['set-cookie']"],
+      // Daraja carries its unguessable callback capability in the query string.
+      // Redact the URL at the request logger boundary so access logs cannot leak it.
+      redact: ["req.url", "req.headers.authorization", "req.headers.cookie", "req.headers.x-cart-token", "req.headers.x-dev-secret", "req.headers.x-donation-status-token", "req.headers.x-payment-status-token", "req.headers['set-cookie']"],
     },
     bodyLimit: 1_048_576,
     // Enable only when the API is reachable exclusively through a trusted
     // reverse proxy that strips client-supplied forwarded headers.
     trustProxy: config.trustProxy,
+  });
+
+  app.addContentTypeParser("application/octet-stream", { parseAs: "buffer", bodyLimit: MEDIA_UPLOAD_LIMIT_BYTES }, (_request, body, done) => {
+    done(null, body);
   });
 
   const configuredOrigins = new Set(config.corsOrigins);
@@ -46,7 +56,7 @@ export async function buildApp(config: AppConfig) {
     },
     credentials: true,
     methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization", "Idempotency-Key", "X-Requested-With"],
+    allowedHeaders: ["Content-Type", "Authorization", "Idempotency-Key", "X-Donation-Status-Token", "X-Payment-Status-Token", "X-Requested-With"],
   });
   await app.register(rateLimit, { max: 120, timeWindow: "1 minute" });
 
@@ -86,10 +96,13 @@ export async function buildApp(config: AppConfig) {
   app.route({ method: ["GET", "POST"], url: "/api/auth/*", handler: authHandler });
   app.route({ method: ["GET", "POST"], url: "/api/auth", handler: authHandler });
 
-  app.get("/health", async () => ({ status: "ok", service: "bazion-api", environment: config.NODE_ENV }));
+  const releaseId = process.env.APP_RELEASE_ID?.trim() || process.env.GITHUB_SHA?.trim() || "local";
+  app.get("/health", async () => ({ status: "ok", service: "bazion-api", environment: config.NODE_ENV, releaseId }));
   await app.register(authRoutes, { prefix: "/v1" });
   await app.register(adminRoutes, { prefix: "/v1" });
   await app.register(commerceRoutes, { prefix: "/v1", config });
+  await app.register(commerceAdminRoutes, { prefix: "/v1" });
+  await app.register(churchRoutes, { prefix: "/v1", config });
 
   app.setErrorHandler((error, request, reply) => {
     const candidate = error as { statusCode?: unknown; code?: unknown };

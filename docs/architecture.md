@@ -29,21 +29,25 @@ A modular monolith keeps transactions, local development, deployment and debuggi
 
 - `apps/api`: server-side HTTP API and application orchestration.
 - `apps/storefront`: customer-facing Next.js example.
-- `apps/admin`: reserved for the Bazion platform-owner control plane; the current client workspace admin is /admin inside apps/storefront.
+- `apps/admin`: Bazion platform-owner control plane; the current client workspace admin is /admin inside apps/storefront.
 - `packages/platform-contracts`: cross-cutting tenant/principal types.
-- `packages/api-contracts`: Zod schemas shared by clients and server.
-- `packages/commerce-domain`: pure cart/order rules; no database or HTTP dependencies.
+- `packages/api-contracts`: commerce request/response schemas shared by apps.
+- `packages/church-ministry-contracts`: ministry-owned request and site-settings schemas shared by storefront and API.
+- `packages/church-ministry-domain`: ministry use cases and domain rules behind repository ports; it does not import Fastify, Next.js, or the database adapter.
+- `packages/commerce-domain`: pure commerce rules such as money totals and product slug generation; no database or HTTP dependencies.
+- `packages/platform-identity`: provider-neutral tenant identity use cases and ports; the provisioning reconciler is its first extracted workflow.
 - `packages/database`: Drizzle schema, SQL migrations, seed and database helpers.
 - `packages/payments`: payment-provider port and normalized result types.
-- `packages/auth`: Better Auth runtime, sessions, organization membership, platform/client role checks and trusted tenant context.
+- `packages/auth`: Better Auth runtime, sessions, organization membership, platform/client role checks, trusted tenant context, and PostgreSQL adapters for platform identity ports.
 - `packages/ui`: shared design-system components.
 - `packages/notifications`: durable authentication email outbox, enqueue-only and delivery-worker database roles, and a separately supervised SMTP worker; SMS and operator-facing dead-letter tooling remain planned.
 - `packages/audit`: append-only audit-event contract and PostgreSQL writer for privileged platform and tenant administration actions.
-- `packages/storage`: object-storage port and tenant object-key helper; provider adapters and media library remain planned.
+- `packages/storage`: tenant object-key helpers, local development adapter and S3-compatible object-storage adapter used by the tenant-scoped church media library.
 - `packages/booking`: initial booking types and booking-window validation; availability/resources/conflict management remain planned.
 - `packages/analytics`: initial privacy-aware event/sink contract; ingestion and tenant reports remain planned.
 - `mcp`: MCP server design. MCP adapters call the same API/domain capabilities; MCP is not the website's cart implementation.
 - `templates`: per-client configuration examples, not copies of business logic.
+- `modules`: versioned module manifests; runtime source currently lives in workspace packages and app adapters. See the [module development contract](module-development-contract.md).
 
 ## Dependency direction
 
@@ -64,7 +68,13 @@ Avoid: domain packages importing apps, database packages importing storefronts, 
 
 ## Deployment topology
 
-Start with one API deployment and one Postgres database for the Bazion demo environment. For actual client work, choose per-client database/schema/deployment boundaries according to risk, scale and budget. Static sites can deploy independently to Cloudflare Pages or another host. Do not force all clients into one deployment.
+Use a shared Postgres database with tenant predicates and RLS as the default economical tier. Offer a dedicated business-data database tier for tenants whose contracts, risk or scale justify its cost. Keep identity, tenant registry, release assignments and platform audit in a protected control plane; store secret references there, never database credentials. The current deployment keeps logical control-plane and shared business tables in the same PostgreSQL database under separate runtime roles; it does not yet run a physically separate control-plane database. Dedicated bindings are unavailable until provisioned, migrated, schema-verified and marked ready.
+
+Build runtime artifacts once, identify them by immutable image digest, and record the source revision and schema version. Promote artifacts through staging, canary and stable release rings; allow explicit per-tenant pins where a client must remain on an older release. Roll back by routing traffic to the last known-good artifact. Keep database changes additive and backward-compatible so the old and candidate application versions can coexist during promotion. Use feature flags for controlled module activation; existing tenant module entitlements are the module-level gate.
+
+Data isolation and software-release isolation are separate controls. A shared API deployment still runs one code version for all tenants. Per-tenant release pins require separate runtime targets and an ingress/deployment adapter that routes a tenant to the selected immutable artifact. Until a provider adapter is configured, release contracts and health metadata are informational; they do not change routing. Do not force all clients into one deployment, and do not claim a tenant is pinned based only on a database setting.
+
+The current repository has a local shared PostgreSQL Compose service and CI validation, but no production deployment provider or tenant deployment adapter. Runtime database routing honors central shared/dedicated bindings, and production dedicated connections fail closed until the host installs a secret-manager adapter. Use provider-neutral ports first, then implement the selected host's deployment adapter without changing tenant business logic.
 
 ## Extension points
 
@@ -137,7 +147,7 @@ sequenceDiagram
   API->>DB: Idempotently mark paid and consume reservation
 ```
 
-The running starter currently implements the cart/order path and a development-only mock payment. The real provider callback, webhook signature verification, reconciliation and reservation expiry steps are production milestones, not yet complete.
+The running starter implements the cart/order path, a development-only mock and a Safaricom Daraja M-Pesa STK Push path. Daraja callbacks use per-attempt random capabilities and validate the provider request IDs, amount, currency and phone before order settlement. Callback-loss reconciliation, refunds/reversals and live merchant validation remain production milestones.
 
 ## Authentication and tenant identity
 

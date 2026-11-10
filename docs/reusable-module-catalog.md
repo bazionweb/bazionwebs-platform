@@ -47,7 +47,7 @@ Build capabilities once and assemble client products with tenant configuration, 
 | [ ] | Page builder and block library | Schema-driven reusable sections, layouts, responsive variants, preview, validated configuration and safe custom fields. |
 | [ ] | Template catalogue | Versioned corporate, ecommerce, school, church and booking templates with manifests, previews, compatibility and upgrade strategy. |
 | [~] | Design system | A basic Button exists. Build tokens, typography, forms, tables, navigation, dashboard shell, accessibility states and tenant themes. |
-| [~] | Media and document storage | Storage interface and tenant object-key helper exist. Add provider adapters, metadata, signed uploads, MIME/size validation, transformations, retention and deletion. |
+| [~] | Media and document storage | Local development and S3-compatible adapters, tenant-scoped image upload/list APIs, file-signature checks and size limits exist. Add image transformations, durable asset metadata, retention/usage controls and guarded deletion. |
 | [ ] | SEO and site discovery | Metadata, canonical URLs, redirects, sitemap, robots, structured data, social previews and image alt text. |
 | [ ] | Forms and lead capture | Form schema/builder, validation, consent, spam protection, submissions, exports, autoresponders and routing. |
 | [ ] | Search | Tenant-filtered search, indexing/reindexing, ranking and autocomplete. Start with PostgreSQL before adding another service. |
@@ -73,7 +73,7 @@ The repository has an early Bazion-owned commerce implementation. Extend it deli
 | [~] | Product catalogue | Product listing and records exist. Add editor, categories, variants, attributes, images, publication, bulk actions and import/export. |
 | [~] | Cart and checkout | Guest cart, cart items, order creation and idempotency foundation exist. Add authenticated carts, promotions, tax/shipping calculation and checkout recovery. |
 | [~] | Orders | Order/order-item persistence exists. Add lifecycle, fulfilment status, admin actions, cancellation, returns/refunds and customer history. |
-| [~] | Payments | Provider contract and mock flow exist. Add real adapters, verified callbacks/webhooks, reconciliation, refunds and failure handling. |
+| [~] | Payments | Mock and Daraja STK Push paths exist with token-protected callback checks. Validate sandbox/live merchant flows and add missing-callback reconciliation, refunds and reversals. |
 | [ ] | Inventory | Stock locations, availability/reservations, adjustments, transfers, expiry and reconciliation. |
 | [ ] | Pricing and promotions | Price lists, scheduled prices, coupons, discounts, bundles and promotion rules. |
 | [ ] | Tax | Jurisdiction/rate setup, inclusive/exclusive rules and invoice snapshots. |
@@ -206,17 +206,17 @@ Mandatory rules:
 # H. Recommended implementation sequence
 
 ## Gate 1 — finish the shared platform shell
-- [ ] Build the platform-owner dashboard and tenant lifecycle.
-- [ ] Complete tenant provisioning reconciliation and custom-domain verification.
-- [~] Implement the module registry, tenant entitlements and tenant settings; expand manifest loading and feature gates across all modules.
-- [~] Add platform audit logs and API keys/service accounts; tenant-scoped audit read UI/API is in place.
-- [ ] Update README/architecture docs to reflect merged authentication, lockfile, migrations and client dashboard.
+- [~] Platform superadmin, tenant lifecycle, owner assignment and tenant settings are implemented; finish recovery workflows and operator review.
+- [~] Provisioning reconciliation and DNS TXT challenge/verification controls exist; finish production domain routing, TLS, redirects and handover.
+- [~] Manifest-backed module catalogue, tenant entitlements and dependency checks exist; enforce entitlements across all supported modules and add quotas/metering.
+- [~] Append-only platform audit and tenant audit history are implemented; finish retention, filters, broader event coverage and service identities.
+- [~] README and implementation status now reflect current modules and migration range; keep these snapshots updated with each release.
 
 ## Gate 2 — reusable delivery primitives
-- [ ] Durable notification outbox and worker.
-- [ ] Media library and storage adapter.
+- [~] Durable notification outbox and SMTP worker are implemented; finish production configuration, supervision evidence and alerting.
+- [~] Tenant-scoped media library and local/S3-compatible storage adapters are implemented; add transforms, metering, retention and guarded deletion.
 - [ ] CMS, page/block builder and template manifests.
-- [ ] Shared UI/design system and admin shell.
+- [~] Shared UI and platform/tenant admin shells exist; expand design tokens, reusable controls and accessibility coverage.
 - [ ] Forms and lead capture.
 - [ ] Workflow/job scheduling and event contracts.
 - [ ] Search and analytics integrations.

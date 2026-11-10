@@ -1,89 +1,65 @@
 {
   "version": "1.0.0",
-  "status": "planned",
+  "status": "partial",
+  "readiness": "buildable",
   "id": "church-ministry",
   "name": "Church and Ministry Management",
-  "description": "Member, ministry, attendance, giving, volunteer and communications solution built on shared platform primitives.",
+  "description": "Tenant-scoped ministry public site, published sermons, event registration, giving intake, enquiries and prayer requests. Membership, attendance, volunteers, settings and full payment reconciliation remain incomplete.",
   "requiredModules": [
     "platform-identity",
-    "tenant-control-plane",
-    "contacts-crm",
-    "booking",
-    "notifications",
-    "document-management",
-    "analytics"
+    "church-ministry",
+    "media-storage"
   ],
   "optionalModules": [
+    "tenant-control-plane",
     "website-content",
-    "page-experience",
-    "forms-leads",
-    "payments",
-    "subscriptions-billing",
-    "integration-hub"
+    "notifications",
+    "analytics",
+    "commerce"
   ],
   "defaultRoles": [
     {
-      "id": "ministry-admin",
+      "id": "owner",
       "label": "Ministry administrator",
       "permissions": [
-        "members.*",
-        "groups.*",
-        "events.*",
-        "reports.read"
+        "tenant.store.read",
+        "tenant.store.update",
+        "tenant.churchprivate.read",
+        "tenant.churchprivate.update"
       ]
     },
     {
-      "id": "pastoral-team",
-      "label": "Pastoral team",
+      "id": "admin",
+      "label": "Ministry administrator",
       "permissions": [
-        "members.read",
-        "care.read",
-        "groups.read"
+        "tenant.store.read",
+        "tenant.store.update",
+        "tenant.churchprivate.read",
+        "tenant.churchprivate.update"
       ]
     },
     {
-      "id": "finance",
-      "label": "Finance team",
+      "id": "contentEditor",
+      "label": "Content editor",
       "permissions": [
-        "giving.read",
-        "giving.reconcile",
-        "reports.finance.read"
+        "tenant.store.read",
+        "tenant.store.update"
       ]
     },
     {
-      "id": "member",
-      "label": "Member",
+      "id": "viewer",
+      "label": "Viewer",
       "permissions": [
-        "profile.self.read",
-        "profile.self.update",
-        "events.read"
+        "tenant.store.read"
       ]
     }
   ],
   "navigation": [
     {
-      "id": "members",
-      "label": "Members",
-      "module": "contacts-crm",
-      "path": "/admin/members"
-    },
-    {
-      "id": "groups",
-      "label": "Groups",
-      "module": "contacts-crm",
-      "path": "/admin/groups"
-    },
-    {
-      "id": "events",
-      "label": "Services and events",
-      "module": "booking",
-      "path": "/admin/events"
-    },
-    {
-      "id": "reports",
-      "label": "Reports",
-      "module": "analytics",
-      "path": "/admin/reports"
+      "id": "ministry-operations",
+      "label": "Ministry operations",
+      "module": "church-ministry",
+      "path": "/admin"
     }
   ],
   "defaults": {
@@ -91,12 +67,12 @@
     "timezone": "Africa/Nairobi",
     "currency": "KES",
     "features": [
-      "member-directory",
-      "groups",
-      "attendance",
+      "published-sermons",
       "events",
-      "volunteers",
-      "giving"
+      "event-registration",
+      "giving-intake",
+      "prayer-requests",
+      "contact-enquiries"
     ]
   },
   "templateIds": [

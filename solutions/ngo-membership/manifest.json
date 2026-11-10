@@ -1,6 +1,10 @@
 {
   "version": "1.0.0",
   "status": "planned",
+  "readiness": "roadmap",
+  "readinessNotes": [
+    "This solution is a roadmap composition. Its required modules must be implemented and contract-validated before provisioning."
+  ],
   "id": "ngo-membership",
   "name": "NGO and Membership",
   "description": "People and organization records, memberships, programs, events, contributions and reporting.",

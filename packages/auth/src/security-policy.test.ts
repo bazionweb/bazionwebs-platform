@@ -1,19 +1,28 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   canCreateClientOrganization,
+  canAccessPlatformTenantScope,
   canGrantClientOwner,
   normalizeTenantHostname,
   resolveTrustedOriginsForRequest,
 } from "./security-policy.js";
 
 describe("authentication and tenant-origin policy", () => {
-  it("only allows verified platform owners and admins to create client organizations", () => {
+  it("only allows verified platform owners to create client organizations", () => {
     expect(canCreateClientOrganization("platform_owner", true)).toBe(true);
-    expect(canCreateClientOrganization("platform_admin", true)).toBe(true);
+    expect(canCreateClientOrganization("platform_admin", true)).toBe(false);
     expect(canCreateClientOrganization("platform_support", true)).toBe(false);
     expect(canCreateClientOrganization("admin", true)).toBe(false);
     expect(canCreateClientOrganization("platform_admin", false)).toBe(false);
     expect(canCreateClientOrganization(null, true)).toBe(false);
+  });
+
+  it("keeps cross-tenant scope exclusive to the platform owner", () => {
+    expect(canAccessPlatformTenantScope("platform_owner", null, "tenant-b")).toBe(true);
+    expect(canAccessPlatformTenantScope("platform_admin", "tenant-a", "tenant-a")).toBe(true);
+    expect(canAccessPlatformTenantScope("platform_admin", "tenant-a", "tenant-b")).toBe(false);
+    expect(canAccessPlatformTenantScope("platform_admin", null, "tenant-a")).toBe(false);
+    expect(canAccessPlatformTenantScope("platform_support", "tenant-a", "tenant-b")).toBe(false);
   });
 
   it("reserves client owner grants for the audited platform transfer workflow", () => {

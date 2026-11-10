@@ -33,11 +33,12 @@ export function AuthPanel() {
       if (mode === "sign-up") {
         const result = await authClient.signUp.email({ name, email, password, callbackURL: getSafeCallbackUrl() });
         if (result.error) throw new Error(result.error.message ?? "Account creation failed.");
-        setMessage("Account created. Follow the verification link sent by email or printed in the local API console.");
+        setMessage("Account created. We’re sending a verification link; check your inbox and spam folder.");
       } else {
-        const result = await authClient.signIn.email({ email, password, callbackURL: "/" });
+        const callbackURL = getSafeCallbackUrl();
+        const result = await authClient.signIn.email({ email, password, callbackURL });
         if (result.error) throw new Error(result.error.message ?? "Sign-in failed.");
-        setMessage("Signed in. Your session is held in an HttpOnly cookie.");
+        window.location.assign(callbackURL);
       }
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Authentication request failed.");
@@ -59,6 +60,7 @@ export function AuthPanel() {
         <label>Password<input required type="password" minLength={12} maxLength={128} autoComplete={mode === "sign-in" ? "current-password" : "new-password"} value={password} onChange={(event) => setPassword(event.target.value)} /></label>
         <button className="checkout-button" type="submit" disabled={busy}>{busy ? "Please wait…" : mode === "sign-in" ? "Sign in →" : "Create account →"}</button>
       </form>
+      {mode === "sign-in" && <a className="auth-toggle" href="/forgot-password">Forgot your password?</a>}
       <button className="auth-toggle" type="button" onClick={() => { setMode(mode === "sign-in" ? "sign-up" : "sign-in"); setMessage(""); }}>
         {mode === "sign-in" ? "Need an account? Create one" : "Already registered? Sign in"}
       </button>

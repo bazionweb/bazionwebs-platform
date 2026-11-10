@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { platformFetch, type Tenant } from "@/lib/platform";
+import { platformFetch, requirePlatformOwner, type Tenant } from "@/lib/platform";
 
 type TenantList = { items: Tenant[]; total: number; limit: number; offset: number };
 
@@ -8,6 +8,7 @@ function Status({ value }: { value: Tenant["status"] }) {
 }
 
 export default async function Home({ searchParams }: { searchParams: Promise<{ q?: string; status?: string; page?: string }> }) {
+  await requirePlatformOwner();
   const params = await searchParams;
   const page = Math.max(0, Number(params.page ?? 0) || 0);
   const query = new URLSearchParams({ limit: "25", offset: String(page * 25) });

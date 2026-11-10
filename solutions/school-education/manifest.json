@@ -1,6 +1,10 @@
 {
   "version": "1.0.0",
   "status": "planned",
+  "readiness": "roadmap",
+  "readinessNotes": [
+    "This solution is a roadmap composition. Its required modules must be implemented and contract-validated before provisioning."
+  ],
   "id": "school-education",
   "name": "School and Education Management",
   "description": "Student lifecycle, guardians, classes, attendance, assessments, school fees and learning tools.",

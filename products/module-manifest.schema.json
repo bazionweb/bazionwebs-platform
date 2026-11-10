@@ -11,9 +11,12 @@
     "owner",
     "status",
     "entrypoints",
+    "implementation",
     "tenantModel",
     "permissions",
     "dependencies",
+    "tables",
+    "migrations",
     "operations"
   ],
   "properties": {
@@ -48,6 +51,12 @@
         "domain": {
           "type": "string"
         },
+        "adapter": {
+          "type": "string"
+        },
+        "contracts": {
+          "type": "string"
+        },
         "api": {
           "type": "string"
         },
@@ -56,6 +65,20 @@
         },
         "worker": {
           "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "implementation": {
+      "type": "object",
+      "required": ["mode"],
+      "properties": {
+        "mode": {
+          "enum": ["workspace-package", "host-adapter", "hybrid", "manifest-only"]
+        },
+        "packageName": {
+          "type": "string",
+          "pattern": "^@bazion/[a-z0-9-]+$"
         }
       },
       "additionalProperties": false
@@ -99,7 +122,8 @@
           "name",
           "owner",
           "tenantScoped",
-          "rls"
+          "rls",
+          "migration"
         ],
         "properties": {
           "name": {
@@ -118,14 +142,20 @@
             ]
           },
           "migration": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": "string",
+            "pattern": "^[0-9]+_[a-z0-9_-]+\\.sql$"
           }
         },
         "additionalProperties": false
       }
+    },
+    "migrations": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[0-9]+_[a-z0-9_-]+\\.sql$"
+      },
+      "uniqueItems": true
     },
     "events": {
       "type": "array",

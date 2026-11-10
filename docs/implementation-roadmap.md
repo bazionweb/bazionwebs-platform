@@ -47,6 +47,8 @@ Deliver:
 
 **Exit gate:** a platform owner can provision a client, assign an owner, enable modules, set branding/domain and safely suspend or restore access without direct SQL.
 
+**Code progress — 10 November 2026:** catalog and manifest validation now distinguish manifest-backed modules from roadmap capabilities, check solution readiness and module dependency closure, and verify table ownership, migrations and tenant RLS declarations. The first platform-identity workflow, tenant provisioning reconciliation, now lives behind a provider-neutral port in `@bazion/platform-identity`; `@bazion/auth` supplies the Better Auth and PostgreSQL adapter. Tenant lifecycle, owner transfer, domain verification, entitlements and notification enqueue remain follow-on port slices.
+
 ## Phase 2 — Shared design system and website factory
 
 **Goal:** turn website packages into configuration-driven products rather than separate codebases.
@@ -71,8 +73,7 @@ Deliver:
 - Form schema/builder, validation, conditional logic, uploads, spam controls, consent and submission records.
 - Contact/customer directory: individuals, organizations, household relationships, tags, notes and communication preferences.
 - Lead pipeline and assignment, import/export, deduplication and consent audit.
-- Media library and object storage adapter (R2 first if it fits; S3-compatible alternative behind same port).
-- Signed uploads, file/MIME/size validation, image transforms, metadata, retention and secure downloads.
+- Image transforms, durable metadata, retention/usage controls and guarded deletion for the shared media library; keep S3-compatible providers behind the storage adapter.
 - Document hub and permission-checked document vault.
 - Localization primitives for language, timezone, formatting, content translations and translated slugs.
 - Search begins with PostgreSQL full-text search; add Meilisearch only after measurement.
@@ -108,7 +109,7 @@ Deliver:
 - Pricing rules, promotion schedules, coupons, discounts, bundles and multi-currency precision.
 - Tax calculation interface with market-specific rules and invoice snapshots.
 - Shipping zones/rates, courier adapters, shipment tracking and delivery proof.
-- Real payment adapters: begin with Safaricom Daraja sandbox and one card provider; add PayPal/Paystack based on customer demand.
+- Validate the existing Safaricom Daraja STK Push in sandbox and with a live merchant, add callback-loss reconciliation and reversals, then add a card provider based on customer demand.
 - Verify signatures, amount, currency, merchant account and event identity on webhooks; implement idempotent inbox, reconciliation, refunds and dispute state.
 - Abandoned-cart messages and order notifications through the durable outbox.
 - B2B/marketplace and recurring subscriptions only after ordinary single-merchant commerce is stable.

@@ -4,9 +4,9 @@ import { PostgresAuditEventWriter, type AuditEvent } from "@bazion/audit";
 import { fromNodeHeaders } from "better-auth/node";
 import { count, eq } from "drizzle-orm";
 import { requireActiveTenantPermission, requirePlatformRole, requirePlatformPermission, normalizeTenantHostname, type ActiveTenantContext } from "@bazion/auth";
-import { auth, reconcileProvisioningTenants, listPlatformTenants, getPlatformTenant, transitionPlatformTenant, transferPlatformTenantOwner, listPlatformTenantOwnerCandidates, getPlatformTenantModuleEntitlements, updatePlatformTenantModuleEntitlement, getPlatformTenantSettings, updatePlatformTenantSettings, countPlatformTenantMembers, listPlatformTenantDomains, createPlatformTenantDomain, getPlatformTenantDomainChallenge, activatePlatformTenantDomain, disablePlatformTenantDomain } from "@bazion/auth/server";
+import { auth, reconcileProvisioningTenants, listPlatformTenants, getPlatformTenant, transitionPlatformTenant, transferPlatformTenantOwner, listPlatformTenantOwnerCandidates, assignVerifiedTenantAdminByEmail, getPlatformTenantModuleEntitlements, updatePlatformTenantModuleEntitlement, getPlatformTenantSettings, updatePlatformTenantSettings, countPlatformTenantMembers, listPlatformTenantDomains, createPlatformTenantDomain, getPlatformTenantDomainChallenge, activatePlatformTenantDomain, disablePlatformTenantDomain } from "@bazion/auth/server";
 import { orders, products } from "@bazion/database";
-import { invitationInputSchema, memberListQuerySchema, memberRoleInputSchema, provisioningReconciliationInputSchema, platformTenantListQuerySchema, platformTenantLifecycleInputSchema, platformTenantOwnerTransferInputSchema, platformTenantOwnerCandidatesQuerySchema, platformTenantModuleInputSchema, platformTenantSettingsInputSchema, platformTenantAuditQuerySchema, platformTenantDomainInputSchema } from "./policy.js";
+import { invitationInputSchema, memberListQuerySchema, memberRoleInputSchema, provisioningReconciliationInputSchema, platformTenantListQuerySchema, platformTenantLifecycleInputSchema, platformTenantOwnerTransferInputSchema, platformTenantOwnerCandidatesQuerySchema, platformTenantInitialAdminInputSchema, platformTenantModuleInputSchema, platformTenantSettingsInputSchema, platformTenantAuditQuerySchema, platformTenantDomainInputSchema } from "./policy.js";
 import { pool, withTenantTransaction } from "../../lib/database.js";
 import { isTenantModuleEnabled } from "../../lib/tenant-modules.js";
 import { getPlatformModule, platformModuleCatalog } from "./module-catalog.js";
@@ -83,13 +83,25 @@ async function requirePermission(
 }
 
 export async function adminRoutes(app: FastifyInstance): Promise<void> {
+  app.get("/admin/tenant/modules", async (request, reply) => {
+    const context = await requireActiveTenantPermission(request.headers, { store: ["read"] });
+    const modules = await Promise.all(platformModuleCatalog
+      .filter((module) => module.tenantAssignable)
+      .map(async (module) => ({
+        id: module.id,
+        name: module.name,
+        enabled: await isTenantModuleEnabled(context.tenantId, module.id),
+      })));
+    return reply.send({ modules });
+  });
+
   // Platform-level recovery operation. Client tenant roles cannot invoke it.
   app.post("/admin/platform/tenants/reconcile-provisioning", async (request, reply) => {
     const parsed = provisioningReconciliationInputSchema.safeParse(request.body ?? {});
     if (!parsed.success) {
       return reply.code(400).send({ error: "INVALID_INPUT", details: parsed.error.flatten() });
     }
-    const operator = await requirePlatformRole(request.headers, ["platform_owner", "platform_admin"]);
+    const operator = await requirePlatformRole(request.headers, ["platform_owner"]);
     const result = await withAudit(
       request,
       {
@@ -115,8 +127,14 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
   app.get("/admin/platform/tenants", async (request, reply) => {
     const parsed = platformTenantListQuerySchema.safeParse(request.query);
     if (!parsed.success) return reply.code(400).send({ error: "INVALID_INPUT", details: parsed.error.flatten() });
-    await requirePlatformPermission(request.headers, "tenant.list");
-    return reply.send(await listPlatformTenants(parsed.data));
+    const operator = await requirePlatformPermission(request.headers, "tenant.list");
+    if (operator.role !== "platform_owner" && !operator.tenantId) {
+      return reply.code(403).send({ error: "PLATFORM_TENANT_SCOPE_REQUIRED" });
+    }
+    return reply.send(await listPlatformTenants({
+      ...parsed.data,
+      ...(operator.role === "platform_owner" ? {} : { tenantId: operator.tenantId }),
+    }));
   });
 
 
@@ -125,7 +143,7 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(tenantId)) {
       return reply.code(400).send({ error: "INVALID_INPUT" });
     }
-    await requirePlatformPermission(request.headers, "tenant.read");
+    await requirePlatformPermission(request.headers, "tenant.read", tenantId);
     const tenant = await getPlatformTenant(tenantId);
     if (!tenant) return reply.code(404).send({ error: "TENANT_NOT_FOUND" });
     return reply.send({ tenant });
@@ -136,7 +154,7 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(tenantId)) {
       return reply.code(400).send({ error: "INVALID_INPUT" });
     }
-    await requirePlatformPermission(request.headers, "tenant.domain.verify");
+    await requirePlatformPermission(request.headers, "tenant.domain.verify", tenantId);
     const tenant = await getPlatformTenant(tenantId);
     if (!tenant) return reply.code(404).send({ error: "TENANT_NOT_FOUND" });
     return reply.send({ items: await listPlatformTenantDomains(tenantId) });
@@ -152,7 +170,7 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
     if (!hostname || !hostname.includes(".") || isIP(hostname)) {
       return reply.code(400).send({ error: "INVALID_HOSTNAME", message: "Enter a fully qualified DNS hostname, not an IP address or local hostname." });
     }
-    const operator = await requirePlatformPermission(request.headers, "tenant.domain.verify");
+    const operator = await requirePlatformPermission(request.headers, "tenant.domain.verify", tenantId);
     const result = await withAudit(
       request,
       {
@@ -180,7 +198,7 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
         || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(domainId)) {
         return reply.code(400).send({ error: "INVALID_INPUT" });
       }
-      const operator = await requirePlatformPermission(request.headers, "tenant.domain.verify");
+      const operator = await requirePlatformPermission(request.headers, "tenant.domain.verify", tenantId);
       const challenge = await getPlatformTenantDomainChallenge(tenantId, domainId);
       if (!challenge) return reply.code(404).send({ error: "DOMAIN_CHALLENGE_NOT_FOUND" });
       if (challenge.status !== "pending") {
@@ -231,7 +249,7 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
         || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(domainId)) {
         return reply.code(400).send({ error: "INVALID_INPUT" });
       }
-      const operator = await requirePlatformPermission(request.headers, "tenant.domain.verify");
+      const operator = await requirePlatformPermission(request.headers, "tenant.domain.verify", tenantId);
       const existing = (await listPlatformTenantDomains(tenantId)).find((item) => item.id === domainId);
       if (!existing) return reply.code(404).send({ error: "TENANT_DOMAIN_NOT_FOUND" });
       if (existing.status === "disabled") return reply.code(409).send({ error: "TENANT_DOMAIN_ALREADY_DISABLED" });
@@ -255,7 +273,7 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(tenantId) || !parsed.success) {
       return reply.code(400).send({ error: "INVALID_INPUT", ...(parsed.success ? {} : { details: parsed.error.flatten() }) });
     }
-    const operator = await requirePlatformPermission(request.headers, "tenant.owner.assign");
+    const operator = await requirePlatformPermission(request.headers, "tenant.owner.assign", tenantId);
     const result = await withAudit(
       request,
       {
@@ -274,6 +292,39 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
     return reply.send({ transfer: result });
   });
 
+  app.post<{ Params: { tenantId: string } }>("/admin/platform/tenants/:tenantId/initial-admin", async (request, reply) => {
+    const tenantId = request.params.tenantId.trim();
+    const parsed = platformTenantInitialAdminInputSchema.safeParse(request.body);
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(tenantId) || !parsed.success) {
+      return reply.code(400).send({ error: "INVALID_INPUT", ...(parsed.success ? {} : { details: parsed.error.flatten() }) });
+    }
+    const operator = await requirePlatformRole(request.headers, ["platform_owner"]);
+    const result = await withAudit(
+      request,
+      {
+        ...userAuditEvent(request, operator, "tenant_admin", tenantId),
+        action: "tenant.initial_admin.provisioned",
+        tenantId,
+      },
+      () => assignVerifiedTenantAdminByEmail(tenantId, parsed.data.email, operator.userId),
+    );
+    if (result.kind === "tenant_not_found") return reply.code(404).send({ error: "TENANT_NOT_FOUND" });
+    if (result.kind === "tenant_not_active") return reply.code(409).send({ error: "TENANT_NOT_ACTIVE" });
+    if (result.kind === "tenant_workspace_setup_required") {
+      return reply.code(409).send({
+        error: "TENANT_WORKSPACE_SETUP_REQUIRED",
+        message: "This tenant is active, but its admin workspace could not be linked safely. No admin access was granted. Contact Bazion support to resolve the workspace setup.",
+      });
+    }
+    if (result.kind === "verified_account_required") {
+      return reply.code(409).send({ error: "VERIFIED_ACCOUNT_REQUIRED", message: "The user must create and verify a Bazion account with this email before tenant admin access can be assigned." });
+    }
+    if (result.kind === "already_admin") {
+      return reply.send({ assignment: { email: result.email, role: result.role, organizationId: result.organizationId } });
+    }
+    return reply.code(200).send({ assignment: { email: result.email, role: result.role, organizationId: result.organizationId } });
+  });
+
 
   app.get<{ Params: { tenantId: string }; Querystring: { limit?: string; offset?: string; q?: string } }>(
     "/admin/platform/tenants/:tenantId/owner-candidates",
@@ -283,7 +334,7 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
       if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(tenantId) || !parsed.success) {
         return reply.code(400).send({ error: "INVALID_INPUT", ...(parsed.success ? {} : { details: parsed.error.flatten() }) });
       }
-      await requirePlatformPermission(request.headers, "tenant.owner.assign");
+      await requirePlatformPermission(request.headers, "tenant.owner.assign", tenantId);
       const result = await listPlatformTenantOwnerCandidates(tenantId, { limit: parsed.data.limit, offset: parsed.data.offset, ...(parsed.data.q === undefined ? {} : { query: parsed.data.q }) });
       if (!result) return reply.code(404).send({ error: "TENANT_NOT_FOUND_OR_NOT_ASSIGNABLE" });
       return reply.send(result);
@@ -291,7 +342,7 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
   );
 
   app.get("/admin/platform/modules", async (request, reply) => {
-    await requirePlatformPermission(request.headers, "module.catalog.read");
+    await requirePlatformRole(request.headers, ["platform_owner"]);
     return reply.send({ modules: platformModuleCatalog });
   });
 
@@ -300,7 +351,7 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(tenantId)) {
       return reply.code(400).send({ error: "INVALID_INPUT" });
     }
-    await requirePlatformPermission(request.headers, "module.catalog.read");
+    await requirePlatformPermission(request.headers, "tenant.modules.read", tenantId);
     const tenant = await getPlatformTenant(tenantId);
     if (!tenant) return reply.code(404).send({ error: "TENANT_NOT_FOUND" });
     const overrides = await getPlatformTenantModuleEntitlements(tenantId);
@@ -329,7 +380,7 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
         || !/^[a-z][a-z0-9-]{1,63}$/.test(moduleId) || !parsed.success) {
         return reply.code(400).send({ error: "INVALID_INPUT", ...(parsed.success ? {} : { details: parsed.error.flatten() }) });
       }
-      const operator = await requirePlatformPermission(request.headers, "tenant.modules.update");
+      const operator = await requirePlatformPermission(request.headers, "tenant.modules.update", tenantId);
       const module = getPlatformModule(moduleId);
       if (!module) return reply.code(404).send({ error: "MODULE_NOT_FOUND" });
       if (!module.tenantAssignable || module.required || !["partial", "stable"].includes(module.status)) {
@@ -384,7 +435,7 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(tenantId)) {
       return reply.code(400).send({ error: "INVALID_INPUT" });
     }
-    await requirePlatformPermission(request.headers, "tenant.settings.read");
+    await requirePlatformPermission(request.headers, "tenant.settings.read", tenantId);
     const settings = await getPlatformTenantSettings(tenantId);
     if (!settings) return reply.code(404).send({ error: "TENANT_NOT_FOUND" });
     return reply.send(settings);
@@ -396,7 +447,7 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(tenantId) || !parsed.success) {
       return reply.code(400).send({ error: "INVALID_INPUT", ...(parsed.success ? {} : { details: parsed.error.flatten() }) });
     }
-    const operator = await requirePlatformPermission(request.headers, "tenant.settings.update");
+    const operator = await requirePlatformPermission(request.headers, "tenant.settings.update", tenantId);
     try {
       const updated = await withAudit(
         request,
@@ -448,7 +499,7 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
       if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(tenantId) || !parsed.success) {
         return reply.code(400).send({ error: "INVALID_INPUT", ...(parsed.success ? {} : { details: parsed.error.flatten() }) });
       }
-      await requirePlatformPermission(request.headers, "audit.read");
+      await requirePlatformPermission(request.headers, "audit.read", tenantId);
       const values: unknown[] = [tenantId];
       let actionFilter = "";
       if (parsed.data.action) {
@@ -478,7 +529,7 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(tenantId)) {
       return reply.code(400).send({ error: "INVALID_INPUT" });
     }
-    await requirePlatformPermission(request.headers, "usage.read");
+    await requirePlatformPermission(request.headers, "usage.read", tenantId);
     const tenant = await getPlatformTenant(tenantId);
     if (!tenant) return reply.code(404).send({ error: "TENANT_NOT_FOUND" });
     const [members, business] = await Promise.all([
@@ -512,7 +563,7 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
       : parsed.data.action === "restore"
         ? "tenant.restore"
         : "tenant.close";
-    const operator = await requirePlatformPermission(request.headers, permission);
+    const operator = await requirePlatformPermission(request.headers, permission, tenantId);
     const result = await withAudit(
       request,
       {

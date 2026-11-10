@@ -1,4 +1,6 @@
+import { isIP } from "node:net";
 import { Pool } from "pg";
+import { currentDatabaseSchemaVersion, requiredDatabaseMigrations } from "./migration-registry.js";
 
 type DbPool = InstanceType<typeof Pool>;
 
@@ -65,6 +67,22 @@ function requireHttpsUrl(name: string): void {
   }
 }
 
+function requirePublicHttpsCallback(value: string): void {
+  try {
+    const parsed = new URL(value);
+    const hostname = parsed.hostname.toLowerCase().replace(/^\[|\]$/g, "");
+    const reservedSuffixes = ["localhost", "local", "internal", "test", "example", "invalid"];
+    if (parsed.protocol !== "https:" || parsed.username || parsed.password || parsed.search || parsed.hash ||
+        isIP(hostname) !== 0 || !hostname.includes(".") ||
+        reservedSuffixes.some((suffix) => hostname === suffix || hostname.endsWith(`.${suffix}`)) ||
+        ["example.com", "example.org", "example.net"].some((domain) => hostname === domain || hostname.endsWith(`.${domain}`))) {
+      fail("MPESA_CALLBACK_URL must use HTTPS on a public DNS hostname without credentials, query parameters or a fragment.");
+    }
+  } catch {
+    fail("MPESA_CALLBACK_URL must be a valid public HTTPS URL.");
+  }
+}
+
 function requireHttpsOriginList(name: string): void {
   const value = required(name);
   if (!value) return;
@@ -90,6 +108,10 @@ function checkStaticProductionConfig(): Record<string, URL | null> {
 
   if (process.env.TENANT_RESOLUTION_MODE !== "verified_domain") {
     fail("TENANT_RESOLUTION_MODE must be verified_domain for production.");
+  }
+  const tenantSchemaVersion = required("TENANT_DATABASE_SCHEMA_VERSION");
+  if (tenantSchemaVersion && tenantSchemaVersion !== currentDatabaseSchemaVersion) {
+    fail(`TENANT_DATABASE_SCHEMA_VERSION must match this release's current schema ${currentDatabaseSchemaVersion}.`);
   }
   if (process.env.AUTH_REQUIRE_EMAIL_VERIFICATION !== "true") {
     fail("AUTH_REQUIRE_EMAIL_VERIFICATION must be true for production.");
@@ -121,9 +143,14 @@ function checkStaticProductionConfig(): Record<string, URL | null> {
 
   const paymentProvider = process.env.PAYMENT_PROVIDER ?? "mock";
   if (paymentProvider === "mock") {
-    fail("The API currently supports only the mock payment provider, and production startup intentionally blocks mock payments. A real payment adapter and its verified webhook flow are required before production API sign-off.");
+    fail("Production startup blocks mock payments. Configure PAYMENT_PROVIDER=mpesa with live Daraja credentials and a verified HTTPS callback endpoint.");
+  } else if (paymentProvider === "mpesa") {
+    for (const name of ["MPESA_CONSUMER_KEY", "MPESA_CONSUMER_SECRET", "MPESA_BUSINESS_SHORT_CODE", "MPESA_PASSKEY"]) required(name);
+    const callbackUrl = required("MPESA_CALLBACK_URL");
+    if (callbackUrl) requirePublicHttpsCallback(callbackUrl);
+    if (process.env.MPESA_ENVIRONMENT !== "production") fail("Production checkout requires MPESA_ENVIRONMENT=production.");
   } else {
-    fail("The current API configuration has no registered production payment adapter. Do not override the production payment safeguard until a real provider implementation is merged.");
+    fail(`Unsupported production payment provider: ${paymentProvider}.`);
   }
 
   const smtpHost = required("NOTIFICATION_SMTP_HOST");
@@ -200,10 +227,10 @@ async function verifyDatabase(urls: Record<string, URL | null>): Promise<void> {
 
     const applied = await migrationPool.query<{ version: string }>(
       "SELECT version FROM public.schema_migrations WHERE version = ANY($1::varchar[])",
-      [["0004_notification_runtime_roles.sql", "0005_platform_audit_events.sql"]],
+      [requiredDatabaseMigrations],
     );
     const versions = new Set(applied.rows.map((row) => row.version));
-    for (const migration of ["0004_notification_runtime_roles.sql", "0005_platform_audit_events.sql"]) {
+    for (const migration of requiredDatabaseMigrations) {
       if (!versions.has(migration)) fail(`Database migration ${migration} has not been applied.`);
     }
 

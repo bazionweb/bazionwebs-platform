@@ -15,7 +15,16 @@ A successful auth callback therefore means the notification was durably queued, 
 
 ## Runtime commands
 
-Build and run the worker as a process separate from the HTTP API:
+Local development entrypoints start the notification worker with the rest of the platform stack:
+
+```powershell
+pnpm dev
+pnpm dev:gmfc
+```
+
+`pnpm dev` includes every workspace with a `dev` task. `pnpm dev:gmfc` starts the GMFC API, storefront and notification worker. Keep the terminal open; verification, reset and invitation emails remain queued until the worker reports that it is polling the outbox.
+
+For a standalone supervised deployment, build and run the worker separately from the HTTP API:
 
 ```sh
 pnpm --filter @bazion/notifications build
@@ -114,7 +123,7 @@ The database preflight connects as each declared role, verifies that the two num
 
 **A green preflight is not a substitute for a test message or a worker-interruption recovery test.** Send a controlled test email and prove the five-minute lease recovery in staging before production.
 
-The preflight also intentionally reports a blocker for the current API: only the mock payment provider is implemented, and the API rejects mock payments in production. A real payment adapter and authenticated webhook/reconciliation tests must be merged before the full production API can pass its production gate. Do not weaken that safeguard or claim production sign-off while it is reported as a blocker.
+The preflight also blocks production while `PAYMENT_PROVIDER=mock`. A Daraja adapter now exists; production requires live credentials and an HTTPS callback endpoint, and the sandbox/live callback lifecycle still needs staged validation. Callback-loss reconciliation and refunds remain incomplete. Do not weaken the mock safeguard or claim production sign-off without those checks.
 
 ## Production worker deployment (systemd example)
 

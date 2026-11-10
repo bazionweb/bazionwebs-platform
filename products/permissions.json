@@ -237,6 +237,24 @@
         "viewer"
       ],
       "description": "read analytics records and operations within the active client organization."
+    },
+    {
+      "id": "tenant.churchprivate.read",
+      "moduleId": "church-ministry",
+      "scope": "tenant",
+      "resource": "churchprivate",
+      "action": "read",
+      "roles": ["owner", "admin"],
+      "description": "read attendee contact details, donor records, enquiries and confidential prayer requests."
+    },
+    {
+      "id": "tenant.churchprivate.update",
+      "moduleId": "church-ministry",
+      "scope": "tenant",
+      "resource": "churchprivate",
+      "action": "update",
+      "roles": ["owner", "admin"],
+      "description": "update private enquiries and prayer-request records."
     }
   ]
 }

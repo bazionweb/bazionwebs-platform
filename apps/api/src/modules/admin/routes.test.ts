@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   transitionPlatformTenant: vi.fn(),
   transferPlatformTenantOwner: vi.fn(),
   listPlatformTenantOwnerCandidates: vi.fn(),
+  assignVerifiedTenantAdminByEmail: vi.fn(),
   getPlatformTenantModuleEntitlements: vi.fn(),
   updatePlatformTenantModuleEntitlement: vi.fn(),
   isPlatformTenantModuleEnabled: vi.fn(),
@@ -36,7 +37,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("@bazion/audit", () => ({ PostgresAuditEventWriter: class { append(event: unknown) { return mocks.appendAuditEvent(event); } } }));
 vi.mock("@bazion/auth", () => ({ requireActiveTenantPermission: mocks.requirePermission, requirePlatformRole: mocks.requirePlatformRole, requirePlatformPermission: mocks.requirePlatformPermission, normalizeTenantHostname: (hostname: string) => { const value = hostname.trim().toLowerCase().replace(/\.$/, ""); return /^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$/.test(value) ? value : null; } }));
-vi.mock("@bazion/auth/server", () => ({ reconcileProvisioningTenants: mocks.reconcileProvisioningTenants, listPlatformTenants: mocks.listPlatformTenants, getPlatformTenant: mocks.getPlatformTenant, transitionPlatformTenant: mocks.transitionPlatformTenant, transferPlatformTenantOwner: mocks.transferPlatformTenantOwner, listPlatformTenantOwnerCandidates: mocks.listPlatformTenantOwnerCandidates, getPlatformTenantModuleEntitlements: mocks.getPlatformTenantModuleEntitlements, updatePlatformTenantModuleEntitlement: mocks.updatePlatformTenantModuleEntitlement, isPlatformTenantModuleEnabled: mocks.isPlatformTenantModuleEnabled, getPlatformTenantSettings: mocks.getPlatformTenantSettings, updatePlatformTenantSettings: mocks.updatePlatformTenantSettings, countPlatformTenantMembers: mocks.countPlatformTenantMembers, listPlatformTenantDomains: mocks.listPlatformTenantDomains, createPlatformTenantDomain: mocks.createPlatformTenantDomain, getPlatformTenantDomainChallenge: mocks.getPlatformTenantDomainChallenge, activatePlatformTenantDomain: mocks.activatePlatformTenantDomain, disablePlatformTenantDomain: mocks.disablePlatformTenantDomain, auth: { api: {
+vi.mock("@bazion/auth/server", () => ({ reconcileProvisioningTenants: mocks.reconcileProvisioningTenants, listPlatformTenants: mocks.listPlatformTenants, getPlatformTenant: mocks.getPlatformTenant, transitionPlatformTenant: mocks.transitionPlatformTenant, transferPlatformTenantOwner: mocks.transferPlatformTenantOwner, listPlatformTenantOwnerCandidates: mocks.listPlatformTenantOwnerCandidates, assignVerifiedTenantAdminByEmail: mocks.assignVerifiedTenantAdminByEmail, getPlatformTenantModuleEntitlements: mocks.getPlatformTenantModuleEntitlements, updatePlatformTenantModuleEntitlement: mocks.updatePlatformTenantModuleEntitlement, isPlatformTenantModuleEnabled: mocks.isPlatformTenantModuleEnabled, getPlatformTenantSettings: mocks.getPlatformTenantSettings, updatePlatformTenantSettings: mocks.updatePlatformTenantSettings, countPlatformTenantMembers: mocks.countPlatformTenantMembers, listPlatformTenantDomains: mocks.listPlatformTenantDomains, createPlatformTenantDomain: mocks.createPlatformTenantDomain, getPlatformTenantDomainChallenge: mocks.getPlatformTenantDomainChallenge, activatePlatformTenantDomain: mocks.activatePlatformTenantDomain, disablePlatformTenantDomain: mocks.disablePlatformTenantDomain, auth: { api: {
   listMembers: mocks.listMembers,
   listInvitations: mocks.listInvitations,
   createInvitation: mocks.createInvitation,
@@ -46,6 +47,34 @@ vi.mock("@bazion/auth/server", () => ({ reconcileProvisioningTenants: mocks.reco
 } } }));
 vi.mock("./domain-verification.js", () => ({ verifyTenantDomainTxt: mocks.verifyTenantDomainTxt }));
 vi.mock("../../lib/database.js", () => ({ pool: { query: mocks.query }, withTenantTransaction: vi.fn() }));
+
+beforeEach(() => {
+  Object.values(mocks).forEach((mock) => mock.mockReset());
+  mocks.requirePermission.mockResolvedValue(context);
+  mocks.requirePlatformRole.mockResolvedValue({ userId: "platform-owner", email: "owner@bazion.test", role: "platform_owner" });
+  mocks.requirePlatformPermission.mockResolvedValue({ userId: "platform-owner", email: "owner@bazion.test", role: "platform_owner", tenantId: null });
+  mocks.listPlatformTenants.mockResolvedValue({ items: [], total: 0, limit: 50, offset: 0 });
+  mocks.getPlatformTenant.mockResolvedValue({ id: "tenant-alpha", slug: "alpha", name: "Alpha Store", status: "active" });
+  mocks.transitionPlatformTenant.mockResolvedValue({ id: "tenant-alpha", slug: "alpha", status: "suspended" });
+  mocks.transferPlatformTenantOwner.mockResolvedValue({ previousOwnerUserId: "old-owner", newOwnerUserId: "new-owner" });
+  mocks.listPlatformTenantOwnerCandidates.mockResolvedValue({ currentOwners: [], candidates: [], total: 0, limit: 50, offset: 0 });
+  mocks.assignVerifiedTenantAdminByEmail.mockResolvedValue({ kind: "assigned", userId: "user-gmfc", email: "admin@gmfc.test", organizationId: "org-gmfc", role: "admin" });
+  mocks.getPlatformTenantModuleEntitlements.mockResolvedValue([]);
+  mocks.updatePlatformTenantModuleEntitlement.mockResolvedValue({ module_id: "commerce", enabled: false, updated_at: "2026-11-06T00:00:00.000Z", updated_by: "platform-owner" });
+  mocks.isPlatformTenantModuleEnabled.mockResolvedValue(true);
+  mocks.getPlatformTenantSettings.mockResolvedValue({ settings: { locale: "en-KE", timeZone: "Africa/Nairobi", brandName: "", primaryColor: "#236b4c", supportEmail: "" }, version: 0, updatedAt: null });
+  mocks.updatePlatformTenantSettings.mockResolvedValue({ kind: "updated", value: { settings: { locale: "en-KE", timeZone: "Africa/Nairobi", brandName: "Alpha", primaryColor: "#236b4c", supportEmail: "" }, version: 1, updatedAt: "2026-11-06T00:00:00.000Z" } });
+  mocks.countPlatformTenantMembers.mockResolvedValue(3);
+  mocks.query.mockResolvedValue({ rows: [], rowCount: 0 });
+  mocks.reconcileProvisioningTenants.mockResolvedValue({ scanned: 2, activated: 1, unmatched: [{ tenantId: "tenant-stuck", slug: "stuck" }], conflicted: [] });
+  mocks.listMembers.mockResolvedValue({ members: [], total: 0 });
+  mocks.listInvitations.mockResolvedValue([]);
+  mocks.createInvitation.mockResolvedValue({ id: "invite-alpha", email: "staff@example.test" });
+  mocks.cancelInvitation.mockResolvedValue({ success: true });
+  mocks.updateMemberRole.mockResolvedValue({ success: true });
+  mocks.removeMember.mockResolvedValue({ success: true });
+  mocks.appendAuditEvent.mockResolvedValue(undefined);
+});
 
 const context = {
   userId: "user-a",
@@ -71,7 +100,7 @@ describe("client administration API", () => {
     Object.values(mocks).forEach((mock) => mock.mockReset());
     mocks.requirePermission.mockResolvedValue(context);
     mocks.requirePlatformRole.mockResolvedValue({ userId: "platform-admin", email: "admin@bazion.test", role: "platform_admin" });
-    mocks.requirePlatformPermission.mockResolvedValue({ userId: "platform-admin", email: "admin@bazion.test", role: "platform_admin" });
+    mocks.requirePlatformPermission.mockResolvedValue({ userId: "platform-admin", email: "admin@bazion.test", role: "platform_admin", tenantId: "tenant-alpha" });
     mocks.listPlatformTenants.mockResolvedValue({ items: [], total: 0, limit: 50, offset: 0 });
     mocks.getPlatformTenant.mockResolvedValue({ id: "tenant-alpha", slug: "alpha", name: "Alpha Store", status: "active" });
     mocks.transitionPlatformTenant.mockResolvedValue({ id: "tenant-alpha", slug: "alpha", status: "suspended" });
@@ -214,7 +243,7 @@ describe("platform tenant provisioning recovery", () => {
     mocks.appendAuditEvent.mockReset().mockResolvedValue(undefined);
   });
 
-  it("allows only a platform owner or administrator to reconcile stale provisioning rows", async () => {
+  it("allows only the platform owner to reconcile stale provisioning rows", async () => {
     const app = await makeApp();
     try {
       const response = await app.inject({
@@ -225,7 +254,7 @@ describe("platform tenant provisioning recovery", () => {
       expect(response.statusCode).toBe(200);
       expect(mocks.requirePlatformRole).toHaveBeenCalledWith(
         expect.any(Object),
-        ["platform_owner", "platform_admin"],
+        ["platform_owner"],
       );
       expect(mocks.reconcileProvisioningTenants).toHaveBeenCalledWith({ staleMinutes: 15, limit: 25 });
       expect(response.json()).toEqual({
@@ -312,7 +341,7 @@ describe("platform tenant provisioning recovery", () => {
 describe("platform tenant lifecycle API", () => {
   beforeEach(() => {
     mocks.requirePlatformPermission.mockReset().mockResolvedValue({
-      userId: "platform-admin", email: "admin@bazion.test", role: "platform_admin",
+      userId: "platform-admin", email: "admin@bazion.test", role: "platform_admin", tenantId: "tenant-alpha",
     });
     mocks.listPlatformTenants.mockReset().mockResolvedValue({ items: [], total: 0, limit: 50, offset: 0 });
     mocks.transitionPlatformTenant.mockReset().mockResolvedValue({
@@ -327,7 +356,7 @@ describe("platform tenant lifecycle API", () => {
       const response = await app.inject({ method: "GET", url: "/v1/admin/platform/tenants?status=active&limit=20" });
       expect(response.statusCode).toBe(200);
       expect(mocks.requirePlatformPermission).toHaveBeenCalledWith(expect.any(Object), "tenant.list");
-      expect(mocks.listPlatformTenants).toHaveBeenCalledWith({ status: "active", limit: 20, offset: 0 });
+      expect(mocks.listPlatformTenants).toHaveBeenCalledWith({ status: "active", limit: 20, offset: 0, tenantId: "tenant-alpha" });
     } finally { await app.close(); }
   });
 
@@ -340,7 +369,7 @@ describe("platform tenant lifecycle API", () => {
         payload: { action: "suspend" },
       });
       expect(response.statusCode).toBe(200);
-      expect(mocks.requirePlatformPermission).toHaveBeenCalledWith(expect.any(Object), "tenant.suspend");
+      expect(mocks.requirePlatformPermission).toHaveBeenCalledWith(expect.any(Object), "tenant.suspend", "11111111-1111-4111-8111-111111111111");
       expect(mocks.transitionPlatformTenant).toHaveBeenCalledWith({
         tenantId: "11111111-1111-4111-8111-111111111111", action: "suspend",
       });
@@ -394,6 +423,67 @@ describe("platform tenant lifecycle API", () => {
   });
 });
 
+describe("initial tenant administrator assignment", () => {
+  const tenantId = "11111111-1111-4111-8111-111111111111";
+
+  beforeEach(() => {
+    Object.values(mocks).forEach((mock) => mock.mockReset());
+    mocks.requirePlatformRole.mockResolvedValue({ userId: "platform-owner", email: "owner@bazion.test", role: "platform_owner" });
+    mocks.assignVerifiedTenantAdminByEmail.mockResolvedValue({
+      kind: "assigned", userId: "user-gmfc", email: "admin@gmfc.test", organizationId: "org-gmfc", role: "admin",
+    });
+    mocks.appendAuditEvent.mockResolvedValue(undefined);
+  });
+
+  it("restricts initial admin assignment to the platform owner and audits the tenant-scoped grant", async () => {
+    const app = await makeApp();
+    try {
+      const response = await app.inject({
+        method: "POST",
+        url: `/v1/admin/platform/tenants/${tenantId}/initial-admin`,
+        payload: { email: "admin@gmfc.test" },
+      });
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toEqual({ assignment: { email: "admin@gmfc.test", role: "admin", organizationId: "org-gmfc" } });
+      expect(mocks.requirePlatformRole).toHaveBeenCalledWith(expect.any(Object), ["platform_owner"]);
+      expect(mocks.assignVerifiedTenantAdminByEmail).toHaveBeenCalledWith(tenantId, "admin@gmfc.test", "platform-owner");
+      expect(mocks.appendAuditEvent).toHaveBeenCalledWith(expect.objectContaining({
+        action: "tenant.initial_admin.provisioned.requested", tenantId,
+      }));
+    } finally { await app.close(); }
+  });
+
+  it("does not assign a tenant admin when the account is not verified", async () => {
+    mocks.assignVerifiedTenantAdminByEmail.mockResolvedValue({ kind: "verified_account_required" });
+    const app = await makeApp();
+    try {
+      const response = await app.inject({
+        method: "POST",
+        url: `/v1/admin/platform/tenants/${tenantId}/initial-admin`,
+        payload: { email: "new@gmfc.test" },
+      });
+      expect(response.statusCode).toBe(409);
+      expect(response.json().error).toBe("VERIFIED_ACCOUNT_REQUIRED");
+    } finally { await app.close(); }
+  });
+
+  it("rejects platform admins and never invokes the membership grant", async () => {
+    mocks.requirePlatformRole.mockRejectedValue(Object.assign(new Error("Forbidden"), {
+      statusCode: 403, code: "PLATFORM_PERMISSION_DENIED",
+    }));
+    const app = await makeApp();
+    try {
+      const response = await app.inject({
+        method: "POST",
+        url: `/v1/admin/platform/tenants/${tenantId}/initial-admin`,
+        payload: { email: "admin@gmfc.test" },
+      });
+      expect(response.statusCode).toBe(403);
+      expect(mocks.assignVerifiedTenantAdminByEmail).not.toHaveBeenCalled();
+    } finally { await app.close(); }
+  });
+});
+
 
 describe("platform tenant detail API", () => {
   it("checks tenant.read permission before returning a tenant record", async () => {
@@ -404,7 +494,7 @@ describe("platform tenant detail API", () => {
         url: "/v1/admin/platform/tenants/11111111-1111-4111-8111-111111111111",
       });
       expect(response.statusCode).toBe(200);
-      expect(mocks.requirePlatformPermission).toHaveBeenCalledWith(expect.any(Object), "tenant.read");
+      expect(mocks.requirePlatformPermission).toHaveBeenCalledWith(expect.any(Object), "tenant.read", "11111111-1111-4111-8111-111111111111");
       expect(mocks.getPlatformTenant).toHaveBeenCalledWith("11111111-1111-4111-8111-111111111111");
       expect(response.json().tenant.id).toBe("tenant-alpha");
     } finally {
@@ -466,7 +556,7 @@ describe("platform tenant owner transfer API", () => {
         payload: { targetUserId: "new-owner" },
       });
       expect(response.statusCode).toBe(200);
-      expect(mocks.requirePlatformPermission).toHaveBeenCalledWith(expect.any(Object), "tenant.owner.assign");
+      expect(mocks.requirePlatformPermission).toHaveBeenCalledWith(expect.any(Object), "tenant.owner.assign", "11111111-1111-4111-8111-111111111111");
       expect(mocks.transferPlatformTenantOwner).toHaveBeenCalledWith(
         "11111111-1111-4111-8111-111111111111", "new-owner",
       );
@@ -572,7 +662,7 @@ describe("platform tenant control-plane extensions", () => {
         url: "/v1/admin/platform/tenants/11111111-1111-4111-8111-111111111111/owner-candidates?q=member",
       });
       expect(response.statusCode).toBe(200);
-      expect(mocks.requirePlatformPermission).toHaveBeenCalledWith(expect.any(Object), "tenant.owner.assign");
+      expect(mocks.requirePlatformPermission).toHaveBeenCalledWith(expect.any(Object), "tenant.owner.assign", "11111111-1111-4111-8111-111111111111");
       expect(mocks.listPlatformTenantOwnerCandidates).toHaveBeenCalledWith(
         "11111111-1111-4111-8111-111111111111", { limit: 50, offset: 0, query: "member" },
       );
@@ -588,7 +678,7 @@ describe("platform tenant control-plane extensions", () => {
         url: "/v1/admin/platform/tenants/11111111-1111-4111-8111-111111111111/modules",
       });
       expect(response.statusCode).toBe(200);
-      expect(mocks.requirePlatformPermission).toHaveBeenCalledWith(expect.any(Object), "module.catalog.read");
+      expect(mocks.requirePlatformPermission).toHaveBeenCalledWith(expect.any(Object), "tenant.modules.read", "11111111-1111-4111-8111-111111111111");
       expect(response.json().modules.find((item: { id: string }) => item.id === "commerce").enabled).toBe(true);
       expect(response.json().modules.find((item: { id: string }) => item.id === "contacts-crm").canManage).toBe(false);
     } finally { await app.close(); }
@@ -611,7 +701,7 @@ describe("platform tenant control-plane extensions", () => {
         payload: { enabled: false },
       });
       expect(changed.statusCode).toBe(200);
-      expect(mocks.requirePlatformPermission).toHaveBeenCalledWith(expect.any(Object), "tenant.modules.update");
+      expect(mocks.requirePlatformPermission).toHaveBeenCalledWith(expect.any(Object), "tenant.modules.update", "11111111-1111-4111-8111-111111111111");
       expect(mocks.appendAuditEvent).toHaveBeenCalledWith(expect.objectContaining({
         action: "tenant.module.entitlement.updated.requested",
         metadata: { moduleId: "commerce", enabled: false },
@@ -633,8 +723,8 @@ describe("platform tenant control-plane extensions", () => {
       });
       expect(read.statusCode).toBe(200);
       expect(write.statusCode).toBe(200);
-      expect(mocks.requirePlatformPermission).toHaveBeenCalledWith(expect.any(Object), "tenant.settings.read");
-      expect(mocks.requirePlatformPermission).toHaveBeenCalledWith(expect.any(Object), "tenant.settings.update");
+      expect(mocks.requirePlatformPermission).toHaveBeenCalledWith(expect.any(Object), "tenant.settings.read", "11111111-1111-4111-8111-111111111111");
+      expect(mocks.requirePlatformPermission).toHaveBeenCalledWith(expect.any(Object), "tenant.settings.update", "11111111-1111-4111-8111-111111111111");
       expect(mocks.updatePlatformTenantSettings).toHaveBeenCalledWith(expect.objectContaining({
         tenantId: "11111111-1111-4111-8111-111111111111", expectedVersion: 0, settings: { brandName: "Alpha" },
       }));
@@ -717,7 +807,7 @@ describe("platform tenant custom domains", () => {
         payload: { hostname: " Shop.Example.com. " },
       });
       expect(response.statusCode).toBe(201);
-      expect(mocks.requirePlatformPermission).toHaveBeenCalledWith(expect.any(Object), "tenant.domain.verify");
+      expect(mocks.requirePlatformPermission).toHaveBeenCalledWith(expect.any(Object), "tenant.domain.verify", tenantId);
       expect(mocks.createPlatformTenantDomain).toHaveBeenCalledWith(tenantId, "shop.example.com");
       expect(response.json().challenge.name).toBe("_bazionweb-challenge.shop.example.com");
       expect(JSON.stringify(mocks.appendAuditEvent.mock.calls)).not.toContain("secret-one-time-value");

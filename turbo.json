@@ -18,6 +18,13 @@
         "^build"
       ]
     },
+    "dev:gmfc": {
+      "cache": false,
+      "persistent": true,
+      "dependsOn": [
+        "^build"
+      ]
+    },
     "typecheck": {
       "dependsOn": [
         "^build"
@@ -25,12 +32,11 @@
       "outputs": []
     },
     "test": {
+      "cache": false,
       "dependsOn": [
         "^build"
       ],
-      "outputs": [
-        "coverage/**"
-      ]
+      "outputs": []
     },
     "lint": {
       "dependsOn": [
@@ -53,7 +59,14 @@
     "PUBLIC_STOREFRONT_URL",
     "PAYMENT_PROVIDER",
     "DEV_PAYMENT_SECRET",
+    "MPESA_ENVIRONMENT",
+    "MPESA_CONSUMER_KEY",
+    "MPESA_CONSUMER_SECRET",
+    "MPESA_BUSINESS_SHORT_CODE",
+    "MPESA_PASSKEY",
+    "MPESA_CALLBACK_URL",
     "MIGRATION_DATABASE_URL",
+    "TENANT_ISOLATION_TEST_DATABASE_URL",
     "AUTH_DATABASE_URL",
     "AUTH_MIGRATION_DATABASE_URL",
     "TENANT_RESOLVER_DATABASE_URL",
@@ -63,6 +76,7 @@
     "BETTER_AUTH_TRUSTED_ORIGINS",
     "AUTH_APP_URL",
     "AUTH_REQUIRE_EMAIL_VERIFICATION",
+    "AUTH_INTEGRATION_TESTS",
     "NOTIFICATION_ENQUEUER_DATABASE_URL",
     "NOTIFICATION_WORKER_DATABASE_URL",
     "NOTIFICATION_ENCRYPTION_KEY",
@@ -76,6 +90,7 @@
     "NOTIFICATION_WORKER_BATCH_SIZE",
     "NOTIFICATION_WORKER_IDLE_MS",
     "DEFAULT_TENANT_CURRENCY",
-    "TRUSTED_PROXY_ADDRESSES"
+    "TRUSTED_PROXY_ADDRESSES",
+    "PLATFORM_CONSOLE_URL"
   ]
 }
