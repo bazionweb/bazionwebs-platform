@@ -159,7 +159,7 @@ for (const directory of directories("products")) {
     }
     if (manifest.version !== reference.version) fail(`${path} module ${reference.id} version does not match its module manifest.`);
     if (["planned", "deprecated"].includes(manifest.status)) fail(`${path} cannot include ${reference.id} with status ${manifest.status}.`);
-    if (product.status === "stable" && manifest.status !== "stable") fail(`${path} cannot be stable while required module ${reference.id} is ${manifest.status}.`);
+    if (product.status === "stable" && manifest.status !== "stable") fail(`${path} cannot be stable while referenced module ${reference.id} is ${manifest.status}.`);
   }
   for (const reference of allModuleRefs) {
     const manifest = moduleManifests.get(reference.id);

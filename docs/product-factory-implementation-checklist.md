@@ -13,7 +13,7 @@ This is the execution checklist for turning the modular platform into a repeatab
 - [ ] Finish Phase 0 PostgreSQL integration evidence.
 - [ ] Finish Phase 1 product contract decisions and readiness checks.
 
-Latest completed implementation commit: `cbe1851 feat: define validated product manifests`.
+Latest completed slices: `cbe1851` product manifests, `e2271ac` runtime catalogue generation, `00743e3` tenant/installation boundary.
 
 ## Phase 0 — Reconcile sources and readiness claims
 
@@ -40,10 +40,10 @@ Latest completed implementation commit: `cbe1851 feat: define validated product 
 - [x] Add one partial Church/Ministry product bound to its buildable solution, required modules, optional modules, applications, template, configuration schema and current database schema.
 - [x] Add cross-reference validation and wire it into `pnpm catalog:validate` and CI.
 - [x] Add positive and negative tests for product composition validation.
-- [ ] Record an ADR for product, solution, module and template identity/version boundaries; status/maturity; configuration ownership; release immutability; and migration compatibility.
-- [ ] Validate a product's declared API routes, permission coverage, module entitlements, database ownership/RLS and required tests before it can become stable or publishable.
-- [ ] Add template compatibility and configuration migration policy before changing any live tenant config schema.
-- [ ] Keep SME and Ecommerce products unpublishable until their solution readiness gates are met.
+- [x] Record an ADR for product, solution, module and template identity/version boundaries; status/maturity; configuration ownership; release immutability; and migration compatibility.
+- [x] Validate product references against module API/permission/table/RLS/test manifests and prevent stable status while the solution, modules or templates are partial.
+- [x] Define template compatibility and configuration migration policy before changing any live tenant config schema.
+- [x] Keep SME and Ecommerce products unpublishable until their solution readiness gates are met.
 
 **Exit gate:** an invalid reference or incompatible version fails locally and in CI; “stable” is only allowed when every required runtime, permission, database, UI and operations gate is evidenced.
 

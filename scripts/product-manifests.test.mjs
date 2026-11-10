@@ -167,3 +167,17 @@ test("rejects a required module when its hard dependency is not also required", 
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /module church-ministry depends on media-storage, which is missing from the product composition/);
 });
+
+test("rejects a stable product when its referenced modules are still partial", () => {
+  const root = fixture();
+  const product = readJson(root, "products/church-ministry/manifest.json");
+  product.status = "stable";
+  const solution = readJson(root, "solutions/church-ministry/manifest.json");
+  solution.status = "stable";
+  writeJson(root, "products/church-ministry/manifest.json", product);
+  writeJson(root, "solutions/church-ministry/manifest.json", solution);
+
+  const result = runValidator(root);
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /cannot be stable while referenced module platform-identity is partial/);
+});
