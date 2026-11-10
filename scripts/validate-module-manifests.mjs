@@ -1,6 +1,7 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { assertSupportedSchema, validateJsonSchema } from "./lib/json-schema.mjs";
+import { packageExportTargetResolves } from "./lib/package-exports.mjs";
 
 const root = process.cwd();
 const readJson = (path) => JSON.parse(readFileSync(join(root, path), "utf8"));
@@ -239,8 +240,8 @@ if (!existsSync(moduleRoot)) {
         fail(`Package ${implementation.packageName} must expose a public root export in package.json for ${path}`);
       } else {
         for (const target of targets) {
-          if (!target.startsWith("./") || !existsSync(join(packageInfo.absolutePath, target))) {
-            fail(`Public export ${target} for ${implementation.packageName} does not resolve to a repository file in ${path}`);
+          if (!packageExportTargetResolves(packageInfo.absolutePath, target)) {
+            fail(`Public export ${target} for ${implementation.packageName} does not resolve to a package file or a generated target backed by source in ${path}`);
           }
         }
       }

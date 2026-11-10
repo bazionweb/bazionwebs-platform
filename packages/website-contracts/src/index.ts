@@ -106,6 +106,7 @@ export const websitePagesSchema = z.array(websitePageSchema).max(24)
     pages.forEach((page, index) => {
       if (ids.has(page.id)) context.addIssue({ code: "custom", message: "Page IDs must be unique.", path: [index, "id"] });
       if (paths.has(page.path)) context.addIssue({ code: "custom", message: "Page paths must be unique.", path: [index, "path"] });
+      if (page.id === "home" && !page.enabled) context.addIssue({ code: "custom", message: "The home page must remain enabled.", path: [index, "enabled"] });
       ids.add(page.id);
       paths.add(page.path);
     });
@@ -126,6 +127,27 @@ function getNavigationTarget(href: string): { kind: "internal"; path: string } |
     return undefined;
   }
   return undefined;
+}
+
+export interface WebsiteNavigationPageIssue {
+  index: number;
+  message: string;
+}
+
+/** Checks that internal navigation points at a page included in the same site configuration. */
+export function getWebsiteNavigationPageIssues(
+  navigation: readonly WebsiteNavigationItem[],
+  pages: readonly WebsitePage[],
+): WebsiteNavigationPageIssue[] {
+  const configuredPaths = new Set(pages.map((page) => page.path));
+  const issues: WebsiteNavigationPageIssue[] = [];
+  navigation.forEach((item, index) => {
+    const target = getNavigationTarget(item.href);
+    if (target?.kind === "internal" && !configuredPaths.has(target.path)) {
+      issues.push({ index, message: "Navigation must target a configured page." });
+    }
+  });
+  return issues;
 }
 
 /** Removes internal navigation entries whose page is not published for this site. */
@@ -166,16 +188,8 @@ export const websiteConfigurationSchema = z.object({
   seo: websiteSeoSchema.default({ title: "", description: "" }),
   pages: websitePagesSchema.default(defaultWebsitePages),
 }).strict().superRefine((configuration, context) => {
-  const pagesByPath = new Map(configuration.pages.map((page) => [page.path, page]));
-  configuration.navigation.forEach((item, index) => {
-    const target = getNavigationTarget(item.href);
-    if (!target || target.kind === "external") return;
-    const page = pagesByPath.get(target.path);
-    if (!page) {
-      context.addIssue({ code: "custom", message: "Navigation must target a configured page.", path: ["navigation", index, "href"] });
-    } else if (!page.enabled) {
-      context.addIssue({ code: "custom", message: "Navigation cannot target a disabled page.", path: ["navigation", index, "href"] });
-    }
-  });
+  for (const issue of getWebsiteNavigationPageIssues(configuration.navigation, configuration.pages)) {
+    context.addIssue({ code: "custom", message: issue.message, path: ["navigation", issue.index, "href"] });
+  }
 });
 export type WebsiteConfiguration = z.infer<typeof websiteConfigurationSchema>;

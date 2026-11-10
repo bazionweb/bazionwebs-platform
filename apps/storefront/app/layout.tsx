@@ -58,7 +58,7 @@ export default function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body><SiteThemeProvider />{children}</body>
+      <body><SiteThemeProvider>{children}</SiteThemeProvider></body>
     </html>
   );
 }

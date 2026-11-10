@@ -6,11 +6,13 @@ import {
   websiteNavigationSchema,
   websitePagesSchema,
   websiteSeoSchema,
+  getWebsiteNavigationPageIssues,
   type WebsiteNavigation,
   type WebsitePages,
 } from "@bazion/website-contracts";
 
 export { getPublicWebsiteNavigation, websitePageSectionSchema } from "@bazion/website-contracts";
+export type { WebsitePage } from "@bazion/website-contracts";
 
 export const defaultChurchNavigation: WebsiteNavigation = [
   { id: "home", label: "Home", href: "/" },
@@ -230,6 +232,10 @@ export const churchPublicSiteSettingsSchema = z.object({
     belief: z.string().trim().min(2).max(1200),
   })).max(30).default([]),
   metadata: websiteSeoSchema.default({ title: "", description: "" }),
+}).superRefine((settings, context) => {
+  for (const issue of getWebsiteNavigationPageIssues(settings.navigation, settings.pages)) {
+    context.addIssue({ code: "custom", message: issue.message, path: ["navigation", issue.index, "href"] });
+  }
 });
 export type ChurchPublicSiteSettings = z.infer<typeof churchPublicSiteSettingsSchema>;
 

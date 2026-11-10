@@ -24,12 +24,14 @@ interface SiteResponse {
 }
 
 let siteRequest: Promise<SiteResponse | null> | null = null;
+let siteRequestResolved = false;
 
 async function loadMinistrySite(): Promise<SiteResponse | null> {
   if (!siteRequest) {
     siteRequest = fetch("/v1/public/church/site", { cache: "no-store" })
       .then(async (response) => response.ok ? await response.json() as SiteResponse : null)
-      .catch(() => null);
+      .catch(() => null)
+      .finally(() => { siteRequestResolved = true; });
   }
   return siteRequest;
 }
@@ -161,4 +163,16 @@ export function useMinistrySite(): MinistryConfig {
     return () => { active = false; };
   }, []);
   return site;
+}
+
+/** Resolves when the first tenant settings request finishes, including its failure fallback. */
+export function useMinistrySiteLoaded(): boolean {
+  const [loaded, setLoaded] = useState(siteRequestResolved);
+  useEffect(() => {
+    if (siteRequestResolved) return;
+    let active = true;
+    void loadMinistrySite().finally(() => { if (active) setLoaded(true); });
+    return () => { active = false; };
+  }, []);
+  return loaded;
 }

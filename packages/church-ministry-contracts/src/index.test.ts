@@ -49,6 +49,21 @@ describe("church public site settings contracts", () => {
     expect(insecureLink.success).toBe(false);
   });
 
+  it("rejects navigation paths without a configured page and keeps disabled page links publishable", () => {
+    expect(churchPublicSiteSettingsSchema.safeParse({
+      navigation: [{ id: "unknown", label: "Unknown", href: "/unknown" }],
+    }).success).toBe(false);
+
+    const result = churchPublicSiteSettingsSchema.safeParse({
+      navigation: [{ id: "about", label: "About", href: "/about" }],
+      pages: [
+        { id: "home", path: "/", title: "Home", sections: ["hero"] },
+        { id: "about", path: "/about", title: "About", enabled: false, sections: ["text"] },
+      ],
+    });
+    expect(result.success).toBe(true);
+  });
+
   it("fills optional ministry profile fields and allows a local logo asset", () => {
     const result = churchSiteSettingsInputSchema.parse({
       profile: { ministryName: "Harbour Church", logoUrl: "/images/logo.svg" },

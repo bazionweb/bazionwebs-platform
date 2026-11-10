@@ -7,6 +7,7 @@ import {
   type ChurchSiteSettingsInput,
 } from "@bazion/church-ministry-contracts";
 import { apiErrorMessage } from "../../lib/api-error";
+import { addSiteNavigationItem, removeSiteNavigationItem, setSitePageEnabled, updateSiteNavigationItem } from "../../lib/site-settings-navigation";
 import { MediaUploadField } from "./media-upload-field";
 
 type SiteProfile = ChurchSiteSettingsInput["profile"];
@@ -122,7 +123,7 @@ export function SiteSettingsEditor() {
       setNotice("Website settings saved. Refresh the public site or preview tab to see the changes.");
     } catch (reason) {
       const message = reason instanceof Error ? reason.message : "Website settings could not be saved.";
-      setError(message.startsWith("[") ? "Check required fields and links. Each content row uses the format shown below its field." : message);
+      setError(message.startsWith("[") ? "Check required fields and links. Navigation must point to a configured page or an HTTPS destination, and page paths must stay unique." : message);
     } finally { setBusy(false); }
   }
 
@@ -171,6 +172,38 @@ export function SiteSettingsEditor() {
       </div>
       <div className="ch-site-settings-grid" style={{ marginTop: 16 }}>
         {(["primaryColor", "secondaryColor", "accentColor"] as const).map((key) => <label key={key} style={labelStyle}>{key.replace("Color", " color")}<div style={{ display: "flex", gap: 9 }}><input aria-label={key} type="color" value={settings.branding[key]} onChange={(event) => setSettings({ ...settings, branding: { ...settings.branding, [key]: event.target.value } })} /><input style={fieldStyle} pattern="#[0-9a-fA-F]{6}" value={settings.branding[key]} onChange={(event) => setSettings({ ...settings, branding: { ...settings.branding, [key]: event.target.value } })} /></div></label>)}
+      </div>
+    </section>
+
+    <section style={sectionStyle}>
+      <h2>Navigation and page visibility</h2>
+      <p className="admin-muted">Choose which pages appear in the public menu, then edit, add, or remove links. The home page must remain enabled. Internal links must use a configured page path; partner links must use HTTPS.</p>
+      <div className="ministry-content-list">
+        <strong>Published pages</strong>
+        {settings.pages.map((page) => <label key={page.id} style={{ display: "flex", gap: 10, alignItems: "center", padding: "8px 0", fontWeight: 500 }}>
+          <input
+            type="checkbox"
+            checked={page.enabled}
+            disabled={page.id === "home"}
+            aria-label={`${page.title} page enabled`}
+            onChange={(event) => setSettings((current) => setSitePageEnabled(current, page.id, event.target.checked))}
+          />
+          <span>{page.title} <small className="admin-muted">{page.path}</small></span>
+        </label>)}
+      </div>
+      <div className="ministry-content-list">
+        <div className="ministry-content-list-heading">
+          <div><strong>Main navigation</strong><small>Links appear in the order shown. A disabled page’s link is hidden automatically.</small></div>
+          <button type="button" className="ministry-media-button" disabled={settings.navigation.length >= 12} onClick={() => setSettings((current) => addSiteNavigationItem(current))}>Add link</button>
+        </div>
+        {settings.navigation.map((item, index) => <article className="ministry-content-entry" key={item.id}>
+          <div className="ch-site-settings-grid">
+            <label style={labelStyle}>Link label<input required maxLength={50} style={fieldStyle} value={item.label} onChange={(event) => setSettings((current) => updateSiteNavigationItem(current, index, { label: event.target.value }))} /></label>
+            <label style={labelStyle}>Destination<input required maxLength={2048} style={fieldStyle} value={item.href} onChange={(event) => setSettings((current) => updateSiteNavigationItem(current, index, { href: event.target.value }))} placeholder="/about or https://partner.example.org" /></label>
+          </div>
+          <button type="button" className="admin-danger-button" onClick={() => setSettings((current) => removeSiteNavigationItem(current, index))}>Remove link</button>
+        </article>)}
+        {!settings.navigation.length && <p className="admin-muted">No navigation links have been added.</p>}
       </div>
     </section>
 

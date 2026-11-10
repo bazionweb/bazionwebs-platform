@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import { ChurchWhatsAppButton } from "@bazion/ui";
-import { useMinistrySite } from "./use-ministry-site";
+import { getWebsitePageForRoute } from "./site-page-availability";
+import { useMinistrySite, useMinistrySiteLoaded } from "./use-ministry-site";
 
 const PUBLIC_MINISTRY_PATHS = new Set([
   "/",
@@ -19,10 +20,13 @@ const PUBLIC_MINISTRY_PATHS = new Set([
   "/terms",
 ]);
 
-export function SiteThemeProvider() {
+export function SiteThemeProvider({ children }: { children: ReactNode }) {
   const site = useMinistrySite();
+  const siteLoaded = useMinistrySiteLoaded();
   const pathname = usePathname();
   const isPublicMinistryPage = PUBLIC_MINISTRY_PATHS.has(pathname) || pathname.startsWith("/events/") || pathname.startsWith("/sermons/");
+  const routePage = getWebsitePageForRoute(site.pages, pathname);
+  const pageIsUnavailable = isPublicMinistryPage && siteLoaded && routePage !== undefined && !routePage.enabled;
 
   useEffect(() => {
     const root = document.documentElement;
@@ -56,7 +60,25 @@ export function SiteThemeProvider() {
   }, [pathname, site.branding.primaryColor, site.branding.secondaryColor, site.branding.accentColor, site.metadata.title, site.metadata.description, site.ministryName, site.tagline]);
 
   useEffect(() => {
+    if (!pageIsUnavailable) return;
+    let robots = document.querySelector<HTMLMetaElement>('meta[name="robots"]');
+    const created = !robots;
+    if (!robots) {
+      robots = document.createElement("meta");
+      robots.name = "robots";
+      document.head.appendChild(robots);
+    }
+    const previous = robots.content;
+    robots.content = "noindex, nofollow";
+    return () => {
+      if (created) robots?.remove();
+      else if (robots) robots.content = previous;
+    };
+  }, [pageIsUnavailable]);
+
+  useEffect(() => {
     if (!isPublicMinistryPage || !("IntersectionObserver" in window)) return;
+    if (pageIsUnavailable) return;
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
 
     const main = document.getElementById("main-content");
@@ -99,9 +121,15 @@ export function SiteThemeProvider() {
         element.classList.remove("ch-reveal", "ch-reveal-visible");
       });
     };
-  }, [pathname, isPublicMinistryPage]);
+  }, [pathname, isPublicMinistryPage, pageIsUnavailable]);
 
   return isPublicMinistryPage
-    ? <ChurchWhatsAppButton href={site.social.whatsapp} ministryName={site.ministryName} />
-    : null;
+    ? <>{pageIsUnavailable ? <main id="main-content" className="ch-section ch-container" role="status">
+      <h1>This page is not available</h1>
+      <p>This ministry has not published this page.</p>
+      <a href="/" className="ch-btn ch-btn-primary">Return to the home page</a>
+    </main> : children}
+      {!pageIsUnavailable && <ChurchWhatsAppButton href={site.social.whatsapp} ministryName={site.ministryName} />}
+    </>
+    : children;
 }
