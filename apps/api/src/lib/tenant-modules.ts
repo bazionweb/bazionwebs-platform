@@ -1,15 +1,5 @@
 import { pool } from "./database.js";
-
-const defaultTenantModuleStates: Readonly<Record<string, boolean>> = {
-  "platform-identity": true,
-  commerce: true,
-  analytics: true,
-  audit: true,
-  notifications: true,
-  "contacts-crm": false,
-  "website-content": false,
-  "church-ministry": true,
-};
+import { getPlatformModule } from "../modules/admin/module-catalog.js";
 
 /** Check the effective tenant entitlement before entering a module API. */
 export async function isTenantModuleEnabled(tenantId: string, moduleId: string): Promise<boolean> {
@@ -24,5 +14,5 @@ export async function isTenantModuleEnabled(tenantId: string, moduleId: string):
   );
   const row = result.rows[0];
   if (!row || row.status !== "active") return false;
-  return row.enabled ?? defaultTenantModuleStates[moduleId] ?? false;
+  return row.enabled ?? getPlatformModule(moduleId)?.defaultEnabled ?? false;
 }

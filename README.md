@@ -12,6 +12,7 @@ An ownership-first, modular platform for building and operating reusable website
 - [Commercial offerings](products/commercial-offerings.json): website/ecommerce/custom-system/hosting/care packages and add-ons mapped to their modules.
 - [Solution packs](solutions/): nine initial tenant solution manifests.
 - [Product manifests](products/): versioned product compositions validated against their solution, module, template, app and database schema dependencies.
+- [Runtime module policy](products/runtime-module-policy.json): entitlement defaults and platform-specific module controls merged into the generated API catalogue.
 - [Implementation roadmap](docs/implementation-roadmap.md): phase-gated delivery sequence and acceptance criteria.
 
 Do not create one package per advertised capability. Build reusable domain modules, then compose client solutions from manifests, templates, permissions and entitlements.
