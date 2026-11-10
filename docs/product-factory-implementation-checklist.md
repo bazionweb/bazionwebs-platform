@@ -10,7 +10,7 @@ This is the execution checklist for turning the modular platform into a repeatab
 - [x] Validate product, solution, module, template, workspace-package and database-schema references in CI.
 - [x] Add validator tests for valid composition, module-version drift and missing hard dependencies.
 - [ ] Run PostgreSQL/server integration tests locally or in CI. The local test run currently skips these because Docker is unavailable and PostgreSQL port 5432 is closed.
-- [ ] Finish Phase 0 installation-model decisions and PostgreSQL integration evidence.
+- [ ] Finish Phase 0 PostgreSQL integration evidence.
 - [ ] Finish Phase 1 product contract decisions and readiness checks.
 
 Latest completed implementation commit: `cbe1851 feat: define validated product manifests`.
@@ -26,7 +26,7 @@ Latest completed implementation commit: `cbe1851 feat: define validated product 
 - [x] Generate the API runtime module catalogue from those sources; add a check mode that fails CI when the generated file is stale.
 - [x] Derive tenant default entitlement states from the runtime catalogue so the same defaults are not maintained twice.
 - [x] Add tests for generated catalogue metadata, policy dependency integrity and stale generated output.
-- [ ] Decide whether one tenant may own multiple product installations; record the choice and consequences in an ADR before creating installation tables.
+- [x] Decide whether one tenant may own multiple product installations; record the choice and consequences in an ADR before creating installation tables.
 - [x] Document the difference between module implementation dependencies and runtime entitlement dependencies.
 - [ ] Run PostgreSQL tenant-isolation, commerce, church onboarding, notification, audit and auth integration tests with the least-privilege CI roles.
 
@@ -66,7 +66,8 @@ Latest completed implementation commit: `cbe1851 feat: define validated product 
 
 **Owner lane:** database integrator + platform identity. **Prerequisite:** tenant/install cardinality ADR and Phase 2 evidence.
 
-- [ ] Define product installation identity separately from tenant identity where one tenant can own multiple sites/products.
+- [x] Define product installation identity separately from tenant identity where one tenant can own multiple sites/products.
+- [ ] Define how verified domains map to an installation before supporting multiple independently branded sites in one tenant.
 - [ ] Specify lifecycle, idempotency, selected product/template versions, distribution mode and tenant ownership constraints.
 - [ ] Specify configuration version/checksum history separately from product definitions and secret storage.
 - [ ] Design PostgreSQL keys, indexes, least-privilege grants, forced RLS, tenant-aware foreign keys and uniqueness rules.
