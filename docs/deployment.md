@@ -27,7 +27,7 @@ Use distinct development, staging and production projects, databases, credential
 
 ## CI/CD baseline
 
-Recommended mature pull-request gates: install from the committed lockfile, typecheck, lint, unit tests, build, dependency audit and migration/RLS integration tests. The current starter CI runs typecheck, available unit tests and build; lint, dependency audit and live PostgreSQL migration/RLS tests remain to be added once the first dependency install and database-backed CI service are available. Protect `main`; require review and green CI; deploy staging from main; approve production deployments. The starter CI uses a bootstrap install only because a lockfile has not yet been generated in the offline build environment. Commit `pnpm-lock.yaml` and switch to frozen installs immediately after the first successful package install.
+The current CI installs from the committed lockfile with `pnpm install --frozen-lockfile`, validates the catalogue and manifests, starts PostgreSQL, applies application and Better Auth migrations, then runs workspace typechecks, tests and builds. The PostgreSQL-backed suites cover tenant isolation and other database boundaries. Linting and dependency auditing are not currently CI gates; add those when their configurations and remediation workflow are established. Keep migration/RLS integration coverage in CI as the database and tenancy model evolve. Protect `main`; require review and green CI; deploy staging from main; approve production deployments.
 
 ## Backups and recovery
 

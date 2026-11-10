@@ -12,7 +12,7 @@
     "dev:platform": "dotenv -e .env -- pnpm --filter @bazion/admin dev",
     "build": "turbo run build",
     "typecheck": "turbo run typecheck",
-    "test": "turbo run test --concurrency=4",
+    "test": "node --test scripts/product-manifests.test.mjs && turbo run test --concurrency=4",
     "db:up": "docker compose up -d db",
     "db:down": "docker compose down",
     "db:migrate": "dotenv -e .env -- pnpm --filter @bazion/database migrate",
@@ -21,7 +21,7 @@
     "gmfc:migrate": "dotenv -e .env -o -v GMFC_TENANT_ID=7a80eaae-6f8c-44c1-b22a-3dca458f0ec1 -v DEFAULT_TENANT_ID=7a80eaae-6f8c-44c1-b22a-3dca458f0ec1 -- pnpm --filter @bazion/database migrate:global-mission",
     "gmfc:migrate:apply": "dotenv -e .env -o -v GMFC_TENANT_ID=7a80eaae-6f8c-44c1-b22a-3dca458f0ec1 -v DEFAULT_TENANT_ID=7a80eaae-6f8c-44c1-b22a-3dca458f0ec1 -- pnpm --filter @bazion/database migrate:global-mission --apply",
     "auth:check": "pnpm --filter @bazion/auth typecheck && pnpm --filter @bazion/auth test",
-    "catalog:validate": "node scripts/validate-product-catalog.mjs && node scripts/validate-module-manifests.mjs",
+    "catalog:validate": "node scripts/validate-product-catalog.mjs && node scripts/validate-module-manifests.mjs && node scripts/validate-product-manifests.mjs",
     "modules:validate": "node scripts/validate-module-manifests.mjs",
     "production:preflight": "node scripts/production-preflight.mjs",
     "platform:create-admin": "dotenv -e .env -- pnpm --filter @bazion/auth run platform:create-admin"

@@ -7,15 +7,15 @@
   "description": "Tenant-scoped ministry public site, published sermons, event registration, giving intake, enquiries and prayer requests. Membership, attendance, volunteers, settings and full payment reconciliation remain incomplete.",
   "requiredModules": [
     "platform-identity",
-    "church-ministry"
+    "church-ministry",
+    "media-storage"
   ],
   "optionalModules": [
     "tenant-control-plane",
     "website-content",
     "notifications",
     "analytics",
-    "commerce",
-    "media-storage"
+    "commerce"
   ],
   "defaultRoles": [
     {

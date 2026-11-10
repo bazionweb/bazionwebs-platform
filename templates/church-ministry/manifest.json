@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "church-ministry",
+  "name": "Church and ministry website",
+  "version": "1.0.0",
+  "status": "partial",
+  "implementation": {
+    "packageName": "@bazion/storefront",
+    "entrypoint": "apps/storefront/app/church-home.tsx"
+  },
+  "configuration": {
+    "schemaVersion": "1.0.0",
+    "sourcePath": "packages/church-ministry-contracts/src/index.ts",
+    "schemaNames": ["churchPublicSiteSettingsSchema", "churchSiteSettingsInputSchema"]
+  }
+}

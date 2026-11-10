@@ -1,0 +1,33 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "church-ministry",
+  "name": "Church and Ministry Management",
+  "version": "1.0.0",
+  "status": "partial",
+  "solution": {
+    "id": "church-ministry",
+    "version": "1.0.0"
+  },
+  "applications": [
+    { "packageName": "@bazion/api", "version": "0.1.0", "role": "api" },
+    { "packageName": "@bazion/storefront", "version": "0.1.0", "role": "storefront" }
+  ],
+  "requiredModules": [
+    { "id": "platform-identity", "version": "1.0.0" },
+    { "id": "church-ministry", "version": "1.0.0" },
+    { "id": "media-storage", "version": "1.0.0" }
+  ],
+  "optionalModules": [
+    { "id": "notifications", "version": "0.1.0" },
+    { "id": "analytics", "version": "1.0.0" },
+    { "id": "commerce", "version": "1.0.0" }
+  ],
+  "templates": [
+    { "id": "church-ministry", "version": "1.0.0" }
+  ],
+  "configuration": {
+    "schemaVersion": "1.0.0",
+    "sourcePath": "packages/church-ministry-contracts/src/index.ts"
+  },
+  "databaseSchemaVersion": "0015_commerce_inventory_reservation_guard.sql"
+}

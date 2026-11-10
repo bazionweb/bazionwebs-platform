@@ -271,3 +271,9 @@ The database integrator must own migration numbering, schema ownership, grants, 
 ## Immediate recommendation
 
 Proceed with **Phase 0 and Phase 1 only** as the next implementation increment. First correct repository status drift, decide the tenant-versus-installation model and define the product manifest/validator. Keep GMFC operating as a reusable-template tenant. Then prove the generic SME factory with two differently configured tenants before creating release-manager or deployment database tables. This preserves the current template, avoids premature infrastructure, and moves directly toward a repeatable product factory rather than a larger catalogue.
+
+## Implementation progress after this review
+
+The review above describes the repository as inspected at `b3c72d5`; the audit itself was committed as `dd9f1be`. Work started after that snapshot has now corrected the stale CI/admin/status claims, introduced product and template manifest schemas, added a Church/Ministry product and template manifest, and wired cross-reference validation into `pnpm catalog:validate` and CI. The Church/Ministry solution now treats media storage as required because its module manifest declares it as a dependency. The catalogue and new manifest validation currently pass.
+
+This is the first product-definition increment only. The platform still has no installation lifecycle, product publication/artifact pipeline, general configuration migration service, managed provisioning flow, or independent/source-owned distribution. Runtime module catalogue parity and the tenant-versus-installation decision remain open Phase 0 work; the SME vertical slice remains a later acceptance gate.

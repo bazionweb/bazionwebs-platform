@@ -71,7 +71,7 @@ jobs:
       - name: Install workspace dependencies from the committed lockfile
         run: pnpm install --frozen-lockfile
 
-      - name: Validate product and solution catalogue manifests
+      - name: Validate catalogue, module, solution, template and product manifests
         run: pnpm catalog:validate
 
       - name: Start PostgreSQL with least-privilege roles

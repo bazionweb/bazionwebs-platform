@@ -24,7 +24,7 @@ The Next.js app proxies `/v1/*` and `/api/auth/*` to the API. Server-rendered pl
 - Superadmin tenant directory, tenant detail, lifecycle, ownership, module, configuration, audit and usage interfaces.
 - Better Auth email/password sign-in and server-side session forwarding.
 
-The module catalogue is currently a runtime snapshot of the checked-in manifests for the seven platform modules. Planned modules are visible but cannot be activated. Existing tenants retain the commerce and analytics defaults unless an explicit entitlement override is saved. The commerce routes enforce the commerce entitlement. Usage reporting currently covers member, product and order counts; storage, bandwidth and API-request metering are not yet collected.
+The API currently maintains a runtime catalogue of eight entries; it is not generated from module manifests, so keep the two sources aligned as part of module work. Planned modules are visible but cannot be activated. Existing tenants retain the commerce and analytics defaults unless an explicit entitlement override is saved. Commerce and church/ministry routes enforce their tenant entitlements; analytics has a permission gate but is not yet covered by the same module-entitlement check. Usage reporting currently covers member, product and order counts; storage, bandwidth and API-request metering are not yet collected.
 
 ## Security boundary
 
