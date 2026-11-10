@@ -60,7 +60,7 @@ describe("versioned website configuration", () => {
     }).success).toBe(false);
   });
 
-  it("requires a home page and rejects navigation to pages that are missing or disabled", () => {
+  it("requires an enabled home page and rejects navigation to pages that are missing", () => {
     expect(websiteConfigurationSchema.safeParse({ pages: [] }).success).toBe(false);
     expect(websiteConfigurationSchema.safeParse({
       navigation: [{ id: "missing", label: "Missing", href: "/missing" }],
@@ -71,6 +71,9 @@ describe("versioned website configuration", () => {
         { id: "home", path: "/", title: "Home", sections: ["hero"] },
         { id: "about", path: "/about", title: "About", enabled: false, sections: ["text"] },
       ],
+    }).success).toBe(true);
+    expect(websiteConfigurationSchema.safeParse({
+      pages: [{ id: "home", path: "/", title: "Home", enabled: false, sections: ["hero"] }],
     }).success).toBe(false);
   });
 
