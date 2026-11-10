@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { ChurchFooter, ChurchNav, PageHero } from "@bazion/ui";
+import { EventCalendarButton } from "../event-calendar-button";
 import { useMinistrySite } from "../../../lib/use-ministry-site";
 
 interface PublicEvent {
@@ -106,6 +107,14 @@ export function EventDetail({ slug }: { slug: string }) {
               <h2>About this event</h2>
               <p style={{ lineHeight: 1.8, whiteSpace: "pre-wrap" }}>{event.description || "More details will be shared by the ministry."}</p>
               <p><strong>Venue:</strong> {event.venue || "To be announced"}{event.address ? `, ${event.address}` : ""}</p>
+              <EventCalendarButton event={{
+                id: event.id,
+                title: event.title,
+                startsAt: event.startsAt,
+                endsAt: event.endsAt,
+                description: event.description,
+                location: [event.venue, event.address].filter(Boolean).join(", "),
+              }} />
               {event.registrationCapacity !== null && <p><strong>Capacity:</strong> {event.registrationCapacity}</p>}
             </article>
             <section className="ch-card"><div className="ch-card-body">

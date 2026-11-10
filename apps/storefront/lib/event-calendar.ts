@@ -86,5 +86,5 @@ export function downloadChurchEventCalendar(event: ChurchCalendarEvent): void {
   document.body.append(link);
   link.click();
   link.remove();
-  window.setTimeout(() => URL.revokeObjectURL(url), 0);
+  window.setTimeout(() => URL.revokeObjectURL(url), 1_000);
 }
