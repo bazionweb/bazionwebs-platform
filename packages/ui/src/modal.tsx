@@ -1,65 +1,70 @@
 "use client";
 
-import { type ReactNode, useEffect } from "react";
+import { type KeyboardEvent, type ReactNode, useEffect, useId, useRef } from "react";
 
 export interface ModalProps {
   isOpen: boolean;
   onClose: () => void;
   title?: string;
   children: ReactNode;
+  onKeyDown?: (event: KeyboardEvent<HTMLDialogElement>) => void;
 }
 
-export function Modal({ isOpen, onClose, title, children }: ModalProps) {
+export function Modal({ isOpen, onClose, title, children, onKeyDown }: ModalProps) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const onCloseRef = useRef(onClose);
+  const titleId = useId();
+  onCloseRef.current = onClose;
+
   useEffect(() => {
-    function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
-    }
-    if (isOpen) {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+
+    const previousOverflow = document.body.style.overflow;
+    if (isOpen && !dialog.open) {
       document.body.style.overflow = "hidden";
-      window.addEventListener("keydown", handleKeyDown);
+      dialog.showModal();
+    } else if (!isOpen && dialog.open) {
+      dialog.close();
     }
+
     return () => {
-      document.body.style.overflow = "unset";
-      window.removeEventListener("keydown", handleKeyDown);
+      if (dialog.open) dialog.close();
+      document.body.style.overflow = previousOverflow;
     };
-  }, [isOpen, onClose]);
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
   return (
-    <div
+    <dialog
+      ref={dialogRef}
       className="ch-modal-overlay"
-      onClick={onClose}
-      role="dialog"
-      aria-modal="true"
-      aria-label={title || "Dialog modal"}
+      aria-labelledby={title ? titleId : undefined}
+      aria-label={title ? undefined : "Dialog"}
+      onCancel={(event) => {
+        event.preventDefault();
+        onCloseRef.current();
+      }}
+      onClose={() => onCloseRef.current()}
+      onClick={(event) => {
+        if (event.target === event.currentTarget) onCloseRef.current();
+      }}
+      onKeyDown={onKeyDown}
     >
-      <div
-        className="ch-modal-content"
-        onClick={(e) => e.stopPropagation()}
-      >
+      <div className="ch-modal-content">
         <button
           type="button"
           className="ch-modal-close"
-          onClick={onClose}
+          onClick={() => onCloseRef.current()}
           aria-label="Close dialog"
+          autoFocus
         >
           ✕
         </button>
-        {title && (
-          <div
-            style={{
-              padding: "20px 24px",
-              borderBottom: "1px solid var(--church-border)",
-              fontWeight: 700,
-              fontSize: "18px",
-            }}
-          >
-            {title}
-          </div>
-        )}
-        <div style={{ padding: "24px" }}>{children}</div>
+        {title && <h2 id={titleId} className="ch-modal-title">{title}</h2>}
+        <div className="ch-modal-body">{children}</div>
       </div>
-    </div>
+    </dialog>
   );
 }

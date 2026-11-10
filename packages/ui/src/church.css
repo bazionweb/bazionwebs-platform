@@ -281,7 +281,14 @@ body { background: var(--church-bg); color: var(--church-text); font-family: var
     padding: 24px;
     background-color: #ffffff;
     border-bottom: 1px solid var(--church-border);
+    transform-origin: top;
+    animation: ch-nav-mobile-menu-in 160ms ease-out both;
   }
+}
+
+@keyframes ch-nav-mobile-menu-in {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 /* ── Hero Banner ──────────────────────────────────────────────── */
@@ -407,6 +414,98 @@ body { background: var(--church-bg); color: var(--church-text); font-family: var
 .ch-card:focus-within {
   transform: translateY(-2px);
   border-color: var(--church-border-dark);
+}
+
+.ch-gallery-trigger {
+  position: relative;
+  display: block;
+  width: 100%;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  background: var(--church-bg-muted);
+  color: #fff;
+  cursor: zoom-in;
+  text-align: left;
+}
+
+.ch-gallery-trigger img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  transition: transform 240ms ease;
+}
+
+.ch-gallery-trigger:hover img,
+.ch-gallery-trigger:focus-visible img {
+  transform: scale(1.035);
+}
+
+.ch-gallery-view-label {
+  position: absolute;
+  inset: auto 12px 12px auto;
+  padding: 8px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 999px;
+  background: rgba(16, 40, 32, 0.88);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 180ms ease, transform 180ms ease;
+}
+
+.ch-gallery-trigger:hover .ch-gallery-view-label,
+.ch-gallery-trigger:focus-visible .ch-gallery-view-label {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.ch-gallery-viewer img {
+  display: block;
+  width: 100%;
+  max-height: min(68vh, 720px);
+  object-fit: contain;
+  background: #111;
+}
+
+.ch-gallery-viewer > p {
+  margin: 14px 0 0;
+  color: var(--church-text-muted);
+  text-align: center;
+  line-height: 1.6;
+}
+
+.ch-gallery-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.ch-gallery-controls > span {
+  color: var(--church-text-muted);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (hover: none) {
+  .ch-gallery-view-label { opacity: 1; transform: none; }
+}
+
+@media (max-width: 480px) {
+  .ch-gallery-controls { gap: 6px; }
+  .ch-gallery-controls .ch-btn { min-height: 40px; padding: 8px 10px; font-size: 12px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ch-gallery-trigger img,
+  .ch-gallery-view-label { transition: none; }
+  .ch-gallery-trigger:hover img,
+  .ch-gallery-trigger:focus-visible img { transform: none; }
 }
 
 .ch-whatsapp-float {
@@ -743,13 +842,26 @@ body { background: var(--church-bg); color: var(--church-text); font-family: var
 .ch-modal-overlay {
   position: fixed;
   inset: 0;
-  background-color: rgba(10, 25, 47, 0.8);
-  backdrop-filter: blur(4px);
   z-index: 100;
+  width: 100vw;
+  height: 100vh;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 24px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  overflow: auto;
+  box-sizing: border-box;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 24px;
+}
+
+.ch-modal-overlay::backdrop {
+  background-color: rgba(10, 25, 47, 0.8);
+  backdrop-filter: blur(4px);
 }
 
 .ch-modal-content {
@@ -761,6 +873,20 @@ body { background: var(--church-bg); color: var(--church-text); font-family: var
   overflow-y: auto;
   position: relative;
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+}
+
+.ch-modal-title {
+  margin: 0;
+  padding: 20px 76px 20px 24px;
+  border-bottom: 1px solid var(--church-border);
+  color: var(--church-primary);
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.ch-modal-body {
+  padding: 24px;
 }
 
 .ch-modal-close {
@@ -778,6 +904,11 @@ body { background: var(--church-bg); color: var(--church-text); font-family: var
   align-items: center;
   justify-content: center;
   z-index: 10;
+}
+
+@media (max-width: 600px) {
+  .ch-modal-overlay { padding: 12px; }
+  .ch-modal-body { padding: 16px; }
 }
 
 /* ── Footer ───────────────────────────────────────────────────── */

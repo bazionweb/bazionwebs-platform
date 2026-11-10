@@ -1,4 +1,12 @@
 import { z } from "zod";
+import {
+  WEBSITE_CONFIGURATION_VERSION,
+  websiteBrandingSchema,
+  websiteConfigurationVersionSchema,
+  websiteNavigationSchema,
+  websitePagesSchema,
+  websiteSeoSchema,
+} from "@bazion/website-contracts";
 
 const publicHttpsUrlSchema = z.string().trim().max(2048).refine((value) => {
   if (value.startsWith("/") && !value.startsWith("//")) return true;
@@ -112,28 +120,35 @@ const publicExternalUrlSchema = z.string().trim().max(2048).url().refine((value)
   try { return new URL(value).protocol === "https:"; } catch { return false; }
 }, "Use an HTTPS link.");
 
-function hasAccessibleContrastOnWhite(color: string): boolean {
-  const channels = color.slice(1).match(/.{2}/g)?.map((channel) => Number.parseInt(channel, 16) / 255);
-  if (!channels || channels.length !== 3) return false;
-  const linear = channels.map((value) => value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4);
-  const luminance = 0.2126 * linear[0]! + 0.7152 * linear[1]! + 0.0722 * linear[2]!;
-  return 1.05 / (luminance + 0.05) >= 4.5;
-}
-
-const accessibleThemeColorSchema = z.string().trim().regex(/^#[0-9a-fA-F]{6}$/)
-  .refine(hasAccessibleContrastOnWhite, "Choose a color with at least 4.5:1 contrast against white.");
-
 export const churchPublicSiteSettingsSchema = z.object({
-  branding: z.object({
-    primaryColor: accessibleThemeColorSchema.default("#193a31"),
-    secondaryColor: accessibleThemeColorSchema.default("#315e50"),
-    accentColor: accessibleThemeColorSchema.default("#8b5b29"),
-    heroImageUrl: publicHttpsUrlSchema.optional(),
-  }).default({
+  schemaVersion: websiteConfigurationVersionSchema.default(WEBSITE_CONFIGURATION_VERSION),
+  branding: websiteBrandingSchema.default({
     primaryColor: "#193a31",
     secondaryColor: "#315e50",
     accentColor: "#8b5b29",
   }),
+  navigation: websiteNavigationSchema.default([
+    { id: "home", label: "Home", href: "/" },
+    { id: "visit", label: "Visit", href: "/visit" },
+    { id: "ministries", label: "Ministries", href: "/ministries" },
+    { id: "about", label: "About", href: "/about" },
+    { id: "sermons", label: "Sermons", href: "/sermons" },
+    { id: "events", label: "Events", href: "/events" },
+    { id: "contact", label: "Contact", href: "/contact" },
+  ]),
+  pages: websitePagesSchema.default([
+    { id: "home", path: "/", title: "Home", enabled: true, sections: ["hero", "text", "events", "testimonials", "call-to-action"] },
+    { id: "about", path: "/about", title: "About", enabled: true, sections: ["hero", "text", "feature-list", "call-to-action"] },
+    { id: "visit", path: "/visit", title: "Plan a Visit", enabled: true, sections: ["hero", "text", "feature-list", "call-to-action"] },
+    { id: "ministries", path: "/ministries", title: "Ministries", enabled: true, sections: ["hero", "card-grid", "call-to-action"] },
+    { id: "sermons", path: "/sermons", title: "Sermons", enabled: true, sections: ["hero", "media"] },
+    { id: "events", path: "/events", title: "Events", enabled: true, sections: ["hero", "events"] },
+    { id: "gallery", path: "/gallery", title: "Gallery", enabled: true, sections: ["hero", "gallery"] },
+    { id: "giving", path: "/give", title: "Giving", enabled: true, sections: ["hero", "text", "call-to-action"] },
+    { id: "contact", path: "/contact", title: "Contact", enabled: true, sections: ["hero", "text", "contact-form"] },
+    { id: "privacy", path: "/privacy", title: "Privacy", enabled: true, sections: ["text"] },
+    { id: "terms", path: "/terms", title: "Terms", enabled: true, sections: ["text"] },
+  ]),
   hero: z.object({
     eyebrow: z.string().trim().max(100).default("WELCOME"),
     title: z.string().trim().max(120).default("A place to belong"),
@@ -206,10 +221,7 @@ export const churchPublicSiteSettingsSchema = z.object({
     topic: z.string().trim().min(2).max(120),
     belief: z.string().trim().min(2).max(1200),
   })).max(30).default([]),
-  metadata: z.object({
-    title: z.string().trim().max(160).default(""),
-    description: z.string().trim().max(320).default(""),
-  }).default({ title: "", description: "" }),
+  metadata: websiteSeoSchema.default({ title: "", description: "" }),
 });
 export type ChurchPublicSiteSettings = z.infer<typeof churchPublicSiteSettingsSchema>;
 

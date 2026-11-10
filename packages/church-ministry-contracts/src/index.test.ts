@@ -15,11 +15,14 @@ describe("church public site settings contracts", () => {
   it("provides complete defaults for a new ministry site", () => {
     const settings = churchPublicSiteSettingsSchema.parse({});
 
-    expect(settings.branding).toEqual({
+    expect(settings.branding).toMatchObject({
       primaryColor: "#193a31",
       secondaryColor: "#315e50",
       accentColor: "#8b5b29",
     });
+    expect(settings.schemaVersion).toBe("1.0.0");
+    expect(settings.navigation.map(({ href }) => href)).toContain("/contact");
+    expect(settings.pages.find(({ id }) => id === "home")?.sections).toContain("hero");
     expect(settings.hero.title).toBe("A place to belong");
     expect(settings.visitorInfo).toEqual({ arrival: "", children: "", accessibility: "", parking: "" });
     expect(settings.serviceTimes).toEqual([]);

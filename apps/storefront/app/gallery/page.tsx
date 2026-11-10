@@ -1,10 +1,19 @@
 "use client";
 
-import { ChurchFooter, ChurchNav, PageHero } from "@bazion/ui";
+import { useState } from "react";
+import { ChurchFooter, ChurchNav, Modal, PageHero } from "@bazion/ui";
 import { useMinistrySite } from "../../lib/use-ministry-site";
 
 export default function GalleryPage() {
   const site = useMinistrySite();
+  const [activeImageIndex, setActiveImageIndex] = useState<number | null>(null);
+  const activeImage = activeImageIndex === null ? null : site.galleryImages[activeImageIndex] ?? null;
+
+  function moveImage(direction: -1 | 1) {
+    if (activeImageIndex === null || site.galleryImages.length < 2) return;
+    setActiveImageIndex((activeImageIndex + direction + site.galleryImages.length) % site.galleryImages.length);
+  }
+
   return <>
     <ChurchNav ministryName={site.ministryName} logoUrl={site.branding.logoUrl} currentPath="/gallery" giveHref="/give" />
     <main id="main-content">
@@ -14,7 +23,15 @@ export default function GalleryPage() {
           <div className="ch-heading-wrap"><span className="ch-eyebrow">Ministry life</span><h2 className="ch-title">Moments together</h2></div>
           {site.galleryImages.length > 0 ? <div className="ch-gallery-grid">
             {site.galleryImages.map((item, index) => <figure className="ch-card ch-gallery-item" key={`${item.imageUrl}-${index}`}>
-              <img src={item.imageUrl} alt={item.alt} loading="lazy" />
+              <button
+                type="button"
+                className="ch-gallery-trigger"
+                aria-label={"View photo " + (index + 1) + (item.caption ? ": " + item.caption : "")}
+                onClick={() => setActiveImageIndex(index)}
+              >
+                <img src={item.imageUrl} alt={item.alt} loading="lazy" />
+                <span className="ch-gallery-view-label" aria-hidden="true">View photo</span>
+              </button>
               {item.caption && <figcaption>{item.caption}</figcaption>}
             </figure>)}
           </div> : <div className="ch-info-card" style={{ maxWidth: 760, margin: "0 auto", textAlign: "center" }}>
@@ -33,5 +50,24 @@ export default function GalleryPage() {
       </section>
     </main>
     <ChurchFooter ministryName={site.ministryName} tagline={site.tagline} phoneNumbers={site.contact.phones} email={site.contact.email} address={site.contact.address} />
+    <Modal
+      isOpen={Boolean(activeImage)}
+      onClose={() => setActiveImageIndex(null)}
+      title={activeImage?.caption || ("Photo " + (activeImageIndex === null ? "" : activeImageIndex + 1))}
+      onKeyDown={(event) => {
+        if (event.key === "ArrowLeft") moveImage(-1);
+        if (event.key === "ArrowRight") moveImage(1);
+      }}
+    >
+      {activeImage && activeImageIndex !== null && <div className="ch-gallery-viewer">
+        <img src={activeImage.imageUrl} alt={activeImage.alt} />
+        {activeImage.caption && <p>{activeImage.caption}</p>}
+        {site.galleryImages.length > 1 && <div className="ch-gallery-controls">
+          <button type="button" className="ch-btn ch-btn-outline" onClick={() => moveImage(-1)} aria-label="Previous photo">← Previous</button>
+          <span aria-live="polite">{activeImageIndex + 1} of {site.galleryImages.length}</span>
+          <button type="button" className="ch-btn ch-btn-outline" onClick={() => moveImage(1)} aria-label="Next photo">Next →</button>
+        </div>}
+      </div>}
+    </Modal>
   </>;
 }

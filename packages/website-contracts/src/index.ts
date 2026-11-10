@@ -1,0 +1,155 @@
+import { z } from "zod";
+
+export const WEBSITE_CONFIGURATION_VERSION = "1.0.0" as const;
+export const websiteConfigurationVersionSchema = z.literal(WEBSITE_CONFIGURATION_VERSION);
+
+function hasAccessibleContrastOnWhite(color: string): boolean {
+  const channels = color.slice(1).match(/.{2}/g)?.map((channel) => Number.parseInt(channel, 16) / 255);
+  if (!channels || channels.length !== 3) return false;
+  const linear = channels.map((value) => value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4);
+  const luminance = 0.2126 * linear[0]! + 0.7152 * linear[1]! + 0.0722 * linear[2]!;
+  return 1.05 / (luminance + 0.05) >= 4.5;
+}
+
+export const websiteColorSchema = z.string().trim().regex(/^#[0-9a-fA-F]{6}$/)
+  .refine(hasAccessibleContrastOnWhite, "Choose a color with at least 4.5:1 contrast against white.");
+
+function isSafeSitePath(value: string): boolean {
+  return value.startsWith("/")
+    && !value.startsWith("//")
+    && !value.includes("\\")
+    && !/[\u0000-\u001f\u007f]/.test(value);
+}
+
+export const websitePathSchema = z.string().trim().min(1).max(2048)
+  .regex(/^\/(?:[a-z0-9]+(?:-[a-z0-9]+)*(?:\/[a-z0-9]+(?:-[a-z0-9]+)*)*)?$/,
+    "Use a lowercase site path made from letters, numbers and hyphens.");
+
+export const websiteResourceUrlSchema = z.string().trim().min(1).max(2048).refine((value) => {
+  if (isSafeSitePath(value)) return true;
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" && !url.username && !url.password;
+  } catch {
+    return false;
+  }
+}, "Use an HTTPS URL or a site-relative path.");
+
+export const websiteBrandingSchema = z.object({
+  primaryColor: websiteColorSchema.default("#1f2937"),
+  secondaryColor: websiteColorSchema.default("#334155"),
+  accentColor: websiteColorSchema.default("#854d0e"),
+  logoUrl: websiteResourceUrlSchema.optional(),
+  heroImageUrl: websiteResourceUrlSchema.optional(),
+}).strict();
+export type WebsiteBranding = z.infer<typeof websiteBrandingSchema>;
+
+export const websiteSeoSchema = z.object({
+  title: z.string().trim().max(160).default(""),
+  description: z.string().trim().max(320).default(""),
+  openGraphImageUrl: websiteResourceUrlSchema.optional(),
+}).strict();
+export type WebsiteSeo = z.infer<typeof websiteSeoSchema>;
+
+export const websiteNavigationItemSchema = z.object({
+  id: z.string().trim().min(1).max(80).regex(/^[a-z][a-z0-9-]*$/),
+  label: z.string().trim().min(1).max(50),
+  href: websiteResourceUrlSchema,
+}).strict();
+export type WebsiteNavigationItem = z.infer<typeof websiteNavigationItemSchema>;
+
+export const websiteNavigationSchema = z.array(websiteNavigationItemSchema).max(12)
+  .superRefine((items, context) => {
+    const ids = new Set<string>();
+    const hrefs = new Set<string>();
+    items.forEach((item, index) => {
+      if (ids.has(item.id)) context.addIssue({ code: "custom", message: "Navigation item IDs must be unique.", path: [index, "id"] });
+      if (hrefs.has(item.href)) context.addIssue({ code: "custom", message: "Navigation destinations must be unique.", path: [index, "href"] });
+      ids.add(item.id);
+      hrefs.add(item.href);
+    });
+  });
+export type WebsiteNavigation = z.infer<typeof websiteNavigationSchema>;
+
+export const websitePageSectionSchema = z.enum([
+  "hero",
+  "text",
+  "feature-list",
+  "card-grid",
+  "testimonials",
+  "gallery",
+  "events",
+  "media",
+  "contact-form",
+  "call-to-action",
+  "faq",
+]);
+export type WebsitePageSection = z.infer<typeof websitePageSectionSchema>;
+
+export const websitePageSchema = z.object({
+  id: z.string().trim().min(1).max(80).regex(/^[a-z][a-z0-9-]*$/),
+  path: websitePathSchema,
+  title: z.string().trim().min(1).max(120),
+  enabled: z.boolean().default(true),
+  sections: z.array(websitePageSectionSchema).max(12).superRefine((sections, context) => {
+    if (new Set(sections).size !== sections.length) {
+      context.addIssue({ code: "custom", message: "Page section IDs must be unique." });
+    }
+  }),
+}).strict();
+export type WebsitePage = z.infer<typeof websitePageSchema>;
+
+export const websitePagesSchema = z.array(websitePageSchema).max(24)
+  .superRefine((pages, context) => {
+    const ids = new Set<string>();
+    const paths = new Set<string>();
+    pages.forEach((page, index) => {
+      if (ids.has(page.id)) context.addIssue({ code: "custom", message: "Page IDs must be unique.", path: [index, "id"] });
+      if (paths.has(page.path)) context.addIssue({ code: "custom", message: "Page paths must be unique.", path: [index, "path"] });
+      ids.add(page.id);
+      paths.add(page.path);
+    });
+    if (!pages.some((page) => page.id === "home" && page.path === "/")) {
+      context.addIssue({ code: "custom", message: "A website must include its home page at '/'.", path: [] });
+    }
+  });
+export type WebsitePages = z.infer<typeof websitePagesSchema>;
+
+export const defaultWebsiteNavigation: WebsiteNavigation = [
+  { id: "home", label: "Home", href: "/" },
+  { id: "about", label: "About", href: "/about" },
+  { id: "services", label: "Services", href: "/services" },
+  { id: "contact", label: "Contact", href: "/contact" },
+];
+
+export const defaultWebsitePages: WebsitePages = [
+  { id: "home", path: "/", title: "Home", enabled: true, sections: ["hero", "text", "feature-list", "call-to-action"] },
+  { id: "about", path: "/about", title: "About", enabled: true, sections: ["hero", "text", "feature-list"] },
+  { id: "services", path: "/services", title: "Services", enabled: true, sections: ["hero", "card-grid", "call-to-action"] },
+  { id: "contact", path: "/contact", title: "Contact", enabled: true, sections: ["hero", "text", "contact-form"] },
+];
+
+export const websiteConfigurationSchema = z.object({
+  schemaVersion: websiteConfigurationVersionSchema.default(WEBSITE_CONFIGURATION_VERSION),
+  branding: websiteBrandingSchema.default({
+    primaryColor: "#1f2937",
+    secondaryColor: "#334155",
+    accentColor: "#854d0e",
+  }),
+  navigation: websiteNavigationSchema.default(defaultWebsiteNavigation),
+  seo: websiteSeoSchema.default({ title: "", description: "" }),
+  pages: websitePagesSchema.default(defaultWebsitePages),
+}).strict().superRefine((configuration, context) => {
+  const pagesByPath = new Map(configuration.pages.map((page) => [page.path, page]));
+  configuration.navigation.forEach((item, index) => {
+    if (!isSafeSitePath(item.href)) return;
+    const path = new URL(item.href, "https://website.invalid").pathname;
+    const page = pagesByPath.get(path);
+    if (!page) {
+      context.addIssue({ code: "custom", message: "Navigation must target a configured page.", path: ["navigation", index, "href"] });
+    } else if (!page.enabled) {
+      context.addIssue({ code: "custom", message: "Navigation cannot target a disabled page.", path: ["navigation", index, "href"] });
+    }
+  });
+});
+export type WebsiteConfiguration = z.infer<typeof websiteConfigurationSchema>;

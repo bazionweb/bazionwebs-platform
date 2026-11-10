@@ -12,6 +12,8 @@ This is the execution checklist for turning the modular platform into a repeatab
 - [x] Run PostgreSQL integration tests with local least-privilege roles and the auth/outbox database roles; CI now forwards their activation variables and does not cache test tasks.
 - [x] Finish Phase 0 PostgreSQL integration evidence: full `pnpm test` passed (24 Turborepo tasks); focused runs passed with no skips for database 15/15, notifications 6/6, audit 4/4, auth 35/35 (email verification enabled), checkout 3/3 and church onboarding 2/2.
 - [x] Finish Phase 1 product contract decisions and readiness checks (`pnpm catalog:validate`; stable release readiness remains blocked for partial dependencies).
+- [x] Phase 2 contract slice: add versioned website branding, navigation, SEO and page-section schemas; adopt them in tenant-owned Church/Ministry settings.
+- [ ] Phase 2 remaining: make settings drive the public site; extract shared page/UI primitives; complete the SME contact/enquiry vertical slice and two-tenant proof.
 
 Foundational completed slices: `cbe1851` product manifests, `e2271ac` runtime catalogue generation, `00743e3` tenant/installation boundary, `35117b2` stable readiness enforcement. The current CI integration-test reliability slice is recorded in the Phase 0 evidence below.
 
@@ -53,7 +55,7 @@ Foundational completed slices: `cbe1851` product manifests, `e2271ac` runtime ca
 
 - [ ] Preserve GMFC as tenant-owned content/configuration on the reusable Church/Ministry template; keep customer content out of shared defaults.
 - [ ] Extract generic design tokens, navigation, forms and responsive layout primitives from the church-specific storefront.
-- [ ] Define a constrained, versioned website configuration contract for branding, navigation, SEO and allowed page sections.
+- [x] Define a constrained, versioned website configuration contract for branding, navigation, SEO and allowed page sections in `@bazion/website-contracts`; Church/Ministry settings reuse the schemas, apply a backwards-compatible `1.0.0` default, and preserve tenant-specific navigation in the domain port.
 - [ ] Implement a small reusable SME website vertical slice: home, service/about page, contact/enquiry form, SEO and accessible responsive states.
 - [ ] Add tenant-scoped enquiry persistence, consent/spam controls, authorization and retention/export behavior.
 - [ ] Configure two tenants with different brands/content/navigation using the same runtime and template.
@@ -150,5 +152,5 @@ Foundational completed slices: `cbe1851` product manifests, `e2271ac` runtime ca
 - [x] Run full `pnpm test`; note any database integration skips and why.
 - [x] Restore the temporary local PostgreSQL test instance to its original stopped state and remove its workspace log.
 - [x] Review `git diff --check`, status docs and the checklist.
-- [ ] Commit only the tested slice with a descriptive message.
+- [x] Commit only the tested slice with a descriptive message.
 - [x] Tick completed checklist items only after the corresponding evidence exists.

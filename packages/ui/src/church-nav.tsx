@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 export interface NavLinkItem {
   label: string;
@@ -35,9 +35,18 @@ export function ChurchNav({
   giveLabel = "Give to the Mission",
 }: ChurchNavProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const mobileToggleRef = useRef<HTMLButtonElement>(null);
 
   return (
-    <header className="ch-nav-header">
+    <header
+      className="ch-nav-header"
+      onKeyDown={(event) => {
+        if (event.key === "Escape" && mobileMenuOpen) {
+          setMobileMenuOpen(false);
+          mobileToggleRef.current?.focus();
+        }
+      }}
+    >
       <a href="#main-content" className="ch-skip-link">Skip to main content</a>
       <div className="ch-container">
         <div className="ch-nav-inner">
@@ -72,6 +81,7 @@ export function ChurchNav({
               {giveLabel}
             </a>
             <button
+              ref={mobileToggleRef}
               type="button"
               className="ch-nav-mobile-toggle"
               aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}

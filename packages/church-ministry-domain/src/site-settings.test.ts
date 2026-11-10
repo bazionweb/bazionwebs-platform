@@ -17,7 +17,10 @@ function snapshot(tenantName: string, title: string, email: string): MinistrySit
       telephoneNumbers: ["+254712345678"],
       socialLinks: { facebook: "https://facebook.com/example", other: "https://example.test" },
     },
-    storedSettings: JSON.stringify({ hero: { title } }),
+    storedSettings: JSON.stringify({
+      hero: { title },
+      navigation: [{ id: "home", label: tenantName, href: "/" }],
+    }),
     leaders: [],
   };
 }
@@ -42,9 +45,11 @@ describe("ministry site settings use cases", () => {
     expect(harbour.profile.ministryName).toBe("Harbour Church");
     expect(harbour.profile.contact.email).toBe("harbour@example.test");
     expect(harbour.settings.hero.title).toBe("Come ashore");
+    expect(harbour.settings.navigation[0]?.label).toBe("Harbour Church");
     expect(river.profile.ministryName).toBe("River Chapel");
     expect(river.profile.contact.email).toBe("river@example.test");
     expect(river.settings.hero.title).toBe("Find your way home");
+    expect(river.settings.navigation[0]?.label).toBe("River Chapel");
     expect(load).toHaveBeenCalledTimes(2);
   });
 
