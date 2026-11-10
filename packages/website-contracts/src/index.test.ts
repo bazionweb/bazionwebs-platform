@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   WEBSITE_CONFIGURATION_VERSION,
+  WEBSITE_ENQUIRY_PRIVACY_NOTICE_VERSION,
   getPublicWebsiteNavigation,
+  websiteEnquirySchema,
   websiteConfigurationSchema,
   websitePageSectionSchema,
 } from "./index.js";
@@ -109,5 +111,48 @@ describe("versioned website configuration", () => {
     expect(websiteConfigurationSchema.safeParse({
       navigation: Array.from({ length: 13 }, (_, index) => ({ id: `link-${index}`, label: `Link ${index}`, href: `/link-${index}` })),
     }).success).toBe(false);
+  });
+});
+
+describe("public website enquiry contract", () => {
+  const validEnquiry = {
+    fullName: "Amina Otieno",
+    email: "amina@example.test",
+    subject: "Service question",
+    message: "Please share more details about your services.",
+    privacyConsent: true,
+  };
+
+  it("normalizes fields and applies the versioned form defaults", () => {
+    const parsed = websiteEnquirySchema.parse({ ...validEnquiry, fullName: " Amina Otieno " });
+
+    expect(parsed.fullName).toBe("Amina Otieno");
+    expect(parsed.formId).toBe("contact");
+    expect(parsed.subject).toBe("Service question");
+    expect(parsed.companyWebsite).toBe("");
+    expect(WEBSITE_ENQUIRY_PRIVACY_NOTICE_VERSION).toBe("1.0.0");
+  });
+
+  it("requires consent and one valid contact method, and constrains user input", () => {
+    expect(websiteEnquirySchema.safeParse({ ...validEnquiry, privacyConsent: false }).success).toBe(false);
+    expect(websiteEnquirySchema.safeParse({ ...validEnquiry, email: "", telephone: "" }).success).toBe(false);
+    expect(websiteEnquirySchema.safeParse({ ...validEnquiry, email: "not-an-email" }).success).toBe(false);
+    expect(websiteEnquirySchema.safeParse({ ...validEnquiry, email: "", telephone: "+1" }).success).toBe(false);
+    expect(websiteEnquirySchema.safeParse({ ...validEnquiry, email: "", telephone: "++254 712345678" }).success).toBe(false);
+    expect(websiteEnquirySchema.safeParse({ ...validEnquiry, message: "short" }).success).toBe(false);
+    expect(websiteEnquirySchema.safeParse({ ...validEnquiry, unknown: "unexpected" }).success).toBe(false);
+  });
+
+  it("accepts telephone-only enquiries and preserves the spam honeypot for server handling", () => {
+    const parsed = websiteEnquirySchema.parse({
+      fullName: "James Kariuki",
+      telephone: "+254 712 345 678",
+      message: "Call me to discuss a project.",
+      privacyConsent: true,
+      companyWebsite: "bot.example",
+    });
+
+    expect(parsed.telephone).toBe("+254 712 345 678");
+    expect(parsed.companyWebsite).toBe("bot.example");
   });
 });

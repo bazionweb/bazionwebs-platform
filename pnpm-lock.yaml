@@ -556,6 +556,31 @@ importers:
         specifier: ^5.1.0
         version: 5.1.0(@types/node@26.6.6)(vite@8.3.6(@types/node@26.6.6)(esbuild@0.28.2)(tsx@4.23.15))
 
+  packages/sme-website-template:
+    dependencies:
+      '@bazion/ui':
+        specifier: workspace:*
+        version: link:../ui
+      '@bazion/website-contracts':
+        specifier: workspace:*
+        version: link:../website-contracts
+      zod:
+        specifier: ^4.6.7
+        version: 4.6.7
+    devDependencies:
+      '@types/react':
+        specifier: ^19.2.2
+        version: 19.3.0
+      react:
+        specifier: ^19.2.0
+        version: 19.3.1
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^5.1.0
+        version: 5.1.0(@types/node@26.6.6)(vite@8.3.6(@types/node@26.6.6)(esbuild@0.28.2)(tsx@4.23.15))
+
   packages/website-contracts:
     dependencies:
       zod:

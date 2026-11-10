@@ -175,6 +175,7 @@ export const defaultWebsitePages: WebsitePages = [
   { id: "about", path: "/about", title: "About", enabled: true, sections: ["hero", "text", "feature-list"] },
   { id: "services", path: "/services", title: "Services", enabled: true, sections: ["hero", "card-grid", "call-to-action"] },
   { id: "contact", path: "/contact", title: "Contact", enabled: true, sections: ["hero", "text", "contact-form"] },
+  { id: "privacy", path: "/privacy", title: "Privacy notice", enabled: true, sections: ["text"] },
 ];
 
 export const websiteConfigurationSchema = z.object({
@@ -193,3 +194,25 @@ export const websiteConfigurationSchema = z.object({
   }
 });
 export type WebsiteConfiguration = z.infer<typeof websiteConfigurationSchema>;
+
+export const WEBSITE_ENQUIRY_PRIVACY_NOTICE_VERSION = "1.0.0" as const;
+
+/** Public website enquiry payload. Tenant identity and retention policy are assigned by the API. */
+export const websiteEnquirySchema = z.object({
+  formId: z.string().trim().min(1).max(80).default("contact"),
+  fullName: z.string().trim().min(2).max(160),
+  email: z.string().trim().email().max(254).or(z.literal("")).optional(),
+  telephone: z.string().trim().max(30).regex(/^\+?[()\d\s.-]*$/)
+    .refine((value) => value.length === 0 || (value.match(/\d/g)?.length ?? 0) >= 7, "Enter a valid telephone number.")
+    .optional().default(""),
+  subject: z.string().trim().max(200).default(""),
+  message: z.string().trim().min(10).max(5000),
+  privacyConsent: z.literal(true),
+  /** Honeypot. A non-empty value should receive a quiet success response without persistence. */
+  companyWebsite: z.string().max(200).optional().default(""),
+}).strict().superRefine((enquiry, context) => {
+  if (!enquiry.email && !enquiry.telephone) {
+    context.addIssue({ code: "custom", message: "Provide an email address or telephone number.", path: ["email"] });
+  }
+});
+export type WebsiteEnquiry = z.infer<typeof websiteEnquirySchema>;
