@@ -12,7 +12,7 @@
     "dev:platform": "dotenv -e .env -- pnpm --filter @bazion/admin dev",
     "build": "turbo run build",
     "typecheck": "turbo run typecheck",
-    "test": "node --test scripts/product-manifests.test.mjs scripts/runtime-module-catalog.test.mjs scripts/ci-test-env.test.mjs && turbo run test --concurrency=4",
+    "test": "node --test scripts/product-manifests.test.mjs scripts/runtime-module-catalog.test.mjs scripts/ci-test-env.test.mjs scripts/package-export-resolution.test.mjs && turbo run test --concurrency=4",
     "db:up": "docker compose up -d db",
     "db:down": "docker compose down",
     "db:migrate": "dotenv -e .env -- pnpm --filter @bazion/database migrate",
