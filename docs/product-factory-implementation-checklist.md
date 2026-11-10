@@ -13,7 +13,7 @@ This is the execution checklist for turning the modular platform into a repeatab
 - [x] Finish Phase 0 PostgreSQL integration evidence: full `pnpm test` passed (24 Turborepo tasks); focused runs passed with no skips for database 15/15, notifications 6/6, audit 4/4, auth 35/35 (email verification enabled), checkout 3/3 and church onboarding 2/2.
 - [x] Finish Phase 1 product contract decisions and readiness checks (`pnpm catalog:validate`; stable release readiness remains blocked for partial dependencies).
 - [x] Phase 2 contract slice: add versioned website branding, navigation, SEO and page-section schemas; adopt them in tenant-owned Church/Ministry settings.
-- [ ] Phase 2 remaining: extract shared page/UI primitives; complete the SME contact/enquiry vertical slice and two-tenant proof.
+- [ ] Phase 2 remaining: extract shared navigation and migrate remaining church-only layout/form styles; complete the SME contact/enquiry vertical slice and two-tenant proof.
 
 Foundational completed slices: `cbe1851` product manifests, `e2271ac` runtime catalogue generation, `00743e3` tenant/installation boundary, `35117b2` stable readiness enforcement. The current CI integration-test reliability slice is recorded in the Phase 0 evidence below.
 
@@ -54,7 +54,9 @@ Foundational completed slices: `cbe1851` product manifests, `e2271ac` runtime ca
 **Owner lane:** storefront/UI + API/contracts. **Prerequisite:** Phase 1 schemas and readiness rules.
 
 - [x] Preserve GMFC as tenant-owned content/configuration on the reusable Church/Ministry template; keep customer content out of shared defaults. The tenant template is a dedicated `@bazion/church-ministry-template` workspace package with explicit contract dependencies and a conformance test.
-- [ ] Extract generic design tokens, navigation, forms and responsive layout primitives from the church-specific storefront.
+- [x] Extract role-based design tokens, responsive container/section/grid and accessible form primitives into `@bazion/ui`; use them on the ministry contact page.
+- [ ] Move primary website navigation to a template-neutral shared primitive while preserving the Church/Ministry configuration adapter.
+- [ ] Continue replacing church-only layout and form styles as product slices adopt the shared primitives.
 - [x] Define a constrained, versioned website configuration contract for branding, navigation, SEO and allowed page sections in `@bazion/website-contracts`; Church/Ministry settings reuse the schemas, apply a backwards-compatible `1.0.0` default, and preserve tenant-specific navigation in the domain port.
 - [x] Bind public navigation to tenant site settings; disabled or unconfigured internal pages and unsafe destinations are filtered, while valid HTTPS partner links remain available.
 - [x] Expose tenant page visibility and navigation editing in the admin UI; validate the saved site contract and keep the home page enabled.

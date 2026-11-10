@@ -5,6 +5,12 @@ import {
   ChurchNav,
   ChurchFooter,
   PageHero,
+  Container,
+  Section,
+  Grid,
+  SelectField,
+  TextAreaField,
+  TextField,
 } from "@bazion/ui";
 import { useMinistrySite } from "../../lib/use-ministry-site";
 
@@ -70,9 +76,9 @@ export default function ContactPage() {
         />
 
         {/* 2. Contact Details & Form */}
-        <section className="ch-section">
-          <div className="ch-container">
-            <div className="ch-grid-2" style={{ alignItems: "start" }}>
+        <Section>
+          <Container>
+            <Grid columns="two" style={{ alignItems: "start", gap: "32px" }}>
               {/* Left Column: Verified Information */}
               <div>
                 <span className="ch-eyebrow">Direct Contacts</span>
@@ -189,56 +195,34 @@ export default function ContactPage() {
                       How Can We Help or Pray With You?
                     </h3>
 
-                    <div>
-                      <label htmlFor="contact-category" style={{ display: "block", fontSize: "13px", fontWeight: 600, marginBottom: "6px" }}>
-                        Category *
-                      </label>
-                      <select
-                        id="contact-category"
-                        value={category}
-                        onChange={(e) => { setCategory(e.target.value); setPrivacyConsent(false); setSubmissionError(""); }}
-                        style={{
-                          width: "100%",
-                          padding: "10px 12px",
-                          borderRadius: "var(--church-radius)",
-                          border: "1px solid var(--church-border)",
-                          backgroundColor: "#ffffff",
-                          fontSize: "14px",
-                        }}
-                      >
+                    <SelectField
+                      id="contact-category"
+                      label="Category"
+                      required
+                      value={category}
+                      onChange={(e) => { setCategory(e.target.value); setPrivacyConsent(false); setSubmissionError(""); }}
+                    >
                         <option value="General Enquiry">General Enquiry</option>
                         <option value="Prayer Request">Prayer Request (Confidential)</option>
                         <option value="Partnership">Ministry Partnership</option>
                         <option value="Event Enquiry">Event / Conference Enquiry</option>
                         <option value="Testimony">Share a Testimony</option>
                         <option value="Other">Other</option>
-                      </select>
-                    </div>
+                    </SelectField>
 
                     {submissionError && <p className="ch-form-error" role="alert">{submissionError}</p>}
 
-                    <div>
-                      <label htmlFor="contact-name" style={{ display: "block", fontSize: "13px", fontWeight: 600, marginBottom: "6px" }}>
-                        Full Name *
-                      </label>
-                      <input
-                        id="contact-name"
-                        type="text"
-                        required
-                        minLength={2}
-                        maxLength={160}
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        placeholder="e.g. John Doe"
-                        style={{
-                          width: "100%",
-                          padding: "10px 12px",
-                          borderRadius: "var(--church-radius)",
-                          border: "1px solid var(--church-border)",
-                          fontSize: "14px",
-                        }}
-                      />
-                    </div>
+                    <TextField
+                      id="contact-name"
+                      label="Full Name"
+                      type="text"
+                      required
+                      minLength={2}
+                      maxLength={160}
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder="e.g. John Doe"
+                    />
 
                     <label style={{ display: "flex", alignItems: "flex-start", gap: 10, fontSize: 13, lineHeight: 1.6 }}>
                       <input type="checkbox" required checked={privacyConsent} onChange={(event) => setPrivacyConsent(event.target.checked)} style={{ marginTop: 3, minWidth: 18, minHeight: 18 }} />
@@ -247,99 +231,52 @@ export default function ContactPage() {
                         : "I agree that the ministry may use these details to respond to my enquiry."} Read the <a href="/privacy">privacy notice</a>.</span>
                     </label>
 
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
-                      <div>
-                        <label htmlFor="contact-email" style={{ display: "block", fontSize: "13px", fontWeight: 600, marginBottom: "6px" }}>
-                          {category === "Prayer Request" ? "Email Address (optional)" : "Email Address *"}
-                        </label>
-                        <input
-                          id="contact-email"
-                          type="email"
-                          required={category !== "Prayer Request"}
-                          maxLength={254}
-                          value={email}
-                          onChange={(e) => setEmail(e.target.value)}
-                          placeholder="e.g. john@example.com"
-                          style={{
-                            width: "100%",
-                            padding: "10px 12px",
-                            borderRadius: "var(--church-radius)",
-                            border: "1px solid var(--church-border)",
-                            fontSize: "14px",
-                          }}
-                        />
-                      </div>
-                      <div>
-                        <label htmlFor="contact-phone" style={{ display: "block", fontSize: "13px", fontWeight: 600, marginBottom: "6px" }}>
-                          Telephone
-                        </label>
-                        <input
-                          id="contact-phone"
-                          type="tel"
-                          value={phone}
-                          onChange={(e) => setPhone(e.target.value)}
-                          placeholder="e.g. +254 712 345 678"
-                          style={{
-                            width: "100%",
-                            padding: "10px 12px",
-                            borderRadius: "var(--church-radius)",
-                            border: "1px solid var(--church-border)",
-                            fontSize: "14px",
-                          }}
-                        />
-                      </div>
-                    </div>
-
-                    {category !== "Prayer Request" && <div>
-                      <label htmlFor="contact-subject" style={{ display: "block", fontSize: "13px", fontWeight: 600, marginBottom: "6px" }}>
-                        Subject *
-                      </label>
-                      <input
-                        id="contact-subject"
-                        type="text"
-                        required
-                        minLength={2}
-                        maxLength={200}
-                        value={subject}
-                        onChange={(e) => setSubject(e.target.value)}
-                        placeholder="Brief summary of your message..."
-                        style={{
-                          width: "100%",
-                          padding: "10px 12px",
-                          borderRadius: "var(--church-radius)",
-                          border: "1px solid var(--church-border)",
-                          fontSize: "14px",
-                        }}
+                    <Grid columns="two" style={{ gap: "12px" }}>
+                      <TextField
+                        id="contact-email"
+                        label={category === "Prayer Request" ? "Email Address (optional)" : "Email Address"}
+                        type="email"
+                        required={category !== "Prayer Request"}
+                        maxLength={254}
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        placeholder="e.g. john@example.com"
                       />
-                    </div>}
-
-                    <div>
-                      <label htmlFor="contact-message" style={{ display: "block", fontSize: "13px", fontWeight: 600, marginBottom: "6px" }}>
-                        {category === "Prayer Request" ? "Your Prayer Request *" : "Message *"}
-                      </label>
-                      <textarea
-                        id="contact-message"
-                        required
-                        minLength={10}
-                        maxLength={5000}
-                        rows={5}
-                        value={message}
-                        onChange={(e) => setMessage(e.target.value)}
-                        placeholder={
-                          category === "Prayer Request"
-                            ? "Please write your prayer need here. Our prayer team will lift you up before God..."
-                            : "Write your message here..."
-                        }
-                        style={{
-                          width: "100%",
-                          padding: "10px 12px",
-                          borderRadius: "var(--church-radius)",
-                          border: "1px solid var(--church-border)",
-                          fontSize: "14px",
-                          fontFamily: "inherit",
-                        }}
+                      <TextField
+                        id="contact-phone"
+                        label="Telephone"
+                        type="tel"
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        placeholder="e.g. +254 712 345 678"
                       />
-                    </div>
+                    </Grid>
+
+                    {category !== "Prayer Request" && <TextField
+                      id="contact-subject"
+                      label="Subject"
+                      type="text"
+                      required
+                      minLength={2}
+                      maxLength={200}
+                      value={subject}
+                      onChange={(e) => setSubject(e.target.value)}
+                      placeholder="Brief summary of your message..."
+                    />}
+
+                    <TextAreaField
+                      id="contact-message"
+                      label={category === "Prayer Request" ? "Your Prayer Request" : "Message"}
+                      required
+                      minLength={10}
+                      maxLength={5000}
+                      rows={5}
+                      value={message}
+                      onChange={(e) => setMessage(e.target.value)}
+                      placeholder={category === "Prayer Request"
+                        ? "Please write your prayer need here. Our prayer team will lift you up before God..."
+                        : "Write your message here..."}
+                    />
 
                     <button
                       type="submit"
@@ -352,9 +289,9 @@ export default function ContactPage() {
                   </form>
                 )}
               </div>
-            </div>
-          </div>
-        </section>
+            </Grid>
+          </Container>
+        </Section>
       </main>
 
       <ChurchFooter

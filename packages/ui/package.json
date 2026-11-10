@@ -10,6 +10,8 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
+    "./tokens.css": "./src/tokens.css",
+    "./primitives.css": "./src/primitives.css",
     "./church.css": "./src/church.css"
   },
   "scripts": {
