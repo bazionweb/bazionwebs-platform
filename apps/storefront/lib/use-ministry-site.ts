@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { ChurchPublicSiteSettings } from "@bazion/api-contracts";
+import type { ChurchPublicSiteSettings } from "@bazion/church-ministry-contracts";
 import { globalMissionConfig } from "../../../templates/global-mission.config";
 import type { MinistryConfig } from "../../../templates/church.types";
 import { getMinistrySiteFallback, neutralMinistrySite } from "./ministry-site-defaults";

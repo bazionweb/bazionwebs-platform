@@ -9,6 +9,8 @@
   },
   "implementation": { "mode": "workspace-package", "packageName": "@bazion/analytics" },
   "tenantModel": "tenant-owned",
+  "tables": [],
+  "migrations": [],
   "permissions": [
     {
       "resource": "analytics",

@@ -1,6 +1,10 @@
 {
   "version": "1.0.0",
   "status": "experimental",
+  "readiness": "roadmap",
+  "readinessNotes": [
+    "Checkout and store administration are present, but inventory-pricing, fulfilment, and verified global payment modules do not yet have runtime manifests."
+  ],
   "id": "ecommerce",
   "name": "Ecommerce",
   "description": "Reusable tenant-configurable storefront and commerce workspace for local and international sellers.",

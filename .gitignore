@@ -10,4 +10,5 @@ out
 .env.local
 .DS_Store
 coverage
+**/.vitest-cache/
 /data/migrations/*.json

@@ -47,6 +47,8 @@ Deliver:
 
 **Exit gate:** a platform owner can provision a client, assign an owner, enable modules, set branding/domain and safely suspend or restore access without direct SQL.
 
+**Code progress — 10 November 2026:** catalog and manifest validation now distinguish manifest-backed modules from roadmap capabilities, check solution readiness and module dependency closure, and verify table ownership, migrations and tenant RLS declarations. The first platform-identity workflow, tenant provisioning reconciliation, now lives behind a provider-neutral port in `@bazion/platform-identity`; `@bazion/auth` supplies the Better Auth and PostgreSQL adapter. Tenant lifecycle, owner transfer, domain verification, entitlements and notification enqueue remain follow-on port slices.
+
 ## Phase 2 — Shared design system and website factory
 
 **Goal:** turn website packages into configuration-driven products rather than separate codebases.

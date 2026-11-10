@@ -20,7 +20,7 @@ Reviewed 10 November 2026. This contract governs reusable product modules in the
 | `hybrid` | A reusable package supplies domain rules; app code provides the HTTP or UI adapter. | Commerce domain plus API. |
 | `manifest-only` | Product metadata exists, but no runtime implementation is available. | Planned website content and contacts modules. |
 
-Do not label a module `stable` while its reusable business logic is hidden in an app adapter or its declared tests, docs, data ownership and permissions are incomplete.
+Use `entrypoints.domain` only for provider-neutral reusable rules. Use `entrypoints.adapter` for provider, database, HTTP or worker integrations; a package can expose both when the boundary is real. Do not label a module `stable` while its reusable business logic is hidden in an app adapter or its declared tests, docs, data ownership and permissions are incomplete.
 
 ## Required module contract
 
@@ -49,7 +49,7 @@ The manifest validator checks package names against actual workspace packages an
 ## Adoption order
 
 1. Keep all existing manifests explicit about their implementation mode and validate that each reference points to real code.
-2. Use church/ministry as the first boundary pilot: keep Fastify and Next.js as adapters, extract bounded reusable logic rather than moving the whole route file at once, and keep Global Mission content in tenant configuration. The first extracted rule is tenant-scoped unique content slugs in `@bazion/church-ministry-domain`; image signature detection and safe upload filenames now belong to the reusable `@bazion/storage` package, while request authorization and upload limits stay in the API adapter.
+2. Use church/ministry as the first boundary pilot: keep Fastify and Next.js as adapters, extract bounded reusable logic rather than moving the whole route file at once, and keep Global Mission content in tenant configuration. Ministry request schemas live in `@bazion/church-ministry-contracts`; slug and site-settings use cases live in `@bazion/church-ministry-domain` behind tenant-scoped repository ports; Fastify keeps authorization and PostgreSQL transactions. Image signature detection and safe upload filenames belong to `@bazion/storage`, while request authorization and upload limits stay in the API adapter.
 3. Provision a second ministry with different identity and content. The PostgreSQL isolation suite verifies separate ministry profiles, saved public-site settings, sermons, and module overrides across two tenant fixtures. `apps/api/src/modules/church/tenant-onboarding.integration.test.ts` also exercises verified-host resolution, tenant-scoped public API reads, media serving, and module disablement against PostgreSQL. Storefront default tests and API route tests cover neutral branding, tenant-prefixed media, and disabled-module gating. A manual browser onboarding check remains before declaring the pilot passed.
 4. Apply the same contract to commerce and the next module only after the pilot passes the module and tenant-isolation checks.
 5. Revisit package publication after an independent consumer exists; do not turn the current module catalogue into 37 separately released repositories.

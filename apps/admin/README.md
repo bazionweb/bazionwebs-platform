@@ -29,7 +29,9 @@ The module catalogue is currently a runtime snapshot of the checked-in manifests
 ## Security boundary
 
 - The UI is not an authorization boundary. The API checks platform permissions on every request.
+- The dedicated control-plane pages verify the signed-in identity on the server and require the global `platform_owner` role before loading the tenant directory. API authorization remains mandatory for each operation.
 - A tenant workspace role does not grant platform access.
+- The tenant `/admin` experience is scoped by active tenant membership. Workspace switching lists only organizations where that user is a member; tenant team controls never grant or enumerate other tenants.
 - Tenant IDs are identifiers, never authority.
 - Lifecycle changes are audited; closing is terminal and requires a suspended tenant.
 - Tenant creation remains in the existing Better Auth organization provisioning flow. Do not add a competing creation path.

@@ -29,6 +29,9 @@ importers:
 
   apps/admin:
     dependencies:
+      '@bazion/auth':
+        specifier: workspace:*
+        version: link:../../packages/auth
       next:
         specifier: 16.4.5
         version: 16.4.5(@types/node@26.6.6)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
@@ -63,6 +66,9 @@ importers:
       '@bazion/auth':
         specifier: workspace:*
         version: link:../../packages/auth
+      '@bazion/church-ministry-contracts':
+        specifier: workspace:*
+        version: link:../../packages/church-ministry-contracts
       '@bazion/church-ministry-domain':
         specifier: workspace:*
         version: link:../../packages/church-ministry-domain
@@ -127,6 +133,12 @@ importers:
       '@bazion/auth':
         specifier: workspace:*
         version: link:../../packages/auth
+      '@bazion/church-ministry-contracts':
+        specifier: workspace:*
+        version: link:../../packages/church-ministry-contracts
+      '@bazion/church-ministry-domain':
+        specifier: workspace:*
+        version: link:../../packages/church-ministry-domain
       '@bazion/ui':
         specifier: workspace:*
         version: link:../../packages/ui
@@ -199,6 +211,9 @@ importers:
       '@bazion/notifications':
         specifier: workspace:*
         version: link:../notifications
+      '@bazion/platform-identity':
+        specifier: workspace:*
+        version: link:../platform-identity
       better-auth:
         specifier: 1.7.17
         version: 1.7.17(drizzle-kit@0.31.11)(drizzle-orm@0.45.4(@types/pg@8.23.1)(kysely@0.29.8)(pg@8.23.1))(next@16.4.5(@types/node@26.6.6)(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(pg@8.23.1)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(vitest@5.1.0(@types/node@26.6.6)(vite@8.3.6(@types/node@26.6.6)(esbuild@0.28.2)(tsx@4.23.15)))
@@ -212,6 +227,12 @@ importers:
       '@types/pg':
         specifier: ^8.15.5
         version: 8.23.1
+      '@types/react':
+        specifier: ^19.2.2
+        version: 19.3.0
+      react:
+        specifier: ^19.2.0
+        version: 19.3.1
       tsx:
         specifier: ^4.20.6
         version: 4.23.15
@@ -228,7 +249,11 @@ importers:
         specifier: ^5.9.3
         version: 5.9.3
 
-  packages/church-ministry-domain:
+  packages/church-ministry-contracts:
+    dependencies:
+      zod:
+        specifier: ^4.6.7
+        version: 4.6.7
     devDependencies:
       typescript:
         specifier: ^5.9.3
@@ -236,6 +261,25 @@ importers:
       vitest:
         specifier: ^5.1.0
         version: 5.1.0(@types/node@26.6.6)(vite@8.3.6(@types/node@26.6.6)(esbuild@0.28.2)(tsx@4.23.15))
+
+  packages/church-ministry-domain:
+    dependencies:
+      '@bazion/church-ministry-contracts':
+        specifier: workspace:*
+        version: link:../church-ministry-contracts
+    devDependencies:
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^5.1.0
+        version: 5.1.0(@types/node@26.6.6)(vite@8.3.6(@types/node@26.6.6)(esbuild@0.28.2)(tsx@4.23.15))
+
+  packages/platform-identity:
+    devDependencies:
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
 
   packages/commerce-domain:
     devDependencies:

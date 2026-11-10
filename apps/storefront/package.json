@@ -8,13 +8,15 @@
     "build": "next build",
     "start": "next start -p 3000",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run lib"
+    "test": "vitest run lib --fsModuleCachePath .vitest-cache"
   },
   "dependencies": {
     "next": "16.4.5",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "@bazion/api-contracts": "workspace:*",
+    "@bazion/church-ministry-contracts": "workspace:*",
+    "@bazion/church-ministry-domain": "workspace:*",
     "@bazion/auth": "workspace:*",
     "@bazion/ui": "workspace:*"
   },

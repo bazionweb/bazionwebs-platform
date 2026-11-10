@@ -6,7 +6,7 @@ import { SiteSettingsEditor } from "./site-settings-editor";
 import { MediaUploadField } from "./media-upload-field";
 import { apiErrorMessage } from "../../lib/api-error";
 import { globalMissionConfig } from "../../../../templates/global-mission.config";
-import { slugifyContentTitle } from "@bazion/api-contracts";
+import { slugifyContentTitle } from "@bazion/church-ministry-domain";
 
 type Tab = "overview" | "site" | "sermons" | "events" | "campaigns" | "registrations" | "donations" | "messages" | "prayers" | "newsletter";
 type Sermon = { id: string; title: string; slug: string; speaker: string; status: string; publishedAt: string | null };

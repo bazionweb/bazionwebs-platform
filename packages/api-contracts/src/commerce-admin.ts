@@ -1,6 +1,5 @@
 import { z } from "zod";
-
-export const commerceCurrencySchema = z.enum(["KES", "USD", "EUR", "GBP", "CAD", "AUD", "NZD", "CHF", "SGD", "ZAR", "NGN", "GHS", "INR", "AED", "BRL", "MXN", "SAR", "CNY", "HKD", "SEK", "NOK", "DKK", "PLN", "THB", "PHP"]);
+import { currencySchema } from "./currency.js";
 
 const safeImageUrl = z.string().trim().max(2048).nullable().optional().refine((value) => {
   if (!value) return true;
@@ -16,7 +15,7 @@ const productObjectSchema = z.object({
   category: z.string().trim().min(1).max(80).default("General"),
   imageUrl: safeImageUrl,
   imageAlt: z.string().trim().max(180).nullable().optional(),
-  currency: commerceCurrencySchema.default("KES"),
+  currency: currencySchema.default("KES"),
   priceMinor: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER),
   compareAtPriceMinor: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER).nullable().optional(),
   featured: z.boolean().default(false),
@@ -52,7 +51,7 @@ export const productListQuerySchema = z.object({
   offset: z.coerce.number().int().min(0).max(100_000).default(0),
   q: z.string().trim().max(100).optional(),
   category: z.string().trim().max(80).optional(),
-  currency: commerceCurrencySchema.optional(),
+  currency: currencySchema.optional(),
   sort: z.enum(["featured", "newest", "price_asc", "price_desc"]).default("featured"),
 }).strict();
 
@@ -68,9 +67,9 @@ export const storeSettingsInputSchema = z.object({
     try { new Intl.DateTimeFormat("en", { timeZone: value }); return true; } catch { return false; }
   }, "Enter a valid IANA time zone such as Africa/Nairobi or Europe/London."),
   defaultCountryCode: z.string().regex(/^[A-Z]{2}$/),
-  defaultCurrency: commerceCurrencySchema,
-  supportedCurrencies: z.array(commerceCurrencySchema).min(1).max(25),
-  shippingRates: z.record(commerceCurrencySchema, z.number().int().min(0).max(Number.MAX_SAFE_INTEGER)),
+  defaultCurrency: currencySchema,
+  supportedCurrencies: z.array(currencySchema).min(1).max(25),
+  shippingRates: z.partialRecord(currencySchema, z.number().int().min(0).max(Number.MAX_SAFE_INTEGER)),
   shippingCountries: z.array(z.string().regex(/^[A-Z]{2}$/)).max(250),
 }).strict().superRefine((value, context) => {
   if (!value.supportedCurrencies.includes(value.defaultCurrency)) {

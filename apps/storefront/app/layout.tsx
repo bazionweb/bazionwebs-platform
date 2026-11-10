@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import "./recovery.css";
 import "@bazion/ui/church.css";
 import { SiteThemeProvider } from "../lib/site-theme-provider";
 import { fetchTenantPublicData, getTenantRequestContext } from "../lib/server-tenant-api";

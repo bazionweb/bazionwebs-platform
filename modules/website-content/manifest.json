@@ -7,6 +7,8 @@
   "entrypoints": {},
   "implementation": { "mode": "manifest-only" },
   "tenantModel": "tenant-owned",
+  "tables": [],
+  "migrations": [],
   "permissions": [
     {
       "resource": "store",

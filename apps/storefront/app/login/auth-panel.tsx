@@ -60,6 +60,7 @@ export function AuthPanel() {
         <label>Password<input required type="password" minLength={12} maxLength={128} autoComplete={mode === "sign-in" ? "current-password" : "new-password"} value={password} onChange={(event) => setPassword(event.target.value)} /></label>
         <button className="checkout-button" type="submit" disabled={busy}>{busy ? "Please wait…" : mode === "sign-in" ? "Sign in →" : "Create account →"}</button>
       </form>
+      {mode === "sign-in" && <a className="auth-toggle" href="/forgot-password">Forgot your password?</a>}
       <button className="auth-toggle" type="button" onClick={() => { setMode(mode === "sign-in" ? "sign-up" : "sign-in"); setMessage(""); }}>
         {mode === "sign-in" ? "Need an account? Create one" : "Already registered? Sign in"}
       </button>

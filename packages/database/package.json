@@ -17,7 +17,7 @@
     "migrate": "tsx scripts/migrate.ts",
     "migrate:global-mission": "tsx scripts/migrate-global-mission.ts",
     "seed": "tsx scripts/seed.ts",
-    "test": "vitest run src",
+    "test": "vitest run src --fsModuleCachePath .vitest-cache",
     "preflight": "tsx src/production-preflight.ts"
   },
   "dependencies": {

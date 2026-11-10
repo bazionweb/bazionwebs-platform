@@ -1,106 +1,180 @@
-import { readFileSync, readdirSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { isAbsolute, join } from "node:path";
+import { assertSupportedSchema, validateJsonSchema } from "./lib/json-schema.mjs";
 
 const root = process.cwd();
-const readJson = (path) => JSON.parse(readFileSync(join(root, path), "utf8"));
+let failures = 0;
 const fail = (message) => {
+  failures += 1;
   console.error(`[catalog-validation] ${message}`);
-  process.exitCode = 1;
 };
+
+function readJson(path) {
+  try {
+    return JSON.parse(readFileSync(join(root, path), "utf8"));
+  } catch (error) {
+    fail(`Could not read valid JSON at ${path}: ${error instanceof Error ? error.message : "unknown error"}`);
+    return null;
+  }
+}
+
+function validateFile(value, schemaPath, filePath) {
+  const schema = readJson(schemaPath);
+  if (!schema || value === null) return;
+  try {
+    assertSupportedSchema(schema, schemaPath);
+    for (const error of validateJsonSchema(value, schema)) fail(`${filePath}: ${error}`);
+  } catch (error) {
+    fail(`${schemaPath}: ${error instanceof Error ? error.message : "invalid schema"}`);
+  }
+}
+
+function isSafeRepoPath(path) {
+  return typeof path === "string" && path.length > 0 && !isAbsolute(path) &&
+    !/^[a-zA-Z]:[\\/]/.test(path) && !path.split(/[\\/]+/).includes("..") && !path.startsWith("\\\\");
+}
+
+function pathExists(path) {
+  return isSafeRepoPath(path) && existsSync(join(root, path));
+}
 
 const catalog = readJson("products/catalog.json");
 const commercial = readJson("products/commercial-offerings.json");
+const permissionRegistry = readJson("products/permissions.json");
+if (!catalog || !commercial || !permissionRegistry) process.exit(1);
 
-if (catalog.schemaVersion !== "1.0.0") fail("Unsupported products/catalog.json schemaVersion.");
-if (!Array.isArray(catalog.modules) || !Array.isArray(catalog.capabilities)) {
-  fail("The product catalogue must include modules and capabilities arrays.");
-  process.exit(1);
+validateFile(catalog, "products/catalog.schema.json", "products/catalog.json");
+validateFile(commercial, "products/commercial-offerings.schema.json", "products/commercial-offerings.json");
+validateFile(permissionRegistry, "products/permissions.schema.json", "products/permissions.json");
+
+const moduleDirectories = existsSync(join(root, "modules"))
+  ? readdirSync(join(root, "modules"), { withFileTypes: true }).filter((item) => item.isDirectory())
+  : [];
+const manifests = new Map();
+for (const directory of moduleDirectories) {
+  const file = `modules/${directory.name}/manifest.json`;
+  const manifest = readJson(file);
+  if (manifest) manifests.set(directory.name, manifest);
 }
 
-const moduleIds = new Set();
-for (const module of catalog.modules) {
-  if (!module.id || !module.name || !Array.isArray(module.sourcePath) || !module.status) {
-    fail(`Invalid module entry: ${JSON.stringify(module)}`);
+const catalogModules = new Map();
+for (const module of catalog.modules ?? []) {
+  if (catalogModules.has(module.id)) {
+    fail(`Duplicate module ID: ${module.id}`);
     continue;
   }
-  if (moduleIds.has(module.id)) fail(`Duplicate module ID: ${module.id}`);
-  moduleIds.add(module.id);
-  if (!["implemented", "partial", "planned"].includes(module.status)) {
-    fail(`Invalid status for module ${module.id}: ${module.status}`);
+  catalogModules.set(module.id, module);
+
+  const manifest = manifests.get(module.id);
+  if (module.classification === "module") {
+    if (!manifest) fail(`Module ${module.id} needs a manifest under modules/${module.id}/manifest.json.`);
+    else {
+      const expectedStatus = manifest.status === "stable" ? "implemented"
+        : manifest.status === "planned" ? "planned" : "partial";
+      if (module.status !== expectedStatus) {
+        fail(`Catalogue status for ${module.id} is ${module.status}; manifest status ${manifest.status} maps to ${expectedStatus}.`);
+      }
+    }
+    for (const path of module.sourcePath ?? []) {
+      if (!isSafeRepoPath(path)) fail(`Unsafe source path for ${module.id}: ${path}`);
+      else if (manifest && manifest.status !== "planned" && !pathExists(path)) fail(`Implemented module ${module.id} source path does not exist: ${path}`);
+    }
+  } else {
+    if (manifest) fail(`Module ${module.id} has a manifest and must be classified as module.`);
+    if (module.status === "implemented") fail(`Roadmap capability ${module.id} cannot be marked implemented without a module manifest.`);
+    if (module.status === "partial" && !(module.sourcePath ?? []).some(pathExists)) {
+      fail(`Partial roadmap capability ${module.id} must point to at least one existing source path.`);
+    }
+    for (const path of module.sourcePath ?? []) {
+      if (!isSafeRepoPath(path)) fail(`Unsafe source path for ${module.id}: ${path}`);
+    }
   }
 }
 
-if (catalog.modules.length !== 37) {
-  fail(`Expected 37 unique module records, found ${catalog.modules.length}`);
+for (const moduleId of manifests.keys()) {
+  if (!catalogModules.has(moduleId)) fail(`Module manifest ${moduleId} is missing from products/catalog.json.`);
 }
 
 const capabilityIds = new Set();
-for (const capability of catalog.capabilities) {
-  if (!capability.id || !capability.name || !capability.group || !capability.moduleId || !capability.recordType) {
-    fail(`Invalid capability entry: ${JSON.stringify(capability)}`);
-    continue;
-  }
+for (const capability of catalog.capabilities ?? []) {
   if (capabilityIds.has(capability.id)) fail(`Duplicate capability ID: ${capability.id}`);
   capabilityIds.add(capability.id);
-  if (!moduleIds.has(capability.moduleId)) {
-    fail(`Capability ${capability.id} references unknown module ${capability.moduleId}`);
+  if (!catalogModules.has(capability.moduleId)) fail(`Capability ${capability.id} references unknown module ${capability.moduleId}.`);
+}
+
+const offeringIds = new Set();
+for (const offering of commercial.offerings ?? []) {
+  if (offeringIds.has(offering.id)) fail(`Duplicate commercial offering ID: ${offering.id}`);
+  offeringIds.add(offering.id);
+  for (const moduleId of offering.moduleIds ?? []) {
+    if (!catalogModules.has(moduleId)) fail(`Offering ${offering.id} references unknown module ${moduleId}.`);
   }
 }
 
-if (catalog.capabilities.length !== 111) {
-  fail(`Expected 111 advertised capabilities, found ${catalog.capabilities.length}`);
+const permissionIds = new Set();
+const permissionTuples = new Set();
+const roles = new Set(permissionRegistry.roles ?? []);
+for (const permission of permissionRegistry.permissions ?? []) {
+  if (permissionIds.has(permission.id)) fail(`Duplicate permission ID: ${permission.id}`);
+  permissionIds.add(permission.id);
+  const tuple = `${permission.scope}:${permission.resource}:${permission.action}`;
+  if (permissionTuples.has(tuple)) fail(`Duplicate permission tuple: ${tuple}`);
+  permissionTuples.add(tuple);
+  if (!catalogModules.has(permission.moduleId)) fail(`Permission ${permission.id} references unknown module ${permission.moduleId}.`);
+  for (const role of permission.roles ?? []) if (!roles.has(role)) fail(`Permission ${permission.id} references unknown role ${role}.`);
 }
 
-const offerIds = new Set();
-for (const offer of commercial.offerings ?? []) {
-  if (!offer.id || !offer.name || !Array.isArray(offer.moduleIds) || offer.moduleIds.length === 0) {
-    fail(`Invalid commercial offer: ${JSON.stringify(offer)}`);
-    continue;
-  }
-  if (offerIds.has(offer.id)) fail(`Duplicate commercial offer ID: ${offer.id}`);
-  offerIds.add(offer.id);
-  for (const moduleId of offer.moduleIds) {
-    if (!moduleIds.has(moduleId)) fail(`Offer ${offer.id} references unknown module ${moduleId}`);
-  }
-}
-if (commercial.offerings?.length !== 35) {
-  fail(`Expected 35 commercial offers, found ${commercial.offerings?.length ?? 0}`);
-}
-
-const solutionDirectories = readdirSync(join(root, "solutions"), { withFileTypes: true })
-  .filter((entry) => entry.isDirectory())
-  .map((entry) => entry.name);
+const solutionDirectories = existsSync(join(root, "solutions"))
+  ? readdirSync(join(root, "solutions"), { withFileTypes: true }).filter((item) => item.isDirectory())
+  : [];
 const solutionIds = new Set();
-let solutionCount = 0;
-
+let buildableSolutions = 0;
 for (const directory of solutionDirectories) {
-  const path = `solutions/${directory}/manifest.json`;
-  let solution;
-  try {
-    solution = readJson(path);
-  } catch {
-    fail(`Missing or invalid JSON solution manifest: ${path}`);
-    continue;
-  }
-  solutionCount += 1;
-  if (!solution.id || !solution.name || !Array.isArray(solution.requiredModules) ||
-      !Array.isArray(solution.optionalModules) || !Array.isArray(solution.defaultRoles) ||
-      !Array.isArray(solution.navigation) || !solution.defaults) {
-    fail(`Invalid solution manifest shape: ${path}`);
-    continue;
-  }
+  const file = `solutions/${directory.name}/manifest.json`;
+  const solution = readJson(file);
+  if (!solution) continue;
+  validateFile(solution, "products/solution-manifest.schema.json", file);
+  if (solution.id !== directory.name) fail(`Solution ID ${solution.id} must match directory ${directory.name}.`);
   if (solutionIds.has(solution.id)) fail(`Duplicate solution ID: ${solution.id}`);
   solutionIds.add(solution.id);
-  for (const moduleId of [...solution.requiredModules, ...solution.optionalModules]) {
-    if (!moduleIds.has(moduleId)) fail(`Solution ${solution.id} references unknown module ${moduleId}`);
-  }
-  for (const nav of solution.navigation) {
-    if (!moduleIds.has(nav.module)) fail(`Solution ${solution.id} navigation ${nav.id} references unknown module ${nav.module}`);
-  }
-}
-if (solutionCount !== 9) fail(`Expected 9 solution manifests, found ${solutionCount}`);
 
-if (process.exitCode) {
-  process.exit(process.exitCode);
+  const required = solution.requiredModules ?? [];
+  const optional = solution.optionalModules ?? [];
+  const composed = new Set([...required, ...optional]);
+  for (const moduleId of composed) if (!catalogModules.has(moduleId)) fail(`Solution ${solution.id} references unknown module ${moduleId}.`);
+  for (const moduleId of required) if (optional.includes(moduleId)) fail(`Solution ${solution.id} lists ${moduleId} as both required and optional.`);
+  for (const item of solution.navigation ?? []) {
+    if (!catalogModules.has(item.module)) fail(`Solution ${solution.id} navigation ${item.id} references unknown module ${item.module}.`);
+    if (!composed.has(item.module)) fail(`Solution ${solution.id} navigation ${item.id} uses ${item.module}, which is not in its composition.`);
+  }
+
+  if (solution.readiness === "roadmap") {
+    if (!solution.readinessNotes?.length) fail(`Roadmap solution ${solution.id} must explain why it is not buildable yet.`);
+    continue;
+  }
+  if (solution.readiness !== "buildable") continue;
+  buildableSolutions += 1;
+  if (["planned", "deprecated"].includes(solution.status)) fail(`Solution ${solution.id} cannot be buildable with status ${solution.status}.`);
+  if (solution.readinessNotes?.length) fail(`Buildable solution ${solution.id} should not carry roadmap readiness notes.`);
+
+  const pending = [...required];
+  const visited = new Set();
+  while (pending.length) {
+    const moduleId = pending.pop();
+    if (visited.has(moduleId)) continue;
+    visited.add(moduleId);
+    const module = catalogModules.get(moduleId);
+    const manifest = manifests.get(moduleId);
+    if (!module || module.classification !== "module" || !manifest || ["planned", "deprecated"].includes(manifest.status)) {
+      fail(`Buildable solution ${solution.id} requires ${moduleId}, which has no ready runtime module manifest.`);
+      continue;
+    }
+    for (const dependency of manifest.dependencies ?? []) {
+      if (!composed.has(dependency)) fail(`Buildable solution ${solution.id} omits transitive module dependency ${dependency} required by ${moduleId}.`);
+      else pending.push(dependency);
+    }
+  }
 }
-console.log(`Product catalogue valid: ${catalog.capabilities.length} capabilities, ${moduleIds.size} modules, ${offerIds.size} offers, ${solutionCount} solutions.`);
+
+if (failures) process.exit(1);
+console.log(`Product catalogue valid: ${catalog.capabilities.length} capabilities, ${catalogModules.size} module records (${manifests.size} manifest-backed modules), ${offeringIds.size} offers, ${solutionIds.size} solutions (${buildableSolutions} buildable).`);

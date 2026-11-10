@@ -5,12 +5,13 @@
   "owner": "platform",
   "status": "partial",
   "entrypoints": {
-    "domain": "packages/storage"
+    "adapter": "packages/storage"
   },
   "implementation": { "mode": "workspace-package", "packageName": "@bazion/storage" },
   "tenantModel": "tenant-owned",
   "permissions": [],
   "tables": [],
+  "migrations": [],
   "dependencies": [],
   "operations": {
     "logs": false,

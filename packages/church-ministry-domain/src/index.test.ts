@@ -1,5 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { uniqueTenantSlug } from "./index.js";
+import { slugifyContentTitle, uniqueTenantSlug } from "./index.js";
+
+describe("slugifyContentTitle", () => {
+  it("normalizes accents and punctuation into a stable URL slug", () => {
+    expect(slugifyContentTitle("Révival & Praise Night!")).toBe("revival-and-praise-night");
+  });
+
+  it("uses the provided fallback for titles without a usable slug", () => {
+    expect(slugifyContentTitle("--", "sermon")).toBe("sermon");
+  });
+});
 
 describe("uniqueTenantSlug", () => {
   it("returns the base slug when the tenant has not used it", async () => {

@@ -15,6 +15,8 @@
     "tenantModel",
     "permissions",
     "dependencies",
+    "tables",
+    "migrations",
     "operations"
   ],
   "properties": {
@@ -47,6 +49,12 @@
       "type": "object",
       "properties": {
         "domain": {
+          "type": "string"
+        },
+        "adapter": {
+          "type": "string"
+        },
+        "contracts": {
           "type": "string"
         },
         "api": {
@@ -114,7 +122,8 @@
           "name",
           "owner",
           "tenantScoped",
-          "rls"
+          "rls",
+          "migration"
         ],
         "properties": {
           "name": {
@@ -133,14 +142,20 @@
             ]
           },
           "migration": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": "string",
+            "pattern": "^[0-9]+_[a-z0-9_-]+\\.sql$"
           }
         },
         "additionalProperties": false
       }
+    },
+    "migrations": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[0-9]+_[a-z0-9_-]+\\.sql$"
+      },
+      "uniqueItems": true
     },
     "events": {
       "type": "array",

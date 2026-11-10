@@ -6,6 +6,7 @@
   "status": "partial",
   "entrypoints": {
     "domain": "packages/church-ministry-domain",
+    "contracts": "packages/church-ministry-contracts",
     "api": "apps/api/src/modules/church",
     "ui": "apps/storefront/app"
   },
@@ -32,6 +33,11 @@
     { "name": "church_prayer_requests", "owner": "church-ministry", "tenantScoped": true, "rls": "forced", "migration": "0008_church_ministry_domain.sql" },
     { "name": "church_newsletter_subscribers", "owner": "church-ministry", "tenantScoped": true, "rls": "forced", "migration": "0008_church_ministry_domain.sql" }
   ],
+  "migrations": [
+    "0008_church_ministry_domain.sql",
+    "0009_church_integrity_and_payment_callbacks.sql",
+    "0011_church_site_and_privacy.sql"
+  ],
   "providers": ["Safaricom Daraja M-Pesa STK Push for donations; requires merchant credentials and provider callback verification"],
   "dependencies": ["platform-identity", "media-storage"],
   "operations": {
@@ -45,7 +51,9 @@
   "jobs": [],
   "tests": [
     "apps/api/src/modules/church/routes.test.ts",
-    "packages/church-ministry-domain/src/index.test.ts"
+    "packages/church-ministry-domain/src/index.test.ts",
+    "packages/church-ministry-domain/src/site-settings.test.ts",
+    "packages/church-ministry-contracts/src/index.test.ts"
   ],
   "docs": ["docs/church-ministry-platform.md"]
 }

@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { currentDatabaseSchemaVersion, requiredDatabaseMigrations } from "@bazion/database";
 
 const mockState = vi.hoisted(() => ({
   pools: [] as Array<{ connectionString: string | undefined; end: ReturnType<typeof vi.fn> }>,
@@ -6,6 +7,7 @@ const mockState = vi.hoisted(() => ({
   directoryRows: [] as Array<Record<string, unknown>>,
   verificationRows: [] as Array<Record<string, unknown>>,
   queries: [] as Array<{ connectionString: string | undefined; query: string }>,
+  appliedMigrations: [] as string[],
 }));
 
 vi.mock("pg", () => ({
@@ -22,7 +24,8 @@ vi.mock("pg", () => ({
       mockState.queries.push({ connectionString: this.connectionString, query });
       if (this.connectionString === "tenant-directory") return { rows: mockState.directoryRows };
       if (this.connectionString === "postgres://gmfc:secret@db.example/gmfc") {
-        return { rows: mockState.verificationRows };
+        const appliedCount = mockState.appliedMigrations.filter((version) => query.includes("schema_migrations") && requiredDatabaseMigrations.includes(version as never)).length;
+        return { rows: mockState.verificationRows.map((row) => ({ ...row, applied_migrations_count: appliedCount })) };
       }
       return { rows: [] };
     }
@@ -39,7 +42,7 @@ vi.mock("drizzle-orm/node-postgres", () => ({
 }));
 
 const tenantId = "7a80eaae-6f8c-44c1-b22a-3dca458f0ec1";
-const expectedSchemaVersion = "0013_tenant_database_routing.sql";
+const expectedSchemaVersion = currentDatabaseSchemaVersion;
 let databaseModule: typeof import("./database.js") | undefined;
 
 async function loadDatabaseModule() {
@@ -65,7 +68,8 @@ describe("tenant database routing", () => {
     mockState.pools = [];
     mockState.transactionConnections = [];
     mockState.directoryRows = [];
-    mockState.verificationRows = [{ tenant_count: 1, matching_tenant_count: 1, schema_applied: true }];
+    mockState.verificationRows = [{ tenant_count: 1, matching_tenant_count: 1 }];
+    mockState.appliedMigrations = [...requiredDatabaseMigrations];
     mockState.queries = [];
     vi.stubEnv("NODE_ENV", "test");
     vi.stubEnv("DATABASE_URL", "shared-business-db");
@@ -130,13 +134,47 @@ describe("tenant database routing", () => {
       runtime_secret_ref: "env://TENANT_DATABASE_GMFC",
       schema_version: expectedSchemaVersion,
     });
-    mockState.verificationRows = [{ tenant_count: 2, matching_tenant_count: 1, schema_applied: false }];
+    mockState.verificationRows = [{ tenant_count: 2, matching_tenant_count: 1 }];
     const database = await loadDatabaseModule();
 
     await expect(database.withTenantTransaction(tenantId, async () => undefined))
       .rejects.toMatchObject({ code: "TENANT_DATABASE_VERIFICATION_FAILED", statusCode: 503 });
     expect(mockState.transactionConnections).toEqual([]);
     expect(mockState.pools.at(-1)?.end).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    "0014_global_mission_commerce_entitlement.sql",
+    "0015_commerce_inventory_reservation_guard.sql",
+  ])("rejects a dedicated database missing required migration %s", async (missingMigration) => {
+    activeTenant({
+      tier: "dedicated",
+      state: "ready",
+      runtime_secret_ref: "env://TENANT_DATABASE_GMFC",
+      schema_version: expectedSchemaVersion,
+    });
+    mockState.appliedMigrations = requiredDatabaseMigrations.filter((version) => version !== missingMigration);
+    const database = await loadDatabaseModule();
+
+    await expect(database.withTenantTransaction(tenantId, async () => undefined))
+      .rejects.toMatchObject({ code: "TENANT_DATABASE_VERIFICATION_FAILED", statusCode: 503 });
+    expect(mockState.transactionConnections).toEqual([]);
+    expect(mockState.pools.at(-1)?.end).toHaveBeenCalledOnce();
+  });
+
+  it("rejects stale schema version configuration even if the old binding matches it", async () => {
+    activeTenant({
+      tier: "dedicated",
+      state: "ready",
+      runtime_secret_ref: "env://TENANT_DATABASE_GMFC",
+      schema_version: "0013_tenant_database_routing.sql",
+    });
+    vi.stubEnv("TENANT_DATABASE_SCHEMA_VERSION", "0013_tenant_database_routing.sql");
+    const database = await loadDatabaseModule();
+
+    await expect(database.withTenantTransaction(tenantId, async () => undefined))
+      .rejects.toMatchObject({ code: "TENANT_DATABASE_SCHEMA_VERSION_MISMATCH", statusCode: 503 });
+    expect(mockState.transactionConnections).toEqual([]);
   });
 
   it("rejects a dedicated binding when its schema version does not match the running API", async () => {

@@ -51,9 +51,19 @@ Application migrations are tracked in `public.schema_migrations`; SQL files are 
 
 ## Email
 
-- In development, leave SMTP blank. Verification, password-reset and invitation links are printed to the API console.
-- In production, configure an authenticated SMTP transport, a verified sender identity, TLS as supported by the provider, and email verification.
-- A mail library does not provide a free email-delivery service. SMTP hosting/provider costs and sending limits remain separate operating concerns.
+- The tenant sign-in page and the separate platform sign-in page both provide **Forgot your password?** recovery. The reset request always gives the same confirmation for known and unknown email addresses.
+- Password-reset links expire after one hour and are single-use. The new password follows the 12–128 character policy, all existing sessions are revoked, and a password-change notice is queued to the account email.
+- Reset pages send `Referrer-Policy: no-referrer`, remove the token from the browser address bar after capture, and do not load third-party page assets.
+- Verification, invitation, reset, and password-change messages are encrypted in the notification outbox and delivered by the notification worker. A queued record does not mean the provider delivered it or that it reached the inbox.
+- For local development, `pnpm run dev:gmfc` starts the API, tenant storefront, platform console, and notification worker together. Configure the SMTP settings in `.env` if you need to receive the email. Check the notification worker and outbox state when it is not delivered; reset links are not printed to the API console.
+- In production, configure an authenticated SMTP transport, verified sender identity, TLS as supported by the provider, and alerts for old pending/dead notifications. Email provider pricing and sending limits are separate operating concerns.
+
+## If the account holder cannot access their email
+
+- Email reset is the only self-service password recovery method currently implemented. Do not use security questions, ask users to disclose an old password, or send a reset token/password in chat.
+- For a tenant account, an existing tenant owner can invite a replacement administrator using a new verified email address and then remove or suspend the inaccessible account through tenant access management. If no tenant owner is available, the Bazion platform owner must use the audited tenant access workflow.
+- For a Bazion platform owner, use the audited platform ownership-transfer or role-management workflow with another verified account. If every platform owner is locked out, treat it as a break-glass incident: require independent identity verification and a second operator's approval, record the change in the incident/audit log, and notify all platform owners through an independent channel. Never restore access by silently editing a password hash or granting tenant-wide access.
+- Support staff must not impersonate users. First restore control of the account's verified email address with its provider when possible, then use the normal password-reset flow.
 
 ## Trusted domains
 
@@ -80,9 +90,9 @@ The Next.js 16 `apps/storefront/proxy.ts` runs only for the `/v1/*` and `/api/au
 
 Fastify accepts forwarded metadata only from the exact addresses/CIDRs in `TRUSTED_PROXY_ADDRESSES`. The deployment must restrict direct network access to the Fastify origin so only the trusted ingress/proxy can reach it. If a platform cannot provide stable trusted egress addresses, use an authenticated private service network or signed tenant-routing assertion rather than enabling trust-all proxy mode.
 
-## Authentication email delivery limitation
+## Authentication email delivery operations
 
-The current Nodemailer callbacks start SMTP delivery without blocking the Better Auth response, following Better Auth's guidance to avoid timing differences in auth endpoints. Delivery errors are logged. This is not a durable queue: a process termination can lose an in-flight message. Before production onboarding depends on verification, invitations or password recovery, implement a durable transactional outbox plus retrying worker and monitor delivery failures.
+Auth callbacks await durable enqueue to the encrypted notification outbox. The worker retries transient SMTP failures and marks exhausted notifications dead. Operators still need to monitor queue age and dead-letter counts, investigate provider bounces, and confirm the sender domain's SPF/DKIM/DMARC configuration before relying on production account recovery.
 
 
 ### Tenant origin validation

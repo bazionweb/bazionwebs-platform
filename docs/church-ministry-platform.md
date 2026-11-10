@@ -4,6 +4,12 @@
 
 The church module is **partial**. It provides tenant-scoped public ministry websites, profile and site settings, published sermons, events and registrations, giving campaigns and donation attempts, contact enquiries, prayer requests, and newsletter opt-ins. It is a reusable website template and starter content editor, not a complete church-management product. The research and public feature map are in [church-ministry-website-research.md](church-ministry-website-research.md).
 
+### Package boundaries
+
+- `@bazion/church-ministry-contracts` owns ministry input schemas and public-site settings types. `@bazion/api-contracts` remains for commerce contracts.
+- `@bazion/church-ministry-domain` owns content slug generation, tenant-unique slug selection, and the ministry site-settings read/save use cases behind `MinistrySiteSettingsRepository`.
+- Fastify checks the active tenant and permissions, then supplies the tenant-scoped PostgreSQL transaction adapter. The storefront owns the editor UI. No ministry business data or tenant credentials move into shared defaults.
+
 The storefront reads a tenant profile and validated `public_site` settings from `ministry_settings`. The signed-in editor can configure identity, logo, contact/social links, palette, hero, visitor information, service times, locations, online stream link, ministries, FAQs, leaders, gallery, values, faith statement, giving instructions and search description. Public service, location and gallery content stays empty until a ministry publishes it. Site colors require a 4.5:1 contrast ratio against white. The profile editor writes profile columns and validated public settings in the same tenant-scoped transaction. Every tenant uses the same media library UI and upload controls, while uploaded files and references remain tenant-scoped.
 
 Uploads are sent to the authenticated API, which checks the file signature against its declared type and enforces an 8 MB limit for JPEG, PNG, WebP and AVIF. Object keys are generated under the active tenant's prefix; the browser cannot choose a tenant ID or storage key. The library is read-only after upload so deleting an asset cannot silently break a live page. Gallery descriptions are edited as required alt text; other image slots use the associated ministry, sermon or event title as their accessible text. Local development uses a temporary local adapter. Production must use an S3-compatible bucket with a public HTTPS CDN/custom domain configured through the `MEDIA_STORAGE_*` variables in `.env.example`.

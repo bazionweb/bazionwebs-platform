@@ -2,14 +2,14 @@ import type { FastifyInstance } from "fastify";
 import { and, count, desc, eq, ilike, inArray, or } from "drizzle-orm";
 import { requireActiveTenantPermission } from "@bazion/auth";
 import { PostgresAuditEventWriter } from "@bazion/audit";
-import { commerceStoreSettings, orderItems, orders, products } from "@bazion/database";
-import { productSlug } from "@bazion/commerce-domain";
-import { pool, withTenantTransaction } from "../../lib/database.js";
-import { isTenantModuleEnabled } from "../../lib/tenant-modules.js";
 import {
   orderListQuerySchema, orderStatusInputSchema, productInputSchema, productListQuerySchema,
   productPatchSchema, storeSettingsInputSchema,
-} from "./admin-policy.js";
+} from "@bazion/api-contracts";
+import { commerceStoreSettings, orderItems, orders, products } from "@bazion/database";
+import { canSetStockOnHand, canSetStockTracking, productSlug } from "@bazion/commerce-domain";
+import { pool, withTenantTransaction } from "../../lib/database.js";
+import { isTenantModuleEnabled } from "../../lib/tenant-modules.js";
 
 const auditWriter = new PostgresAuditEventWriter(pool);
 const defaultStoreSettings = {
@@ -164,8 +164,11 @@ export async function commerceAdminRoutes(app: FastifyInstance) {
             throw Object.assign(new Error("Compare price must be at least the current price."), { statusCode: 400, code: "INVALID_COMPARE_PRICE" });
           }
           const nextStock = patch.stockOnHand ?? current.stockOnHand;
-          if (nextStock < current.stockReserved) {
+          if (!canSetStockOnHand(current.stockReserved, nextStock)) {
             throw Object.assign(new Error("Stock on hand cannot be lower than stock currently reserved for orders."), { statusCode: 409, code: "STOCK_RESERVED" });
+          }
+          if (patch.stockTracked === false && !canSetStockTracking(current.stockReserved, false)) {
+            throw Object.assign(new Error("Inventory tracking cannot be disabled while orders have stock reserved."), { statusCode: 409, code: "STOCK_RESERVED" });
           }
           const [updated] = await tx.update(products).set({
             ...patch,

@@ -2,9 +2,8 @@ import { createHash, randomBytes } from "node:crypto";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { and, desc, eq, getTableColumns, ilike, or, sql } from "drizzle-orm";
 import {
-  contactMessageSchema,
   churchPublicSiteSettingsSchema,
-  churchSiteSettingsInputSchema,
+  contactMessageSchema,
   donationInitiateSchema,
   donationCampaignInputSchema,
   eventInputSchema,
@@ -12,9 +11,9 @@ import {
   newsletterSubscribeSchema,
   prayerRequestSchema,
   sermonInputSchema,
-  slugifyContentTitle,
-} from "@bazion/api-contracts";
-import { uniqueTenantSlug } from "@bazion/church-ministry-domain";
+  type ChurchSiteSettingsInput,
+} from "@bazion/church-ministry-contracts";
+import { getMinistrySiteSettings, saveMinistrySiteSettings, slugifyContentTitle, uniqueTenantSlug } from "@bazion/church-ministry-domain";
 import {
   churchContactMessages,
   churchDonations,
@@ -74,24 +73,6 @@ function isUniqueConstraintViolation(error: unknown, depth = 0): boolean {
   return record.code === "23505" || isUniqueConstraintViolation(record.cause, depth + 1);
 }
 
-function safePublicImageUrl(value: string | null | undefined): string {
-  if (!value) return "";
-  if (value.startsWith("/") && !value.startsWith("//")) return value;
-  try { return new URL(value).protocol === "https:" ? value : ""; } catch { return ""; }
-}
-
-function safeSocialLinks(value: unknown): Record<string, string> {
-  const source = objectValue(value);
-  if (!source) return {};
-  const allowed = new Set(["youtube", "facebook", "instagram", "twitter", "whatsapp"]);
-  const links: Array<[string, string]> = [];
-  for (const [key, link] of Object.entries(source)) {
-    if (!allowed.has(key) || typeof link !== "string") continue;
-    try { if (new URL(link).protocol === "https:") links.push([key, link]); } catch { /* Ignore unsafe or malformed links. */ }
-  }
-  return Object.fromEntries(links);
-}
-
 function parseStoredSiteSettings(value: string | null | undefined) {
   if (!value) return churchPublicSiteSettingsSchema.parse({});
   try {
@@ -120,6 +101,64 @@ export async function churchRoutes(app: FastifyInstance, options: RouteOptions) 
     ...(mediaStorageConfig.localDirectory ? { localDirectory: mediaStorageConfig.localDirectory } : {}),
     ...(mediaStorageConfig.s3 ? { s3: mediaStorageConfig.s3 } : {}),
   });
+
+  const ministrySiteSettingsRepository = {
+    load: (tenantId: string) => withTenantTransaction(tenantId, async (tx) => {
+      const [tenant] = await tx.select({ name: tenants.name }).from(tenants).where(eq(tenants.id, tenantId)).limit(1);
+      const [profile] = await tx.select().from(ministryProfiles).where(eq(ministryProfiles.tenantId, tenantId)).limit(1);
+      const leaders = await tx.select().from(leadershipProfiles)
+        .where(and(eq(leadershipProfiles.tenantId, tenantId), eq(leadershipProfiles.status, "active")))
+        .orderBy(leadershipProfiles.displayOrder);
+      const [storedSettings] = await tx.select({ settingValue: ministrySettings.settingValue }).from(ministrySettings)
+        .where(and(eq(ministrySettings.tenantId, tenantId), eq(ministrySettings.settingKey, "public_site"))).limit(1);
+      return {
+        tenantName: tenant?.name ?? null,
+        profile: profile ?? null,
+        storedSettings: storedSettings?.settingValue ?? null,
+        leaders: leaders.map(({ name, position, biography, photoUrl }) => ({ name, position, biography, photoUrl })),
+      };
+    }),
+    save: (tenantId: string, input: ChurchSiteSettingsInput, updatedAt: Date) =>
+      withTenantTransaction(tenantId, async (tx) => {
+        const { profile, settings } = input;
+        await tx.insert(ministryProfiles).values({
+          tenantId,
+          ministryName: profile.ministryName,
+          logoAssetUrl: profile.logoUrl || null,
+          description: profile.tagline,
+          vision: profile.vision,
+          mission: profile.mission,
+          outreach: profile.outreach,
+          address: profile.contact.address,
+          email: profile.contact.email || null,
+          telephoneNumbers: profile.contact.phones,
+          socialLinks: profile.social,
+          updatedAt,
+        }).onConflictDoUpdate({
+          target: ministryProfiles.tenantId,
+          set: {
+            ministryName: profile.ministryName,
+            logoAssetUrl: profile.logoUrl || null,
+            description: profile.tagline,
+            vision: profile.vision,
+            mission: profile.mission,
+            outreach: profile.outreach,
+            address: profile.contact.address,
+            email: profile.contact.email || null,
+            telephoneNumbers: profile.contact.phones,
+            socialLinks: profile.social,
+            updatedAt,
+          },
+        });
+
+        const settingValue = JSON.stringify(settings);
+        await tx.insert(ministrySettings).values({ tenantId, settingKey: "public_site", settingValue, updatedAt })
+          .onConflictDoUpdate({
+            target: [ministrySettings.tenantId, ministrySettings.settingKey],
+            set: { settingValue, updatedAt },
+          });
+      }),
+  };
 
   // ─────────────────────────────────────────────────────────────────────────────
   // PUBLIC CHURCH ROUTES
@@ -806,43 +845,7 @@ export async function churchRoutes(app: FastifyInstance, options: RouteOptions) 
   app.get("/admin/church/site-settings", async (request, reply) => {
     const context = await requireActiveTenantPermission(request.raw.headers, { store: ["read"] });
     await assertChurchEnabled(context.tenantId);
-
-    return withTenantTransaction(context.tenantId, async (tx) => {
-      const [tenant] = await tx.select({ name: tenants.name }).from(tenants).where(eq(tenants.id, context.tenantId)).limit(1);
-      const [profile] = await tx.select().from(ministryProfiles).where(eq(ministryProfiles.tenantId, context.tenantId)).limit(1);
-      const [storedSettings] = await tx.select({ settingValue: ministrySettings.settingValue }).from(ministrySettings)
-        .where(and(eq(ministrySettings.tenantId, context.tenantId), eq(ministrySettings.settingKey, "public_site"))).limit(1);
-      const leaders = await tx.select().from(leadershipProfiles)
-        .where(and(eq(leadershipProfiles.tenantId, context.tenantId), eq(leadershipProfiles.status, "active")))
-        .orderBy(leadershipProfiles.displayOrder);
-      const settings = parseStoredSiteSettings(storedSettings?.settingValue);
-      if (!storedSettings?.settingValue) {
-        settings.leadership = leaders.map((leader) => ({
-          name: leader.name,
-          role: leader.position,
-          bio: leader.biography ?? undefined,
-          photoUrl: safePublicImageUrl(leader.photoUrl) || undefined,
-        }));
-      }
-
-      return reply.send({
-        profile: {
-          ministryName: profile?.ministryName ?? tenant?.name ?? context.tenantName,
-          tagline: profile?.description ?? "",
-          logoUrl: safePublicImageUrl(profile?.logoAssetUrl),
-          vision: profile?.vision ?? "",
-          mission: profile?.mission ?? "",
-          outreach: profile?.outreach ?? "",
-          contact: {
-            address: profile?.address ?? "",
-            email: profile?.email ?? "",
-            phones: Array.isArray(profile?.telephoneNumbers) ? profile.telephoneNumbers.filter((phone): phone is string => typeof phone === "string") : [],
-          },
-          social: safeSocialLinks(profile?.socialLinks),
-        },
-        settings,
-      });
-    });
+    return reply.send(await getMinistrySiteSettings(ministrySiteSettingsRepository, context.tenantId));
   });
 
   // PUT /v1/admin/church/site-settings
@@ -850,55 +853,9 @@ export async function churchRoutes(app: FastifyInstance, options: RouteOptions) 
     const context = await requireActiveTenantPermission(request.raw.headers, { store: ["update"] });
     await assertChurchEnabled(context.tenantId);
 
-    const parsed = churchSiteSettingsInputSchema.safeParse(request.body);
-    if (!parsed.success) return reply.code(400).send({ error: "VALIDATION_ERROR", details: parsed.error.issues });
-    const { profile, settings } = parsed.data;
-    const updatedAt = new Date();
-
-    await withTenantTransaction(context.tenantId, async (tx) => {
-      await tx.insert(ministryProfiles).values({
-        tenantId: context.tenantId,
-        ministryName: profile.ministryName,
-        logoAssetUrl: profile.logoUrl || null,
-        description: profile.tagline,
-        vision: profile.vision,
-        mission: profile.mission,
-        outreach: profile.outreach,
-        address: profile.contact.address,
-        email: profile.contact.email || null,
-        telephoneNumbers: profile.contact.phones,
-        socialLinks: profile.social,
-        updatedAt,
-      }).onConflictDoUpdate({
-        target: ministryProfiles.tenantId,
-        set: {
-          ministryName: profile.ministryName,
-          logoAssetUrl: profile.logoUrl || null,
-          description: profile.tagline,
-          vision: profile.vision,
-          mission: profile.mission,
-          outreach: profile.outreach,
-          address: profile.contact.address,
-          email: profile.contact.email || null,
-          telephoneNumbers: profile.contact.phones,
-          socialLinks: profile.social,
-          updatedAt,
-        },
-      });
-
-      const settingValue = JSON.stringify(settings);
-      await tx.insert(ministrySettings).values({
-        tenantId: context.tenantId,
-        settingKey: "public_site",
-        settingValue,
-        updatedAt,
-      }).onConflictDoUpdate({
-        target: [ministrySettings.tenantId, ministrySettings.settingKey],
-        set: { settingValue, updatedAt },
-      });
-    });
-
-    return reply.send({ success: true, updatedAt: updatedAt.toISOString() });
+    const result = await saveMinistrySiteSettings(ministrySiteSettingsRepository, context.tenantId, request.body);
+    if (!result.success) return reply.code(400).send({ error: "VALIDATION_ERROR", details: result.issues });
+    return reply.send(result);
   });
 
   // GET /v1/admin/church/campaigns

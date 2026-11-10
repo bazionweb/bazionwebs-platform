@@ -1,5 +1,6 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join, relative, resolve } from "node:path";
+import { assertSupportedSchema, validateJsonSchema } from "./lib/json-schema.mjs";
 
 const root = process.cwd();
 const readJson = (path) => JSON.parse(readFileSync(join(root, path), "utf8"));
@@ -15,6 +16,10 @@ const repoPathExists = (path) => isSafeRepoPath(path) && existsSync(join(root, p
 const catalog = readJson("products/catalog.json");
 const schema = readJson("products/module-manifest.schema.json");
 const registry = readJson("products/permissions.json");
+const permissionSchema = readJson("products/permissions.schema.json");
+assertSupportedSchema(schema, "products/module-manifest.schema.json");
+assertSupportedSchema(permissionSchema, "products/permissions.schema.json");
+for (const error of validateJsonSchema(registry, permissionSchema)) fail(`products/permissions.json: ${error}`);
 const modulesById = new Map((catalog.modules ?? []).map((item) => [item.id, item]));
 const manifestModules = new Set();
 
@@ -26,6 +31,7 @@ const permissionIds = new Set();
 const permissionKeys = new Set();
 const permissionsByModule = new Map();
 const workspacePackages = new Map();
+const packagesByName = new Map();
 for (const workspaceRoot of ["apps", "packages"]) {
   const directory = join(root, workspaceRoot);
   if (!existsSync(directory)) continue;
@@ -35,12 +41,84 @@ for (const workspaceRoot of ["apps", "packages"]) {
     if (!existsSync(packageFile)) continue;
     try {
       const pkg = JSON.parse(readFileSync(packageFile, "utf8"));
-      if (typeof pkg.name === "string") workspacePackages.set(packagePath, pkg.name);
+      if (typeof pkg.name === "string") {
+        workspacePackages.set(packagePath, pkg.name);
+        packagesByName.set(pkg.name, { path: packagePath, absolutePath: join(root, packagePath), manifest: pkg });
+      }
     } catch {
       fail(`Invalid workspace package metadata: ${packagePath}/package.json`);
     }
   }
 }
+
+function sourceFiles(directory) {
+  if (!existsSync(directory)) return [];
+  return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const path = join(directory, entry.name);
+    if (entry.isDirectory()) return sourceFiles(path);
+    return /\.(?:ts|tsx|js|jsx|mjs|cjs)$/.test(entry.name) ? [path] : [];
+  });
+}
+
+function importSpecifiers(source) {
+  const found = [];
+  const pattern = /(?:\bfrom\s*|\bimport\s*(?:\(\s*)?|\brequire\s*\(\s*)["']([^"']+)["']/g;
+  for (const match of source.matchAll(pattern)) found.push(match[1]);
+  return found;
+}
+
+function packageExportTargets(value) {
+  if (typeof value === "string") return [value];
+  if (Array.isArray(value)) return value.flatMap(packageExportTargets);
+  if (value && typeof value === "object") return Object.values(value).flatMap(packageExportTargets);
+  return [];
+}
+
+const allPackageFiles = new Map();
+for (const [packagePath, packageName] of workspacePackages) {
+  const packageInfo = packagesByName.get(packageName);
+  const sourceDir = join(packageInfo.absolutePath, "src");
+  const files = sourceFiles(sourceDir);
+  allPackageFiles.set(packagePath, files);
+  const declared = new Set([
+    ...Object.keys(packageInfo.manifest.dependencies ?? {}),
+    ...Object.keys(packageInfo.manifest.devDependencies ?? {}),
+    ...Object.keys(packageInfo.manifest.peerDependencies ?? {}),
+    ...Object.keys(packageInfo.manifest.optionalDependencies ?? {}),
+  ]);
+  for (const file of files) {
+    const source = readFileSync(file, "utf8");
+    for (const specifier of importSpecifiers(source)) {
+      if (specifier.startsWith("@bazion/") && packagesByName.has(specifier.split("/").slice(0, 2).join("/")) &&
+          !declared.has(specifier.split("/").slice(0, 2).join("/"))) {
+        fail(`${relative(root, file)} imports workspace package ${specifier} without declaring it in package.json.`);
+      }
+      if (!specifier.startsWith(".")) continue;
+      const resolved = resolve(dirname(file), specifier);
+      const repoRelative = relative(root, resolved).replaceAll("\\", "/");
+      if (packagePath.startsWith("packages/") && repoRelative.startsWith("apps/")) {
+        fail(`${relative(root, file)} imports application code ${specifier}; packages may not depend on apps.`);
+      }
+      for (const [otherPath, otherName] of workspacePackages) {
+        if (otherPath === packagePath || !resolved.startsWith(join(root, otherPath))) continue;
+        if (!declared.has(otherName)) fail(`${relative(root, file)} crosses into ${otherName} without declaring it in package.json.`);
+      }
+    }
+  }
+}
+
+const migrationCache = new Map();
+function migrationSql(filename) {
+  if (!migrationCache.has(filename)) {
+    const path = join(root, "packages/database/migrations", filename);
+    migrationCache.set(filename, existsSync(path) ? readFileSync(path, "utf8") : "");
+  }
+  return migrationCache.get(filename);
+}
+
+const declaredTableOwners = new Map();
+const domainPackagePaths = new Set();
+const moduleDependencies = new Map();
 for (const permission of registry.permissions ?? []) {
   if (!permission.id || !/^[a-z][a-z0-9.-]+$/.test(permission.id) ||
       !permission.moduleId || !permission.resource || !permission.action ||
@@ -76,7 +154,12 @@ if (!existsSync(moduleRoot)) {
       fail(`Missing or invalid module manifest: ${path}`);
       continue;
     }
-    const { id, name, version, owner, status, tenantModel, entrypoints, implementation, permissions, dependencies, operations } = manifest;
+    const schemaErrors = validateJsonSchema(manifest, schema);
+    if (schemaErrors.length) {
+      for (const error of schemaErrors) fail(`${path}: ${error}`);
+      continue;
+    }
+    const { id, name, version, owner, status, tenantModel, entrypoints, implementation, permissions, dependencies, operations, tables, migrations } = manifest;
     if (id !== directory.name) fail(`Manifest ID must match directory name: ${path}`);
     if (manifestModules.has(id)) fail(`Duplicate module manifest: ${id}`);
     manifestModules.add(id);
@@ -103,7 +186,7 @@ if (!existsSync(moduleRoot)) {
       continue;
     }
     for (const key of Object.keys(entrypoints)) {
-      if (!["domain", "api", "ui", "worker"].includes(key) || typeof entrypoints[key] !== "string") {
+      if (!["domain", "adapter", "contracts", "api", "ui", "worker"].includes(key) || typeof entrypoints[key] !== "string") {
         fail(`Invalid entrypoint ${key} in ${path}`);
         continue;
       }
@@ -112,6 +195,31 @@ if (!existsSync(moduleRoot)) {
     const entrypointPaths = Object.values(entrypoints).filter((entrypoint) => typeof entrypoint === "string");
     const packageEntrypoints = entrypointPaths.filter((entrypoint) => workspacePackages.has(entrypoint));
     const appEntrypoints = entrypointPaths.filter((entrypoint) => entrypoint.startsWith("apps/"));
+    const domainPackagePath = entrypoints.domain;
+    if (typeof domainPackagePath === "string" && domainPackagePath.startsWith("packages/") &&
+        workspacePackages.has(domainPackagePath) && !domainPackagePaths.has(domainPackagePath)) {
+      domainPackagePaths.add(domainPackagePath);
+      const packageName = workspacePackages.get(domainPackagePath);
+      const packageInfo = packageName ? packagesByName.get(packageName) : undefined;
+      const forbiddenDependency = (name) => name === "better-auth" || name === "fastify" || name === "next" ||
+        name === "pg" || name === "postgres" || name === "mysql2" || name === "mongodb" ||
+        name === "drizzle-orm" || name === "@neondatabase/serverless" || name.startsWith("@aws-sdk/") ||
+        name.startsWith("@stripe/") || name.startsWith("@google-cloud/");
+      if (packageInfo) {
+        const declared = Object.keys(packageInfo.manifest.dependencies ?? {});
+        for (const name of declared) {
+          if (forbiddenDependency(name)) fail(`Domain package ${packageName} depends on adapter/provider package ${name}.`);
+        }
+        for (const file of allPackageFiles.get(domainPackagePath) ?? []) {
+          for (const specifier of importSpecifiers(readFileSync(file, "utf8"))) {
+            const importedPackage = specifier.startsWith("@") ? specifier.split("/").slice(0, 2).join("/") : specifier.split("/")[0];
+            if (forbiddenDependency(importedPackage)) {
+              fail(`${relative(root, file)} imports adapter/provider package ${importedPackage} from a domain entrypoint.`);
+            }
+          }
+        }
+      }
+    }
     if (implementation.mode === "manifest-only") {
       if (status !== "planned" || entrypointPaths.length > 0 || implementation.packageName) {
         fail(`Manifest-only modules must be planned and have no code entrypoints in ${path}`);
@@ -123,6 +231,18 @@ if (!existsSync(moduleRoot)) {
       if (typeof implementation.packageName !== "string" ||
           !packageEntrypoints.some((entrypoint) => workspacePackages.get(entrypoint) === implementation.packageName)) {
         fail(`Implementation packageName must resolve to an entrypoint workspace package in ${path}`);
+      }
+      const packageInfo = packagesByName.get(implementation.packageName);
+      const rootExport = packageInfo?.manifest.exports?.["."];
+      const targets = packageExportTargets(rootExport);
+      if (!packageInfo || !targets.length) {
+        fail(`Package ${implementation.packageName} must expose a public root export in package.json for ${path}`);
+      } else {
+        for (const target of targets) {
+          if (!target.startsWith("./") || !existsSync(join(packageInfo.absolutePath, target))) {
+            fail(`Public export ${target} for ${implementation.packageName} does not resolve to a repository file in ${path}`);
+          }
+        }
       }
     } else if (implementation.packageName !== undefined) {
       fail(`Only workspace-package or hybrid modules may declare packageName in ${path}`);
@@ -145,19 +265,59 @@ if (!existsSync(moduleRoot)) {
     for (const docPath of manifest.docs ?? []) {
       if (!repoPathExists(docPath)) fail(`Documentation path does not exist or leaves the repository in ${path}: ${docPath}`);
     }
-    for (const table of manifest.tables ?? []) {
+    if (migrations !== undefined && (!Array.isArray(migrations) || new Set(migrations).size !== migrations.length)) {
+      fail(`Migration filenames must be a unique array in ${path}`);
+    }
+    const declaredMigrations = Array.isArray(migrations) ? migrations : [];
+    for (const migration of declaredMigrations) {
+      if (typeof migration !== "string" || !/^[0-9]+_[a-z0-9_-]+\.sql$/.test(migration) || !repoPathExists(`packages/database/migrations/${migration}`)) {
+        fail(`Migration does not exist in ${path}: ${migration}`);
+      }
+    }
+    const tableNames = new Set();
+    for (const table of tables ?? []) {
       if (!table.name || !table.owner || typeof table.tenantScoped !== "boolean" ||
           !["forced", "not-applicable"].includes(table.rls)) {
         fail(`Invalid table ownership declaration in ${path}`);
         continue;
       }
+      if (tableNames.has(table.name)) fail(`Duplicate table ownership declaration in ${path}: ${table.name}`);
+      tableNames.add(table.name);
+      const currentOwner = declaredTableOwners.get(table.name);
+      if (currentOwner && currentOwner !== id) fail(`Table ${table.name} is assigned to both ${currentOwner} and ${id}.`);
+      declaredTableOwners.set(table.name, id);
       if (table.owner !== id) fail(`Table ${table.name} must be owned by module ${id} in ${path}`);
       if (table.tenantScoped && table.rls !== "forced") fail(`Tenant table ${table.name} must use forced RLS in ${path}`);
       if (table.migration && !repoPathExists(`packages/database/migrations/${table.migration}`)) {
         fail(`Migration for table ${table.name} does not exist in ${path}: ${table.migration}`);
       }
+      if (table.migration && !declaredMigrations.includes(table.migration)) {
+        fail(`Migration for table ${table.name} must also be listed in migrations in ${path}`);
+      }
+      if (table.migration && declaredMigrations.includes(table.migration)) {
+        const sqlText = migrationSql(table.migration);
+        const escapedName = table.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        const createPattern = new RegExp(`\\bCREATE\\s+TABLE(?:\\s+IF\\s+NOT\\s+EXISTS)?\\s+(?:public\\.)?[\"']?${escapedName}[\"']?\\s*\\(`, "i");
+        const drizzleTablePattern = new RegExp(`pgTable\\s*\\(\\s*[\"']${escapedName}[\"']`, "m");
+        const databaseSchema = [...(allPackageFiles.get("packages/database") ?? [])]
+          .map((file) => readFileSync(file, "utf8")).join("\\n");
+        if (!createPattern.test(sqlText) && !drizzleTablePattern.test(databaseSchema)) {
+          fail(`Table ${table.name} is not defined by Drizzle or created by ${table.migration} (${path}).`);
+        }
+        if (table.tenantScoped) {
+          const relatedSql = declaredMigrations.map(migrationSql).join("\\n");
+          const directRls = new RegExp(`ALTER\\s+TABLE\\s+(?:public\\.)?[\"']?${escapedName}[\"']?\\s+ENABLE\\s+ROW\\s+LEVEL\\s+SECURITY[\\s\\S]*?ALTER\\s+TABLE\\s+(?:public\\.)?[\"']?${escapedName}[\"']?\\s+FORCE\\s+ROW\\s+LEVEL\\s+SECURITY`, "i").test(relatedSql);
+          const genericRls = /FOREACH\s+\w+\s+IN\s+ARRAY\s+ARRAY\s*\[[\s\S]*?\]/i.test(relatedSql) &&
+            new RegExp(`[\"']${escapedName}[\"']`, "i").test(relatedSql) &&
+            /ALTER\s+TABLE\s+%I\s+ENABLE\s+ROW\s+LEVEL\s+SECURITY/i.test(relatedSql) &&
+            /ALTER\s+TABLE\s+%I\s+FORCE\s+ROW\s+LEVEL\s+SECURITY/i.test(relatedSql) &&
+            /CREATE\s+POLICY\s+tenant_isolation\s+ON\s+%I/i.test(relatedSql);
+          if (!directRls && !genericRls) fail(`Tenant-scoped table ${table.name} must declare forced RLS and a tenant policy in its migrations (${path}).`);
+        }
+      }
     }
     if (new Set(dependencies).size !== dependencies.length) fail(`Duplicate dependency in ${path}`);
+    moduleDependencies.set(id, dependencies);
     for (const dependency of dependencies) {
       if (!modulesById.has(dependency)) fail(`Unknown dependency ${dependency} in ${path}`);
     }
@@ -196,6 +356,26 @@ if (!existsSync(moduleRoot)) {
   }
 }
 if (manifestModules.size === 0) fail("No module manifests were found.");
+
+const dependencyStates = new Map();
+const dependencyStack = [];
+function visitDependencies(moduleId) {
+  const state = dependencyStates.get(moduleId);
+  if (state === "complete") return;
+  if (state === "visiting") {
+    const cycleStart = dependencyStack.indexOf(moduleId);
+    fail(`Module dependency cycle: ${[...dependencyStack.slice(cycleStart), moduleId].join(" -> ")}.`);
+    return;
+  }
+  dependencyStates.set(moduleId, "visiting");
+  dependencyStack.push(moduleId);
+  for (const dependency of moduleDependencies.get(moduleId) ?? []) {
+    if (moduleDependencies.has(dependency)) visitDependencies(dependency);
+  }
+  dependencyStack.pop();
+  dependencyStates.set(moduleId, "complete");
+}
+for (const moduleId of moduleDependencies.keys()) visitDependencies(moduleId);
 
 if (process.exitCode) process.exit(process.exitCode);
 console.log(`Module manifests valid: ${manifestModules.size} modules, ${permissionIds.size} registered permissions (registry v${registry.version}).`);

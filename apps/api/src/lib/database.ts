@@ -2,6 +2,7 @@ import { Pool } from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { sql } from "drizzle-orm";
 import * as schema from "@bazion/database";
+import { currentDatabaseSchemaVersion, requiredDatabaseMigrations } from "@bazion/database";
 
 /** Shared-tier data pool and control-plane lookups only. Tenant business data must use withTenantTransaction. */
 export const pool = new Pool({
@@ -162,23 +163,25 @@ async function buildDedicatedPool(binding: ResolvedBinding, secretReference: str
   });
 
   try {
-    const expectedSchemaVersion = process.env.TENANT_DATABASE_SCHEMA_VERSION?.trim();
-    if (!expectedSchemaVersion || binding.schemaVersion !== expectedSchemaVersion) {
+    const configuredSchemaVersion = process.env.TENANT_DATABASE_SCHEMA_VERSION?.trim();
+    if ((configuredSchemaVersion && configuredSchemaVersion !== currentDatabaseSchemaVersion) ||
+        binding.schemaVersion !== currentDatabaseSchemaVersion) {
       throw routingError("TENANT_DATABASE_SCHEMA_VERSION_MISMATCH");
     }
     const verification = await dedicatedPool.query<{
       tenant_count: number;
       matching_tenant_count: number;
-      schema_applied: boolean;
+      applied_migrations_count: number;
     }>(
       `SELECT count(*)::int AS tenant_count,
               count(*) FILTER (WHERE id = $1)::int AS matching_tenant_count,
-              EXISTS (SELECT 1 FROM public.schema_migrations WHERE version = $2) AS schema_applied
+              (SELECT count(*)::int FROM public.schema_migrations WHERE version = ANY($2::varchar[])) AS applied_migrations_count
          FROM public.tenants`,
-      [binding.tenantId, expectedSchemaVersion],
+      [binding.tenantId, requiredDatabaseMigrations],
     );
     const row = verification.rows[0];
-    if (!row || row.tenant_count !== 1 || row.matching_tenant_count !== 1 || !row.schema_applied) {
+    if (!row || row.tenant_count !== 1 || row.matching_tenant_count !== 1 ||
+        row.applied_migrations_count !== requiredDatabaseMigrations.length) {
       throw routingError("TENANT_DATABASE_VERIFICATION_FAILED");
     }
   } catch (error) {

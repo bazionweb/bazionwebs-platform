@@ -6,15 +6,18 @@
     {
       "id": "platform-identity",
       "name": "Identity, authentication and access control",
+      "classification": "module",
       "sourcePath": [
+        "packages/platform-identity",
         "packages/auth"
       ],
-      "status": "implemented",
+      "status": "partial",
       "scope": "Better Auth sessions, organization membership and tenant roles are implemented. Versioned module-owned permission declarations are checked against the static Better Auth adapter; service identities remain planned."
     },
     {
       "id": "tenant-control-plane",
       "name": "Tenant registry, provisioning, domain ownership and platform administration",
+      "classification": "roadmap-capability",
       "sourcePath": [
         "packages/auth",
         "packages/database",
@@ -26,6 +29,7 @@
     {
       "id": "module-entitlements",
       "name": "Module registry, plans, feature gates and quotas",
+      "classification": "roadmap-capability",
       "sourcePath": [
         "apps/admin",
         "apps/api/src/modules/admin",
@@ -37,6 +41,7 @@
     {
       "id": "design-system",
       "name": "Shared UI and brand/theme system",
+      "classification": "roadmap-capability",
       "sourcePath": [
         "packages/ui"
       ],
@@ -46,6 +51,7 @@
     {
       "id": "website-content",
       "name": "CMS, articles, news and publishing",
+      "classification": "module",
       "sourcePath": [
         "packages/content"
       ],
@@ -55,6 +61,7 @@
     {
       "id": "page-experience",
       "name": "Visual page builder, blocks, layouts and templates",
+      "classification": "roadmap-capability",
       "sourcePath": [
         "packages/page-builder",
         "templates"
@@ -65,6 +72,7 @@
     {
       "id": "forms-leads",
       "name": "Forms, lead capture and submissions",
+      "classification": "roadmap-capability",
       "sourcePath": [
         "packages/forms"
       ],
@@ -74,6 +82,7 @@
     {
       "id": "contacts-crm",
       "name": "Contacts, CRM and customer directory",
+      "classification": "module",
       "sourcePath": [
         "packages/contacts"
       ],
@@ -83,6 +92,7 @@
     {
       "id": "search-seo-localization",
       "name": "Search, SEO, structured data and localized content",
+      "classification": "roadmap-capability",
       "sourcePath": [
         "packages/search",
         "packages/seo",
@@ -94,8 +104,9 @@
     {
       "id": "marketing-communications",
       "name": "Newsletter, transactional messaging and channel integrations",
+      "classification": "roadmap-capability",
       "sourcePath": [
-        "packages/marketing"
+        "packages/notifications"
       ],
       "status": "partial",
       "scope": "Newsletter campaigns, subscriber segmentation and provider-specific campaign connectors; transactional delivery lives in notifications."
@@ -103,6 +114,7 @@
     {
       "id": "media-storage",
       "name": "Uploads, media library and object storage",
+      "classification": "module",
       "sourcePath": [
         "packages/storage"
       ],
@@ -112,6 +124,7 @@
     {
       "id": "document-management",
       "name": "Secure document vault, searchable downloads and generated documents",
+      "classification": "roadmap-capability",
       "sourcePath": [
         "packages/documents"
       ],
@@ -121,6 +134,7 @@
     {
       "id": "commerce",
       "name": "Products, variants, carts, checkout and orders",
+      "classification": "module",
       "sourcePath": [
         "packages/commerce-domain",
         "apps/api/src/modules/commerce"
@@ -131,6 +145,7 @@
     {
       "id": "payments",
       "name": "Payment orchestration and provider adapters",
+      "classification": "roadmap-capability",
       "sourcePath": [
         "packages/payments"
       ],
@@ -140,9 +155,10 @@
     {
       "id": "inventory-pricing",
       "name": "Stock, price lists, promotions and coupons",
+      "classification": "roadmap-capability",
       "sourcePath": [
-        "packages/inventory",
-        "packages/promotions"
+        "packages/commerce-domain",
+        "apps/api/src/modules/commerce"
       ],
       "status": "partial",
       "scope": "Basic stock fields and reservations exist. Add adjustment ledger, warehouses, variants, price rules and promotions."
@@ -150,6 +166,7 @@
     {
       "id": "fulfilment",
       "name": "Shipping, courier, delivery and returns",
+      "classification": "roadmap-capability",
       "sourcePath": [
         "packages/fulfilment"
       ],
@@ -159,6 +176,7 @@
     {
       "id": "booking",
       "name": "Appointments, availability and calendar resources",
+      "classification": "roadmap-capability",
       "sourcePath": [
         "packages/booking"
       ],
@@ -168,6 +186,7 @@
     {
       "id": "client-portals",
       "name": "Customer and institutional self-service portals",
+      "classification": "roadmap-capability",
       "sourcePath": [
         "apps/storefront",
         "apps/admin"
@@ -178,6 +197,7 @@
     {
       "id": "subscriptions-billing",
       "name": "SaaS subscriptions, invoices and commercial entitlements",
+      "classification": "roadmap-capability",
       "sourcePath": [
         "packages/billing"
       ],
@@ -187,6 +207,7 @@
     {
       "id": "education",
       "name": "School management and learning management",
+      "classification": "roadmap-capability",
       "sourcePath": [
         "packages/education"
       ],
@@ -196,6 +217,7 @@
     {
       "id": "ministry",
       "name": "Church and ministry management",
+      "classification": "roadmap-capability",
       "sourcePath": [
         "packages/ministry"
       ],
@@ -205,6 +227,7 @@
     {
       "id": "healthcare",
       "name": "Clinic operations and patient administration",
+      "classification": "roadmap-capability",
       "sourcePath": [
         "packages/healthcare"
       ],
@@ -214,6 +237,7 @@
     {
       "id": "erp-supply-chain",
       "name": "ERP, finance and supply-chain workflows",
+      "classification": "roadmap-capability",
       "sourcePath": [
         "packages/erp"
       ],
@@ -223,6 +247,7 @@
     {
       "id": "integration-hub",
       "name": "Provider adapters, API connections and webhook delivery",
+      "classification": "roadmap-capability",
       "sourcePath": [
         "packages/integrations"
       ],
@@ -232,6 +257,7 @@
     {
       "id": "hosting-control-plane",
       "name": "Hosting plans, compute resources, clusters and resource quotas",
+      "classification": "roadmap-capability",
       "sourcePath": [
         "packages/hosting"
       ],
@@ -241,9 +267,12 @@
     {
       "id": "domains-email",
       "name": "Domains, DNS, TLS and corporate email services",
+      "classification": "roadmap-capability",
       "sourcePath": [
-        "packages/domains",
-        "packages/email-service"
+        "packages/auth",
+        "packages/database",
+        "apps/admin",
+        "apps/api/src/modules/admin"
       ],
       "status": "partial",
       "scope": "Verified-domain lookup exists. Add ownership challenges, TLS lifecycle and mailbox-provider integrations; do not build a mail server prematurely."
@@ -251,6 +280,7 @@
     {
       "id": "deployment-environments",
       "name": "Git deployment, CI/CD, preview and staging environments",
+      "classification": "roadmap-capability",
       "sourcePath": [
         "packages/deployments"
       ],
@@ -260,8 +290,8 @@
     {
       "id": "backup-recovery",
       "name": "Database/object backups, migrations and disaster recovery",
+      "classification": "roadmap-capability",
       "sourcePath": [
-        "packages/backups",
         "packages/database"
       ],
       "status": "partial",
@@ -270,6 +300,7 @@
     {
       "id": "observability-resilience",
       "name": "Uptime, telemetry, performance, incidents, failover and capacity",
+      "classification": "roadmap-capability",
       "sourcePath": [
         "packages/observability",
         "packages/resilience"
@@ -280,6 +311,7 @@
     {
       "id": "security-operations",
       "name": "Security scanning, vulnerability response and access reviews",
+      "classification": "roadmap-capability",
       "sourcePath": [
         "packages/security-ops"
       ],
@@ -289,6 +321,7 @@
     {
       "id": "support-maintenance",
       "name": "Support desk, maintenance plans, updates and SLA handling",
+      "classification": "roadmap-capability",
       "sourcePath": [
         "packages/support"
       ],
@@ -298,6 +331,7 @@
     {
       "id": "sales-project-delivery",
       "name": "Commercial catalogue, quotes, discovery, project delivery and change requests",
+      "classification": "roadmap-capability",
       "sourcePath": [
         "packages/sales",
         "packages/projects"
@@ -308,6 +342,7 @@
     {
       "id": "analytics",
       "name": "Privacy-aware product and website analytics",
+      "classification": "module",
       "sourcePath": [
         "packages/analytics"
       ],
@@ -317,6 +352,7 @@
     {
       "id": "solution-assembler",
       "name": "Versioned vertical solution manifests",
+      "classification": "roadmap-capability",
       "sourcePath": [
         "solutions"
       ],
@@ -326,6 +362,7 @@
     {
       "id": "notifications",
       "name": "Transactional email, SMS and delivery outbox",
+      "classification": "module",
       "sourcePath": [
         "packages/notifications"
       ],
@@ -335,6 +372,7 @@
     {
       "id": "audit",
       "name": "Append-only security and business audit trail",
+      "classification": "module",
       "sourcePath": [
         "packages/audit"
       ],
@@ -344,6 +382,7 @@
     {
       "id": "church-ministry",
       "name": "Church and ministry public content and operations",
+      "classification": "module",
       "sourcePath": [
         "packages/church-ministry-domain",
         "apps/api/src/modules/church",

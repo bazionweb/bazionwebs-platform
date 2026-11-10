@@ -3,7 +3,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { createOutboxPayloadCodec, PostgresNotificationOutbox } from "@bazion/notifications";
 import { organization } from "better-auth/plugins";
 import { Pool } from "pg";
-import { reconcileTenantProvisioning } from "./tenant-reconciliation.js";
+import { reconcileTenantProvisioning } from "@bazion/platform-identity";
 import { ac, organizationRoles, parseOrganizationRoles } from "./permissions.js";
 import {
   canCreateClientOrganization,
@@ -62,7 +62,7 @@ async function enqueueAuthEmail(
   subject: string,
   url: string,
   intro: string,
-  event: "password-reset" | "email-verification" | "organization-invitation",
+  event: "password-reset" | "password-reset-complete" | "email-verification" | "organization-invitation",
   eventId: string,
 ): Promise<void> {
   const eventHash = createHash("sha256").update(eventId).digest("hex");
@@ -186,15 +186,38 @@ export const auth = betterAuth({
     maxPasswordLength: 128,
     requireEmailVerification: process.env.AUTH_REQUIRE_EMAIL_VERIFICATION !== "false",
     revokeSessionsOnPasswordReset: true,
+    resetPasswordTokenExpiresIn: 60 * 60,
     sendResetPassword: async ({ user, url }) => {
-      await enqueueAuthEmail(
-        user.email,
-        "Reset your Bazion Web password",
-        url,
-        "Use the secure link below to reset your password.",
-        "password-reset",
-        url,
-      );
+      try {
+        await enqueueAuthEmail(
+          user.email,
+          "Reset your Bazion Web password",
+          url,
+          "Use the secure link below to reset your password.",
+          "password-reset",
+          url,
+        );
+      } catch {
+        // Keep the public response identical for registered and unknown addresses.
+        // Do not log the account address, reset URL, or token.
+        process.stderr.write("[bazion-auth] password-reset email could not be queued\n");
+      }
+    },
+    onPasswordReset: async ({ user }) => {
+      try {
+        await enqueueAuthEmail(
+          user.email,
+          "Your Bazion Web password was changed",
+          "",
+          "Your password was successfully changed. If you did not make this change, contact Bazion support immediately.",
+          "password-reset-complete",
+          randomBytes(16).toString("hex"),
+        );
+      } catch {
+        // The password is already changed. Keep the success response while logging
+        // a generic alert that does not disclose the account or reset token.
+        process.stderr.write("[bazion-auth] password-reset notification could not be queued\n");
+      }
     },
   },
   emailVerification: {
@@ -224,7 +247,9 @@ export const auth = betterAuth({
     customRules: {
       "/sign-in/email": { window: 60, max: 8 },
       "/sign-up/email": { window: 3600, max: 10 },
-      "/forget-password": { window: 3600, max: 5 },
+      "/request-password-reset": { window: 3600, max: 5 },
+      "/reset-password": { window: 3600, max: 10 },
+      "/reset-password/*": { window: 3600, max: 10 },
     },
   },
   advanced: {

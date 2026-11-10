@@ -5,10 +5,14 @@
   "owner": "platform",
   "status": "partial",
   "entrypoints": {
-    "domain": "packages/audit"
+    "adapter": "packages/audit"
   },
   "implementation": { "mode": "workspace-package", "packageName": "@bazion/audit" },
   "tenantModel": "mixed",
+  "tables": [
+    { "name": "platform_audit_events", "owner": "audit", "tenantScoped": false, "rls": "not-applicable", "migration": "0005_platform_audit_events.sql" }
+  ],
+  "migrations": ["0005_platform_audit_events.sql"],
   "permissions": [],
   "dependencies": [
     "platform-identity"

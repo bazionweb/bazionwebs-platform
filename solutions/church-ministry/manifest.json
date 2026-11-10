@@ -1,6 +1,7 @@
 {
   "version": "1.0.0",
   "status": "partial",
+  "readiness": "buildable",
   "id": "church-ministry",
   "name": "Church and Ministry Management",
   "description": "Tenant-scoped ministry public site, published sermons, event registration, giving intake, enquiries and prayer requests. Membership, attendance, volunteers, settings and full payment reconciliation remain incomplete.",
@@ -13,7 +14,8 @@
     "website-content",
     "notifications",
     "analytics",
-    "commerce"
+    "commerce",
+    "media-storage"
   ],
   "defaultRoles": [
     {

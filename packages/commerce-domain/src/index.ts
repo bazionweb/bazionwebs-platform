@@ -1,3 +1,11 @@
+import { DomainError } from "./errors.js";
+
+export { DomainError } from "./errors.js";
+export { availableStock, canReserveStock, canSetStockOnHand, canSetStockTracking, releaseStockReservation, reserveStock } from "./inventory.js";
+export type { InventoryBalance, InventoryPosition } from "./inventory.js";
+export { planPaymentSettlement } from "./payment-settlement.js";
+export type { CommerceOrderStatus, CommercePaymentStatus, PaymentSettlementPlan } from "./payment-settlement.js";
+
 export type CurrencyCode = "KES" | "USD" | "EUR" | "GBP" | "CAD" | "AUD" | "NZD" | "CHF" | "SGD" | "ZAR" | "NGN" | "GHS" | "INR" | "AED" | "BRL" | "MXN" | "SAR" | "CNY" | "HKD" | "SEK" | "NOK" | "DKK" | "PLN" | "THB" | "PHP";
 
 export interface CartLine {
@@ -19,16 +27,6 @@ export function productSlug(name: string): string {
   const slug = name.toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "")
     .replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 180).replace(/-+$/g, "");
   return slug || "product";
-}
-
-export class DomainError extends Error {
-  constructor(
-    public readonly code: string,
-    message: string,
-  ) {
-    super(message);
-    this.name = "DomainError";
-  }
 }
 
 function assertMinorUnits(value: number, label: string): void {

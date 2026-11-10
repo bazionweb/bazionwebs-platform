@@ -5,7 +5,7 @@ import {
   churchPublicSiteSettingsSchema,
   type ChurchPublicSiteSettings,
   type ChurchSiteSettingsInput,
-} from "@bazion/api-contracts";
+} from "@bazion/church-ministry-contracts";
 import { apiErrorMessage } from "../../lib/api-error";
 import { MediaUploadField } from "./media-upload-field";
 

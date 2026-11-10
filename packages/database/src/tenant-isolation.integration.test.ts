@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { Pool, type PoolClient } from "pg";
+import { requiredDatabaseMigrations } from "./migration-registry.js";
 
 type TenantFixture = {
   tenantId: string;
@@ -230,6 +231,15 @@ describe.skipIf(!enabled)("PostgreSQL tenant isolation (real roles and RLS)", ()
       "SELECT pg_get_userbyid(relowner) AS owner FROM pg_class WHERE oid = 'public.products'::regclass",
     );
     expect(owner.rows[0]?.owner).not.toBe("bazion_app");
+  });
+
+  it("has every migration required by the current platform schema applied", async () => {
+    const applied = await migrationPool.query<{ version: string }>(
+      "SELECT version FROM public.schema_migrations WHERE version = ANY($1::varchar[])",
+      [requiredDatabaseMigrations],
+    );
+    const appliedVersions = new Set(applied.rows.map((row) => row.version));
+    expect(requiredDatabaseMigrations.filter((version) => !appliedVersions.has(version))).toEqual([]);
   });
 
   it("isolates reads across all tenant-owned business tables", async () => {

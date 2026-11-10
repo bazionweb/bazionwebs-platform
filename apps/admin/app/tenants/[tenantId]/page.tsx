@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { platformFetch, type Tenant } from "@/lib/platform";
+import { platformFetch, requirePlatformOwner, type Tenant } from "@/lib/platform";
 import { LifecycleActions } from "./lifecycle-actions";
 import { TenantControlPanel } from "./control-panel";
 
@@ -27,6 +27,7 @@ type TenantDomain = { id: string; hostname: string; status: "pending" | "active"
 type TenantDomains = { items: TenantDomain[] };
 
 export default async function TenantDetail({ params }: { params: Promise<{ tenantId: string }> }) {
+  await requirePlatformOwner();
   const { tenantId } = await params;
   const result = await platformFetch<{ tenant: Tenant }>(`tenants/${encodeURIComponent(tenantId)}`);
   if (result.status === 404) notFound();

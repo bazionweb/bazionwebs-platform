@@ -1,5 +1,6 @@
 import { isIP } from "node:net";
 import { Pool } from "pg";
+import { currentDatabaseSchemaVersion, requiredDatabaseMigrations } from "./migration-registry.js";
 
 type DbPool = InstanceType<typeof Pool>;
 
@@ -107,6 +108,10 @@ function checkStaticProductionConfig(): Record<string, URL | null> {
 
   if (process.env.TENANT_RESOLUTION_MODE !== "verified_domain") {
     fail("TENANT_RESOLUTION_MODE must be verified_domain for production.");
+  }
+  const tenantSchemaVersion = required("TENANT_DATABASE_SCHEMA_VERSION");
+  if (tenantSchemaVersion && tenantSchemaVersion !== currentDatabaseSchemaVersion) {
+    fail(`TENANT_DATABASE_SCHEMA_VERSION must match this release's current schema ${currentDatabaseSchemaVersion}.`);
   }
   if (process.env.AUTH_REQUIRE_EMAIL_VERIFICATION !== "true") {
     fail("AUTH_REQUIRE_EMAIL_VERIFICATION must be true for production.");
@@ -222,34 +227,10 @@ async function verifyDatabase(urls: Record<string, URL | null>): Promise<void> {
 
     const applied = await migrationPool.query<{ version: string }>(
       "SELECT version FROM public.schema_migrations WHERE version = ANY($1::varchar[])",
-      [[
-        "0001_initial.sql",
-        "0002_auth_tenant_registry.sql",
-        "0003_notification_outbox.sql",
-        "0004_notification_runtime_roles.sql",
-        "0005_platform_audit_events.sql",
-        "0006_tenant_lifecycle.sql",
-        "0007_platform_tenant_control_plane.sql",
-        "0008_church_ministry_domain.sql",
-        "0009_church_integrity_and_payment_callbacks.sql",
-        "0010_commerce_mpesa_callbacks.sql",
-        "0011_church_site_and_privacy.sql",
-      ]],
+      [requiredDatabaseMigrations],
     );
     const versions = new Set(applied.rows.map((row) => row.version));
-    for (const migration of [
-      "0001_initial.sql",
-      "0002_auth_tenant_registry.sql",
-      "0003_notification_outbox.sql",
-      "0004_notification_runtime_roles.sql",
-      "0005_platform_audit_events.sql",
-      "0006_tenant_lifecycle.sql",
-      "0007_platform_tenant_control_plane.sql",
-      "0008_church_ministry_domain.sql",
-      "0009_church_integrity_and_payment_callbacks.sql",
-      "0010_commerce_mpesa_callbacks.sql",
-      "0011_church_site_and_privacy.sql",
-    ]) {
+    for (const migration of requiredDatabaseMigrations) {
       if (!versions.has(migration)) fail(`Database migration ${migration} has not been applied.`);
     }
 

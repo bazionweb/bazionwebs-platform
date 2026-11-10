@@ -1,15 +1,14 @@
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { and, asc, desc, eq, ilike, sql } from "drizzle-orm";
-import { calculateTotals, type CurrencyCode } from "@bazion/commerce-domain";
-import { addCartItemSchema, checkoutSchema, createCartSchema, updateCartItemSchema } from "@bazion/api-contracts";
+import { calculateTotals, canReserveStock, planPaymentSettlement, releaseStockReservation, reserveStock, type CurrencyCode } from "@bazion/commerce-domain";
+import { addCartItemSchema, checkoutSchema, createCartSchema, productListQuerySchema, updateCartItemSchema } from "@bazion/api-contracts";
 import { carts, cartItems, commerceStoreSettings, idempotencyRecords, orderItems, orders, paymentAttempts, products, webhookEvents } from "@bazion/database";
 import { withTenantTransaction, type TenantTransaction } from "../../lib/database.js";
 import type { AppConfig } from "../../config.js";
 import { resolveTenantId } from "../../lib/tenant-resolution.js";
 import { isTenantModuleEnabled } from "../../lib/tenant-modules.js";
 import { DarajaClient, DarajaRequestError, normalizeKenyanPhoneNumber } from "@bazion/payments";
-import { productListQuerySchema } from "./admin-policy.js";
 
 interface RouteOptions { config: AppConfig }
 
@@ -52,12 +51,12 @@ async function releaseOrderReservations(tx: TenantTransaction, tenantId: string,
     if (quantity <= 0) continue;
     const [locked] = await tx.select().from(products)
       .where(and(eq(products.id, row.product.id), eq(products.tenantId, tenantId))).for("update").limit(1);
-    if (!locked || locked.stockReserved < quantity || (consume && locked.stockOnHand < quantity)) {
+    if (!locked) {
       throw new Error("INVENTORY_RESERVATION_INVARIANT_FAILED");
     }
+    const balance = releaseStockReservation(locked, quantity, consume);
     await tx.update(products).set({
-      stockReserved: locked.stockReserved - quantity,
-      ...(consume ? { stockOnHand: locked.stockOnHand - quantity } : {}),
+      ...balance,
       updatedAt: new Date(),
     }).where(and(eq(products.id, locked.id), eq(products.tenantId, tenantId)));
     await tx.update(orderItems).set({ reservedQuantity: 0 })
@@ -215,7 +214,7 @@ export async function commerceRoutes(app: FastifyInstance, options: RouteOptions
       const [existing] = await tx.select().from(cartItems).where(and(eq(cartItems.cartId, cart.id), eq(cartItems.productId, product.id), eq(cartItems.tenantId, tenantId))).limit(1);
       const nextQuantity = (existing?.quantity ?? 0) + parsed.data.quantity;
       if (nextQuantity > 99) throw Object.assign(new Error("Maximum quantity per product is 99."), { statusCode: 400, code: "QUANTITY_LIMIT" });
-      if (product.stockTracked && product.stockOnHand - product.stockReserved < nextQuantity) {
+      if (product.stockTracked && !canReserveStock(product, nextQuantity)) {
         throw Object.assign(new Error("Insufficient available stock."), { statusCode: 409, code: "OUT_OF_STOCK" });
       }
       if (existing) {
@@ -246,7 +245,7 @@ export async function commerceRoutes(app: FastifyInstance, options: RouteOptions
       if (!item) throw Object.assign(new Error("Cart item not found."), { statusCode: 404, code: "ITEM_NOT_FOUND" });
       const [product] = await tx.select().from(products).where(and(eq(products.id, item.productId), eq(products.tenantId, tenantId))).limit(1);
       if (!product || !product.active) throw Object.assign(new Error("Product is no longer available."), { statusCode: 409, code: "PRODUCT_UNAVAILABLE" });
-      if (product.stockTracked && product.stockOnHand - product.stockReserved < parsed.data.quantity) throw Object.assign(new Error("Insufficient available stock."), { statusCode: 409, code: "OUT_OF_STOCK" });
+      if (product.stockTracked && !canReserveStock(product, parsed.data.quantity)) throw Object.assign(new Error("Insufficient available stock."), { statusCode: 409, code: "OUT_OF_STOCK" });
       await tx.update(cartItems).set({ quantity: parsed.data.quantity, unitPriceMinor: product.priceMinor, updatedAt: new Date() })
         .where(and(eq(cartItems.id, item.id), eq(cartItems.tenantId, tenantId)));
       const items = await tx.select({ id: cartItems.id, productId: cartItems.productId, quantity: cartItems.quantity,
@@ -350,7 +349,7 @@ export async function commerceRoutes(app: FastifyInstance, options: RouteOptions
           .where(and(eq(products.id, row.product.id), eq(products.tenantId, tenantId))).for("update").limit(1);
         if (!locked || !locked.active) throw Object.assign(new Error(`Product ${row.product.sku} is no longer available.`), { statusCode: 409, code: "PRODUCT_UNAVAILABLE" });
         if (locked.currency !== cart.currency) throw Object.assign(new Error("A product currency no longer matches the cart."), { statusCode: 409, code: "CURRENCY_MISMATCH" });
-        if (locked.stockTracked && locked.stockOnHand - locked.stockReserved < row.item.quantity) throw Object.assign(new Error(`Insufficient stock for ${locked.sku}.`), { statusCode: 409, code: "OUT_OF_STOCK" });
+        if (locked.stockTracked && !canReserveStock(locked, row.item.quantity)) throw Object.assign(new Error(`Insufficient stock for ${locked.sku}.`), { statusCode: 409, code: "OUT_OF_STOCK" });
         lockedProducts.push({ item: row.item, product: locked });
       }
 
@@ -376,7 +375,8 @@ export async function commerceRoutes(app: FastifyInstance, options: RouteOptions
           lineTotalMinor: product.priceMinor * item.quantity,
         });
         if (reservedQuantity > 0) {
-          await tx.update(products).set({ stockReserved: product.stockReserved + reservedQuantity, updatedAt: new Date() })
+          const balance = reserveStock(product, reservedQuantity);
+          await tx.update(products).set({ ...balance, updatedAt: new Date() })
             .where(and(eq(products.id, product.id), eq(products.tenantId, tenantId)));
         }
       }
@@ -439,12 +439,13 @@ export async function commerceRoutes(app: FastifyInstance, options: RouteOptions
               const [attempt] = await tx.select().from(paymentAttempts)
                 .where(and(eq(paymentAttempts.id, checkout.payment!.id), eq(paymentAttempts.tenantId, tenantId)))
                 .for("update").limit(1);
-              if (attempt?.status === "processing") {
-                await tx.update(paymentAttempts).set({ status: "failed", callbackTokenHash: null, updatedAt: new Date() })
+              const settlement = attempt ? planPaymentSettlement("pending_payment", attempt.status, false) : null;
+              if (attempt && settlement?.kind === "settle") {
+                await tx.update(paymentAttempts).set({ status: settlement.paymentStatus, callbackTokenHash: null, updatedAt: new Date() })
                   .where(and(eq(paymentAttempts.id, attempt.id), eq(paymentAttempts.tenantId, tenantId)));
-                await tx.update(orders).set({ status: "cancelled", updatedAt: new Date() })
+                await tx.update(orders).set({ status: settlement.orderStatus, updatedAt: new Date() })
                   .where(and(eq(orders.id, checkout.order!.id), eq(orders.tenantId, tenantId), eq(orders.status, "pending_payment")));
-                await releaseOrderReservations(tx, tenantId, checkout.order!.id, false);
+                await releaseOrderReservations(tx, tenantId, checkout.order!.id, settlement.consumeReservedStock);
               }
             });
             return reply.send({ orderId: checkout.order.id, orderNumber: checkout.order.orderNumber,
@@ -524,14 +525,15 @@ export async function commerceRoutes(app: FastifyInstance, options: RouteOptions
         .limit(1);
       if (!record) return reply.code(404).send({ error: "CALLBACK_NOT_FOUND" });
       const attempt = record.attempt;
-      if (attempt.status === "succeeded" || attempt.status === "failed" || attempt.status === "cancelled") {
+      const settlement = planPaymentSettlement(record.orderStatus, attempt.status, resultCode === 0);
+      if (settlement.kind === "duplicate") {
         return reply.send({ ResultCode: 0, ResultDesc: "Already processed" });
       }
       if ((attempt.checkoutRequestId && attempt.checkoutRequestId !== checkoutRequestId) ||
           (attempt.merchantRequestId && attempt.merchantRequestId !== merchantRequestId)) {
         return reply.code(409).send({ error: "CALLBACK_REFERENCE_MISMATCH" });
       }
-      if (record.orderStatus !== "pending_payment") return reply.code(409).send({ error: "ORDER_NOT_PAYABLE" });
+      if (settlement.kind === "order_not_payable") return reply.code(409).send({ error: "ORDER_NOT_PAYABLE" });
 
       if (resultCode === 0) {
         const amountMinor = Math.round(Number(metadata.get("Amount")) * 100);
@@ -545,11 +547,11 @@ export async function commerceRoutes(app: FastifyInstance, options: RouteOptions
           return reply.code(400).send({ error: "PAYMENT_CALLBACK_VALIDATION_FAILED" });
         }
 
-        await releaseOrderReservations(tx, tenantId, record.orderId, true);
-        await tx.update(orders).set({ status: "paid", updatedAt: new Date() })
+        await releaseOrderReservations(tx, tenantId, record.orderId, settlement.consumeReservedStock);
+        await tx.update(orders).set({ status: settlement.orderStatus, updatedAt: new Date() })
           .where(and(eq(orders.id, record.orderId), eq(orders.tenantId, tenantId), eq(orders.status, "pending_payment")));
         await tx.update(paymentAttempts).set({
-          status: "succeeded",
+          status: settlement.paymentStatus,
           providerReference: receipt.trim().slice(0, 160),
           checkoutRequestId,
           merchantRequestId,
@@ -557,11 +559,11 @@ export async function commerceRoutes(app: FastifyInstance, options: RouteOptions
           updatedAt: new Date(),
         }).where(and(eq(paymentAttempts.id, attempt.id), eq(paymentAttempts.tenantId, tenantId)));
       } else {
-        await releaseOrderReservations(tx, tenantId, record.orderId, false);
-        await tx.update(orders).set({ status: "cancelled", updatedAt: new Date() })
+        await releaseOrderReservations(tx, tenantId, record.orderId, settlement.consumeReservedStock);
+        await tx.update(orders).set({ status: settlement.orderStatus, updatedAt: new Date() })
           .where(and(eq(orders.id, record.orderId), eq(orders.tenantId, tenantId), eq(orders.status, "pending_payment")));
         await tx.update(paymentAttempts).set({
-          status: "failed",
+          status: settlement.paymentStatus,
           checkoutRequestId,
           merchantRequestId,
           updatedAt: new Date(),
@@ -571,7 +573,7 @@ export async function commerceRoutes(app: FastifyInstance, options: RouteOptions
         tenantId,
         provider: "mpesa",
         providerEventId: checkoutRequestId,
-        eventType: resultCode === 0 ? "payment.succeeded" : "payment.failed",
+        eventType: settlement.eventType,
       }).onConflictDoNothing();
       return reply.send({ ResultCode: 0, ResultDesc: "Accepted" });
     });
@@ -614,13 +616,15 @@ export async function commerceRoutes(app: FastifyInstance, options: RouteOptions
           .where(and(eq(paymentAttempts.orderId, order.id), eq(paymentAttempts.tenantId, tenantId), eq(paymentAttempts.provider, "mock")))
           .for("update").limit(1);
         if (!mockAttempt) return { kind: "invalid_state" as const };
+        const settlement = planPaymentSettlement(order.status, mockAttempt.status, true);
+        if (settlement.kind !== "settle") return { kind: "invalid_state" as const };
         const eventId = `mock_success_${order.id}`;
         const [existingEvent] = await tx.select().from(webhookEvents).where(and(eq(webhookEvents.tenantId, tenantId), eq(webhookEvents.provider, "mock"), eq(webhookEvents.providerEventId, eventId))).limit(1);
-        if (!existingEvent) await tx.insert(webhookEvents).values({ tenantId, provider: "mock", providerEventId: eventId, eventType: "payment.succeeded" });
-        await releaseOrderReservations(tx, tenantId, order.id, true);
-        await tx.update(orders).set({ status: "paid", updatedAt: new Date() })
+        if (!existingEvent) await tx.insert(webhookEvents).values({ tenantId, provider: "mock", providerEventId: eventId, eventType: settlement.eventType });
+        await releaseOrderReservations(tx, tenantId, order.id, settlement.consumeReservedStock);
+        await tx.update(orders).set({ status: settlement.orderStatus, updatedAt: new Date() })
           .where(and(eq(orders.id, order.id), eq(orders.tenantId, tenantId), eq(orders.status, "pending_payment")));
-        await tx.update(paymentAttempts).set({ status: "succeeded", updatedAt: new Date() }).where(and(eq(paymentAttempts.orderId, order.id), eq(paymentAttempts.tenantId, tenantId), eq(paymentAttempts.provider, "mock")));
+        await tx.update(paymentAttempts).set({ status: settlement.paymentStatus, updatedAt: new Date() }).where(and(eq(paymentAttempts.orderId, order.id), eq(paymentAttempts.tenantId, tenantId), eq(paymentAttempts.provider, "mock")));
         return { kind: "paid" as const, orderNumber: order.orderNumber };
       });
       if (outcome.kind === "not_found") return reply.code(404).send({ error: "ORDER_NOT_FOUND" });

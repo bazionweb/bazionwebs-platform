@@ -1,6 +1,10 @@
 {
   "version": "1.0.0",
   "status": "planned",
+  "readiness": "roadmap",
+  "readinessNotes": [
+    "This solution is a roadmap composition. Its required modules must be implemented and contract-validated before provisioning."
+  ],
   "id": "professional-services",
   "name": "Professional Services",
   "description": "Client acquisition and delivery workspace for consultants, agencies and appointment-based professionals.",

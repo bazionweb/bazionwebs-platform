@@ -31,11 +31,14 @@ A modular monolith keeps transactions, local development, deployment and debuggi
 - `apps/storefront`: customer-facing Next.js example.
 - `apps/admin`: Bazion platform-owner control plane; the current client workspace admin is /admin inside apps/storefront.
 - `packages/platform-contracts`: cross-cutting tenant/principal types.
-- `packages/api-contracts`: Zod schemas shared by clients and server.
+- `packages/api-contracts`: commerce request/response schemas shared by apps.
+- `packages/church-ministry-contracts`: ministry-owned request and site-settings schemas shared by storefront and API.
+- `packages/church-ministry-domain`: ministry use cases and domain rules behind repository ports; it does not import Fastify, Next.js, or the database adapter.
 - `packages/commerce-domain`: pure commerce rules such as money totals and product slug generation; no database or HTTP dependencies.
+- `packages/platform-identity`: provider-neutral tenant identity use cases and ports; the provisioning reconciler is its first extracted workflow.
 - `packages/database`: Drizzle schema, SQL migrations, seed and database helpers.
 - `packages/payments`: payment-provider port and normalized result types.
-- `packages/auth`: Better Auth runtime, sessions, organization membership, platform/client role checks and trusted tenant context.
+- `packages/auth`: Better Auth runtime, sessions, organization membership, platform/client role checks, trusted tenant context, and PostgreSQL adapters for platform identity ports.
 - `packages/ui`: shared design-system components.
 - `packages/notifications`: durable authentication email outbox, enqueue-only and delivery-worker database roles, and a separately supervised SMTP worker; SMS and operator-facing dead-letter tooling remain planned.
 - `packages/audit`: append-only audit-event contract and PostgreSQL writer for privileged platform and tenant administration actions.
