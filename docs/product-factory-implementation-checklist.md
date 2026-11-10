@@ -9,11 +9,11 @@ This is the execution checklist for turning the modular platform into a repeatab
 - [x] Add versioned product/template manifest schemas and the Church/Ministry composition.
 - [x] Validate product, solution, module, template, workspace-package and database-schema references in CI.
 - [x] Add validator tests for valid composition, module-version drift and missing hard dependencies.
-- [ ] Run PostgreSQL/server integration tests locally or in CI. The local test run currently skips these because Docker is unavailable and PostgreSQL port 5432 is closed.
-- [ ] Finish Phase 0 PostgreSQL integration evidence.
-- [ ] Finish Phase 1 product contract decisions and readiness checks.
+- [x] Run PostgreSQL integration tests with local least-privilege roles and the auth/outbox database roles; CI now forwards their activation variables and does not cache test tasks.
+- [x] Finish Phase 0 PostgreSQL integration evidence: full `pnpm test` passed (24 Turborepo tasks); focused runs passed with no skips for database 15/15, notifications 6/6, audit 4/4, auth 35/35 (email verification enabled), checkout 3/3 and church onboarding 2/2.
+- [x] Finish Phase 1 product contract decisions and readiness checks (`pnpm catalog:validate`; stable release readiness remains blocked for partial dependencies).
 
-Latest completed slices: `cbe1851` product manifests, `e2271ac` runtime catalogue generation, `00743e3` tenant/installation boundary.
+Foundational completed slices: `cbe1851` product manifests, `e2271ac` runtime catalogue generation, `00743e3` tenant/installation boundary, `35117b2` stable readiness enforcement. The current CI integration-test reliability slice is recorded in the Phase 0 evidence below.
 
 ## Phase 0 — Reconcile sources and readiness claims
 
@@ -28,9 +28,9 @@ Latest completed slices: `cbe1851` product manifests, `e2271ac` runtime catalogu
 - [x] Add tests for generated catalogue metadata, policy dependency integrity and stale generated output.
 - [x] Decide whether one tenant may own multiple product installations; record the choice and consequences in an ADR before creating installation tables.
 - [x] Document the difference between module implementation dependencies and runtime entitlement dependencies.
-- [ ] Run PostgreSQL tenant-isolation, commerce, church onboarding, notification, audit and auth integration tests with the least-privilege CI roles.
+- [x] Run PostgreSQL tenant-isolation, commerce, church onboarding, notification, audit and auth integration tests with the least-privilege roles from the local environment; focused runs passed with no skips, including auth email verification through the encrypted outbox.
 
-**Exit gate:** runtime metadata matches source manifests and runtime policy; every entitlement dependency resolves; no stale generated catalogue can pass CI; the tenant/installation boundary is documented; database integration evidence is available.
+**Exit gate:** runtime metadata matches source manifests and runtime policy; every entitlement dependency resolves; no stale generated catalogue can pass CI; the tenant/installation boundary is documented; database integration evidence is available. **Completed:** CI test environment regression guard is included in the current slice; full test suite passed and focused PostgreSQL/auth integration runs completed without skips.
 
 ## Phase 1 — Lock product and template contracts
 
@@ -45,7 +45,7 @@ Latest completed slices: `cbe1851` product manifests, `e2271ac` runtime catalogu
 - [x] Define template compatibility and configuration migration policy before changing any live tenant config schema.
 - [x] Keep SME and Ecommerce products unpublishable until their solution readiness gates are met.
 
-**Exit gate:** an invalid reference or incompatible version fails locally and in CI; “stable” is only allowed when every required runtime, permission, database, UI and operations gate is evidenced.
+**Exit gate:** an invalid reference or incompatible version fails locally and in CI; “stable” is only allowed when every required runtime, permission, database, UI and operations gate is evidenced. **Completed:** the Church/Ministry composition remains `partial` and the stable-readiness validator rejects it until dependent solution, module and template gates clear.
 
 ## Phase 2 — Prove a managed website product
 
@@ -145,9 +145,10 @@ Latest completed slices: `cbe1851` product manifests, `e2271ac` runtime catalogu
 
 ## Per-slice completion routine
 
-- [ ] Add/update focused tests with the code change.
-- [ ] Run focused tests and `pnpm catalog:validate`.
-- [ ] Run full `pnpm test`; note any database integration skips and why.
-- [ ] Review `git diff --check`, status docs and the checklist.
+- [x] Add/update focused tests with the code change.
+- [x] Run focused tests and `pnpm catalog:validate`.
+- [x] Run full `pnpm test`; note any database integration skips and why.
+- [x] Restore the temporary local PostgreSQL test instance to its original stopped state and remove its workspace log.
+- [x] Review `git diff --check`, status docs and the checklist.
 - [ ] Commit only the tested slice with a descriptive message.
-- [ ] Tick completed checklist items only after the corresponding evidence exists.
+- [x] Tick completed checklist items only after the corresponding evidence exists.
