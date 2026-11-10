@@ -1,0 +1,180 @@
+.bw-site-nav {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  border-bottom: 1px solid var(--bw-color-border);
+  background: color-mix(in srgb, var(--bw-color-canvas) 96%, transparent);
+  backdrop-filter: blur(14px);
+}
+
+.bw-site-nav-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 76px;
+  gap: var(--bw-space-4);
+}
+
+.bw-site-nav-brand {
+  display: flex;
+  align-items: center;
+  gap: var(--bw-space-3);
+  min-width: 0;
+  color: var(--bw-color-brand);
+  text-decoration: none;
+}
+
+.bw-site-nav-logo {
+  width: auto;
+  height: 44px;
+  object-fit: contain;
+}
+
+.bw-site-nav-title {
+  overflow: hidden;
+  font-family: var(--bw-font-display);
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bw-site-nav-links {
+  display: flex;
+  align-items: center;
+  gap: var(--bw-space-6);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.bw-site-nav-link {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 8px 4px;
+  color: var(--bw-color-text);
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: color var(--bw-motion-standard) var(--bw-ease-standard);
+}
+
+.bw-site-nav-link::after {
+  position: absolute;
+  right: 0;
+  bottom: 4px;
+  left: 0;
+  height: 2px;
+  background: var(--bw-color-accent);
+  content: "";
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform var(--bw-motion-standard) var(--bw-ease-standard);
+}
+
+.bw-site-nav-link:hover,
+.bw-site-nav-link.active { color: var(--bw-color-brand); }
+.bw-site-nav-link.active::after,
+.bw-site-nav-link:hover::after,
+.bw-site-nav-link:focus-visible::after { transform: scaleX(1); }
+
+.bw-site-nav-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--bw-space-3);
+}
+
+.bw-site-nav-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 10px 20px;
+  border: 1px solid transparent;
+  border-radius: var(--bw-radius-pill);
+  background: var(--bw-color-accent);
+  color: var(--bw-color-surface);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.4;
+  text-align: center;
+  text-decoration: none;
+  transition: background-color var(--bw-motion-fast) var(--bw-ease-standard), transform var(--bw-motion-fast) var(--bw-ease-standard);
+}
+
+.bw-site-nav-action:hover {
+  background: var(--bw-color-accent-hover, var(--bw-color-brand-hover));
+  transform: translateY(-1px);
+}
+
+.bw-site-nav-toggle {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 8px;
+  border: 0;
+  background: transparent;
+  color: var(--bw-color-brand);
+  font: inherit;
+  font-size: 20px;
+  cursor: pointer;
+}
+
+.bw-site-nav-mobile { display: none; }
+
+.bw-site-nav-skip {
+  position: absolute;
+  z-index: 200;
+  top: 8px;
+  left: 8px;
+  padding: 12px 16px;
+  border-radius: var(--bw-radius-md);
+  background: var(--bw-color-canvas);
+  color: var(--bw-color-brand);
+  transform: translateY(-150%);
+  transition: transform var(--bw-motion-fast) var(--bw-ease-standard);
+}
+
+.bw-site-nav-skip:focus { transform: translateY(0); }
+
+.bw-site-nav a:focus-visible,
+.bw-site-nav button:focus-visible {
+  outline: 3px solid var(--bw-color-accent);
+  outline-offset: 3px;
+}
+
+@media (max-width: 1120px) {
+  .bw-site-nav-links { display: none; }
+  .bw-site-nav-inner > nav { display: none; }
+  .bw-site-nav-actions > .bw-site-nav-action--desktop { display: none; }
+  .bw-site-nav-toggle { display: inline-flex; }
+  .bw-site-nav-mobile:not([hidden]) {
+    display: flex;
+    flex-direction: column;
+    gap: var(--bw-space-2);
+    padding: var(--bw-space-4) 24px var(--bw-space-6);
+    border-bottom: 1px solid var(--bw-color-border);
+    background: var(--bw-color-surface);
+    animation: bw-site-nav-enter 160ms ease-out both;
+  }
+  .bw-site-nav-mobile .bw-site-nav-link { font-size: 16px; }
+  .bw-site-nav-action--mobile { width: 100%; margin-top: var(--bw-space-2); }
+}
+
+@keyframes bw-site-nav-enter {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bw-site-nav,
+  .bw-site-nav *,
+  .bw-site-nav-mobile { animation: none !important; transition: none !important; }
+  .bw-site-nav-action:hover { transform: none; }
+}

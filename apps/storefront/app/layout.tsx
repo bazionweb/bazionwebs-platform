@@ -3,6 +3,7 @@ import "./globals.css";
 import "./recovery.css";
 import "@bazion/ui/tokens.css";
 import "@bazion/ui/primitives.css";
+import "@bazion/ui/navigation.css";
 import "@bazion/ui/church.css";
 import { SiteThemeProvider } from "../lib/site-theme-provider";
 import { fetchTenantPublicData, getTenantRequestContext } from "../lib/server-tenant-api";

@@ -12,6 +12,7 @@
     },
     "./tokens.css": "./src/tokens.css",
     "./primitives.css": "./src/primitives.css",
+    "./navigation.css": "./src/navigation.css",
     "./church.css": "./src/church.css"
   },
   "scripts": {
