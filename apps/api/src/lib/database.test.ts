@@ -143,10 +143,7 @@ describe("tenant database routing", () => {
     expect(mockState.pools.at(-1)?.end).toHaveBeenCalledOnce();
   });
 
-  it.each([
-    "0014_global_mission_commerce_entitlement.sql",
-    "0015_commerce_inventory_reservation_guard.sql",
-  ])("rejects a dedicated database missing required migration %s", async (missingMigration) => {
+  it.each(requiredDatabaseMigrations)("rejects a dedicated database missing required migration %s", async (missingMigration) => {
     activeTenant({
       tier: "dedicated",
       state: "ready",
