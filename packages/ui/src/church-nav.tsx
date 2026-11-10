@@ -12,7 +12,7 @@ export interface ChurchNavProps {
   logoUrl?: string;
   currentPath?: string;
   links?: NavLinkItem[];
-  giveHref?: string;
+  giveHref?: string | null;
   giveLabel?: string;
 }
 
@@ -77,9 +77,7 @@ export function ChurchNav({
           </nav>
 
           <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-            <a href={giveHref} className="ch-btn ch-btn-accent">
-              {giveLabel}
-            </a>
+            {giveHref !== null && <a href={giveHref} className="ch-btn ch-btn-accent">{giveLabel}</a>}
             <button
               ref={mobileToggleRef}
               type="button"
@@ -114,14 +112,12 @@ export function ChurchNav({
               </a>
             );
           })}
-          <a
+          {giveHref !== null && <a
             href={giveHref}
             className="ch-btn ch-btn-accent"
             style={{ width: "100%", marginTop: "12px" }}
             onClick={() => setMobileMenuOpen(false)}
-          >
-            {giveLabel}
-          </a>
+          >{giveLabel}</a>}
         </nav>
       )}
     </header>

@@ -14,8 +14,9 @@ export default function TermsPage() {
       <ChurchNav
         ministryName={site.ministryName}
         logoUrl={site.branding.logoUrl}
+        links={site.navigation}
         currentPath="/terms"
-        giveHref="/give"
+        giveHref={site.pages.some((page) => page.id === "giving" && page.enabled) ? "/give" : null}
       />
 
       <main id="main-content">

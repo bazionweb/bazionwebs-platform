@@ -52,6 +52,11 @@ const permissionRegistry = readJson("products/permissions.json");
 if (!productSchema || !templateSchema || !catalog || !permissionRegistry) process.exit(1);
 
 const packagesByName = new Map();
+const rootTemplatePackage = "templates/package.json";
+if (existsSync(join(root, rootTemplatePackage))) {
+  const pkg = readJson(rootTemplatePackage);
+  if (pkg?.name) packagesByName.set(pkg.name, { path: rootTemplatePackage, manifest: pkg });
+}
 for (const workspaceRoot of ["apps", "packages"]) {
   for (const directory of directories(workspaceRoot)) {
     const packagePath = `${workspaceRoot}/${directory.name}/package.json`;

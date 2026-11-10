@@ -6,7 +6,35 @@ import {
   websiteNavigationSchema,
   websitePagesSchema,
   websiteSeoSchema,
+  type WebsiteNavigation,
+  type WebsitePages,
 } from "@bazion/website-contracts";
+
+export { getPublicWebsiteNavigation, websitePageSectionSchema } from "@bazion/website-contracts";
+
+export const defaultChurchNavigation: WebsiteNavigation = [
+  { id: "home", label: "Home", href: "/" },
+  { id: "visit", label: "Visit", href: "/visit" },
+  { id: "ministries", label: "Ministries", href: "/ministries" },
+  { id: "about", label: "About", href: "/about" },
+  { id: "sermons", label: "Sermons", href: "/sermons" },
+  { id: "events", label: "Events", href: "/events" },
+  { id: "contact", label: "Contact", href: "/contact" },
+];
+
+export const defaultChurchPages: WebsitePages = [
+  { id: "home", path: "/", title: "Home", enabled: true, sections: ["hero", "text", "events", "testimonials", "call-to-action"] },
+  { id: "about", path: "/about", title: "About", enabled: true, sections: ["hero", "text", "feature-list", "call-to-action"] },
+  { id: "visit", path: "/visit", title: "Plan a Visit", enabled: true, sections: ["hero", "text", "feature-list", "call-to-action"] },
+  { id: "ministries", path: "/ministries", title: "Ministries", enabled: true, sections: ["hero", "card-grid", "call-to-action"] },
+  { id: "sermons", path: "/sermons", title: "Sermons", enabled: true, sections: ["hero", "media"] },
+  { id: "events", path: "/events", title: "Events", enabled: true, sections: ["hero", "events"] },
+  { id: "gallery", path: "/gallery", title: "Gallery", enabled: true, sections: ["hero", "gallery"] },
+  { id: "giving", path: "/give", title: "Giving", enabled: true, sections: ["hero", "text", "call-to-action"] },
+  { id: "contact", path: "/contact", title: "Contact", enabled: true, sections: ["hero", "text", "contact-form"] },
+  { id: "privacy", path: "/privacy", title: "Privacy", enabled: true, sections: ["text"] },
+  { id: "terms", path: "/terms", title: "Terms", enabled: true, sections: ["text"] },
+];
 
 const publicHttpsUrlSchema = z.string().trim().max(2048).refine((value) => {
   if (value.startsWith("/") && !value.startsWith("//")) return true;
@@ -127,28 +155,8 @@ export const churchPublicSiteSettingsSchema = z.object({
     secondaryColor: "#315e50",
     accentColor: "#8b5b29",
   }),
-  navigation: websiteNavigationSchema.default([
-    { id: "home", label: "Home", href: "/" },
-    { id: "visit", label: "Visit", href: "/visit" },
-    { id: "ministries", label: "Ministries", href: "/ministries" },
-    { id: "about", label: "About", href: "/about" },
-    { id: "sermons", label: "Sermons", href: "/sermons" },
-    { id: "events", label: "Events", href: "/events" },
-    { id: "contact", label: "Contact", href: "/contact" },
-  ]),
-  pages: websitePagesSchema.default([
-    { id: "home", path: "/", title: "Home", enabled: true, sections: ["hero", "text", "events", "testimonials", "call-to-action"] },
-    { id: "about", path: "/about", title: "About", enabled: true, sections: ["hero", "text", "feature-list", "call-to-action"] },
-    { id: "visit", path: "/visit", title: "Plan a Visit", enabled: true, sections: ["hero", "text", "feature-list", "call-to-action"] },
-    { id: "ministries", path: "/ministries", title: "Ministries", enabled: true, sections: ["hero", "card-grid", "call-to-action"] },
-    { id: "sermons", path: "/sermons", title: "Sermons", enabled: true, sections: ["hero", "media"] },
-    { id: "events", path: "/events", title: "Events", enabled: true, sections: ["hero", "events"] },
-    { id: "gallery", path: "/gallery", title: "Gallery", enabled: true, sections: ["hero", "gallery"] },
-    { id: "giving", path: "/give", title: "Giving", enabled: true, sections: ["hero", "text", "call-to-action"] },
-    { id: "contact", path: "/contact", title: "Contact", enabled: true, sections: ["hero", "text", "contact-form"] },
-    { id: "privacy", path: "/privacy", title: "Privacy", enabled: true, sections: ["text"] },
-    { id: "terms", path: "/terms", title: "Terms", enabled: true, sections: ["text"] },
-  ]),
+  navigation: websiteNavigationSchema.default(defaultChurchNavigation),
+  pages: websitePagesSchema.default(defaultChurchPages),
   hero: z.object({
     eyebrow: z.string().trim().max(100).default("WELCOME"),
     title: z.string().trim().max(120).default("A place to belong"),

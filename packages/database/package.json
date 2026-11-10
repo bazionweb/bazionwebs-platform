@@ -21,6 +21,7 @@
     "preflight": "tsx src/production-preflight.ts"
   },
   "dependencies": {
+    "@bazion/church-ministry-template": "workspace:*",
     "drizzle-orm": "^0.45.4",
     "pg": "^8.23.1"
   },

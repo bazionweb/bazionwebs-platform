@@ -95,7 +95,7 @@ export function EventDetail({ slug }: { slug: string }) {
   }).replace(/</g, "\\u003c") : null;
 
   return <>
-    <ChurchNav ministryName={site.ministryName} logoUrl={site.branding.logoUrl} currentPath="/events" giveHref="/give" />
+    <ChurchNav ministryName={site.ministryName} logoUrl={site.branding.logoUrl} links={site.navigation} currentPath="/events" giveHref={site.pages.some((page) => page.id === "giving" && page.enabled) ? "/give" : null} />
     {loading ? <main id="main-content" className="ch-section ch-container"><p role="status">Loading event…</p></main>
       : loadError || !event ? <main id="main-content" className="ch-section ch-container"><h1>Event unavailable</h1><p role="alert">{loadError || "This event is not available."}</p><a className="ch-btn ch-btn-outline" href="/events">Browse events</a></main>
         : <main id="main-content">

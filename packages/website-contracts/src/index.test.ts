@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   WEBSITE_CONFIGURATION_VERSION,
+  getPublicWebsiteNavigation,
   websiteConfigurationSchema,
   websitePageSectionSchema,
 } from "./index.js";
@@ -71,6 +72,33 @@ describe("versioned website configuration", () => {
         { id: "about", path: "/about", title: "About", enabled: false, sections: ["text"] },
       ],
     }).success).toBe(false);
+  });
+
+  it("keeps external links and published pages while hiding unpublished and unconfigured destinations", () => {
+    const navigation = [
+      { id: "home", label: "Home", href: "/" },
+      { id: "about", label: "About", href: "/about" },
+      { id: "contact", label: "Contact", href: "/contact" },
+      { id: "partner", label: "Partner", href: "https://partner.example.org" },
+    ];
+    const pages = [
+      { id: "home", path: "/", title: "Home", enabled: true, sections: ["hero"] as const },
+      { id: "about", path: "/about", title: "About", enabled: false, sections: ["text"] as const },
+    ];
+
+    expect(getPublicWebsiteNavigation(navigation, pages).map(({ id }) => id)).toEqual(["home", "partner"]);
+  });
+
+  it("drops unsafe navigation destinations even when called with unparsed input", () => {
+    const navigation = [
+      { id: "home", label: "Home", href: "/" },
+      { id: "script", label: "Unsafe", href: "javascript:alert(1)" },
+      { id: "insecure", label: "Insecure", href: "http://example.org" },
+      { id: "protocol-relative", label: "Protocol relative", href: "//example.org" },
+    ];
+    const pages = [{ id: "home", path: "/", title: "Home", enabled: true, sections: ["hero"] as const }];
+
+    expect(getPublicWebsiteNavigation(navigation, pages).map(({ id }) => id)).toEqual(["home"]);
   });
 
   it("rejects unsupported schema versions and oversized site maps", () => {

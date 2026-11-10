@@ -1,3 +1,5 @@
+import type { ChurchPublicSiteSettings } from "@bazion/church-ministry-contracts";
+
 export interface MinistryConfig {
   tenantSlug: string;
   ministryName: string;
@@ -29,6 +31,8 @@ export interface MinistryConfig {
     twitter?: string;
     whatsapp?: string;
   };
+  navigation: ChurchPublicSiteSettings["navigation"];
+  pages: ChurchPublicSiteSettings["pages"];
   statistics: Array<{
     label: string;
     value: number | string;

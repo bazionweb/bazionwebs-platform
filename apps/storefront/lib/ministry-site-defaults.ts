@@ -1,5 +1,5 @@
-import type { MinistryConfig } from "../../../templates/church.types";
-import { globalMissionConfig } from "../../../templates/global-mission.config";
+import { defaultChurchNavigation, defaultChurchPages } from "@bazion/church-ministry-contracts";
+import { globalMissionConfig, type MinistryConfig } from "@bazion/church-ministry-template";
 
 /** Neutral defaults for a ministry tenant that has not configured its public site yet. */
 export const neutralMinistrySite: MinistryConfig = {
@@ -20,6 +20,8 @@ export const neutralMinistrySite: MinistryConfig = {
   },
   contact: { phones: [], email: "", address: "" },
   social: {},
+  navigation: defaultChurchNavigation,
+  pages: defaultChurchPages,
   statistics: [],
   giving: { mpesaPaybill: "", accountName: "", instructions: "", suggestedAmounts: [] },
   serviceTimes: [],

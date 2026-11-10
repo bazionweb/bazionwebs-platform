@@ -55,7 +55,7 @@ export default function SermonsPage() {
   const featuredSermon = sermons[0];
 
   return <>
-    <ChurchNav ministryName={site.ministryName} logoUrl={site.branding.logoUrl} currentPath="/sermons" giveHref="/give" />
+    <ChurchNav ministryName={site.ministryName} logoUrl={site.branding.logoUrl} links={site.navigation} currentPath="/sermons" giveHref={site.pages.some((page) => page.id === "giving" && page.enabled) ? "/give" : null} />
     <main id="main-content">
       <PageHero eyebrow="ONLINE MINISTRY ARCHIVE" title="Sermons & Spiritual" highlightedTitle="Teachings" subtitle="Browse messages published by this ministry." bgImageUrl={site.branding.heroBgUrl} />
       {featuredSermon && <section className="ch-section ch-section-alt"><div className="ch-container">

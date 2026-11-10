@@ -56,7 +56,7 @@ export function SermonDetail({ slug }: { slug: string }) {
   }, [sermon, site.ministryName]);
 
   return <>
-    <ChurchNav ministryName={site.ministryName} logoUrl={site.branding.logoUrl} currentPath="/sermons" giveHref="/give" />
+    <ChurchNav ministryName={site.ministryName} logoUrl={site.branding.logoUrl} links={site.navigation} currentPath="/sermons" giveHref={site.pages.some((page) => page.id === "giving" && page.enabled) ? "/give" : null} />
     {loading ? <main id="main-content" className="ch-section ch-container"><p role="status">Loading sermon…</p></main>
       : !sermon ? <main id="main-content" className="ch-section ch-container"><h1>Sermon unavailable</h1><p role="alert">{error || "This sermon is not available."}</p><a className="ch-btn ch-btn-outline" href="/sermons">Browse sermons</a></main>
         : <main id="main-content">

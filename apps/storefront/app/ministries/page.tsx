@@ -7,7 +7,7 @@ export default function MinistriesPage() {
   const site = useMinistrySite();
 
   return <>
-    <ChurchNav ministryName={site.ministryName} logoUrl={site.branding.logoUrl} currentPath="/ministries" giveHref="/give" />
+    <ChurchNav ministryName={site.ministryName} logoUrl={site.branding.logoUrl} links={site.navigation} currentPath="/ministries" giveHref={site.pages.some((page) => page.id === "giving" && page.enabled) ? "/give" : null} />
     <main id="main-content">
       <PageHero
         eyebrow="FIND YOUR PLACE"

@@ -1,4 +1,5 @@
 import type { MinistryConfig } from "./church.types.js";
+import { defaultChurchNavigation, defaultChurchPages } from "@bazion/church-ministry-contracts";
 
 export const globalMissionConfig: MinistryConfig = {
   tenantSlug: "global-mission-fc",
@@ -31,6 +32,8 @@ export const globalMissionConfig: MinistryConfig = {
     twitter: "https://twitter.com/globalmissionfc",
     whatsapp: "https://wa.me/254721341793",
   },
+  navigation: defaultChurchNavigation,
+  pages: defaultChurchPages,
   statistics: [
     { label: "Souls reached", value: 34200, suffix: "+" },
     { label: "Annual conferences", value: 5 },

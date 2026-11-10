@@ -3,7 +3,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Pool } from "pg";
 import { mapGlobalMissionEvents, type SourceEvent } from "../src/global-mission-migration.js";
-import { globalMissionConfig } from "../../../templates/global-mission.config.js";
+import { globalMissionConfig } from "@bazion/church-ministry-template";
 
 const args = process.argv.slice(2);
 const apply = args.includes("--apply");

@@ -11,7 +11,7 @@ import {
   Modal,
   StatsCounter,
 } from "@bazion/ui";
-import { globalMissionConfig } from "../../../templates/global-mission.config";
+import { globalMissionConfig } from "@bazion/church-ministry-template";
 import { EventCalendarButton } from "./events/event-calendar-button";
 import { useMinistrySite } from "../lib/use-ministry-site";
 
@@ -105,8 +105,9 @@ export default function ChurchHomePage() {
       <ChurchNav
         ministryName={site.ministryName}
         logoUrl={site.branding.logoUrl}
+        links={site.navigation}
         currentPath="/"
-        giveHref="/give"
+        giveHref={site.pages.some((page) => page.id === "giving" && page.enabled) ? "/give" : null}
         giveLabel="Give to the Mission"
       />
 

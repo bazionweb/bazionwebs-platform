@@ -115,6 +115,32 @@ export const websitePagesSchema = z.array(websitePageSchema).max(24)
   });
 export type WebsitePages = z.infer<typeof websitePagesSchema>;
 
+function getNavigationTarget(href: string): { kind: "internal"; path: string } | { kind: "external" } | undefined {
+  if (isSafeSitePath(href)) {
+    return { kind: "internal", path: new URL(href, "https://website.invalid").pathname };
+  }
+  try {
+    const url = new URL(href);
+    if (url.protocol === "https:" && !url.username && !url.password) return { kind: "external" };
+  } catch {
+    return undefined;
+  }
+  return undefined;
+}
+
+/** Removes internal navigation entries whose page is not published for this site. */
+export function getPublicWebsiteNavigation(
+  navigation: readonly WebsiteNavigationItem[],
+  pages: readonly WebsitePage[],
+): WebsiteNavigationItem[] {
+  const publishedPaths = new Set(pages.filter((page) => page.enabled).map((page) => page.path));
+  return navigation.filter((item) => {
+    const target = getNavigationTarget(item.href);
+    if (!target) return false;
+    return target.kind === "external" || publishedPaths.has(target.path);
+  });
+}
+
 export const defaultWebsiteNavigation: WebsiteNavigation = [
   { id: "home", label: "Home", href: "/" },
   { id: "about", label: "About", href: "/about" },
@@ -142,9 +168,9 @@ export const websiteConfigurationSchema = z.object({
 }).strict().superRefine((configuration, context) => {
   const pagesByPath = new Map(configuration.pages.map((page) => [page.path, page]));
   configuration.navigation.forEach((item, index) => {
-    if (!isSafeSitePath(item.href)) return;
-    const path = new URL(item.href, "https://website.invalid").pathname;
-    const page = pagesByPath.get(path);
+    const target = getNavigationTarget(item.href);
+    if (!target || target.kind === "external") return;
+    const page = pagesByPath.get(target.path);
     if (!page) {
       context.addIssue({ code: "custom", message: "Navigation must target a configured page.", path: ["navigation", index, "href"] });
     } else if (!page.enabled) {

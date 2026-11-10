@@ -54,8 +54,9 @@ export default function ContactPage() {
       <ChurchNav
         ministryName={site.ministryName}
         logoUrl={site.branding.logoUrl}
+        links={site.navigation}
         currentPath="/contact"
-        giveHref="/give"
+        giveHref={site.pages.some((page) => page.id === "giving" && page.enabled) ? "/give" : null}
       />
 
       <main id="main-content">

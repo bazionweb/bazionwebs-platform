@@ -8,7 +8,7 @@ export default function VisitPage() {
   const hasVisitorDetails = Boolean(site.serviceTimes.length || site.locations.length || Object.values(site.visitorInfo).some((value) => value.trim()));
 
   return <>
-    <ChurchNav ministryName={site.ministryName} logoUrl={site.branding.logoUrl} currentPath="/visit" giveHref="/give" />
+    <ChurchNav ministryName={site.ministryName} logoUrl={site.branding.logoUrl} links={site.navigation} currentPath="/visit" giveHref={site.pages.some((page) => page.id === "giving" && page.enabled) ? "/give" : null} />
     <main id="main-content">
       <PageHero
         eyebrow="YOU ARE WELCOME HERE"

@@ -15,7 +15,7 @@ export default function GalleryPage() {
   }
 
   return <>
-    <ChurchNav ministryName={site.ministryName} logoUrl={site.branding.logoUrl} currentPath="/gallery" giveHref="/give" />
+    <ChurchNav ministryName={site.ministryName} logoUrl={site.branding.logoUrl} links={site.navigation} currentPath="/gallery" giveHref={site.pages.some((page) => page.id === "giving" && page.enabled) ? "/give" : null} />
     <main id="main-content">
       <PageHero eyebrow="STORIES FROM OUR COMMUNITY" title="Our" highlightedTitle="Gallery" subtitle="Photos and moments shared by this ministry." bgImageUrl={site.branding.heroBgUrl} />
       <section className="ch-section">

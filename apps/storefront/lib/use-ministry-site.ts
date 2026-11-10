@@ -1,9 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { ChurchPublicSiteSettings } from "@bazion/church-ministry-contracts";
-import { globalMissionConfig } from "../../../templates/global-mission.config";
-import type { MinistryConfig } from "../../../templates/church.types";
+import { getPublicWebsiteNavigation, type ChurchPublicSiteSettings } from "@bazion/church-ministry-contracts";
+import { globalMissionConfig, type MinistryConfig } from "@bazion/church-ministry-template";
 import { getMinistrySiteFallback, neutralMinistrySite } from "./ministry-site-defaults";
 
 interface SiteResponse {
@@ -96,6 +95,7 @@ export function useMinistrySite(): MinistryConfig {
       const settings = data.siteSettings;
       const isGlobalMission = data.tenant?.slug === globalMissionConfig.tenantSlug;
       const fallback = getMinistrySiteFallback(data.tenant);
+      const pages = settings?.pages ?? fallback.pages;
       const phones = Array.isArray(profile?.telephoneNumbers)
         ? profile.telephoneNumbers.filter((phone): phone is string => typeof phone === "string" && phone.trim().length > 0)
         : fallback.contact.phones;
@@ -130,6 +130,8 @@ export function useMinistrySite(): MinistryConfig {
           address: profile?.address?.trim() || fallback.contact.address,
         },
         social: { ...fallback.social, ...social, ...(whatsapp ? { whatsapp } : {}) },
+        navigation: getPublicWebsiteNavigation(settings?.navigation ?? fallback.navigation, pages),
+        pages,
         giving: settings ? settings.giving : fallback.giving,
         serviceTimes: settings?.serviceTimes ?? fallback.serviceTimes,
         locations: settings?.locations ?? fallback.locations,

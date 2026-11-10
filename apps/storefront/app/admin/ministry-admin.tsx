@@ -5,7 +5,7 @@ import { authClient } from "@bazion/auth/client";
 import { SiteSettingsEditor } from "./site-settings-editor";
 import { MediaUploadField } from "./media-upload-field";
 import { apiErrorMessage } from "../../lib/api-error";
-import { globalMissionConfig } from "../../../../templates/global-mission.config";
+import { globalMissionConfig } from "@bazion/church-ministry-template";
 import { slugifyContentTitle } from "@bazion/church-ministry-domain";
 
 type Tab = "overview" | "site" | "sermons" | "events" | "campaigns" | "registrations" | "donations" | "messages" | "prayers" | "newsletter";

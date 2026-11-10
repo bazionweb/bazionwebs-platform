@@ -14,8 +14,9 @@ export default function PrivacyPolicyPage() {
       <ChurchNav
         ministryName={site.ministryName}
         logoUrl={site.branding.logoUrl}
+        links={site.navigation}
         currentPath="/privacy"
-        giveHref="/give"
+        giveHref={site.pages.some((page) => page.id === "giving" && page.enabled) ? "/give" : null}
       />
 
       <main id="main-content">

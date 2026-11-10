@@ -16,6 +16,8 @@ describe("neutral ministry site defaults", () => {
       accentColor: "#c99a43",
     });
     expect(neutralMinistrySite.contact).toEqual({ phones: [], email: "", address: "" });
+    expect(neutralMinistrySite.navigation.map(({ href }) => href)).toContain("/contact");
+    expect(neutralMinistrySite.pages.find(({ id }) => id === "home")?.sections).toContain("hero");
   });
 
   it("applies a tenant's public identity without carrying another tenant's content", () => {

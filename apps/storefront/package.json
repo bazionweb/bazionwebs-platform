@@ -17,6 +17,7 @@
     "@bazion/api-contracts": "workspace:*",
     "@bazion/church-ministry-contracts": "workspace:*",
     "@bazion/church-ministry-domain": "workspace:*",
+    "@bazion/church-ministry-template": "workspace:*",
     "@bazion/auth": "workspace:*",
     "@bazion/ui": "workspace:*"
   },
