@@ -61,7 +61,21 @@ export default function SermonsPage() {
       {featuredSermon && <section className="ch-section ch-section-alt"><div className="ch-container">
         <div className="ch-heading-wrap"><span className="ch-eyebrow">Latest Message</span><h2 className="ch-title">{featuredSermon.title}</h2><p className="ch-subtitle">By {featuredSermon.speaker} • {sermonDate(featuredSermon)}{featuredSermon.scriptureReference ? ` • ${featuredSermon.scriptureReference}` : ""}</p></div>
         {featuredSermon.youtubeVideoId ? <div style={{ maxWidth: 800, margin: "0 auto" }}>
-          <div style={{ position: "relative", paddingBottom: "56.25%", height: 0, borderRadius: "var(--church-radius-lg)", overflow: "hidden" }}><iframe src={`https://www.youtube.com/embed/${encodeURIComponent(featuredSermon.youtubeVideoId)}`} title={featuredSermon.title} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", border: 0 }} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen /></div>
+          <button
+            type="button"
+            className="ch-sermon-featured-video"
+            aria-label={"Play latest message: " + featuredSermon.title}
+            onClick={() => setActiveVideo({ title: featuredSermon.title, youtubeVideoId: featuredSermon.youtubeVideoId ?? undefined })}
+          >
+            <img
+              src={featuredSermon.thumbnailUrl || "https://img.youtube.com/vi/" + encodeURIComponent(featuredSermon.youtubeVideoId) + "/hqdefault.jpg"}
+              alt=""
+              loading="lazy"
+              decoding="async"
+            />
+            <span className="ch-sermon-featured-play" aria-hidden="true">▶</span>
+            <span className="ch-sermon-featured-label" aria-hidden="true">Watch the latest message</span>
+          </button>
           {featuredSermon.description && <p style={{ textAlign: "center", lineHeight: 1.7 }}>{featuredSermon.description}</p>}
         </div> : <p className="ch-container">Video details have not been published for this message.</p>}
       </div></section>}
