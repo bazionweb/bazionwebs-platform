@@ -75,5 +75,5 @@ The API records an append-only platform audit event before calling Dokploy. If t
 
 - The provider adapter creates one Dokploy Compose resource per tenant/template naming convention and preserves persistent volumes when deleting a resource.
 - An ambiguous create result without a saved provider resource ID is held for reconciliation; the API does not blindly create a second resource.
-- This endpoint is synchronous through the Dokploy create/deploy request. A background status reconciler, rollback workflow, and deployment history UI are separate follow-on work.
+- This endpoint is synchronous through the Dokploy create/deploy request. The Superadmin tenant detail page shows deployment records and recent events. A separate inspect-only background status reconciler is documented in [hosting-reconciler.md](../hosting-reconciler.md). A rollback workflow and safe discovery of ambiguous create results without a persisted resource ID remain future work.
 - Enabling the API route does not deploy existing tenants or contact Dokploy until a platform owner explicitly calls the endpoint.
