@@ -1,7 +1,9 @@
 import Fastify from "fastify";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { hostingRoutes } from "./routes.js";
+import type { TenantHostingTemplate } from "@bazion/platform-contracts";
 import type { HostingProvisioningRuntime } from "./runtime.js";
+import type { LoadedTenantHostingTemplate } from "./templates.js";
 
 const mocks = vi.hoisted(() => ({
   requirePlatformRole: vi.fn(),
@@ -29,7 +31,7 @@ const reference = {
 function makeRuntime(): HostingProvisioningRuntime {
   return {
     providerId: "dokploy",
-    loadTemplate: vi.fn(async () => ({
+    loadTemplate: vi.fn(async (_template: TenantHostingTemplate): Promise<LoadedTenantHostingTemplate> => ({
       template: "node-nextjs",
       composeFile: "services:\n  app:\n    image: ${APP_IMAGE:?required}\n",
       templateVersion: "sha256:" + "a".repeat(64),
