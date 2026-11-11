@@ -60,7 +60,7 @@ describe("DokployComposeProvider", () => {
   });
 
   it("starts an existing compose resource with the dedicated start endpoint", async () => {
-    const { provider, fetch } = setup(() => new Response("{} of no importance", { status: 200 }));
+    const { provider, fetch } = setup(() => new Response("{}", { status: 200 }));
     await provider.start(reference);
     expect(new URL(fetch.mock.calls[0]?.[0]?.toString() ?? "").pathname).toBe("/api/compose.start");
     expect(JSON.parse(String(fetch.mock.calls[0]?.[1]?.body))).toEqual({ composeId: "compose-123" });
