@@ -283,7 +283,8 @@ describe("platform tenant hosting route", () => {
     } finally {
       await app.close();
     }
-  
+  });
+
   it("runs an audited provider lifecycle action as a platform owner", async () => {
     const runtime = makeRuntime();
     const app = await makeApp(runtime);
