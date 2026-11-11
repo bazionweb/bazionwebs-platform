@@ -1,8 +1,11 @@
 import { isIP } from "node:net";
+import { dirname, isAbsolute, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { z } from "zod";
 import type { DarajaConfig } from "@bazion/payments";
 
 const optionalEnv = z.preprocess((value) => value === "" ? undefined : value, z.string().trim().min(1).optional());
+const defaultHostingTemplateDirectory = resolve(dirname(fileURLToPath(import.meta.url)), "../../../deploy/client-templates");
 
 function validateCallbackUrl(value: string, production: boolean): void {
   const url = new URL(value);
@@ -58,6 +61,13 @@ const envSchema = z.object({
   AUTH_REQUIRE_EMAIL_VERIFICATION: z.enum(["true", "false"]).default("true"),
   DEFAULT_TENANT_CURRENCY: z.enum(["KES", "USD", "EUR", "GBP"]).default("KES"),
   TRUSTED_PROXY_ADDRESSES: z.string().default(""),
+  HOSTING_PROVIDER: z.enum(["disabled", "dokploy"]).default("disabled"),
+  DOKPLOY_BASE_URL: optionalEnv,
+  DOKPLOY_API_KEY: optionalEnv,
+  DOKPLOY_ENVIRONMENT_ID: optionalEnv,
+  DOKPLOY_SERVER_ID: optionalEnv,
+  HOSTING_SECRET_DIRECTORY: z.string().trim().min(1).default("/run/secrets"),
+  HOSTING_TEMPLATE_DIRECTORY: z.string().trim().min(1).default(defaultHostingTemplateDirectory),
 });
 
 export function loadConfig() {
@@ -112,6 +122,27 @@ export function loadConfig() {
   if (config.NODE_ENV === "production" && config.NOTIFICATION_ENCRYPTION_KEY === exampleNotificationKey) {
     throw new Error("Production startup blocked: replace the repository's development notification key with a fresh random key.");
   }
+  const dokployValues = [config.DOKPLOY_BASE_URL, config.DOKPLOY_API_KEY, config.DOKPLOY_ENVIRONMENT_ID];
+  const dokployConfiguredCount = dokployValues.filter(Boolean).length;
+  if (dokployConfiguredCount !== 0 && dokployConfiguredCount !== dokployValues.length) {
+    throw new Error("Configure DOKPLOY_BASE_URL, DOKPLOY_API_KEY and DOKPLOY_ENVIRONMENT_ID together.");
+  }
+  if (config.HOSTING_PROVIDER === "dokploy" && dokployConfiguredCount !== dokployValues.length) {
+    throw new Error("HOSTING_PROVIDER=dokploy requires DOKPLOY_BASE_URL, DOKPLOY_API_KEY and DOKPLOY_ENVIRONMENT_ID.");
+  }
+  if (config.HOSTING_PROVIDER === "disabled" && (dokployConfiguredCount > 0 || config.DOKPLOY_SERVER_ID)) {
+    throw new Error("DOKPLOY_* credentials are configured while HOSTING_PROVIDER is disabled.");
+  }
+  if (config.HOSTING_PROVIDER === "dokploy") {
+    const dokployUrl = new URL(config.DOKPLOY_BASE_URL!);
+    if (dokployUrl.protocol !== "https:" || dokployUrl.username || dokployUrl.password || dokployUrl.search || dokployUrl.hash) {
+      throw new Error("DOKPLOY_BASE_URL must be an HTTPS URL without credentials, query parameters or a fragment.");
+    }
+    if (!isAbsolute(config.HOSTING_SECRET_DIRECTORY)) {
+      throw new Error("HOSTING_SECRET_DIRECTORY must be an absolute path when hosting is enabled.");
+    }
+  }
+
   const trustedProxyAddresses = config.TRUSTED_PROXY_ADDRESSES.split(",").map((value) => value.trim()).filter(Boolean);
   if (config.NODE_ENV === "production" && trustedProxyAddresses.length === 0) {
     throw new Error("Production startup blocked: configure the trusted ingress proxy IPs/CIDRs and block direct public access to the API.");
@@ -157,6 +188,17 @@ export function loadConfig() {
           publicBaseUrl: config.MEDIA_STORAGE_PUBLIC_BASE_URL!,
         },
       } : {}),
+    },
+    hosting: {
+      provider: config.HOSTING_PROVIDER,
+      secretDirectory: config.HOSTING_SECRET_DIRECTORY,
+      templateDirectory: config.HOSTING_TEMPLATE_DIRECTORY,
+      dokploy: config.HOSTING_PROVIDER === "dokploy" ? {
+        baseUrl: config.DOKPLOY_BASE_URL!,
+        apiKey: config.DOKPLOY_API_KEY!,
+        environmentId: config.DOKPLOY_ENVIRONMENT_ID!,
+        ...(config.DOKPLOY_SERVER_ID ? { serverId: config.DOKPLOY_SERVER_ID } : {}),
+      } : null,
     },
     requireEmailVerification: config.AUTH_REQUIRE_EMAIL_VERIFICATION === "true",
     trustProxy: trustedProxyAddresses.length ? trustedProxyAddresses : false,

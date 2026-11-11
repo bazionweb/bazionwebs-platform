@@ -104,6 +104,10 @@ export interface TenantHostingDeployment {
   reference: TenantHostingDeploymentReference;
   state: TenantHostingDeploymentState;
   lastDeployedAt: string | null;
+  /** Provider-reported identity metadata used to verify recovery ownership. */
+  providerResourceName?: string;
+  /** Provider-reported environment/project scope; never supplied by the caller. */
+  providerEnvironmentId?: string;
 }
 
 /**

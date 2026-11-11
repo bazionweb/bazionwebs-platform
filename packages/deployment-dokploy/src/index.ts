@@ -13,6 +13,12 @@ export interface DokployConfig {
   environmentId: string;
   serverId?: string;
   fetch?: typeof fetch;
+  /** Total attempts for read-only GET requests. Mutating POST requests are never retried. */
+  readRetryAttempts?: number;
+  /** Initial delay before retrying a transient read failure. */
+  readRetryBaseDelayMs?: number;
+  /** Maximum delay, including a provider-supplied Retry-After value. */
+  readRetryMaxDelayMs?: number;
 }
 
 interface DokployResource {
@@ -23,6 +29,9 @@ interface DokployResource {
   status?: string;
   updatedAt?: string;
   createdAt?: string;
+  name?: string;
+  appName?: string;
+  environmentId?: string;
 }
 
 function resourceId(payload: unknown): string {
@@ -31,6 +40,23 @@ function resourceId(payload: unknown): string {
   const id = value.composeId ?? value.id ?? value.compose?.composeId ?? value.compose?.id;
   if (typeof id !== "string" || !id.trim()) throw new Error("DOKPLOY_RESOURCE_ID_MISSING");
   return id;
+}
+
+const retryableReadStatuses = new Set([408, 425, 429, 502, 503, 504]);
+
+function wait(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
+function retryAfterDelay(value: string | null, maximumMs: number): number | null {
+  if (!value) return null;
+  const seconds = Number(value);
+  if (Number.isFinite(seconds) && seconds >= 0) {
+    return Math.min(maximumMs, seconds * 1_000);
+  }
+  const timestamp = Date.parse(value);
+  if (Number.isNaN(timestamp)) return null;
+  return Math.min(maximumMs, Math.max(0, timestamp - Date.now()));
 }
 
 function safeEnvironment(values: Readonly<Record<string, string>>): string {
@@ -62,12 +88,23 @@ function deploymentState(value: string | undefined): TenantHostingDeployment["st
 export class DokployComposeProvider implements TenantHostingProvider {
   private readonly baseUrl: URL;
   private readonly requestFetch: typeof fetch;
+  private readonly readRetryAttempts: number;
+  private readonly readRetryBaseDelayMs: number;
+  private readonly readRetryMaxDelayMs: number;
 
   constructor(
     private readonly config: DokployConfig,
     private readonly secrets: TenantHostingSecretResolver,
   ) {
     this.baseUrl = new URL(config.baseUrl);
+    this.readRetryAttempts = config.readRetryAttempts ?? 3;
+    this.readRetryBaseDelayMs = config.readRetryBaseDelayMs ?? 200;
+    this.readRetryMaxDelayMs = config.readRetryMaxDelayMs ?? 2_000;
+    if (
+      !Number.isInteger(this.readRetryAttempts) || this.readRetryAttempts < 1 || this.readRetryAttempts > 5 ||
+      !Number.isInteger(this.readRetryBaseDelayMs) || this.readRetryBaseDelayMs < 0 || this.readRetryBaseDelayMs > 5_000 ||
+      !Number.isInteger(this.readRetryMaxDelayMs) || this.readRetryMaxDelayMs < this.readRetryBaseDelayMs || this.readRetryMaxDelayMs > 30_000
+    ) throw new Error("DOKPLOY_RETRY_CONFIGURATION_INVALID");
     if (
       this.baseUrl.protocol !== "https:" ||
       this.baseUrl.username ||
@@ -83,22 +120,49 @@ export class DokployComposeProvider implements TenantHostingProvider {
 
   private async request(path: string, method: "GET" | "POST", body?: unknown): Promise<unknown> {
     const url = new URL(path, this.baseUrl);
-    const response = await this.requestFetch(url, {
-      method,
-      headers: {
-        accept: "application/json",
-        "content-type": "application/json",
-        "x-api-key": this.config.apiKey,
-      },
-      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-      signal: AbortSignal.timeout(20_000),
-    });
-    if (!response.ok) throw new Error(`DOKPLOY_HTTP_${response.status}`);
-    if (response.status === 204) return null;
-    const text = await response.text();
-    if (!text) return null;
-    try { return JSON.parse(text) as unknown; }
-    catch { throw new Error("DOKPLOY_INVALID_RESPONSE"); }
+    // Replaying a mutating request can create duplicate resources or deployments
+    // when a provider timeout hides a successful operation. Retry GET only.
+    const maxAttempts = method === "GET" ? this.readRetryAttempts : 1;
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      let response: Response;
+      try {
+        response = await this.requestFetch(url, {
+          method,
+          headers: {
+            accept: "application/json",
+            "content-type": "application/json",
+            "x-api-key": this.config.apiKey,
+          },
+          ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+          signal: AbortSignal.timeout(20_000),
+        });
+      } catch {
+        if (method !== "GET" || attempt >= maxAttempts) {
+          throw new Error("DOKPLOY_REQUEST_FAILED");
+        }
+        await wait(Math.min(
+          this.readRetryMaxDelayMs,
+          this.readRetryBaseDelayMs * (2 ** (attempt - 1)),
+        ));
+        continue;
+      }
+
+      if (!response.ok) {
+        if (method === "GET" && retryableReadStatuses.has(response.status) && attempt < maxAttempts) {
+          const delay = retryAfterDelay(response.headers.get("retry-after"), this.readRetryMaxDelayMs)
+            ?? Math.min(this.readRetryMaxDelayMs, this.readRetryBaseDelayMs * (2 ** (attempt - 1)));
+          await wait(delay);
+          continue;
+        }
+        throw new Error(`DOKPLOY_HTTP_${response.status}`);
+      }
+      if (response.status === 204) return null;
+      const text = await response.text();
+      if (!text) return null;
+      try { return JSON.parse(text) as unknown; }
+      catch { throw new Error("DOKPLOY_INVALID_RESPONSE"); }
+    }
+    throw new Error("DOKPLOY_REQUEST_FAILED");
   }
 
   async provision(input: {
@@ -159,10 +223,20 @@ export class DokployComposeProvider implements TenantHostingProvider {
     this.assertReference(reference);
     const payload = await this.request(`compose.one?composeId=${encodeURIComponent(reference.resourceId)}`, "GET") as DokployResource | null;
     if (!payload) throw new Error("DOKPLOY_RESOURCE_NOT_FOUND");
+    if (resourceId(payload) !== reference.resourceId) throw new Error("DOKPLOY_RESOURCE_ID_MISMATCH");
+    if (typeof payload.environmentId === "string" && payload.environmentId !== this.config.environmentId) {
+      throw new Error("DOKPLOY_RESOURCE_ENVIRONMENT_MISMATCH");
+    }
     return {
       reference,
       state: deploymentState(payload.composeStatus ?? payload.status),
       lastDeployedAt: payload.updatedAt ?? null,
+      ...(typeof payload.name === "string" && payload.name.trim()
+        ? { providerResourceName: payload.name }
+        : {}),
+      ...(typeof payload.environmentId === "string" && payload.environmentId.trim()
+        ? { providerEnvironmentId: payload.environmentId }
+        : {}),
     };
   }
 

@@ -78,12 +78,18 @@ importers:
       '@bazion/database':
         specifier: workspace:*
         version: link:../../packages/database
+      '@bazion/deployment-dokploy':
+        specifier: workspace:*
+        version: link:../../packages/deployment-dokploy
       '@bazion/notifications':
         specifier: workspace:*
         version: link:../../packages/notifications
       '@bazion/payments':
         specifier: workspace:*
         version: link:../../packages/payments
+      '@bazion/platform-contracts':
+        specifier: workspace:*
+        version: link:../../packages/platform-contracts
       '@bazion/storage':
         specifier: workspace:*
         version: link:../../packages/storage

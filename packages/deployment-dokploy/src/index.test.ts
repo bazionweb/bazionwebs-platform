@@ -90,13 +90,99 @@ describe("DokployComposeProvider", () => {
     })).rejects.toThrow("INVALID_TENANT_SLUG");
   });
 
+  it("rejects a compose response whose ID does not match the requested resource", async () => {
+    const { provider } = setup(() => new Response(JSON.stringify({
+      composeId: "different-resource", environmentId: "environment-1", name: "alpha-node-nextjs",
+      composeStatus: "done",
+    }), { status: 200 }));
+    await expect(provider.inspect(reference)).rejects.toThrow("DOKPLOY_RESOURCE_ID_MISMATCH");
+  });
+
+  it("rejects a compose resource from another Dokploy environment", async () => {
+    const { provider } = setup(() => new Response(JSON.stringify({
+      composeId: "compose-123", environmentId: "another-environment", name: "alpha-node-nextjs",
+      composeStatus: "done",
+    }), { status: 200 }));
+    await expect(provider.inspect(reference)).rejects.toThrow("DOKPLOY_RESOURCE_ENVIRONMENT_MISMATCH");
+  });
+
   it("inspects provider state without exposing the raw response", async () => {
     const { provider } = setup(() => new Response(JSON.stringify({
-      composeId: "compose-123", composeStatus: "done", updatedAt: "2026-11-11T01:00:00.000Z",
+      composeId: "compose-123", name: "alpha-node-nextjs", appName: "bz-alpha-node-nextjs",
+      environmentId: "environment-1", composeStatus: "done", updatedAt: "2026-11-11T01:00:00.000Z",
       env: "SHOULD_NOT_ESCAPE",
     }), { status: 200 }));
     const result = await provider.inspect(reference);
     expect(result.state).toBe("running");
+    expect(result.providerResourceName).toBe("alpha-node-nextjs");
+    expect(result.providerEnvironmentId).toBe("environment-1");
     expect(JSON.stringify(result)).not.toContain("SHOULD_NOT_ESCAPE");
   });
+  it("retries transient read-only inspections and honours Retry-After", async () => {
+    let calls = 0;
+    const { provider, fetch } = setup(() => {
+      calls += 1;
+      if (calls === 1) return new Response("temporarily unavailable", {
+        status: 503,
+        headers: { "retry-after": "0" },
+      });
+      return new Response(JSON.stringify({
+        composeId: "compose-123",
+        environmentId: "environment-1",
+        composeStatus: "done",
+      }), { status: 200 });
+    });
+    const result = await provider.inspect(reference);
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(result.state).toBe("running");
+  });
+
+  it("retries transient GET network failures but does not expose the network error", async () => {
+    let calls = 0;
+    const { provider, fetch } = setup(() => {
+      calls += 1;
+      if (calls === 1) throw new Error("socket failed with secret details");
+      return new Response(JSON.stringify({
+        composeId: "compose-123",
+        environmentId: "environment-1",
+        composeStatus: "stopped",
+      }), { status: 200 });
+    });
+    const result = await provider.inspect(reference);
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(result.state).toBe("stopped");
+  });
+
+  it("does not retry non-transient read errors", async () => {
+    const { provider, fetch } = setup(() => new Response("not found", { status: 404 }));
+    await expect(provider.inspect(reference)).rejects.toThrow("DOKPLOY_HTTP_404");
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("never retries resource creation or deployment POSTs after transient errors", async () => {
+    const create = setup(() => new Response("temporarily unavailable", { status: 503 }));
+    await expect(create.provider.provision({
+      tenantId: "tenant-1" as never,
+      tenantSlug: "acme-shop",
+      template: "ecommerce",
+      composeFile: "services: {}",
+      environmentSecretRef: "secret://tenant-1/runtime",
+    })).rejects.toThrow("DOKPLOY_HTTP_503");
+    expect(create.fetch).toHaveBeenCalledTimes(1);
+
+    const deploy = setup(() => new Response("temporarily unavailable", { status: 503 }));
+    await expect(deploy.provider.deploy(reference)).rejects.toThrow("DOKPLOY_HTTP_503");
+    expect(deploy.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects unsafe read retry configuration", () => {
+    const secrets: TenantHostingSecretResolver = { resolveEnvironment: async () => ({}) };
+    expect(() => new DokployComposeProvider({
+      baseUrl: "https://server.example.test",
+      apiKey: "key",
+      environmentId: "environment-1",
+      readRetryAttempts: 6,
+    }, secrets)).toThrow("DOKPLOY_RETRY_CONFIGURATION_INVALID");
+  });
+
 });
