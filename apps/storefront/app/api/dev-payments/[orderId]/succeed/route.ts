@@ -7,11 +7,16 @@ export async function POST(_request: Request, context: { params: Promise<{ order
   const apiBase = process.env.API_BASE_URL ?? "http://localhost:4000";
   const secret = process.env.DEV_PAYMENT_SECRET;
   if (!secret) return new Response("Development payment secret is not configured", { status: 503 });
-  const result = await fetch(`${apiBase}/v1/_dev/orders/${orderId}/pay`, {
-    method: "POST",
-    headers: { "x-dev-secret": secret },
-    cache: "no-store",
-  });
+  let result: Response;
+  try {
+    result = await fetch(`${apiBase}/v1/_dev/orders/${orderId}/pay`, {
+      method: "POST",
+      headers: { "x-dev-secret": secret },
+      cache: "no-store",
+    });
+  } catch {
+    return new Response("Payment service is unavailable", { status: 503 });
+  }
   if (!result.ok) return new Response("Payment simulation failed", { status: result.status });
   return NextResponse.redirect(new URL(`/?payment=simulated&orderId=${orderId}`, process.env.PUBLIC_STOREFRONT_URL ?? "http://localhost:3000"), 303);
 }

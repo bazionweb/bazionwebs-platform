@@ -37,4 +37,4 @@ export interface PaymentProvider {
 }
 
 export { DarajaClient, DarajaRequestError, normalizeKenyanPhoneNumber } from "./daraja.js";
-export type { DarajaConfig, DarajaStkPushInput, DarajaStkPushResult } from "./daraja.js";
+export type { DarajaConfig, DarajaStkPushInput, DarajaStkPushResult, DarajaStkPushQueryResult } from "./daraja.js";

@@ -51,9 +51,36 @@ export default async function TenantDetail({ params }: { params: Promise<{ tenan
 
   return <main className="detail-shell">
     <header className="topbar"><Link href="/">← All tenants</Link><span>Platform / Tenant detail</span></header>
-    <p className="eyebrow">WORKSPACE RECORD</p>
-    <h1>{tenant.name}</h1>
-    <p className="muted">{tenant.slug} · {tenant.id}</p>
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "16px" }}>
+      <div>
+        <p className="eyebrow">WORKSPACE RECORD</p>
+        <h1>{tenant.name}</h1>
+        <p className="muted">{tenant.slug} · {tenant.id}</p>
+      </div>
+      <div style={{ display: "flex", gap: "10px", marginTop: "12px", alignItems: "center", flexWrap: "wrap" }}>
+        <Link href={`/troubleshoot?tenantId=${tenant.id}`} className="secondary" style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
+          🛠️ Troubleshoot Workspace
+        </Link>
+        <a
+          href={`http://localhost:3100/?tenant=${tenant.slug}`}
+          target="_blank"
+          rel="noreferrer"
+          className="secondary"
+          title={`Visit ${tenant.name} public website`}
+        >
+          Open Storefront ↗
+        </a>
+        <a
+          href={`http://localhost:3100/workspace?select=${tenant.auth_organization_id ?? ""}&workspace=${tenant.slug}&redirect=/admin`}
+          target="_blank"
+          rel="noreferrer"
+          className="primary"
+          title={`Open ${tenant.name} tenant administration desk`}
+        >
+          Open Tenant Desk ↗
+        </a>
+      </div>
+    </div>
     <section className="detail-grid">
       <article><span>STATUS</span><strong className={`status status-${tenant.status}`}>{tenant.status}</strong></article>
       <article><span>DEFAULT CURRENCY</span><strong>{tenant.default_currency}</strong></article>

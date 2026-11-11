@@ -239,6 +239,9 @@ importers:
       '@bazion/deployment-dokploy':
         specifier: workspace:*
         version: link:../../packages/deployment-dokploy
+      '@bazion/notifications':
+        specifier: workspace:*
+        version: link:../../packages/notifications
       '@bazion/payments':
         specifier: workspace:*
         version: link:../../packages/payments

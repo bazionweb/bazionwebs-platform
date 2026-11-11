@@ -95,8 +95,12 @@ function toPublicCart(cart: { id: string; currency: string; status: string; expi
 
 export async function commerceRoutes(app: FastifyInstance, options: RouteOptions) {
   const daraja = options.config.mpesa ? new DarajaClient(options.config.mpesa) : null;
+  const tenantForRequest = (request: FastifyRequest) => {
+    const explicit = request.headers["x-bazion-tenant"] as string | undefined;
+    return resolveTenantId(request.hostname, options.config, explicit);
+  };
   app.get("/storefront", async (request) => {
-    const tenantId = await resolveTenantId(request.hostname, options.config);
+    const tenantId = await tenantForRequest(request);
     await assertCommerceEnabled(tenantId);
     return withTenantTransaction(tenantId, async (tx) => {
       const [settings] = await tx.select().from(commerceStoreSettings)
@@ -112,7 +116,7 @@ export async function commerceRoutes(app: FastifyInstance, options: RouteOptions
   app.get<{ Querystring: { q?: string; category?: string; currency?: string; sort?: string; limit?: string; offset?: string } }>("/products", async (request, reply) => {
     const parsed = productListQuerySchema.safeParse(request.query);
     if (!parsed.success) return reply.code(400).send({ error: "INVALID_INPUT", details: parsed.error.flatten() });
-    const tenantId = await resolveTenantId(request.hostname, options.config);
+    const tenantId = await tenantForRequest(request);
     await assertCommerceEnabled(tenantId);
     return withTenantTransaction(tenantId, async (tx) => {
       const [settings] = await tx.select().from(commerceStoreSettings)
@@ -149,7 +153,7 @@ export async function commerceRoutes(app: FastifyInstance, options: RouteOptions
   });
 
   app.get<{ Params: { slug: string } }>("/products/:slug", async (request, reply) => {
-    const tenantId = await resolveTenantId(request.hostname, options.config);
+    const tenantId = await tenantForRequest(request);
     await assertCommerceEnabled(tenantId);
     const [product] = await withTenantTransaction(tenantId, (tx) => tx.select({
       id: products.id, sku: products.sku, slug: products.slug, name: products.name,
@@ -163,7 +167,7 @@ export async function commerceRoutes(app: FastifyInstance, options: RouteOptions
   });
 
   app.post("/carts", async (request, reply) => {
-    const tenantId = await resolveTenantId(request.hostname, options.config);
+    const tenantId = await tenantForRequest(request);
     await assertCommerceEnabled(tenantId);
     const parsed = createCartSchema.safeParse(request.body ?? {});
     if (!parsed.success) return reply.code(400).send({ error: "INVALID_INPUT", details: parsed.error.flatten() });
@@ -185,7 +189,7 @@ export async function commerceRoutes(app: FastifyInstance, options: RouteOptions
   });
 
   app.get<{ Params: { cartId: string } }>("/carts/:cartId", async (request, reply) => {
-    const tenantId = await resolveTenantId(request.hostname, options.config);
+    const tenantId = await tenantForRequest(request);
     await assertCommerceEnabled(tenantId);
     const token = getCartToken(request, request.params.cartId);
     const result = await withTenantTransaction(tenantId, async (tx) => {
@@ -200,7 +204,7 @@ export async function commerceRoutes(app: FastifyInstance, options: RouteOptions
   });
 
   app.post<{ Params: { cartId: string } }>("/carts/:cartId/items", async (request, reply) => {
-    const tenantId = await resolveTenantId(request.hostname, options.config);
+    const tenantId = await tenantForRequest(request);
     await assertCommerceEnabled(tenantId);
     const token = getCartToken(request, request.params.cartId);
     const parsed = addCartItemSchema.safeParse(request.body);
@@ -233,7 +237,7 @@ export async function commerceRoutes(app: FastifyInstance, options: RouteOptions
   });
 
   app.patch<{ Params: { cartId: string; itemId: string } }>("/carts/:cartId/items/:itemId", async (request, reply) => {
-    const tenantId = await resolveTenantId(request.hostname, options.config);
+    const tenantId = await tenantForRequest(request);
     await assertCommerceEnabled(tenantId);
     const token = getCartToken(request, request.params.cartId);
     const parsed = updateCartItemSchema.safeParse(request.body);
@@ -258,7 +262,7 @@ export async function commerceRoutes(app: FastifyInstance, options: RouteOptions
   });
 
   app.delete<{ Params: { cartId: string; itemId: string } }>("/carts/:cartId/items/:itemId", async (request, reply) => {
-    const tenantId = await resolveTenantId(request.hostname, options.config);
+    const tenantId = await tenantForRequest(request);
     await assertCommerceEnabled(tenantId);
     const token = getCartToken(request, request.params.cartId);
     const result = await withTenantTransaction(tenantId, async (tx) => {
@@ -275,7 +279,7 @@ export async function commerceRoutes(app: FastifyInstance, options: RouteOptions
   });
 
   app.post("/checkout", async (request, reply) => {
-    const tenantId = await resolveTenantId(request.hostname, options.config);
+    const tenantId = await tenantForRequest(request);
     await assertCommerceEnabled(tenantId);
     const keyHeader = request.headers["idempotency-key"];
     if (typeof keyHeader !== "string" || keyHeader.length < 8 || keyHeader.length > 160) {
@@ -580,7 +584,7 @@ export async function commerceRoutes(app: FastifyInstance, options: RouteOptions
   });
 
   app.get("/public/commerce/payments/status", async (request, reply) => {
-    const tenantId = await resolveTenantId(request.hostname, options.config);
+    const tenantId = await tenantForRequest(request);
     await assertCommerceEnabled(tenantId);
     const statusToken = request.headers["x-payment-status-token"];
     if (typeof statusToken !== "string" || !/^[A-Za-z0-9_-]{32,160}$/.test(statusToken)) {
@@ -602,7 +606,7 @@ export async function commerceRoutes(app: FastifyInstance, options: RouteOptions
 
   if (options.config.NODE_ENV !== "production") {
     app.post<{ Params: { orderId: string } }>("/_dev/orders/:orderId/pay", async (request, reply) => {
-    const tenantId = await resolveTenantId(request.hostname, options.config);
+    const tenantId = await tenantForRequest(request);
     await assertCommerceEnabled(tenantId);
       const secret = request.headers["x-dev-secret"];
       if (typeof secret !== "string" || !secureTextEqual(secret, options.config.DEV_PAYMENT_SECRET)) return reply.code(401).send({ error: "UNAUTHORIZED" });

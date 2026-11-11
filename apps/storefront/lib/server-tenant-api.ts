@@ -1,4 +1,4 @@
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { cache } from "react";
 
 const apiBaseUrl = (process.env.API_BASE_URL ?? "http://localhost:4000").replace(/\/$/, "");
@@ -6,15 +6,21 @@ const apiBaseUrl = (process.env.API_BASE_URL ?? "http://localhost:4000").replace
 export async function getTenantRequestContext(): Promise<{ origin: string; headers: HeadersInit } | null> {
   try {
     const incomingHeaders = await headers();
+    const cookieStore = await cookies();
     const hostHeader = incomingHeaders.get("x-forwarded-host") ?? incomingHeaders.get("host");
     const host = hostHeader?.split(",", 1)[0]?.trim();
     const rawProtocol = incomingHeaders.get("x-forwarded-proto")?.split(",", 1)[0]?.trim();
     const protocol = rawProtocol === "http" ? "http" : "https";
     if (!host) return null;
     const url = new URL(`${protocol}://${host}`);
+    const tenantCookie = cookieStore.get("bazion_tenant")?.value;
+    const extraHeaders: Record<string, string> = {};
+    if (tenantCookie) {
+      extraHeaders["x-bazion-tenant"] = tenantCookie;
+    }
     return {
       origin: url.origin,
-      headers: { "x-forwarded-host": url.host, "x-forwarded-proto": protocol },
+      headers: { "x-forwarded-host": url.host, "x-forwarded-proto": protocol, ...extraHeaders },
     };
   } catch {
     return null;

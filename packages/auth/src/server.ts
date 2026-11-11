@@ -1,5 +1,5 @@
 import { betterAuth } from "better-auth";
-import { createHash, randomBytes } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { createOutboxPayloadCodec, PostgresNotificationOutbox } from "@bazion/notifications";
 import { organization } from "better-auth/plugins";
 import { Pool } from "pg";
@@ -161,16 +161,49 @@ async function afterCreateOrganization({ organization: org }: {
   if (!organizationId || !slug || !name) {
     throw new Error("Organization was created without the required Bazion tenant mapping fields.");
   }
-  const result = await tenantProvisionerPool.query(
+  const result = await tenantProvisionerPool.query<{ id: string }>(
     `UPDATE public.tenants
         SET auth_organization_id = $1, name = $2, status = 'active', updated_at = now()
       WHERE slug = $3
         AND status IN ('provisioning', 'active')
-        AND (auth_organization_id IS NULL OR auth_organization_id = $1)`,
+        AND (auth_organization_id IS NULL OR auth_organization_id = $1)
+      RETURNING id`,
     [organizationId, name, slug],
   );
   if (result.rowCount !== 1) {
     throw new Error("Organization was created but its Bazion tenant mapping needs reconciliation.");
+  }
+
+  const tenantId = result.rows[0]?.id;
+  if (tenantId) {
+    // Seed baseline profile, settings, module entitlements, and local dev domain
+    await tenantProvisionerPool.query(
+      `INSERT INTO public.ministry_profiles (tenant_id, ministry_name, description, vision, mission, outreach, telephone_numbers, social_links)
+       VALUES ($1, $2, $3, 'To love God and serve people.', 'Preach truth, hope and love.', 'Community outreach and fellowship.', '[]'::jsonb, '{}'::jsonb)
+       ON CONFLICT (tenant_id) DO NOTHING`,
+      [tenantId, name, `Welcome to ${name}`],
+    ).catch(() => {});
+
+    await tenantProvisionerPool.query(
+      `INSERT INTO public.ministry_settings (tenant_id, setting_key, setting_value)
+       VALUES ($1, 'public_site', '{"theme":{"primaryColor":"#193a31","secondaryColor":"#315e50","accentColor":"#8b5b29"},"pages":{"sermons":true,"events":true,"give":true,"ministries":true,"about":true,"contact":true}}')
+       ON CONFLICT (tenant_id, setting_key) DO NOTHING`,
+      [tenantId],
+    ).catch(() => {});
+
+    await tenantProvisionerPool.query(
+      `INSERT INTO public.tenant_module_entitlements (tenant_id, module_id, enabled, updated_by)
+       VALUES ($1, 'church-ministry', true, 'system:provisioning')
+       ON CONFLICT (tenant_id, module_id) DO NOTHING`,
+      [tenantId],
+    ).catch(() => {});
+
+    await tenantProvisionerPool.query(
+      `INSERT INTO public.tenant_domains (tenant_id, hostname, status, verified_at)
+       VALUES ($1, $2, 'active', now())
+       ON CONFLICT (hostname) DO NOTHING`,
+      [tenantId, `${slug}.localhost`],
+    ).catch(() => {});
   }
 }
 
@@ -332,6 +365,23 @@ export async function resolvePublicTenantByHostname(hostname: string) {
       WHERE d.hostname = $1 AND t.status = 'active'
       LIMIT 1`,
     [host],
+  );
+  return result.rows[0] ?? null;
+}
+
+export async function resolvePublicTenantBySlug(slug: string) {
+  const cleanSlug = slug.trim().toLowerCase();
+  const result = await tenantResolverPool.query<{
+    id: string;
+    slug: string;
+    name: string;
+    default_currency: string;
+  }>(
+    `SELECT t.id, t.slug, t.name, t.default_currency
+       FROM public.tenants t
+      WHERE t.slug = $1 AND t.status = 'active'
+      LIMIT 1`,
+    [cleanSlug],
   );
   return result.rows[0] ?? null;
 }
@@ -1102,3 +1152,149 @@ export async function transferPlatformTenantOwner(
     client.release();
   }
 }
+
+export interface PlatformUserMembership {
+  organizationId: string;
+  organizationName: string;
+  organizationSlug: string;
+  role: string;
+}
+
+export interface PlatformUserRecord {
+  id: string;
+  email: string;
+  name: string;
+  emailVerified: boolean;
+  createdAt: string;
+  memberships: PlatformUserMembership[];
+  activeSessionsCount: number;
+}
+
+export async function listPlatformUsers(input: {
+  query?: string;
+  limit?: number;
+  offset?: number;
+}): Promise<{
+  items: PlatformUserRecord[];
+  total: number;
+  limit: number;
+  offset: number;
+}> {
+  const limit = Math.min(Math.max(input.limit ?? 25, 1), 100);
+  const offset = Math.max(input.offset ?? 0, 0);
+  const q = (input.query ?? "").trim();
+  const searchPattern = q ? `%${q}%` : "";
+
+  const countRes = await authPool.query<{ total: string }>(
+    `SELECT count(DISTINCT u.id)::text AS total FROM "user" u WHERE ($1 = '' OR u.email ILIKE $1 OR u.name ILIKE $1)`,
+    [searchPattern],
+  );
+  const total = Number(countRes.rows[0]?.total ?? 0);
+
+  const rows = await authPool.query<{
+    id: string;
+    email: string;
+    name: string;
+    email_verified: boolean;
+    created_at: string;
+    memberships: PlatformUserMembership[];
+    active_sessions_count: string;
+  }>(
+    `SELECT u.id, u.email, u.name, u."emailVerified" AS email_verified, u."createdAt"::text AS created_at,
+            coalesce(
+              json_agg(
+                json_build_object(
+                  'organizationId', o.id,
+                  'organizationName', o.name,
+                  'organizationSlug', o.slug,
+                  'role', m.role
+                )
+              ) FILTER (WHERE o.id IS NOT NULL), '[]'::json
+            ) AS memberships,
+            (SELECT count(*)::text FROM "session" s WHERE s."userId" = u.id AND s."expiresAt" > now()) AS active_sessions_count
+       FROM "user" u
+       LEFT JOIN "member" m ON m."userId" = u.id
+       LEFT JOIN "organization" o ON o.id = m."organizationId"
+      WHERE ($1 = '' OR u.email ILIKE $1 OR u.name ILIKE $1)
+      GROUP BY u.id
+      ORDER BY u."createdAt" DESC
+      LIMIT $2 OFFSET $3`,
+    [searchPattern, limit, offset],
+  );
+
+  return {
+    items: rows.rows.map((row) => ({
+      id: row.id,
+      email: row.email,
+      name: row.name,
+      emailVerified: row.email_verified,
+      createdAt: row.created_at,
+      memberships: row.memberships ?? [],
+      activeSessionsCount: Number(row.active_sessions_count ?? 0),
+    })),
+    total,
+    limit,
+    offset,
+  };
+}
+
+export async function forceVerifyPlatformUserEmail(userId: string): Promise<boolean> {
+  const result = await authPool.query(
+    'UPDATE "user" SET "emailVerified" = true, "updatedAt" = now() WHERE id = $1',
+    [userId],
+  );
+  return result.rowCount === 1;
+}
+
+export async function revokePlatformUserSessions(userId: string): Promise<number> {
+  const result = await authPool.query(
+    'DELETE FROM "session" WHERE "userId" = $1',
+    [userId],
+  );
+  return result.rowCount ?? 0;
+}
+
+export async function generateEmergencyPasswordResetUrl(userIdOrEmail: string): Promise<{
+  resetUrl: string;
+  email: string;
+} | null> {
+  const userResult = await authPool.query<{ id: string; email: string; name: string }>(
+    'SELECT id, email, name FROM "user" WHERE id = $1 OR lower(email) = lower($1) LIMIT 1',
+    [userIdOrEmail.trim()],
+  );
+  const user = userResult.rows[0];
+  if (!user) return null;
+
+  const token = randomBytes(32).toString("hex");
+  const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
+  // Better-Auth expects identifier: `reset-password:${token}` and value: userId
+  const identifier = `reset-password:${token}`;
+
+  await authPool.query(
+    'DELETE FROM "verification" WHERE (value = $1 AND identifier LIKE \'reset-password:%\') OR identifier = $2',
+    [user.id, identifier],
+  );
+  await authPool.query(
+    'INSERT INTO "verification" (id, identifier, value, "expiresAt", "createdAt", "updatedAt") VALUES ($1, $2, $3, $4, now(), now())',
+    [randomUUID(), identifier, user.id, expiresAt],
+  );
+
+  const resetUrl = `${appBaseUrl}/reset-password?token=${encodeURIComponent(token)}`;
+
+  try {
+    await enqueueAuthEmail(
+      user.email,
+      "Emergency Bazion Web Password Reset",
+      resetUrl,
+      "An emergency password reset link was generated by the platform administrator.",
+      "password-reset",
+      resetUrl,
+    );
+  } catch {
+    // Platform admin still receives the URL directly
+  }
+
+  return { resetUrl, email: user.email };
+}
+
+export { requirePlatformRole, requirePlatformPermission } from "./tenant-context.js";

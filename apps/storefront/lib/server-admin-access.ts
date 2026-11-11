@@ -16,21 +16,24 @@ async function loadAdminIdentity(): Promise<AdminIdentity | null> {
   const incomingHeaders = await headers();
   const cookie = incomingHeaders.get("cookie");
   if (!cookie) return null;
-  const response = await fetch(`${apiBaseUrl}/v1/auth/me`, {
-    headers: { cookie },
-    cache: "no-store",
-    signal: AbortSignal.timeout(5_000),
-  });
-  if (response.status === 401) return null;
-  if (!response.ok) throw new Error("Could not verify your dashboard access. Please try again.");
-  return await response.json() as AdminIdentity;
+  try {
+    const response = await fetch(`${apiBaseUrl}/v1/auth/me`, {
+      headers: { cookie },
+      cache: "no-store",
+      signal: AbortSignal.timeout(5_000),
+    });
+    if (response.status === 401) return null;
+    if (!response.ok) return null;
+    return (await response.json()) as AdminIdentity;
+  } catch {
+    return null;
+  }
 }
 
 export async function requireTenantDashboardAccess(): Promise<AdminIdentity> {
   const identity = await loadAdminIdentity();
   if (!identity) redirect("/login?callbackURL=%2Fadmin");
   if (!identity.organization || !identity.tenant || identity.tenant.status !== "active") {
-    if (identity.platformRole === "platform_owner") redirect("/platform");
     redirect("/workspace?reason=tenant-access-required");
   }
   return identity;

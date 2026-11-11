@@ -13,8 +13,11 @@ export default function LoginPage() {
   const [accessNotice, setAccessNotice] = useState("");
 
   useEffect(() => {
-    if (new URLSearchParams(window.location.search).get("reason") === "platform-owner-required") {
+    const reason = new URLSearchParams(window.location.search).get("reason");
+    if (reason === "platform-owner-required") {
       setAccessNotice("This control plane is for Bazion platform owners. Tenant administrators should use their own organization’s admin workspace; tenant membership does not grant access to other organizations.");
+    } else if (reason === "identity-unavailable") {
+      setAccessNotice("Unable to reach the identity verification service. Please verify that the API server is active and try again.");
     }
   }, []);
 
