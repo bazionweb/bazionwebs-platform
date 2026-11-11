@@ -1,0 +1,27 @@
+[Unit]
+Description=Bazion Web tenant hosting deployment reconciler
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=bazion
+Group=bazion
+WorkingDirectory=/opt/bazionwebs-platform
+EnvironmentFile=/etc/bazionweb/hosting-reconciler.env
+ExecStart=/usr/bin/node /opt/bazionwebs-platform/apps/api/dist/hosting-worker.js
+Restart=on-failure
+RestartSec=10
+TimeoutStopSec=120
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+
+[Install]
+WantedBy=multi-user.target
