@@ -40,8 +40,10 @@ function provider(overrides: Partial<TenantHostingProvider> = {}): TenantHosting
   return {
     provision: vi.fn(async () => reference),
     deploy: vi.fn(async () => undefined),
-    inspect: vi.fn(async () => ({ reference, state: "running" as const, lastDeployedAt: "2026-11-11T09:00:00.000Z" })),
+    start: vi.fn(async () => undefined),
     stop: vi.fn(async () => undefined),
+    redeploy: vi.fn(async () => undefined),
+    inspect: vi.fn(async () => ({ reference, state: "running" as const, lastDeployedAt: "2026-11-11T09:00:00.000Z" })),
     remove: vi.fn(async () => undefined),
     ...overrides,
   };
