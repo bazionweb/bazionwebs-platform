@@ -22,7 +22,8 @@ describe("database migration registry", () => {
     expect(requiredDatabaseMigrations).toContain("0016_tenant_hosting_deployments.sql");
     expect(requiredDatabaseMigrations).toContain("0017_hosting_reconciliation_schedule.sql");
     expect(requiredDatabaseMigrations).toContain("0018_hosting_provider_lifecycle.sql");
+    expect(requiredDatabaseMigrations).toContain("0019_tenant_backup_restore_access.sql");
     expect(currentDatabaseSchemaVersion).toBe(requiredDatabaseMigrations.at(-1));
-    expect(currentDatabaseSchemaVersion).toBe("0018_hosting_provider_lifecycle.sql");
+    expect(currentDatabaseSchemaVersion).toBe("0019_tenant_backup_restore_access.sql");
   });
 });
