@@ -327,5 +327,4 @@ describe("platform tenant hosting route", () => {
       await app.close();
     }
   });
-  });
 });
