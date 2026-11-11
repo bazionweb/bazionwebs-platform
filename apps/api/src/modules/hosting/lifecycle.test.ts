@@ -1,7 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import type { TenantHostingDeploymentReference, TenantHostingProvider } from "@bazion/platform-contracts";
 import {
+  PostgresHostingLifecycleStore,
   TenantHostingLifecycleService,
+  type HostingLifecyclePool,
   type HostingLifecycleClaim,
   type HostingLifecycleClaimResult,
   type HostingLifecycleStore,
@@ -44,6 +46,96 @@ const input = {
   actorId: "platform-owner",
   requestId: "req-1",
 };
+
+describe("PostgresHostingLifecycleStore", () => {
+  it("claims only matching provider resources and records events against the deployment UUID", async () => {
+    const statements: string[] = [];
+    const parameters: unknown[][] = [];
+    const pool = {
+      async connect() {
+        return {
+          async query(statement: string, values: unknown[] = []) {
+            statements.push(statement);
+            parameters.push(values);
+            if (statement.startsWith("SELECT d.id::text")) return {
+              rows: [{
+                id: claim.deploymentId, tenant_id: reference.tenantId, provider: "dokploy",
+                provider_resource_id: reference.resourceId, state: "stopped",
+                created_at: new Date(reference.createdAt), tenant_status: "active", lease_expires_at: null,
+              }],
+              rowCount: 1,
+            };
+            if (statement.startsWith("UPDATE public.tenant_hosting_deployments")) return { rows: [], rowCount: 1 };
+            return { rows: [], rowCount: 1 };
+          },
+          release() {},
+        };
+      },
+    } as HostingLifecyclePool;
+    const store = new PostgresHostingLifecycleStore(pool);
+    const result = await store.claim({ ...input, action: "start", expectedProvider: "dokploy" });
+    expect(result.kind).toBe("claimed");
+    if (result.kind !== "claimed") return;
+    expect(result.claim).toMatchObject({ deploymentId: claim.deploymentId, reference });
+    expect(statements.some((statement) => statement.includes("FOR UPDATE OF d,t"))).toBe(true);
+    expect(parameters.some((values) => values[0] === claim.deploymentId && values[1] === reference.tenantId)).toBe(true);
+    expect(parameters.some((values) => values[0] === claim.deploymentId && values[5] === "platform-owner")).toBe(true);
+  });
+
+  it("rejects a provider mismatch before leasing or mutating a foreign resource", async () => {
+    const statements: string[] = [];
+    const pool = {
+      async connect() {
+        return {
+          async query(statement: string) {
+            statements.push(statement);
+            if (statement.startsWith("SELECT d.id::text")) return {
+              rows: [{
+                id: claim.deploymentId, tenant_id: reference.tenantId, provider: "another-provider",
+                provider_resource_id: reference.resourceId, state: "stopped",
+                created_at: new Date(reference.createdAt), tenant_status: "active", lease_expires_at: null,
+              }],
+              rowCount: 1,
+            };
+            return { rows: [], rowCount: 1 };
+          },
+          release() {},
+        };
+      },
+    } as HostingLifecyclePool;
+    const result = await new PostgresHostingLifecycleStore(pool).claim({
+      ...input, action: "start", expectedProvider: "dokploy",
+    });
+    expect(result).toEqual({ kind: "provider_mismatch" });
+    expect(statements.some((statement) => statement.startsWith("UPDATE"))).toBe(false);
+    expect(statements).toContain("ROLLBACK");
+  });
+
+  it("requires closed tenants and stopped deployments before resource removal", async () => {
+    const pool = {
+      async connect() {
+        return {
+          async query(statement: string) {
+            if (statement.startsWith("SELECT d.id::text")) return {
+              rows: [{
+                id: claim.deploymentId, tenant_id: reference.tenantId, provider: "dokploy",
+                provider_resource_id: reference.resourceId, state: "running",
+                created_at: new Date(reference.createdAt), tenant_status: "active", lease_expires_at: null,
+              }],
+              rowCount: 1,
+            };
+            return { rows: [], rowCount: 1 };
+          },
+          release() {},
+        };
+      },
+    } as HostingLifecyclePool;
+    const result = await new PostgresHostingLifecycleStore(pool).claim({
+      ...input, action: "remove", expectedProvider: "dokploy",
+    });
+    expect(result).toEqual({ kind: "tenant_not_closed" });
+  });
+});
 
 describe("TenantHostingLifecycleService", () => {
   it("starts an existing resource and persists provider-confirmed state", async () => {
