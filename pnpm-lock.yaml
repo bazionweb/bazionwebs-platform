@@ -10,6 +10,19 @@ importers:
         specifier: 12.18.0
         version: 12.18.0
 
+  packages/deployment-dokploy:
+    dependencies:
+      '@bazion/platform-contracts':
+        specifier: workspace:*
+        version: link:../platform-contracts
+    devDependencies:
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^5.1.0
+        version: 5.1.0(@types/node@26.6.6)(vite@8.3.6(@types/node@26.6.6)(esbuild@0.28.2)(tsx@4.23.15))
+
 packages:
 
   '@pnpm/exe.android-arm64@12.18.0':
