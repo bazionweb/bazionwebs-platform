@@ -21,6 +21,7 @@ export const requiredDatabaseMigrations = [
   "0016_tenant_hosting_deployments.sql",
   "0017_hosting_reconciliation_schedule.sql",
   "0018_hosting_provider_lifecycle.sql",
+  "0019_tenant_backup_restore_access.sql",
 ] as const;
 
 /** Current tenant database release marker; updates automatically with the registry. */
