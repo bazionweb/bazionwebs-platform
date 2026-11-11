@@ -255,26 +255,42 @@ function releaseDedicatedPool(entry: DedicatedPoolEntry): void {
   }
 }
 
+export interface TenantTransactionOptions {
+  /** Permit backup/restore tooling to work with suspended or closed tenants without reactivating them. */
+  allowInactive?: boolean;
+  /** A stable read-only MVCC snapshot for logical backups. */
+  repeatableReadOnly?: boolean;
+}
+
 async function inTenantTransaction<T>(
   database: TenantDatabase,
   tenantId: string,
   callback: (tx: TenantTransaction) => Promise<T>,
+  options: TenantTransactionOptions = {},
 ): Promise<T> {
   return database.transaction(async (tx) => {
+    if (options.repeatableReadOnly) {
+      // This must be the first statement after BEGIN; do not move below set_config.
+      await tx.execute(sql.raw("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY"));
+    }
     await tx.execute(sql`select set_config('app.tenant_id', ${tenantId}, true)`);
     return callback(tx);
   });
 }
 
 /** Resolve the tenant binding before every transaction; dedicated failures never fall back to shared data. */
-export async function withTenantTransaction<T>(tenantId: string, callback: (tx: TenantTransaction) => Promise<T>): Promise<T> {
+export async function withTenantTransaction<T>(
+  tenantId: string,
+  callback: (tx: TenantTransaction) => Promise<T>,
+  options: TenantTransactionOptions = {},
+): Promise<T> {
   const binding = await resolveBinding(tenantId);
-  if (binding.tenantStatus !== "active") throw routingError("TENANT_DATABASE_TENANT_INACTIVE");
+  if (!options.allowInactive && binding.tenantStatus !== "active") throw routingError("TENANT_DATABASE_TENANT_INACTIVE");
 
   if (binding.tier === "shared" && binding.state === "shared") {
     const staleDedicatedPool = dedicatedPools.get(tenantId);
     if (staleDedicatedPool) retirePool(staleDedicatedPool);
-    return inTenantTransaction(db, tenantId, callback);
+    return inTenantTransaction(db, tenantId, callback, options);
   }
   if (binding.tier !== "dedicated" || binding.state !== "ready") {
     const staleDedicatedPool = dedicatedPools.get(tenantId);
