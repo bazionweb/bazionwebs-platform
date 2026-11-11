@@ -35,10 +35,10 @@ export interface HostingLifecycleClaim {
 export type HostingLifecycleClaimResult =
   | { kind: "claimed"; claim: HostingLifecycleClaim }
   | { kind: "already"; state: TenantHostingDeploymentState }
-  | { kind: "not_found" | "tenant_not_active" | "tenant_not_closed" | "in_progress" | "invalid_state" | "removed" };
+  | { kind: "not_found" | "tenant_not_active" | "tenant_not_closed" | "in_progress" | "invalid_state" | "removed" | "provider_mismatch" };
 
 export interface HostingLifecycleStore {
-  claim(input: TenantHostingLifecycleInput): Promise<HostingLifecycleClaimResult>;
+  claim(input: TenantHostingLifecycleInput & { expectedProvider: string }): Promise<HostingLifecycleClaimResult>;
   complete(input: {
     claim: HostingLifecycleClaim;
     action: TenantHostingLifecycleAction;
@@ -89,7 +89,7 @@ export class PostgresHostingLifecycleStore implements HostingLifecycleStore {
     }
   }
 
-  async claim(input: TenantHostingLifecycleInput): Promise<HostingLifecycleClaimResult> {
+  async claim(input: TenantHostingLifecycleInput & { expectedProvider: string }): Promise<HostingLifecycleClaimResult> {
     const client = await this.pool.connect();
     try {
       await client.query("BEGIN");
@@ -103,6 +103,7 @@ export class PostgresHostingLifecycleStore implements HostingLifecycleStore {
       const row = result.rows[0];
       if (!row) { await client.query("ROLLBACK"); return { kind: "not_found" }; }
       if (row.state === "removed") { await client.query("ROLLBACK"); return { kind: "removed" }; }
+      if (row.provider !== input.expectedProvider) { await client.query("ROLLBACK"); return { kind: "provider_mismatch" }; }
       if (row.provider_resource_id === null) { await client.query("ROLLBACK"); return { kind: "invalid_state" }; }
       if (leaseActive(row.lease_expires_at)) { await client.query("ROLLBACK"); return { kind: "in_progress" }; }
 
@@ -265,7 +266,7 @@ export class TenantHostingLifecycleService {
   }
 
   async execute(input: TenantHostingLifecycleInput): Promise<TenantHostingLifecycleResult> {
-    const claimed = await this.store.claim(input);
+    const claimed = await this.store.claim({ ...input, expectedProvider: this.providerId });
     if (claimed.kind === "already") return { action: input.action, state: claimed.state, confirmed: true, already: true };
     const errors: Record<Exclude<HostingLifecycleClaimResult["kind"], "claimed" | "already">, string> = {
       not_found: "HOSTING_DEPLOYMENT_NOT_FOUND",
@@ -274,6 +275,7 @@ export class TenantHostingLifecycleService {
       in_progress: "HOSTING_LIFECYCLE_IN_PROGRESS",
       invalid_state: "HOSTING_LIFECYCLE_STATE_INVALID",
       removed: "HOSTING_DEPLOYMENT_REMOVED",
+      provider_mismatch: "HOSTING_PROVIDER_MISMATCH",
     };
     if (claimed.kind !== "claimed") throw new Error(errors[claimed.kind]);
     const { claim } = claimed;
