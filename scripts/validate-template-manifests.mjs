@@ -1,5 +1,5 @@
 import { existsSync, realpathSync, readdirSync, readFileSync } from "node:fs";
-import { dirname, join, relative, resolve, sep } from "node:path";
+import { join, resolve, sep } from "node:path";
 import { assertSupportedSchema, validateJsonSchema } from "./lib/json-schema.mjs";
 
 const root = realpathSync(process.cwd());
