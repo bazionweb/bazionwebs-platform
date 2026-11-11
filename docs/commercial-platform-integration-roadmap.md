@@ -60,14 +60,14 @@ This checklist coordinates the Bazion commercial website (`D:\bazionweb`) and th
 
 **Goal:** transfer paid provisioning requests and platform outcomes without dual writes.
 
-- [ ] In Bazionweb, commit paid-order settlement and a provisioning outbox row in one database transaction.
-- [ ] Add a delivery worker with bounded retries, exponential backoff, timeout policy and dead-letter visibility.
-- [ ] Authenticate service calls with short-lived, audience-scoped credentials and least-privilege scopes.
-- [ ] In the platform, persist an inbox/idempotency receipt before acknowledging the command.
-- [ ] Store platform status events in an outbox in the same transaction as operation state transitions.
-- [ ] Deliver status callbacks to Bazionweb with signatures, event IDs, replay protection and retry/replay tools.
-- [ ] Add reconciliation for accepted-without-status, duplicate, stale and permanently-failed messages.
-- [ ] Add PostgreSQL-backed integration tests for transaction atomicity, duplicate delivery and service downtime.
+- [x] In Bazionweb, commit paid-order settlement and a provisioning outbox row in one database transaction. (`PaymentSettlementService.activatePaidSubscription` and `DiagnosticsService` `AUTO_APPLY_PAYMENT` enqueue per-line `PlatformProvisioningOutbox` rows inside Prisma `tx`.)
+- [x] Add a delivery worker with bounded retries, exponential backoff, timeout policy and dead-letter visibility. (Both `PlatformProvisioningWorkerService` in Bazionweb and `PlatformStatusOutboxDispatcher` in the platform enforce bounded retries, jittered backoff, request timeouts, lease fencing, dead-lettering, and admin replay endpoints.)
+- [x] Authenticate service calls with short-lived, audience-scoped credentials and least-privilege scopes. (Short-lived HS256 JWTs with strict `aud`/`scope`/TTL validation and rotation support plus `bazion_product_provisioner` least-privilege PostgreSQL grants.)
+- [x] In the platform, persist an inbox/idempotency receipt before acknowledging the command. (`product_provisioning_inbox` + atomic operation/installation creation in migration `0019` and `POST /v1/internal/commercial/provisioning-requests`.)
+- [x] Store platform status events in an outbox in the same transaction as operation state transitions. (`AFTER INSERT` trigger on `product_provisioning_operation_events` writes `product_provisioning_status_outbox` atomically.)
+- [x] Deliver status callbacks to Bazionweb with signatures, event IDs, replay protection and retry/replay tools. (Signed `X-Bazion-Signature` callbacks with timestamps, `eventId` inbox deduplication, replay window enforcement, monotonic `PlatformProvisioningProjection`, and operator replay.)
+- [x] Add reconciliation for accepted-without-status, duplicate, stale and permanently-failed messages. (Platform and Bazionweb admin reconciliation reports plus lagging-operation polling.)
+- [ ] Add PostgreSQL-backed integration tests for transaction atomicity, duplicate delivery and service downtime. (Platform live PostgreSQL tests pass in `delivery.integration.test.ts`; Bazionweb atomic outbox/worker/callback/reconciliation specs in `platform-provisioning-delivery.spec.ts` currently run with mocked Prisma delegates because no local Bazionweb PostgreSQL instance is provisioned yet.)
 
 **Exit gate:** neither a lost message nor duplicate delivery can lose or multiply a paid provisioning request.
 
@@ -204,15 +204,15 @@ The audit also found a divergent local branch, `feature/church-ministry-platform
 
 ### Phase 3 — Durable request and status delivery
 
-- [ ] Add the Bazionweb outbox insert inside the same Prisma transaction that settles a paid order in `PaymentSettlementService`; cover provider webhooks, customer return verification and scheduled reconciliation.
-- [ ] Guarantee one outbox command per settled order line with a deterministic event/idempotency key and canonical request fingerprint.
-- [ ] Add a bounded sender worker with timeouts, exponential backoff with jitter, lease/fencing semantics, dead-letter state and an operator replay action.
-- [ ] Authenticate platform commands with a machine identity and narrow audience/scope; rotate credentials and reject expired or wrong-audience calls.
-- [ ] Persist an inbox receipt and provisioning operation before acknowledging a command; duplicate IDs return the original operation without rerunning work.
-- [ ] In the platform, append status events to an outbox in the same transaction as operation changes; send signed callbacks with replay protection.
-- [ ] In Bazionweb, verify signatures/timestamps/event IDs and upsert a commercial status projection idempotently.
-- [ ] Add reconciliation for accepted-without-status, callback lag, repeated events, dead letters and order/platform mismatches.
-- [ ] Test transaction atomicity and system downtime with PostgreSQL and both service adapters.
+- [x] Add the Bazionweb outbox insert inside the same Prisma transaction that settles a paid order in `PaymentSettlementService`; cover provider webhooks, customer return verification and scheduled reconciliation.
+- [x] Guarantee one outbox command per settled order line with a deterministic event/idempotency key and canonical request fingerprint.
+- [x] Add a bounded sender worker with timeouts, exponential backoff with jitter, lease/fencing semantics, dead-letter state and an operator replay action.
+- [x] Authenticate platform commands with a machine identity and narrow audience/scope; rotate credentials and reject expired or wrong-audience calls.
+- [x] Persist an inbox receipt and provisioning operation before acknowledging a command; duplicate IDs return the original operation without rerunning work.
+- [x] In the platform, append status events to an outbox in the same transaction as operation changes; send signed callbacks with replay protection.
+- [x] In Bazionweb, verify signatures/timestamps/event IDs and upsert a commercial status projection idempotently.
+- [x] Add reconciliation for accepted-without-status, callback lag, repeated events, dead letters and order/platform mismatches.
+- [ ] Test transaction atomicity and system downtime with PostgreSQL and both service adapters. (Platform live PostgreSQL delivery integration tests pass; Bazionweb specs pass against mocked Prisma delegates and still need a live Bazionweb PostgreSQL run once provisioned.)
 
 ### Phase 4 — Offer resolution and hosting authority
 

@@ -22,8 +22,18 @@ describe("database migration registry", () => {
     expect(requiredDatabaseMigrations).toContain("0016_tenant_hosting_deployments.sql");
     expect(requiredDatabaseMigrations).toContain("0017_hosting_reconciliation_schedule.sql");
     expect(requiredDatabaseMigrations).toContain("0018_product_installations_provisioning_sagas.sql");
+    expect(requiredDatabaseMigrations).toContain("0019_commercial_provisioning_delivery.sql");
     expect(currentDatabaseSchemaVersion).toBe(requiredDatabaseMigrations.at(-1));
-    expect(currentDatabaseSchemaVersion).toBe("0018_product_installations_provisioning_sagas.sql");
+    expect(currentDatabaseSchemaVersion).toBe("0019_commercial_provisioning_delivery.sql");
+  });
+
+  it("enforces inbox uniqueness, outbox safety validation, and provisioner-only delivery access", () => {
+    const migration = readFileSync(join(migrationsDirectory, "0019_commercial_provisioning_delivery.sql"), "utf8");
+    expect(migration).toContain("product_provisioning_inbox");
+    expect(migration).toContain("product_provisioning_status_outbox");
+    expect(migration).toContain("is_safe_commercial_status_event_payload");
+    expect(migration).toContain("enqueue_product_provisioning_status_outbox");
+    expect(migration).toContain("bazion_product_provisioner");
   });
 
   it("persists installation identity and inspectable saga evidence without customer contact data", () => {

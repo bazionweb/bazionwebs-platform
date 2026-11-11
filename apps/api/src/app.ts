@@ -13,6 +13,8 @@ import { churchRoutes } from "./modules/church/routes.js";
 import { hostingRoutes } from "./modules/hosting/routes.js";
 import { hostingRecoveryRoutes } from "./modules/hosting/recovery-routes.js";
 import { createHostingProvisioningRuntime } from "./modules/hosting/runtime.js";
+import { commercialProvisioningRoutes } from "./modules/commercial-provisioning/routes.js";
+import { createCommercialProvisioningRuntime } from "./modules/commercial-provisioning/runtime.js";
 
 const MEDIA_UPLOAD_LIMIT_BYTES = 8 * 1024 * 1024;
 
@@ -114,6 +116,14 @@ export async function buildApp(config: AppConfig) {
   await app.register(hostingRecoveryRoutes, {
     prefix: "/v1",
     runtime: hostingRuntime,
+  });
+  const commercialProvisioningRuntime = createCommercialProvisioningRuntime(config.commercialProvisioning);
+  await app.register(commercialProvisioningRoutes, {
+    prefix: "/v1",
+    runtime: commercialProvisioningRuntime,
+  });
+  app.addHook("onClose", async () => {
+    await commercialProvisioningRuntime?.close();
   });
 
   app.setErrorHandler((error, request, reply) => {

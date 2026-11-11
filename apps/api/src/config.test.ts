@@ -82,4 +82,50 @@ describe("API runtime configuration", () => {
     vi.stubEnv("NOTIFICATION_ENCRYPTION_KEY", Buffer.from("too-short").toString("base64"));
     expect(() => loadConfig()).toThrow(/canonical Base64-encoded 32-byte key/);
   });
+
+  it("requires PRODUCT_PROVISIONER_DATABASE_URL and >=32-char non-placeholder secret when commercial provisioning is enabled", () => {
+    expect(loadConfig().commercialProvisioning.enabled).toBe(false);
+
+    vi.stubEnv("COMMERCIAL_PROVISIONING_ENABLED", "true");
+    expect(() => loadConfig()).toThrow(/requires PRODUCT_PROVISIONER_DATABASE_URL and COMMERCIAL_PROVISIONING_COMMAND_SECRET/);
+    vi.stubEnv("COMMERCIAL_PROVISIONING_COMMAND_SECRET", "short-secret");
+    vi.stubEnv("PRODUCT_PROVISIONER_DATABASE_URL", "");
+    expect(() => loadConfig()).toThrow(/requires PRODUCT_PROVISIONER_DATABASE_URL/);
+
+    vi.stubEnv("PRODUCT_PROVISIONER_DATABASE_URL", "postgres://bazion_product_provisioner:test@localhost:5432/bazion_platform");
+    expect(() => loadConfig()).toThrow(/at least 32 characters/);
+
+    vi.stubEnv("COMMERCIAL_PROVISIONING_COMMAND_SECRET", "production-grade-commercial-secret-value-32");
+    expect(loadConfig().commercialProvisioning.enabled).toBe(true);
+    expect(loadConfig().commercialProvisioning).toMatchObject({
+      commandIssuer: "bazionweb",
+      commandAudience: "bazion-platform:commercial-provisioning",
+    });
+
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("MEDIA_STORAGE_DRIVER", "s3");
+    vi.stubEnv("MEDIA_STORAGE_ENDPOINT", "https://r2.cloudflarestorage.com");
+    vi.stubEnv("MEDIA_STORAGE_BUCKET", "bazion-media");
+    vi.stubEnv("MEDIA_STORAGE_ACCESS_KEY_ID", "test-key");
+    vi.stubEnv("MEDIA_STORAGE_SECRET_ACCESS_KEY", "test-secret");
+    vi.stubEnv("MEDIA_STORAGE_PUBLIC_BASE_URL", "https://media.bazion-demo.org");
+    vi.stubEnv("PAYMENT_PROVIDER", "mpesa");
+    vi.stubEnv("MPESA_ENVIRONMENT", "production");
+    vi.stubEnv("MPESA_CONSUMER_KEY", "k");
+    vi.stubEnv("MPESA_CONSUMER_SECRET", "s");
+    vi.stubEnv("MPESA_BUSINESS_SHORT_CODE", "174379");
+    vi.stubEnv("MPESA_PASSKEY", "p");
+    vi.stubEnv("MPESA_CALLBACK_URL", "https://api.bazion-demo.org/v1/cb");
+    vi.stubEnv("TENANT_RESOLUTION_MODE", "verified_domain");
+    vi.stubEnv("NOTIFICATION_ENCRYPTION_KEY", Buffer.from("prod-test-key-for-bazion-platform-32", "utf8").subarray(0, 32).toString("base64"));
+    vi.stubEnv("TRUSTED_PROXY_ADDRESSES", "10.0.0.1");
+    vi.stubEnv("BETTER_AUTH_SECRET", "production-grade-better-auth-secret-32chars");
+    vi.stubEnv("BETTER_AUTH_URL", "https://api.bazion-demo.org");
+    vi.stubEnv("AUTH_APP_URL", "https://app.bazion-demo.org");
+    vi.stubEnv("PUBLIC_STOREFRONT_URL", "https://store.bazion-demo.org");
+    vi.stubEnv("CORS_ORIGINS", "https://app.bazion-demo.org");
+    vi.stubEnv("BETTER_AUTH_TRUSTED_ORIGINS", "https://app.bazion-demo.org");
+    vi.stubEnv("COMMERCIAL_PROVISIONING_COMMAND_SECRET", "dev-only-secret-that-must-not-run-in-production");
+    expect(() => loadConfig()).toThrow(/replace the development commercial provisioning secret/);
+  });
 });

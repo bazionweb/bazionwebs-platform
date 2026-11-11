@@ -68,6 +68,11 @@ const envSchema = z.object({
   DOKPLOY_SERVER_ID: optionalEnv,
   HOSTING_SECRET_DIRECTORY: z.string().trim().min(1).default("/run/secrets"),
   HOSTING_TEMPLATE_DIRECTORY: z.string().trim().min(1).default(defaultHostingTemplateDirectory),
+  COMMERCIAL_PROVISIONING_ENABLED: z.enum(["true", "false"]).default("false"),
+  PRODUCT_PROVISIONER_DATABASE_URL: optionalEnv,
+  COMMERCIAL_PROVISIONING_COMMAND_SECRET: optionalEnv,
+  COMMERCIAL_PROVISIONING_COMMAND_ISSUER: z.string().trim().min(1).default("bazionweb"),
+  COMMERCIAL_PROVISIONING_COMMAND_AUDIENCE: z.string().trim().min(1).default("bazion-platform:commercial-provisioning"),
 });
 
 export function loadConfig() {
@@ -142,6 +147,23 @@ export function loadConfig() {
       throw new Error("HOSTING_SECRET_DIRECTORY must be an absolute path when hosting is enabled.");
     }
   }
+  const hasProvisionerUrl = Boolean(config.PRODUCT_PROVISIONER_DATABASE_URL);
+  const hasCommandSecret = Boolean(config.COMMERCIAL_PROVISIONING_COMMAND_SECRET);
+  const commercialProvisioningEnabled = config.COMMERCIAL_PROVISIONING_ENABLED === "true";
+  if (hasCommandSecret && !hasProvisionerUrl) {
+    throw new Error("COMMERCIAL_PROVISIONING_COMMAND_SECRET requires PRODUCT_PROVISIONER_DATABASE_URL.");
+  }
+  if (commercialProvisioningEnabled && (!hasProvisionerUrl || !hasCommandSecret)) {
+    throw new Error("COMMERCIAL_PROVISIONING_ENABLED requires PRODUCT_PROVISIONER_DATABASE_URL and COMMERCIAL_PROVISIONING_COMMAND_SECRET.");
+  }
+  if (config.COMMERCIAL_PROVISIONING_COMMAND_SECRET) {
+    if (config.COMMERCIAL_PROVISIONING_COMMAND_SECRET.length < 32) {
+      throw new Error("COMMERCIAL_PROVISIONING_COMMAND_SECRET must be at least 32 characters.");
+    }
+    if (config.NODE_ENV === "production" && /dev-only|ci-only|change-me|replace-with|local-dev/i.test(config.COMMERCIAL_PROVISIONING_COMMAND_SECRET)) {
+      throw new Error("Production startup blocked: replace the development commercial provisioning secret.");
+    }
+  }
 
   const trustedProxyAddresses = config.TRUSTED_PROXY_ADDRESSES.split(",").map((value) => value.trim()).filter(Boolean);
   if (config.NODE_ENV === "production" && trustedProxyAddresses.length === 0) {
@@ -201,6 +223,13 @@ export function loadConfig() {
       } : null,
     },
     requireEmailVerification: config.AUTH_REQUIRE_EMAIL_VERIFICATION === "true",
+    commercialProvisioning: {
+      enabled: commercialProvisioningEnabled,
+      databaseUrl: config.PRODUCT_PROVISIONER_DATABASE_URL,
+      commandSecret: config.COMMERCIAL_PROVISIONING_COMMAND_SECRET,
+      commandIssuer: config.COMMERCIAL_PROVISIONING_COMMAND_ISSUER,
+      commandAudience: config.COMMERCIAL_PROVISIONING_COMMAND_AUDIENCE,
+    },
     trustProxy: trustedProxyAddresses.length ? trustedProxyAddresses : false,
     mpesa: darajaConfiguredCount === darajaValues.length
       ? {

@@ -29,5 +29,5 @@
     "schemaVersion": "1.0.0",
     "sourcePath": "packages/church-ministry-contracts/src/index.ts"
   },
-  "databaseSchemaVersion": "0018_product_installations_provisioning_sagas.sql"
+  "databaseSchemaVersion": "0019_commercial_provisioning_delivery.sql"
 }
