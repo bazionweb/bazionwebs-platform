@@ -49,6 +49,7 @@ export const tenantHostingDeploymentEvents = pgTable("tenant_hosting_deployment_
 }, (table) => [
   check("tenant_hosting_events_actor_type_ck", sql`${table.actorType} in ('user', 'service', 'system')`),
   foreignKey({ columns: [table.deploymentId, table.tenantId], foreignColumns: [tenantHostingDeployments.id, tenantHostingDeployments.tenantId], name: "tenant_hosting_events_deployment_tenant_fk" }),
+  check("tenant_hosting_events_metadata_ck", sql`jsonb_typeof(${table.metadata}) = 'object'`),
   index("tenant_hosting_events_tenant_occurred_idx").on(table.tenantId, table.occurredAt),
   index("tenant_hosting_events_deployment_occurred_idx").on(table.deploymentId, table.occurredAt),
 ]);
