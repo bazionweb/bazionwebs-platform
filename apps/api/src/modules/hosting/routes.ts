@@ -74,7 +74,8 @@ export async function hostingRoutes(
         });
         return reply.code(409).send({ error: "TENANT_NOT_ACTIVE" });
       }
-      if (!options.runtime) return reply.code(503).send({ error: "HOSTING_NOT_CONFIGURED" });
+      const runtime = options.runtime;
+      if (!runtime) return reply.code(503).send({ error: "HOSTING_NOT_CONFIGURED" });
 
       const auditBase = {
         actorType: "user" as const,
@@ -83,7 +84,7 @@ export async function hostingRoutes(
         tenantId,
         resourceType: "tenant_hosting_deployment",
         requestId: request.id,
-        metadata: { template: parsed.data.template, provider: options.runtime.providerId },
+        metadata: { template: parsed.data.template, provider: runtime.providerId },
       };
       // Fail closed: do not contact Dokploy unless the intent was recorded.
       await auditWriter.append({
@@ -93,8 +94,8 @@ export async function hostingRoutes(
       });
 
       try {
-        const loaded = await options.runtime.loadTemplate(parsed.data.template);
-        const result = await options.runtime.provision({
+        const loaded = await runtime.loadTemplate(parsed.data.template);
+        const result = await runtime.provision({
           tenantId,
           template: parsed.data.template,
           templateVersion: loaded.templateVersion,
