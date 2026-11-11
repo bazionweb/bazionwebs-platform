@@ -33,13 +33,14 @@ services:
       WORDPRESS_DB_USER: ${MARIADB_USER:?Set a unique database user}
       WORDPRESS_DB_PASSWORD: ${MARIADB_PASSWORD:?Set a strong database password}
       WORDPRESS_CONFIG_EXTRA: |
-        if (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && strpos($_SERVER['HTTP_X_FORWARDED_PROTO'], 'https') !== false) {
-          $_SERVER['HTTPS'] = 'on';
+        if (isset($$_SERVER['HTTP_X_FORWARDED_PROTO']) && strpos($$_SERVER['HTTP_X_FORWARDED_PROTO'], 'https') !== false) {
+          $$_SERVER['HTTPS'] = 'on';
         }
         define('DISALLOW_FILE_EDIT', true);
         define('WP_MEMORY_LIMIT', '128M');
         define('WP_MAX_MEMORY_LIMIT', '256M');
     volumes:
+      - db_data:/var/lib/mysql
       - wordpress_content:/var/www/html/wp-content
     mem_limit: 768m
     cpus: 1.00
