@@ -239,6 +239,9 @@ importers:
       '@bazion/payments':
         specifier: workspace:*
         version: link:../../packages/payments
+      '@bazion/platform-contracts':
+        specifier: workspace:*
+        version: link:../../packages/platform-contracts
       '@bazion/storage':
         specifier: workspace:*
         version: link:../../packages/storage
