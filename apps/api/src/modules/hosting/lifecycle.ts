@@ -18,7 +18,7 @@ export interface TenantHostingLifecycleInput {
   deploymentId: string;
   action: TenantHostingLifecycleAction;
   actorId: string;
-  requestId?: string;
+  requestId?: string | undefined;
 }
 export interface TenantHostingLifecycleResult {
   action: TenantHostingLifecycleAction;
@@ -46,14 +46,14 @@ export interface HostingLifecycleStore {
     confirmed: boolean;
     lastDeployedAt: string | null;
     actorId: string;
-    requestId?: string;
+    requestId?: string | undefined;
   }): Promise<boolean>;
   fail(input: {
     claim: HostingLifecycleClaim;
     action: TenantHostingLifecycleAction;
     errorCode: string;
     actorId: string;
-    requestId?: string;
+    requestId?: string | undefined;
   }): Promise<void>;
 }
 
@@ -173,7 +173,7 @@ export class PostgresHostingLifecycleStore implements HostingLifecycleStore {
     confirmed: boolean;
     lastDeployedAt: string | null;
     actorId: string;
-    requestId?: string;
+    requestId?: string | undefined;
   }): Promise<boolean> {
     const client = await this.pool.connect();
     try {
@@ -213,7 +213,7 @@ export class PostgresHostingLifecycleStore implements HostingLifecycleStore {
     action: TenantHostingLifecycleAction;
     errorCode: string;
     actorId: string;
-    requestId?: string;
+    requestId?: string | undefined;
   }): Promise<void> {
     const client = await this.pool.connect();
     try {
