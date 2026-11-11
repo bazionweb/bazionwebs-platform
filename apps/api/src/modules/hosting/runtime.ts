@@ -1,7 +1,12 @@
 import { resolve } from "node:path";
 import { DokployComposeProvider, type DokployConfig } from "@bazion/deployment-dokploy";
 import { pool } from "../../lib/database.js";
-import { PostgresHostingProvisioningStore, TenantHostingProvisioningService } from "./provisioning.js";
+import {
+  PostgresHostingProvisioningStore,
+  TenantHostingProvisioningService,
+  type ProvisionTenantHostingInput,
+  type ProvisionTenantHostingResult,
+} from "./provisioning.js";
 import { DockerSecretTenantHostingSecretResolver } from "./secrets.js";
 import { loadTenantHostingTemplate } from "./templates.js";
 import type { TenantHostingTemplate } from "@bazion/platform-contracts";
@@ -15,9 +20,7 @@ export interface HostingRuntimeConfig {
 
 export interface HostingProvisioningRuntime {
   providerId: string;
-  provision: TenantHostingProvisioningService["provision"] extends (...args: infer A) => infer R
-    ? (...args: A) => R
-    : never;
+  provision(input: ProvisionTenantHostingInput): Promise<ProvisionTenantHostingResult>;
   loadTemplate(template: TenantHostingTemplate): ReturnType<typeof loadTenantHostingTemplate>;
 }
 
