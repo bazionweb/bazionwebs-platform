@@ -40,7 +40,6 @@ services:
         define('WP_MEMORY_LIMIT', '128M');
         define('WP_MAX_MEMORY_LIMIT', '256M');
     volumes:
-      - db_data:/var/lib/mysql
       - wordpress_content:/var/www/html/wp-content
     mem_limit: 768m
     cpus: 1.00
