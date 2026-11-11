@@ -741,10 +741,20 @@ describe("platform tenant control-plane extensions", () => {
         .mockResolvedValueOnce({ rows: [{ id: "event-a", action: "tenant.suspend.completed" }], rowCount: 1 });
       const audit = await app.inject({
         method: "GET",
-        url: "/v1/admin/platform/tenants/11111111-1111-4111-8111-111111111111/audit?limit=10",
+        url: "/v1/admin/platform/tenants/11111111-1111-4111-8111-111111111111/audit?limit=10&offset=20",
       });
       expect(audit.statusCode).toBe(200);
       expect(audit.json().items[0].id).toBe("event-a");
+      expect(mocks.query).toHaveBeenNthCalledWith(
+        1,
+        expect.stringContaining("WHERE tenant_id = $1"),
+        ["11111111-1111-4111-8111-111111111111"],
+      );
+      expect(mocks.query).toHaveBeenNthCalledWith(
+        2,
+        expect.stringContaining("LIMIT $2 OFFSET $3"),
+        ["11111111-1111-4111-8111-111111111111", 10, 20],
+      );
 
       const { withTenantTransaction } = await import("../../lib/database.js");
       vi.mocked(withTenantTransaction).mockResolvedValueOnce({
@@ -757,6 +767,31 @@ describe("platform tenant control-plane extensions", () => {
       });
       expect(usage.statusCode).toBe(200);
       expect(usage.json()).toMatchObject({ members: 7, products: 4, activeProducts: 3, orders: 9 });
+    } finally { await app.close(); }
+  });
+
+  it("binds the audit action filter and pagination values consistently", async () => {
+    const app = await makeApp();
+    try {
+      mocks.query.mockResolvedValueOnce({ rows: [{ total: "0" }], rowCount: 1 })
+        .mockResolvedValueOnce({ rows: [], rowCount: 0 });
+
+      const response = await app.inject({
+        method: "GET",
+        url: "/v1/admin/platform/tenants/11111111-1111-4111-8111-111111111111/audit?action=tenant.suspend&limit=15&offset=30",
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(mocks.query).toHaveBeenNthCalledWith(
+        1,
+        expect.stringContaining("WHERE tenant_id = $1 AND action ILIKE $2"),
+        ["11111111-1111-4111-8111-111111111111", "tenant.suspend%"],
+      );
+      expect(mocks.query).toHaveBeenNthCalledWith(
+        2,
+        expect.stringContaining("LIMIT $3 OFFSET $4"),
+        ["11111111-1111-4111-8111-111111111111", "tenant.suspend%", 15, 30],
+      );
     } finally { await app.close(); }
   });
 });

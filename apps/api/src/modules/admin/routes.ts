@@ -507,7 +507,7 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
       let actionFilter = "";
       if (parsed.data.action) {
         values.push(`${parsed.data.action}%`);
-        actionFilter = ` AND action ILIKE ${values.length}`;
+        actionFilter = ` AND action ILIKE $${values.length}`;
       }
       const countResult = await pool.query<{ total: string }>(
         `SELECT count(*)::text AS total FROM public.platform_audit_events WHERE tenant_id = $1${actionFilter}`,
@@ -520,7 +520,7 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
            FROM public.platform_audit_events
           WHERE tenant_id = $1${actionFilter}
           ORDER BY occurred_at DESC, id DESC
-          LIMIT ${pageValues.length - 1} OFFSET ${pageValues.length}`,
+          LIMIT $${pageValues.length - 1} OFFSET $${pageValues.length}`,
         pageValues,
       );
       return reply.send({ items: rows.rows, total: Number(countResult.rows[0]?.total ?? 0), limit: parsed.data.limit, offset: parsed.data.offset });
