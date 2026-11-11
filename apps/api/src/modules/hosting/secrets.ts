@@ -18,7 +18,7 @@ function invalidSecret(): Error {
 }
 
 function validateImageReference(value: string): boolean {
-  if (/replace[-_ ]?with|your-(organization|app|store)|placeholder/i.test(value) || /:latest$/i.test(value)) return false;
+  if (/replace[-_ ]?with|your[-_]|placeholder/i.test(value) || /:latest$/i.test(value)) return false;
   if (/^sha256:[a-f0-9]{64}$/i.test(value)) return false;
   if (/@sha256:[a-f0-9]{64}$/i.test(value)) return true;
   const finalSegment = value.split("/").at(-1) ?? "";
