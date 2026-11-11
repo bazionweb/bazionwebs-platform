@@ -45,14 +45,13 @@ This checklist coordinates the Bazion commercial website (`D:\bazionweb`) and th
 
 **Goal:** persist product lifecycle separately from tenant identity and deployment state.
 
-- [ ] Design an installation table with tenant FK, immutable product/solution/template releases, configuration schema version and lifecycle timestamps.
-- [ ] Add installation-scoped unique external references and a durable provisioning-operation record with idempotency constraints.
-- [ ] Define legal transitions, retry ownership, cancellation behavior and terminal states.
+- [x] Add the initial installation and durable provisioning-operation tables with pinned product/solution/template references, unique external order/idempotency references, request fingerprints and lifecycle fields in migrations `0018`–`0019`.
+- [x] Add database-enforced operation transition/update rules, immutable event history and the initial retry/terminal-state model.
 - [ ] Keep configuration history separate from product definitions; prohibit secret values in snapshots.
 - [ ] Resolve verified-domain-to-installation routing before allowing multiple branded installations per tenant.
-- [ ] Add least-privilege grants, forced RLS where tenant-owned, tenant-aware FKs and audit records.
-- [ ] Add migrations, rollback/recovery guidance and PostgreSQL integration tests for isolation and duplicate requests.
-- [ ] Add authenticated platform API routes to accept a request and retrieve an operation; return `202 Accepted` for accepted work.
+- [x] Add least-privilege grants, forced RLS for tenant-owned installations, tenant-aware foreign keys and append-only operation events.
+- [ ] Complete migration recovery guidance and PostgreSQL coverage for all legal transitions, fingerprint conflicts, immutability and partial failure.
+- [x] Add authenticated platform API routes to accept a request and retrieve an operation; commit the idempotent receipt before returning `202 Accepted`.
 
 **Exit gate:** an installation and operation can be created exactly once, queried, authorized and recovered without changing existing tenant behavior.
 
@@ -67,7 +66,7 @@ This checklist coordinates the Bazion commercial website (`D:\bazionweb`) and th
 - [x] Store platform status events in an outbox in the same transaction as operation state transitions. (`AFTER INSERT` trigger on `product_provisioning_operation_events` writes `product_provisioning_status_outbox` atomically.)
 - [x] Deliver status callbacks to Bazionweb with signatures, event IDs, replay protection and retry/replay tools. (Signed `X-Bazion-Signature` callbacks with timestamps, `eventId` inbox deduplication, replay window enforcement, monotonic `PlatformProvisioningProjection`, and operator replay.)
 - [x] Add reconciliation for accepted-without-status, duplicate, stale and permanently-failed messages. (Platform and Bazionweb admin reconciliation reports plus lagging-operation polling.)
-- [x] Add PostgreSQL-backed integration tests for transaction atomicity, duplicate delivery and service downtime. The platform PostgreSQL delivery integration ran in the current validation. Bazionweb's PostgreSQL suite and the dual-repository HTTP/PostgreSQL suite are implemented, but their 3 database tests were skipped because `BAZIONWEB_TEST_DATABASE_URL` is unset. The available local `bazionweb_test` database has no tables and `bazion_migrator` cannot create objects in `public`; the configured Bazionweb `.env` points to remote Neon and must not be used for local tests. A dedicated local test database or CI database wiring remains an exit-gate requirement.
+- [ ] Finish PostgreSQL-backed integration verification for transaction atomicity, duplicate delivery and service downtime in both systems. The platform delivery integration passed locally; Bazionweb's database suite and the dual-repository HTTP/PostgreSQL suite are implemented but their 3 database tests were skipped because `BAZIONWEB_TEST_DATABASE_URL` is unset. The available local `bazionweb_test` database has no tables and `bazion_migrator` cannot create objects in `public`; Bazionweb's configured `.env` points to remote Neon and must not be used for local tests. A dedicated local test database or CI database wiring remains an exit-gate requirement.
 
 **Exit gate:** neither a lost message nor duplicate delivery can lose or multiply a paid provisioning request.
 
@@ -136,9 +135,9 @@ This checklist coordinates the Bazion commercial website (`D:\bazionweb`) and th
 
 ## Audit intake: findings to incorporate
 
-The second repository audit agrees with this roadmap on independent systems of record, durable asynchronous delivery, one hosting authority and one identity authority. It is useful as a **readiness and defect list**, not as a replacement architecture. Its sample `/sync/events` payload and one-client/one-tenant model are not adopted; the strict versioned provisioning contract and tenant-to-installation model remain the integration boundary.
+The second repository audit agrees with this roadmap on independent systems of record, durable asynchronous delivery, one hosting authority and one identity authority. It is useful as a **readiness and defect list**, not as a replacement architecture. Its sample `/sync/events` payload and one-client/one-tenant model are not adopted; the strict versioned provisioning contract and tenant-to-installation model remain the integration boundary. Several findings in the pasted audit describe an earlier source snapshot; this section records which are already fixed and which remain verified work.
 
-The audit also found a divergent local branch, `feature/church-ministry-platform` (`8d19d09`), with 11 commits not in the current branch and 136 current-branch commits absent from it. It contains a `@bazion/product-installations` implementation, configuration checksums and forward transforms, forced RLS, and guarded offboarding/30-day retention. Its migrations `0016`–`0021` conflict with the current branch's hosting migrations `0016`–`0017` and the new provisioning migration `0018`. **Do not merge that branch wholesale or create a second installation model.** Review and port the reusable behavior, reconcile schema differences, and assign all new migration numbers after the current migration head.
+The audited divergent branch, `feature/church-ministry-platform` (`8d19d09` at the time of that audit), remains locally present. At this checkpoint it has 11 commits absent from the current branch; the current branch has 144 commits absent from it. The current branch already has the initial `product_installations` / provisioning-operation model in `packages/database/migrations/0018_product_installations_provisioning_sagas.sql` and command-delivery schema in `0019_commercial_provisioning_delivery.sql`; hosting owns `0016`–`0017`. The feature branch contains additional configuration checksums/transforms, forced RLS and offboarding/retention behavior that still need comparison. **Do not merge that branch wholesale, renumber migrations already applied, or create a second installation model.** Port only verified reusable behavior and assign future migrations after the current head.
 
 ### Verified pre-sync risks
 
@@ -149,8 +148,8 @@ The audit also found a divergent local branch, `feature/church-ministry-platform
 - Hosting secrets currently resolve from pre-mounted Docker Swarm files under `/run/secrets`, and the current hosting package has no completed saga adapter for stop/remove compensation. Keep shared-managed RLS products out of per-tenant Dokploy provisioning. Enable dedicated deployment only after secret-manager provisioning, provider identity checks, idempotent stop/remove operations, and recovery tests exist.
 - In `D:\bazionweb`, settlement paths in `PaymentSettlementService` update Prisma directly and do not all emit the `invoice.paid` event used by `BillingService.markPaid`. Place the provisioning outbox write in the settlement transaction itself so webhooks, return verification, and reconciliation share the same atomic path.
 - The commercial app currently marks overdue invoices and alerts administrators; it does not yet implement the grace-expiry-to-suspension lifecycle assumed by Phase 6. Add an explicit grace policy and idempotent subscription lifecycle events before relying on automated suspension.
-- The commercial audit also flags sandbox impersonation writes, a Dokploy domain bind missing an application ID, and the absence of `apps/web/package-lock.json`. Verify each with a focused test before changing it. The root lockfile appears to be the monorepo lock authority; do not restore a nested lockfile until workspace policy confirms it is intended.
-- The contract's runtime catalog-ID regex previously accepted uppercase while its generated JSON Schema did not. Runtime validation now matches the lowercase schema; regression and cross-repository tests are required before marking the fix complete. The example offer `church-ministry-launch` is not in `products/commercial-offerings.json`; use a real, versioned offer binding in the contract examples before any live sender is enabled.
+- The commercial audit flags sandbox impersonation writes, a Dokploy domain bind missing an application ID, and the absence of `apps/web/package-lock.json`. The missing application ID is confirmed: the SSL remediation path calls `bindDomain` without either `applicationId` or `workloadId`, and the provider forwards an undefined identifier. Add the verified stored workload/application reference and a regression test. The sandbox claim still needs a server-side route/guard audit and mutation-blocking tests; frontend read-only behavior is not an API security control. Lockfiles are mixed today: there is a root workspace lock and an API nested lock, but no web nested lock; CI installs the web from its app directory with `npm install`. Choose and enforce one reproducible lock/install policy across CI and Docker rather than adding a lockfile by guesswork.
+- The contract's runtime catalog-ID regex previously accepted uppercase while its generated JSON Schema did not. Runtime validation now matches the lowercase schema and has regression coverage; cross-repository shared fixtures remain open. The example offer `church-ministry-launch` is not in the platform's `products/commercial-offerings.json`; replace it with a real versioned offer once the binding is published. The request's `composition` is an assertion of requested pins, not authority: the platform must resolve the offer/version from its own catalogue and reject any mismatch before creating an installation.
 
 ## Detailed phase checklist and audit-driven work
 
@@ -165,11 +164,12 @@ The audit also found a divergent local branch, `feature/church-ministry-platform
 - [x] Remove the rate-limit reset false-success path and misleading UI; disclose that the current stores do not support targeted resets.
 - [x] Remove implicit church/product initialization from generic organization creation, default optional product modules off, and keep local tenant domains development-only.
 - [ ] Connect maintenance mode to a real scoped behavior or remove the ineffective control; implement idempotent product-specific configuration in the installation workflow.
-- [ ] Verify and either fix or explicitly defer the commercial sandbox mutation guard and domain-bind application identity; test both.
-- [ ] Confirm whether npm workspaces use only the root `package-lock.json`; make `npm ci`/lockfile policy explicit in CI.
+- [ ] Add a server-side guard that blocks prohibited mutations from sandbox/impersonation tokens; define allowed read-only actions and test representative API writes. Do not rely on the web UI to enforce this boundary.
+- [ ] Pass a verified Dokploy workload/application identifier to the commercial SSL remediation domain bind and test the exact provider payload.
+- [ ] Choose one lock/install policy for the npm workspaces and make CI and Docker use it deterministically (`npm ci` from the intended lock authority); remove accidental per-app drift.
 - [ ] Agree that an order can provision one installation in v1. Add a stable order-line reference before allowing several installations from one order.
 - [ ] Confirm shared-managed products use the platform's shared tenant database and do not create a Dokploy deployment.
-- [ ] Record that the installation features on `feature/church-ministry-platform` are unmerged source work and reconcile their migration history before porting them.
+- [ ] Compare the feature-branch configuration transforms, secret-key rejection and retention/offboarding code against the current model; selectively port useful behavior without replaying or renumbering migrations `0016`–`0019`.
 
 **Phase 0 exit evidence:** regression tests cover every production selector and audited no-op; both repositories have a recorded baseline; ownership and hosting boundaries are written down.
 
@@ -212,7 +212,7 @@ The audit also found a divergent local branch, `feature/church-ministry-platform
 - [x] In the platform, append status events to an outbox in the same transaction as operation changes; send signed callbacks with replay protection.
 - [x] In Bazionweb, verify signatures/timestamps/event IDs and upsert a commercial status projection idempotently.
 - [x] Add reconciliation for accepted-without-status, callback lag, repeated events, dead letters and order/platform mismatches.
-- [x] Test transaction atomicity and system downtime with PostgreSQL and both service adapters. (Verified locally across `platform-provisioning-postgres.integration.spec.ts` on `bazionweb_test` and `delivery.integration.test.ts` + `cross-repo-e2e.integration.test.ts` against `bazionweb_test` + `bazion_platform` over live NestJS and Fastify HTTP; note that Bazionweb's historical `20250601000000_init` -> `20261001000000_paystack_provider` chain requires `prisma db push` hydration before applying `20261111000000_platform_provisioning_outbox/migration.sql`.)
+- [ ] Run transaction atomicity, duplicate delivery and service-downtime tests with a safe Bazionweb test database and both live service adapters. Platform PostgreSQL delivery integration passed; Bazionweb's PostgreSQL cases and cross-repository database tests were skipped because no safe `BAZIONWEB_TEST_DATABASE_URL` is configured. Never hydrate or migrate the configured remote Neon database for this test suite.
 
 ### Phase 4 — Offer resolution and hosting authority
 
@@ -220,7 +220,7 @@ The audit also found a divergent local branch, `feature/church-ministry-platform
 - [ ] Reject unknown offers, unstable releases, incompatible module sets and unsupported distribution modes before creating tenants or installations.
 - [ ] For `shared-managed`, provision tenant records and entitlements only; do not call Dokploy or allocate one database per tenant.
 - [ ] For a future dedicated deployment mode, first implement provider-neutral secret-manager lookup and tenant-scoped credentials; remove dependence on manually pre-mounted Swarm files.
-- [ ] Implement provider inspection, idempotent stop, and guarded remove by verified provider resource identity. A timeout-after-success must trigger inspect/reconcile before any replay or compensation.
+- [ ] Expose provider inspection, idempotent stop and guarded remove through an authorized Platform API/saga adapter, keyed by verified provider resource identity. The provider interface has stop/destroy methods, but the current HTTP hosting surface does not expose teardown actions. A timeout-after-success must trigger inspect/reconcile before replay or compensation.
 - [ ] Keep all Dokploy create/update/stop/remove mutations in Bazion Platform. Bazionweb stores a read projection keyed by platform deployment ID.
 - [ ] Map existing commercial hosting rows to platform deployment IDs and compare results before removing old mutation paths.
 - [ ] Keep tenant commerce/donation ledgers and payment webhooks separate from Bazion package billing.
@@ -246,7 +246,8 @@ The audit also found a divergent local branch, `feature/church-ministry-platform
 - [ ] Stop only a newly created resource whose provider identity and operation ownership have been verified. Never auto-remove a resource containing customer data; require an audited operator action for destructive cleanup.
 - [ ] Add operator views/actions for retry, resume, reconcile and compensation with authorization, reason, actor, before/after state and append-only audit.
 - [ ] Add recovery for worker crash after external success but before database commit; test stale leases and fencing.
-- [ ] Keep subscription activation/grace/suspension/reactivation/cancellation as separate lifecycle commands. Commercial rules decide grace; Platform applies the signed entitlement transition.
+- [ ] In Bazionweb, define the grace/dunning policy and implement idempotent overdue → grace → suspension transitions, notices and lifecycle outbox events before automated suspension is enabled; an overdue invoice alone must not suspend an installation.
+- [ ] Keep subscription activation/grace/suspension/reactivation/cancellation as separate versioned lifecycle commands. Bazionweb owns grace and subscription decisions; Platform applies the signed, idempotent entitlement transition.
 - [ ] Make suspension reversible. Treat deletion/offboarding as a separate export, retention and audited purge workflow, incorporating the proven 30-day archive behavior from the feature branch.
 - [ ] Add failure injection after every step plus duplicate message, timeout-after-success, retry exhaustion, callback loss and failed compensation tests.
 
@@ -265,7 +266,7 @@ The audit also found a divergent local branch, `feature/church-ministry-platform
 
 | Repository | Branch | Commit at checkpoint | Working tree | Database evidence |
 | --- | --- | --- | --- | --- |
-| Bazion Platform | `feat/provider-neutral-deployment-contract` | `80ef1dea7ab128570b579e8633f4df44a54d1c79` | Only pre-existing untracked `.agents/` audit artifacts; preserved | Local `bazion_platform` includes migration `0019_commercial_provisioning_delivery.sql`; platform PostgreSQL integration tests pass. |
+| Bazion Platform | `feat/provider-neutral-deployment-contract` | `8470440453b8e4eb051c98062451c57f034ec3d8` | Only pre-existing untracked `.agents/` audit artifacts; preserved | Local `bazion_platform` includes migrations `0018`–`0019`; platform PostgreSQL delivery integration passes. |
 | Bazionweb | `main` | `50bc5595631bce5e40533f2792bc1f7fded1a5c3` | Clean | The new outbox migration is committed but not applied to the empty local `bazionweb_test`; do not use the remote Neon URL for tests. |
 
 The commercial delivery feature is committed in Bazionweb (`5dcdf2f`) and the platform (`355f7d7`, with the dual-system test harness in `80ef1de`). The standalone SSL test determinism fix is `4e41822`; billing test injection updates are `50bc559`.
@@ -273,12 +274,12 @@ The commercial delivery feature is committed in Bazionweb (`5dcdf2f`) and the pl
 ## Current implementation status
 
 - Phase 1's strict request/operation/event contract and generated JSON Schema are committed. The uppercase catalog-ID validator drift is corrected and covered by tests. The fixture-sharing, offer binding, and compatibility tasks remain open.
-- Phase 2 is in progress: a platform installation/operation/saga journal migration, dedicated database role, Drizzle declarations and PostgreSQL integration test are implemented in the current slice. Migration `0018_product_installations_provisioning_sagas.sql` applied locally. The full workspace suite, including PostgreSQL-backed registry integration, passes locally; CI evidence and remaining registry/API authorization cases are still required before closing the phase.
+- Phase 2 is in progress: the initial installation/operation schema, dedicated database role, Drizzle declarations, inbox/routes and PostgreSQL integration tests are implemented in migrations `0018`–`0019`. The platform registry integration passed locally, but branch-feature reconciliation, configuration history/transform coverage, migration recovery evidence and remaining authorization/fingerprint-conflict cases are still required before closing the phase.
 - The audited tenant-selector bypass is fixed; six focused tests verify production host authority and local-only explicit selection. Maintenance-mode enforcement remains an open Phase 0 blocker.
 - Tenant-scoped audit filtering and pagination now use PostgreSQL bind placeholders consistently; route tests cover filtered and unfiltered pagination.
 - Rate-limit reset now fails explicitly with an audited `501` while the configured stores lack reset APIs; the dashboard no longer offers a nonfunctional unblock form. Maintenance-mode enforcement remains open Phase 0 work.
 - Generic auth organization creation now only links its reserved tenant and creates a local hostname outside production. Optional commerce, analytics and church-ministry entitlements default off; the installation workflow must explicitly enable the purchased composition. Maintenance-mode enforcement remains open.
-- Phase 3 command/status delivery is committed in both repositories. The platform PostgreSQL delivery integration passed. Bazionweb's full test run passed 593 API and 576 web tests, but its PostgreSQL integration suite skipped 3 database cases; the dual-repository integration test also skipped because no safe local Bazionweb test URL is configured. Current evidence does not support claiming a live Bazionweb PostgreSQL run. CI database wiring, database-backed saga execution/compensation, product offer bindings (Phase 4), provider compensation, identity flow (Phase 5), and pilot remain outstanding.
+- Phase 3 command/status delivery is committed in both repositories. The platform PostgreSQL delivery integration passed. Bazionweb's full test run passed 593 API and 576 web tests, but its PostgreSQL integration suite skipped 3 database cases; the dual-repository integration test also skipped because no safe local Bazionweb test URL is configured. Current evidence does not support claiming a live Bazionweb or dual-database PostgreSQL run. CI/safe local database wiring, database-backed saga execution/compensation, product offer bindings (Phase 4), provider compensation, identity flow (Phase 5), and pilot remain outstanding.
 - Do not mark a phase complete until its exit gate has evidence in CI and a commit. Migrations already applied locally are immutable; follow-up schema changes require a new numbered migration.
 
 ## Security references
