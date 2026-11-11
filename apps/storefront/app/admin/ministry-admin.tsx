@@ -19,6 +19,58 @@ type Prayer = { id: string; fullName: string; email: string | null; telephone: s
 type NewsletterSubscriber = { id: string; email: string; consentAt: string; status: string };
 type Overview = { sermonCount: number; eventCount: number; registrationCount: number; donationCount: number; totalRaisedMinor: number; pendingPrayers: number; newMessages: number };
 
+function extractYouTubeVideoId(input: string): string {
+  const trimmed = input.trim();
+  if (!trimmed) return "";
+  const shortMatch = trimmed.match(/youtu\.be\/([a-zA-Z0-9_-]{5,})/);
+  if (shortMatch?.[1]) return shortMatch[1];
+  const longMatch = trimmed.match(/[?&]v=([a-zA-Z0-9_-]{5,})/);
+  if (longMatch?.[1]) return longMatch[1];
+  const embedMatch = trimmed.match(/youtube\.com\/embed\/([a-zA-Z0-9_-]{5,})/);
+  if (embedMatch?.[1]) return embedMatch[1];
+  const liveMatch = trimmed.match(/youtube\.com\/live\/([a-zA-Z0-9_-]{5,})/);
+  if (liveMatch?.[1]) return liveMatch[1];
+  return trimmed;
+}
+
+function getNextDayOfWeek(dayOfWeek: number, hour = 10, minute = 0): string {
+  const d = new Date();
+  const currentDay = d.getDay();
+  let daysUntil = dayOfWeek - currentDay;
+  if (daysUntil <= 0) daysUntil += 7;
+  d.setDate(d.getDate() + daysUntil);
+  d.setHours(hour, minute, 0, 0);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function EmptyStateGuide({
+  icon,
+  title,
+  description,
+  actionLabel,
+  onAction,
+}: {
+  icon: string;
+  title: string;
+  description: string;
+  actionLabel?: string;
+  onAction?: () => void;
+}) {
+  return (
+    <div className="admin-empty-guide">
+      <div className="admin-empty-icon" aria-hidden="true">{icon}</div>
+      <h3>{title}</h3>
+      <p>{description}</p>
+      {actionLabel && onAction && (
+        <button type="button" className="ch-btn ch-btn-primary" style={{ marginTop: 8 }} onClick={onAction}>
+          {actionLabel}
+        </button>
+      )}
+    </div>
+  );
+}
+
 async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, { credentials: "include", cache: "no-store", ...init, headers: { "content-type": "application/json", ...init?.headers } });
   const result = await response.json().catch(() => null) as T | null;
@@ -113,6 +165,11 @@ export function MinistryAdminDashboard() {
 
   async function createEvent(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault(); setBusy(true); setNotice("");
+    if (eventForm.endsAt && new Date(eventForm.endsAt) < new Date(eventForm.startsAt)) {
+      setNotice("Event end time must be after the start time.");
+      setBusy(false);
+      return;
+    }
     try {
       const result = await apiRequest<{ event: { slug: string } }>("/v1/admin/church/events", { method: "POST", body: JSON.stringify({
         ...eventForm,
@@ -278,22 +335,112 @@ export function MinistryAdminDashboard() {
       {tab === "site" && <SiteSettingsEditor />}
       {tab === "sermons" && <>
         <form onSubmit={createSermon} className="ch-grid-2" style={{ marginBottom: 24 }}>
-          <label style={{ display: "grid", gap: 6 }}>Title<input required minLength={3} maxLength={200} value={sermonForm.title} onChange={(e) => setSermonForm({ ...sermonForm, title: e.target.value })} /><small className="admin-muted">Page link: /sermons/{slugifyContentTitle(sermonForm.title, "sermon")} · generated automatically</small></label>
+          <label style={{ display: "grid", gap: 6 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: 6 }}>
+              <span>Title</span>
+              <button
+                type="button"
+                className="admin-sample-btn"
+                onClick={() => setSermonForm({
+                  title: "Walking in Faith and Victory",
+                  speaker: "Senior Pastor",
+                  description: "Discover the foundational principles of living a victorious Christian life amidst modern challenges.",
+                  scriptureReference: "Hebrews 11:1-6",
+                  youtubeVideoId: "",
+                  thumbnailUrl: "",
+                  status: "published",
+                })}
+              >
+                + Load sample sermon
+              </button>
+            </div>
+            <input required minLength={3} maxLength={200} value={sermonForm.title} onChange={(e) => setSermonForm({ ...sermonForm, title: e.target.value })} />
+            <small className="admin-muted">Page link: /sermons/{slugifyContentTitle(sermonForm.title, "sermon")} · generated automatically</small>
+          </label>
           <label style={{ display: "grid", gap: 6 }}>Speaker<input required minLength={2} maxLength={160} value={sermonForm.speaker} onChange={(e) => setSermonForm({ ...sermonForm, speaker: e.target.value })} /></label>
-          <label style={{ display: "grid", gap: 6 }}>Scripture reference<input maxLength={160} value={sermonForm.scriptureReference} onChange={(e) => setSermonForm({ ...sermonForm, scriptureReference: e.target.value })} /></label>
-          <label style={{ display: "grid", gap: 6 }}>YouTube video ID<input minLength={5} maxLength={64} value={sermonForm.youtubeVideoId} onChange={(e) => setSermonForm({ ...sermonForm, youtubeVideoId: e.target.value })} /></label>
+          <label style={{ display: "grid", gap: 6 }}>Scripture reference<input maxLength={160} placeholder="e.g. John 3:16-18, Psalm 23" value={sermonForm.scriptureReference} onChange={(e) => setSermonForm({ ...sermonForm, scriptureReference: e.target.value })} /></label>
+          <label style={{ display: "grid", gap: 6 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+              <span>YouTube video link or ID</span>
+              {sermonForm.youtubeVideoId ? <span className="admin-field-success-badge">✓ Video ID: {sermonForm.youtubeVideoId}</span> : null}
+            </div>
+            <input placeholder="e.g. dQw4w9WgXcQ or https://youtu.be/..." value={sermonForm.youtubeVideoId} onChange={(e) => setSermonForm({ ...sermonForm, youtubeVideoId: extractYouTubeVideoId(e.target.value) })} />
+            <small className="admin-muted">Paste full YouTube link or ID; we extract the ID automatically.</small>
+          </label>
           <MediaUploadField label="Sermon thumbnail" value={sermonForm.thumbnailUrl} onChange={(value) => setSermonForm({ ...sermonForm, thumbnailUrl: value })} />
           <label style={{ gridColumn: "1 / -1" }}>Description<textarea maxLength={5000} rows={4} value={sermonForm.description} onChange={(e) => setSermonForm({ ...sermonForm, description: e.target.value })} /></label>
-          <label style={{ display: "grid", gap: 6 }}>Visibility<select aria-label="New sermon visibility" value={sermonForm.status} onChange={(e) => setSermonForm({ ...sermonForm, status: e.target.value as "draft" | "published" })}><option value="draft">Save as draft</option><option value="published">Publish now</option></select></label>
+          <label style={{ display: "grid", gap: 6 }}>Visibility<select aria-label="New sermon visibility" value={sermonForm.status} onChange={(e) => setSermonForm({ ...sermonForm, status: e.target.value as "draft" | "published" })}><option value="draft">Save as draft (hidden from public)</option><option value="published">Publish now (visible on public site)</option></select></label>
           <button className="ch-btn ch-btn-primary" disabled={busy}>Save sermon</button>
         </form>
         {sermons.map((item) => <article key={item.id} className="ch-card"><div className="ch-card-body"><strong>{item.title}</strong><p>{item.speaker} · {item.status} · /sermons/{item.slug}</p><select aria-label={`Visibility for ${item.title}`} value={item.status} disabled={busy} onChange={(e) => void setPublicContentStatus("sermons", item.id, e.target.value)}><option value="draft">Draft</option><option value="published">Published</option><option value="archived">Archived</option></select> <button className="ch-btn ch-btn-outline" disabled={busy} onClick={() => void removeRecord(`/v1/admin/church/sermons/${item.id}`, "sermon")}>Delete</button></div></article>)}
+        {!loading && sermons.length === 0 && (
+          <EmptyStateGuide
+            icon="♪"
+            title="No sermons in your library yet"
+            description="Sermons allow your congregation and visitors to watch or listen to messages online anytime. Published sermons appear at /sermons and in the homepage teaching section."
+            actionLabel="Load sample sermon"
+            onAction={() => setSermonForm({
+              title: "Walking in Faith and Victory",
+              speaker: "Senior Pastor",
+              description: "Discover the foundational principles of living a victorious Christian life amidst modern challenges.",
+              scriptureReference: "Hebrews 11:1-6",
+              youtubeVideoId: "",
+              thumbnailUrl: "",
+              status: "published",
+            })}
+          />
+        )}
       </>}
       {tab === "events" && <>
         <form onSubmit={createEvent} className="ch-grid-2" style={{ marginBottom: 24 }}>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", gridColumn: "1 / -1", margin: "0 0 8px" }}>
+            <span style={{ fontSize: 11, fontWeight: 600, color: "var(--church-text-muted)" }}>Quick schedule:</span>
+            <button
+              type="button"
+              className="admin-sample-btn"
+              onClick={() => {
+                const nextSunStart = getNextDayOfWeek(0, 10, 0);
+                const nextSunEnd = getNextDayOfWeek(0, 12, 30);
+                setEventForm((prev) => ({ ...prev, startsAt: nextSunStart, endsAt: nextSunEnd }));
+              }}
+            >
+              This/Next Sunday 10:00 AM
+            </button>
+            <button
+              type="button"
+              className="admin-sample-btn"
+              onClick={() => {
+                const satStart = getNextDayOfWeek(6, 14, 0);
+                const satEnd = getNextDayOfWeek(6, 17, 0);
+                setEventForm((prev) => ({ ...prev, startsAt: satStart, endsAt: satEnd }));
+              }}
+            >
+              This/Next Saturday 2:00 PM
+            </button>
+            <button
+              type="button"
+              className="admin-sample-btn"
+              onClick={() => setEventForm({
+                title: "Kingdom Life Annual Conference 2026",
+                description: "Join believers from across the nation for three days of transformative worship, teachings, and empowering ministry.",
+                startsAt: getNextDayOfWeek(5, 17, 0),
+                endsAt: getNextDayOfWeek(0, 13, 0),
+                venue: "Main Worship Sanctuary",
+                address: "123 Faith Way, Nairobi",
+                posterUrl: "",
+                registrationCapacity: "250",
+                registrationEnabled: true,
+              })}
+            >
+              + Load sample event
+            </button>
+          </div>
           <label style={{ display: "grid", gap: 6 }}>Event title<input required minLength={3} maxLength={200} value={eventForm.title} onChange={(e) => setEventForm({ ...eventForm, title: e.target.value })} /><small className="admin-muted">Page link: /events/{slugifyContentTitle(eventForm.title, "event")} · generated automatically</small></label>
           <label style={{ display: "grid", gap: 6 }}>Starts at<input required type="datetime-local" value={eventForm.startsAt} onChange={(e) => setEventForm({ ...eventForm, startsAt: e.target.value })} /></label>
           <label style={{ display: "grid", gap: 6 }}>Ends at (optional)<input type="datetime-local" value={eventForm.endsAt} onChange={(e) => setEventForm({ ...eventForm, endsAt: e.target.value })} /></label>
+          {eventForm.startsAt && eventForm.endsAt && new Date(eventForm.endsAt) < new Date(eventForm.startsAt) ? (
+            <div className="admin-field-alert" style={{ gridColumn: "1 / -1" }}>⚠️ Event end time must be after the start time.</div>
+          ) : null}
           <label style={{ display: "grid", gap: 6 }}>Venue<input maxLength={180} value={eventForm.venue} onChange={(e) => setEventForm({ ...eventForm, venue: e.target.value })} /></label>
           <label style={{ display: "grid", gap: 6 }}>Address<input maxLength={500} value={eventForm.address} onChange={(e) => setEventForm({ ...eventForm, address: e.target.value })} /></label>
           <MediaUploadField label="Event poster" value={eventForm.posterUrl} onChange={(value) => setEventForm({ ...eventForm, posterUrl: value })} />
@@ -302,16 +449,63 @@ export function MinistryAdminDashboard() {
           <label style={{ display: "flex", alignItems: "center", gap: 10 }}><input type="checkbox" checked={eventForm.registrationEnabled} onChange={(e) => setEventForm({ ...eventForm, registrationEnabled: e.target.checked })} />Enable event registration</label>
           <button className="ch-btn ch-btn-primary" disabled={busy}>Create event</button>
         </form>
-        {events.map((item) => <article key={item.id} className="ch-card"><div className="ch-card-body"><strong>{item.title}</strong><p>{new Date(item.startsAt).toLocaleString()} · {item.venue ?? "Venue not set"} · {item.status}</p><label>Status <select aria-label={`Status for ${item.title}`} value={item.status} disabled={busy} onChange={(e) => void setPublicContentStatus("events", item.id, e.target.value)}><option value="upcoming">Upcoming</option><option value="in_progress">In progress</option><option value="completed">Completed</option><option value="cancelled">Cancelled</option></select></label> <button className="ch-btn ch-btn-outline" disabled={busy} onClick={() => void removeRecord(`/v1/admin/church/events/${item.id}`, "event")}>Delete</button></div></article>)}
+        {events.map((item) => <article key={item.id} className="ch-card"><div className="ch-card-body"><strong>{item.title}</strong><p>{new Date(item.startsAt).toLocaleString()} · {item.venue ?? "Venue not set"} · {item.status}</p><label>Status <select aria-label={`Status for ${item.title}`} value={item.status} disabled={busy} onChange={(e) => void setPublicContentStatus("events", item.id, e.target.value)}><option value="upcoming">Upcoming</option><option value="in_progress">In progress</option><option value="completed">Completed</option></select></label> <button className="ch-btn ch-btn-outline" disabled={busy} onClick={() => void removeRecord(`/v1/admin/church/events/${item.id}`, "event")}>Delete</button></div></article>)}
+        {!loading && events.length === 0 && (
+          <EmptyStateGuide
+            icon="✦"
+            title="No ministry events scheduled"
+            description="Plan conferences, prayer summits, youth fellowships, or Sunday gatherings. Visitors can read event details, see venue maps, and RSVP online."
+            actionLabel="Load sample event"
+            onAction={() => setEventForm({
+              title: "Kingdom Life Annual Conference 2026",
+              description: "Join believers from across the nation for three days of transformative worship, teachings, and empowering ministry.",
+              startsAt: getNextDayOfWeek(5, 17, 0),
+              endsAt: getNextDayOfWeek(0, 13, 0),
+              venue: "Main Worship Sanctuary",
+              address: "123 Faith Way, Nairobi",
+              posterUrl: "",
+              registrationCapacity: "250",
+              registrationEnabled: true,
+            })}
+          />
+        )}
       </>}
       {tab === "campaigns" && <>
         <p className="admin-muted">Create a giving campaign or pause one. Progress increases only after a payment provider confirms a donation.</p>
         <form onSubmit={createCampaign} className="ch-grid-2" style={{ marginBottom: 24 }}>
-          <label style={{ display: "grid", gap: 6 }}>Campaign title<input required minLength={3} maxLength={180} placeholder="Campaign title" value={campaignForm.title} onChange={(event) => setCampaignForm({ ...campaignForm, title: event.target.value })} /><small className="admin-muted">Campaign link: /give#{slugifyContentTitle(campaignForm.title, "campaign")} · generated automatically</small></label>
-          <input required type="number" min={1} max={500000000} aria-label="Campaign target amount in KES" placeholder="Target amount (KES)" value={campaignForm.targetAmountKsh} onChange={(event) => setCampaignForm({ ...campaignForm, targetAmountKsh: event.target.value })} />
+          <label style={{ display: "grid", gap: 6 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: 6 }}>
+              <span>Campaign title</span>
+              <button
+                type="button"
+                className="admin-sample-btn"
+                onClick={() => setCampaignForm({
+                  title: "Community Outreach & Food Drive",
+                  description: "Providing essential food hampers, blankets, and school kits for 500 vulnerable families in our local community.",
+                  targetAmountKsh: "250000",
+                  startsAt: getNextDayOfWeek(1, 8, 0),
+                  endsAt: getNextDayOfWeek(0, 18, 0),
+                })}
+              >
+                + Load sample campaign
+              </button>
+            </div>
+            <input required minLength={3} maxLength={180} placeholder="e.g. Building Expansion Project" value={campaignForm.title} onChange={(event) => setCampaignForm({ ...campaignForm, title: event.target.value })} />
+            <small className="admin-muted">Campaign link: /give#{slugifyContentTitle(campaignForm.title, "campaign")} · generated automatically</small>
+          </label>
+          <label style={{ display: "grid", gap: 6 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+              <span>Target amount (KES)</span>
+              {Number(campaignForm.targetAmountKsh) > 0 ? (
+                <span className="admin-field-success-badge">Target: KES {Number(campaignForm.targetAmountKsh).toLocaleString()}</span>
+              ) : null}
+            </div>
+            <input required type="number" min={1} max={500000000} aria-label="Campaign target amount in KES" placeholder="Target amount in KES (e.g. 250000)" value={campaignForm.targetAmountKsh} onChange={(event) => setCampaignForm({ ...campaignForm, targetAmountKsh: event.target.value })} />
+            <small className="admin-muted">Whole KES. Verified gifts automatically increment progress.</small>
+          </label>
           <input type="datetime-local" aria-label="Campaign starts at" value={campaignForm.startsAt} onChange={(event) => setCampaignForm({ ...campaignForm, startsAt: event.target.value })} />
           <input type="datetime-local" aria-label="Campaign ends at" value={campaignForm.endsAt} onChange={(event) => setCampaignForm({ ...campaignForm, endsAt: event.target.value })} />
-          <textarea maxLength={5000} aria-label="Campaign description" placeholder="What the campaign supports" value={campaignForm.description} onChange={(event) => setCampaignForm({ ...campaignForm, description: event.target.value })} />
+          <textarea maxLength={5000} aria-label="Campaign description" placeholder="What the campaign supports and why it matters" value={campaignForm.description} onChange={(event) => setCampaignForm({ ...campaignForm, description: event.target.value })} />
           <button className="ch-btn ch-btn-primary" disabled={busy}>Create campaign</button>
         </form>
         <div style={{ display: "grid", gap: 12 }}>
@@ -319,20 +513,40 @@ export function MinistryAdminDashboard() {
             <div><strong>{campaign.title}</strong><p>{campaign.currency} {(campaign.raisedAmountMinor / 100).toLocaleString()} raised of {(campaign.targetAmountMinor / 100).toLocaleString()} · /give#{campaign.slug}</p></div>
             <label>Campaign status <select value={campaign.status} disabled={busy} onChange={(event) => void setCampaignStatus(campaign.id, event.target.value)}><option value="active">Active</option><option value="paused">Paused</option><option value="completed">Completed</option></select></label>
           </div></article>)}
-          {!campaigns.length && <p>No giving campaigns have been created.</p>}
+          {!loading && campaigns.length === 0 && (
+            <EmptyStateGuide
+              icon="♡"
+              title="No giving campaigns created yet"
+              description="Create targeted fundraising drives for missions, building expansions, or community relief. Real-time progress bars update as confirmed gifts arrive."
+              actionLabel="Load sample campaign"
+              onAction={() => setCampaignForm({
+                title: "Community Outreach & Food Drive",
+                description: "Providing essential food hampers, blankets, and school kits for 500 vulnerable families in our local community.",
+                targetAmountKsh: "250000",
+                startsAt: getNextDayOfWeek(1, 8, 0),
+                endsAt: getNextDayOfWeek(0, 18, 0),
+              })}
+            />
+          )}
         </div>
       </>}
       {tab === "registrations" && registrations.map((item) => <article className="ch-card" key={item.id}><div className="ch-card-body"><strong>{item.fullName} · {item.eventTitle}</strong><p>{item.email} · {item.telephone}</p><p>Ref {item.registrationReference} · {item.status}</p><button className="admin-danger-button" disabled={busy} onClick={() => void removeRecord(`/v1/admin/church/registrations/${item.id}`, "event registration")}>Delete personal data</button></div></article>)}
       {tab === "donations" && donations.map((item) => <article className="ch-card" key={item.id}><div className="ch-card-body"><strong>{item.anonymous ? "Anonymous donor" : item.donorName || "Donor"} · {item.currency} {(item.amountMinor / 100).toLocaleString()}</strong><p>{item.givingCategory} · {item.paymentMethod} · {item.paymentStatus}</p><p>{item.paymentStatus === "verified" ? "Provider-confirmed" : "Not confirmed"} · {new Date(item.createdAt).toLocaleString()}</p></div></article>)}
       {tab === "messages" && messages.map((item) => <article className="ch-card" key={item.id}><div className="ch-card-body"><strong>{item.subject}</strong><p>{item.fullName} · {item.email} · {item.category}</p><p>{item.message}</p><select value={item.status} disabled={busy} onChange={(e) => void changeStatus("messages", item.id, e.target.value)}><option value="new">New</option><option value="reviewed">Reviewed</option><option value="archived">Archived</option></select> <button className="admin-danger-button" disabled={busy} onClick={() => void removeRecord(`/v1/admin/church/messages/${item.id}`, "enquiry")}>Delete personal data</button></div></article>)}
       {tab === "prayers" && prayers.map((item) => <article className="ch-card" key={item.id}><div className="ch-card-body"><strong>{item.fullName} · {item.status}</strong><p>{item.requestText}</p><select value={item.status} disabled={busy} onChange={(e) => void changeStatus("prayers", item.id, e.target.value)}><option value="received">Received</option><option value="prayed_for">Prayed for</option></select> <button className="admin-danger-button" disabled={busy} onClick={() => void removeRecord(`/v1/admin/church/prayers/${item.id}`, "prayer request")}>Delete personal data</button></div></article>)}
-      {tab === "newsletter" && sensitiveAccess && <><p className="admin-muted">Email opt-ins are stored with consent time. Remove an address after a person asks to withdraw or erase their subscription.</p>{newsletterSubscribers.map((subscriber) => <article className="ch-card" key={subscriber.id}><div className="ch-card-body" style={{ display: "flex", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}><div><strong>{subscriber.email}</strong><p>Consent recorded {new Date(subscriber.consentAt).toLocaleString()} · {subscriber.status}</p></div><button className="admin-danger-button" disabled={busy} onClick={() => void removeRecord(`/v1/admin/church/newsletter/${subscriber.id}`, "email opt-in")}>Remove opt-in</button></div></article>)}{!newsletterSubscribers.length && <p>No email opt-ins have been recorded.</p>}</>}
-      {!loading && sensitiveAccess && tab === "registrations" && registrations.length === 0 && <p>No registrations yet.</p>}
-      {!loading && sensitiveAccess && tab === "donations" && donations.length === 0 && <p>No donation attempts yet.</p>}
-      {!loading && sensitiveAccess && tab === "messages" && messages.length === 0 && <p>No enquiries yet.</p>}
-      {!loading && sensitiveAccess && tab === "prayers" && prayers.length === 0 && <p>No prayer requests yet.</p>}
-      {!loading && tab === "sermons" && sermons.length === 0 && <p>No sermons have been published.</p>}
-      {!loading && tab === "events" && events.length === 0 && <p>No events have been created.</p>}
+      {tab === "newsletter" && sensitiveAccess && <><p className="admin-muted">Email opt-ins are stored with consent time. Remove an address after a person asks to withdraw or erase their subscription.</p>{newsletterSubscribers.map((subscriber) => <article className="ch-card" key={subscriber.id}><div className="ch-card-body" style={{ display: "flex", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}><div><strong>{subscriber.email}</strong><p>Consent recorded {new Date(subscriber.consentAt).toLocaleString()} · {subscriber.status}</p></div><button className="admin-danger-button" disabled={busy} onClick={() => void removeRecord(`/v1/admin/church/newsletter/${subscriber.id}`, "email opt-in")}>Remove opt-in</button></div></article>)}{!newsletterSubscribers.length && <EmptyStateGuide icon="📬" title="No newsletter subscribers yet" description="Visitors who subscribe to email updates on your website will be saved here with verified consent timestamps." />}</>}
+      {!loading && sensitiveAccess && tab === "registrations" && registrations.length === 0 && (
+        <EmptyStateGuide icon="⌑" title="No event registrations yet" description="When visitors register for events with registration enabled, their contact details, timestamps, and registration references will appear here." />
+      )}
+      {!loading && sensitiveAccess && tab === "donations" && donations.length === 0 && (
+        <EmptyStateGuide icon="💳" title="No confirmed donations yet" description="When supporters give through verified M-Pesa STK prompts or your payment gateway, confirmed contributions appear here automatically." />
+      )}
+      {!loading && sensitiveAccess && tab === "messages" && messages.length === 0 && (
+        <EmptyStateGuide icon="✉" title="Your enquiries inbox is clear" description="Messages submitted via the Contact form on your website will arrive here so your pastoral or support team can follow up." />
+      )}
+      {!loading && sensitiveAccess && tab === "prayers" && prayers.length === 0 && (
+        <EmptyStateGuide icon="✧" title="No prayer requests pending" description="Confidential prayer requests submitted by visitors through your website will appear here for pastoral intercession." />
+      )}
     </div></section>
   </div>;
 }

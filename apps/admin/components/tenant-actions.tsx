@@ -20,7 +20,7 @@ export function CreateTenantModal() {
   const [currency, setCurrency] = useState("KES");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
+  const [provisioned, setProvisioned] = useState<{ name: string; slug: string; orgId?: string } | null>(null);
   const router = useRouter();
 
   function handleNameChange(val: string) {
@@ -30,11 +30,21 @@ export function CreateTenantModal() {
     }
   }
 
+  function handleClose() {
+    if (busy) return;
+    setIsOpen(false);
+    setName("");
+    setSlug("");
+    setIsManualSlug(false);
+    setError("");
+    setProvisioned(null);
+    router.refresh();
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
     setError("");
-    setSuccess("");
 
     try {
       const response = await fetch("/api/auth/organization/create", {
@@ -50,15 +60,12 @@ export function CreateTenantModal() {
         throw new Error(data.message || data.error || `Creation failed (${response.status})`);
       }
 
-      setSuccess(`Workspace "${name}" provisioned successfully!`);
-      setTimeout(() => {
-        setIsOpen(false);
-        setName("");
-        setSlug("");
-        setIsManualSlug(false);
-        setSuccess("");
-        router.refresh();
-      }, 1200);
+      setProvisioned({
+        name: name.trim(),
+        slug: slug.trim(),
+        orgId: data.organization?.id || data.id,
+      });
+      router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to provision workspace.");
     } finally {
@@ -71,94 +78,163 @@ export function CreateTenantModal() {
       <button
         type="button"
         className="primary create-workspace-btn"
-        onClick={() => setIsOpen(true)}
+        onClick={() => {
+          setProvisioned(null);
+          setError("");
+          setIsOpen(true);
+        }}
       >
         <span>+ Provision Workspace</span>
       </button>
 
       {isOpen && (
-        <div className="modal-backdrop" onClick={() => !busy && setIsOpen(false)}>
+        <div className="modal-backdrop" onClick={handleClose}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <div>
                 <p className="eyebrow">NEW CLIENT WORKSPACE</p>
-                <h2>Provision Workspace</h2>
-                <p className="muted">Creates an isolated tenant organization with dedicated schemas and roles.</p>
+                <h2>{provisioned ? "Workspace Ready" : "Provision Workspace"}</h2>
+                <p className="muted">
+                  {provisioned
+                    ? "Workspace has been created with dedicated schemas and roles."
+                    : "Creates an isolated tenant organization with dedicated schemas and roles."}
+                </p>
               </div>
               <button
                 type="button"
                 className="modal-close"
                 disabled={busy}
-                onClick={() => setIsOpen(false)}
+                onClick={handleClose}
               >
                 ✕
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="modal-form">
-              {error && <div className="notice-inline error-notice">{error}</div>}
-              {success && <div className="notice-inline success-notice">{success}</div>}
+            {provisioned ? (
+              <div className="modal-form" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                <div className="notice-inline success-notice" style={{ padding: 14 }}>
+                  <strong>Workspace &quot;{provisioned.name}&quot; provisioned successfully!</strong>
+                  <p style={{ marginTop: 6, fontSize: 13, lineHeight: 1.5 }}>
+                    Your new tenant is live and isolated with default ministry settings and role access.
+                  </p>
+                </div>
 
-              <label>
-                Workspace / Client Name
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. St. Jude Outreach Ministries"
-                  value={name}
-                  onChange={(e) => handleNameChange(e.target.value)}
-                  disabled={busy}
-                />
-              </label>
+                <div style={{ display: "flex", flexDirection: "column", gap: 10, background: "var(--surface)", padding: 14, borderRadius: 6, border: "1px solid var(--border)" }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: "var(--muted)" }}>DIRECT WORKSPACE ACCESS LINKS:</div>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                    <div>
+                      <strong style={{ display: "block", fontSize: 13 }}>Public Storefront</strong>
+                      <code style={{ fontSize: 12 }}>http://localhost:3100/?tenant={provisioned.slug}</code>
+                    </div>
+                    <a
+                      href={`http://localhost:3100/?tenant=${provisioned.slug}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="primary"
+                      style={{ padding: "6px 14px", textDecoration: "none", borderRadius: 4, fontSize: 13 }}
+                    >
+                      Open Site ↗
+                    </a>
+                  </div>
+                  <hr style={{ border: 0, borderTop: "1px solid var(--border)", margin: "4px 0" }} />
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                    <div>
+                      <strong style={{ display: "block", fontSize: 13 }}>Tenant Admin Desk</strong>
+                      <code style={{ fontSize: 12 }}>http://localhost:3100/workspace?workspace={provisioned.slug}</code>
+                    </div>
+                    <a
+                      href={`http://localhost:3100/workspace?select=${provisioned.orgId ?? ""}&workspace=${provisioned.slug}&redirect=/admin`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="secondary"
+                      style={{ padding: "6px 14px", textDecoration: "none", borderRadius: 4, fontSize: 13 }}
+                    >
+                      Open Desk ↗
+                    </a>
+                  </div>
+                </div>
 
-              <label>
-                URL Identifier (Slug)
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. st-jude-outreach"
-                  value={slug}
-                  onChange={(e) => {
-                    setIsManualSlug(true);
-                    setSlug(slugify(e.target.value));
-                  }}
-                  disabled={busy}
-                />
-                <small className="muted">Lowercase letters, numbers, and dashes only.</small>
-              </label>
-
-              <label>
-                Base Currency
-                <select
-                  value={currency}
-                  onChange={(e) => setCurrency(e.target.value)}
-                  disabled={busy}
-                >
-                  <option value="KES">KES - Kenyan Shilling</option>
-                  <option value="USD">USD - US Dollar</option>
-                  <option value="EUR">EUR - Euro</option>
-                  <option value="GBP">GBP - British Pound</option>
-                </select>
-              </label>
-
-              <div className="modal-actions">
-                <button
-                  type="button"
-                  className="secondary"
-                  disabled={busy}
-                  onClick={() => setIsOpen(false)}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="primary"
-                  disabled={busy || !name.trim() || !slug.trim()}
-                >
-                  {busy ? "Provisioning…" : "Create & Provision Workspace →"}
-                </button>
+                <div className="modal-actions" style={{ marginTop: 8 }}>
+                  <button
+                    type="button"
+                    className="primary"
+                    onClick={handleClose}
+                  >
+                    Done & View All Workspaces ✓
+                  </button>
+                </div>
               </div>
-            </form>
+            ) : (
+              <form onSubmit={handleSubmit} className="modal-form">
+                {error && <div className="notice-inline error-notice">{error}</div>}
+
+                <label>
+                  Workspace / Client Name
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. St. Jude Outreach Ministries"
+                    value={name}
+                    onChange={(e) => handleNameChange(e.target.value)}
+                    disabled={busy}
+                  />
+                </label>
+
+                <label>
+                  URL Identifier (Slug)
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. st-jude-outreach"
+                    value={slug}
+                    onChange={(e) => {
+                      setIsManualSlug(true);
+                      setSlug(slugify(e.target.value));
+                    }}
+                    disabled={busy}
+                  />
+                  <small className="muted">
+                    {slug ? (
+                      <>Local dev URL will be: <code>http://localhost:3100/?tenant={slug}</code></>
+                    ) : (
+                      "Lowercase letters, numbers, and dashes only."
+                    )}
+                  </small>
+                </label>
+
+                <label>
+                  Base Currency
+                  <select
+                    value={currency}
+                    onChange={(e) => setCurrency(e.target.value)}
+                    disabled={busy}
+                  >
+                    <option value="KES">KES - Kenyan Shilling</option>
+                    <option value="USD">USD - US Dollar</option>
+                    <option value="EUR">EUR - Euro</option>
+                    <option value="GBP">GBP - British Pound</option>
+                  </select>
+                </label>
+
+                <div className="modal-actions">
+                  <button
+                    type="button"
+                    className="secondary"
+                    disabled={busy}
+                    onClick={handleClose}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="primary"
+                    disabled={busy || !name.trim() || !slug.trim()}
+                  >
+                    {busy ? "Provisioning…" : "Create & Provision Workspace →"}
+                  </button>
+                </div>
+              </form>
+            )}
           </div>
         </div>
       )}

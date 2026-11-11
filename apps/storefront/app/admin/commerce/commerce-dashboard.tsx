@@ -202,19 +202,72 @@ export function CommerceDashboard({ initialTab = "products" }: { initialTab?: "p
     {loading && <p className="commerce-loading" role="status">Loading your store workspace…</p>}
 
     {!loading && tab === "products" && <section className="commerce-panel" aria-labelledby="catalog-panel-title">
-      <div className="commerce-panel-heading"><div><p className="commerce-admin-kicker">THE CATALOG</p><h2 id="catalog-panel-title">Products</h2><p>Prices are entered in major currency units. Inventory reservations are protected during checkout.</p></div>{canCreateProduct && <button type="button" className="commerce-primary" onClick={() => { setEditingProductId(null); setForm(emptyProduct); document.getElementById("commerce-product-form")?.scrollIntoView({ behavior: "smooth" }); }}>+ Add product</button>}</div>
+      <div className="commerce-panel-heading">
+        <div>
+          <p className="commerce-admin-kicker">THE CATALOG</p>
+          <h2 id="catalog-panel-title">Products</h2>
+          <p>Prices are entered in major currency units. Inventory reservations are protected during checkout.</p>
+        </div>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          {canCreateProduct && (
+            <button
+              type="button"
+              className="commerce-secondary"
+              onClick={() => {
+                setEditingProductId(null);
+                setForm({
+                  sku: "APRL-HOODIE-01",
+                  slug: "faith-classic-hoodie",
+                  name: "Faith Classic Premium Hoodie",
+                  description: "Ultra-soft, heavyweight combed cotton fleece hoodie with embroidered faith insignia.",
+                  category: "Apparel",
+                  imageUrl: "",
+                  imageAlt: "Front view of faith classic hoodie",
+                  currency: store.defaultCurrency,
+                  price: "2500.00",
+                  compareAtPrice: "3000.00",
+                  featured: true,
+                  stockTracked: true,
+                  stockOnHand: "50",
+                  active: true,
+                });
+                document.getElementById("commerce-product-form")?.scrollIntoView({ behavior: "smooth" });
+              }}
+            >
+              + Load sample product
+            </button>
+          )}
+          {canCreateProduct && <button type="button" className="commerce-primary" onClick={() => { setEditingProductId(null); setForm(emptyProduct); document.getElementById("commerce-product-form")?.scrollIntoView({ behavior: "smooth" }); }}>+ Add product</button>}
+        </div>
+      </div>
       {productError && <p className="commerce-error" role="alert">{productError}</p>}
       {productError && productError.includes("role") ? <Link className="commerce-signin" href="/login?next=%2Fadmin%2Fcommerce">Sign in with an authorized workspace role</Link> : null}
       {canCreateProduct && <form id="commerce-product-form" className="commerce-product-form" onSubmit={saveProduct}>
         <div className="commerce-form-title"><div><h3>{editingProductId ? "Edit product" : "Add a product"}</h3><p>Keep titles and product images descriptive for shoppers.</p></div>{editingProductId && <button type="button" className="commerce-text-button" onClick={() => { setEditingProductId(null); setForm(emptyProduct); }}>Cancel edit</button>}</div>
         <div className="commerce-form-grid">
           <label>Product name<input required minLength={2} maxLength={180} value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value, slug: form.slug || event.target.value.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") })} /></label>
-          <label>SKU<input required maxLength={80} value={form.sku} onChange={(event) => setForm({ ...form, sku: event.target.value })} /></label>
+          <label>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+              <span>SKU</span>
+              <button
+                type="button"
+                style={{ fontSize: 10, background: "none", border: "none", color: "#355747", cursor: "pointer", textDecoration: "underline" }}
+                onClick={() => {
+                  const base = (form.name || "ITEM").toUpperCase().replace(/[^A-Z0-9]+/g, "-").slice(0, 10).replace(/^-|-$/g, "");
+                  const random = Math.floor(100 + Math.random() * 900);
+                  setForm({ ...form, sku: `${base}-${random}` });
+                }}
+              >
+                Auto-generate SKU
+              </button>
+            </div>
+            <input required maxLength={80} placeholder="e.g. ITEM-001" value={form.sku} onChange={(event) => setForm({ ...form, sku: event.target.value })} />
+          </label>
           <label>URL slug<input maxLength={180} pattern="[a-z0-9]+(-[a-z0-9]+)*" value={form.slug} onChange={(event) => setForm({ ...form, slug: event.target.value })} /></label>
           <label>Category<input required maxLength={80} value={form.category} onChange={(event) => setForm({ ...form, category: event.target.value })} /></label>
-          <label>Price<input type="number" required min="0" step="0.01" inputMode="decimal" value={form.price} onChange={(event) => setForm({ ...form, price: event.target.value })} /></label>
+          <label>Price ({form.currency})<input type="number" required min="0" step="0.01" inputMode="decimal" placeholder="e.g. 1500.00" value={form.price} onChange={(event) => setForm({ ...form, price: event.target.value })} /><small style={{ fontSize: 10, color: "#666" }}>Standard currency units</small></label>
           <label>Currency<select value={form.currency} onChange={(event) => setForm({ ...form, currency: event.target.value as Currency })}>{currencies.map((currency) => <option key={currency}>{currency}</option>)}</select></label>
-          <label>Compare-at price<input type="number" min="0" step="0.01" inputMode="decimal" placeholder="Optional sale reference" value={form.compareAtPrice} onChange={(event) => setForm({ ...form, compareAtPrice: event.target.value })} /></label>
+          <label>Compare-at price<input type="number" min="0" step="0.01" inputMode="decimal" placeholder="Optional sale reference" value={form.compareAtPrice} onChange={(event) => setForm({ ...form, compareAtPrice: event.target.value })} /><small style={{ fontSize: 10, color: "#666" }}>Original non-sale price</small></label>
           <label>Stock on hand<input type="number" min="0" step="1" value={form.stockOnHand} disabled={!form.stockTracked} onChange={(event) => setForm({ ...form, stockOnHand: event.target.value })} /></label>
           <label className="commerce-wide">Description<textarea maxLength={5000} rows={3} value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} /></label>
           <label className="commerce-wide">Product image URL<input type="text" placeholder="https://… or /images/product.jpg" value={form.imageUrl} onChange={(event) => setForm({ ...form, imageUrl: event.target.value })} /></label>
@@ -225,7 +278,42 @@ export function CommerceDashboard({ initialTab = "products" }: { initialTab?: "p
         <button className="commerce-primary" type="submit" disabled={saving}>{saving ? "Saving…" : editingProductId ? "Save product" : "Add product"}</button>
       </form>}
       <div className="commerce-product-list">
-        {products.length === 0 ? <div className="commerce-empty"><span>✳</span><h3>Your catalog is ready.</h3><p>Add your first product to begin building the public shop.</p></div> : products.map((product) => <article className="commerce-product-row" key={product.id}>
+        {products.length === 0 ? (
+          <div className="commerce-empty">
+            <span>✳</span>
+            <h3>Your catalog is ready.</h3>
+            <p>Add your first product to begin building the public shop.</p>
+            {canCreateProduct && (
+              <button
+                type="button"
+                className="commerce-primary"
+                style={{ marginTop: 12 }}
+                onClick={() => {
+                  setEditingProductId(null);
+                  setForm({
+                    sku: "APRL-HOODIE-01",
+                    slug: "faith-classic-hoodie",
+                    name: "Faith Classic Premium Hoodie",
+                    description: "Ultra-soft, heavyweight combed cotton fleece hoodie with embroidered faith insignia.",
+                    category: "Apparel",
+                    imageUrl: "",
+                    imageAlt: "Front view of faith classic hoodie",
+                    currency: store.defaultCurrency,
+                    price: "2500.00",
+                    compareAtPrice: "3000.00",
+                    featured: true,
+                    stockTracked: true,
+                    stockOnHand: "50",
+                    active: true,
+                  });
+                  document.getElementById("commerce-product-form")?.scrollIntoView({ behavior: "smooth" });
+                }}
+              >
+                + Load sample product
+              </button>
+            )}
+          </div>
+        ) : products.map((product) => <article className="commerce-product-row" key={product.id}>
           {product.imageUrl ? <img src={product.imageUrl} alt="" loading="lazy" /> : <div className="commerce-product-monogram" aria-hidden="true">{product.name.slice(0, 1).toUpperCase()}</div>}
           <div className="commerce-product-row-main"><span className="commerce-product-category">{product.category} · {product.sku}</span><h3>{product.name}</h3><p>{amount(product.priceMinor, product.currency, store.locale)}{product.compareAtPriceMinor ? ` · Compare ${amount(product.compareAtPriceMinor, product.currency, store.locale)}` : ""}</p></div>
           <div className="commerce-product-stock"><span className={product.active ? "status-active" : "status-muted"}>{product.active ? "Published" : "Draft"}</span><small>{product.stockTracked ? `${Math.max(product.stockOnHand - product.stockReserved, 0)} available` : "Inventory not tracked"}</small></div>
@@ -262,7 +350,18 @@ export function CommerceDashboard({ initialTab = "products" }: { initialTab?: "p
         }}>{currencies.map((currency) => <option key={currency}>{currency}</option>)}</select></label>
         <fieldset className="commerce-wide"><legend>Shopper currencies</legend><div className="commerce-checks">{currencies.map((currency) => <label key={currency}><input type="checkbox" checked={store.supportedCurrencies.includes(currency)} onChange={(event) => setStore({ ...store, supportedCurrencies: event.target.checked ? [...store.supportedCurrencies, currency] : store.supportedCurrencies.filter((item) => item !== currency) })} /> {currency}</label>)}</div><p className="commerce-help">A separate product price is required in each currency. The store does not perform automatic exchange-rate conversion.</p></fieldset>
         <div className="commerce-wide"><p className="commerce-field-label">Flat delivery estimate by currency</p><div className="commerce-rate-grid">{store.supportedCurrencies.map((currency) => <label key={currency}>{currency}<input type="number" min="0" step="0.01" value={decimal(store.shippingRates[currency])} onChange={(event) => setStore({ ...store, shippingRates: { ...store.shippingRates, [currency]: parseAmount(event.target.value) ?? 0 } })} /></label>)}</div><p className="commerce-help">Flat-rate delivery only. Tax is not automatically calculated by this starter template.</p></div>
-        <label className="commerce-wide">Delivery countries<input placeholder="KE, UG, TZ, GB (leave blank to allow all countries)" value={countriesInput} onChange={(event) => setCountriesInput(event.target.value)} /><small>Use two-letter ISO country codes. An empty list allows the countries shown in checkout.</small></label>
+        <label className="commerce-wide">
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: 6 }}>
+            <span>Delivery countries</span>
+            <div style={{ display: "flex", gap: 6 }}>
+              <button type="button" className="admin-sample-btn" onClick={() => setCountriesInput("KE")}>Kenya only</button>
+              <button type="button" className="admin-sample-btn" onClick={() => setCountriesInput("KE, UG, TZ, RW")}>East Africa</button>
+              <button type="button" className="admin-sample-btn" onClick={() => setCountriesInput("")}>All countries</button>
+            </div>
+          </div>
+          <input placeholder="KE, UG, TZ, GB (leave blank to allow all countries)" value={countriesInput} onChange={(event) => setCountriesInput(event.target.value)} />
+          <small>Use two-letter ISO country codes separated by commas. Leave blank to allow checkout from any country.</small>
+        </label>
         <label className="commerce-home-toggle"><input type="checkbox" checked={store.isHomePage} onChange={(event) => setStore({ ...store, isHomePage: event.target.checked })} /><span><strong>Use this shop as the public homepage</strong><small>This setting affects only this tenant. The reusable ministry template stays available to every other tenant.</small></span></label>
         {storeError && <p className="commerce-error commerce-wide" role="alert">{storeError}</p>}
         <div className="commerce-wide commerce-settings-actions"><button className="commerce-primary" type="submit" disabled={saving}>{saving ? "Saving…" : "Save store settings"}</button><Link href="/shop" target="_blank" rel="noreferrer">Open shop preview ↗</Link></div>

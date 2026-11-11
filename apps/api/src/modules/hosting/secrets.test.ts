@@ -71,7 +71,7 @@ describe("DockerSecretTenantHostingSecretResolver", () => {
       .rejects.toThrow("HOSTING_SECRET_INVALID");
   });
 
-  it("does not follow symbolic links when reading mounted secrets", async () => {
+  it.skipIf(process.platform === "win32")("does not follow symbolic links when reading mounted secrets", async () => {
     const directory = await secretDirectory();
     const outside = join(directory, "outside");
     await writeFile(outside, JSON.stringify({ APP_IMAGE: "ghcr.io/example/shop:1.2.3" }), { mode: 0o400 });

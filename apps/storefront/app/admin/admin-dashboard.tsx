@@ -29,12 +29,12 @@ type Invitation = {
 type MemberResponse = { members: Member[]; total: number };
 
 const roles = [
-  ["admin", "Administrator"],
-  ["catalogManager", "Catalog manager"],
-  ["orderManager", "Order manager"],
-  ["contentEditor", "Content editor"],
-  ["viewer", "Viewer"],
-  ["member", "Basic member"],
+  ["admin", "Administrator", "Full management of website settings, content, team, orders, and donations."],
+  ["contentEditor", "Content editor", "Can create, update, and publish sermons, events, giving campaigns, and site pages."],
+  ["catalogManager", "Catalog manager", "Can create products, set prices, and manage stock on hand in the store."],
+  ["orderManager", "Order manager", "Can view incoming orders and mark items as fulfilled."],
+  ["viewer", "Viewer", "Read-only access to view records, metrics, and donor summaries without edit rights."],
+  ["member", "Basic member", "Standard workspace membership."],
 ] as const;
 
 type AssignableRole = (typeof roles)[number][0];
@@ -272,9 +272,29 @@ export function AdminDashboard() {
           <h2>Invite a member</h2>
           <p className="admin-muted">Invitations are scoped to this workspace. Client administrators cannot grant the platform-controlled owner role.</p>
           <form className="admin-invite-form" onSubmit={sendInvitation}>
-            <label>Email address<input type="email" required maxLength={254} value={inviteEmail} onChange={(event) => setInviteEmail(event.target.value)} placeholder="colleague@example.com" /></label>
-            <label>Workspace role<select value={inviteRole} onChange={(event) => setInviteRole(event.target.value as AssignableRole)}>{roles.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
-            <button className="admin-primary-button" type="submit" disabled={busyKey !== ""}>{busyKey === "invite" ? "Sending…" : "Send invitation"}</button>
+            <label>
+              Email address
+              <input
+                type="email"
+                required
+                maxLength={254}
+                value={inviteEmail}
+                onChange={(event) => setInviteEmail(event.target.value.trim())}
+                placeholder="colleague@example.com"
+              />
+            </label>
+            <label>
+              Workspace role
+              <select value={inviteRole} onChange={(event) => setInviteRole(event.target.value as AssignableRole)}>
+                {roles.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+              </select>
+              <small className="admin-muted" style={{ marginTop: 4, lineHeight: 1.4 }}>
+                <strong>Role scope:</strong> {roles.find(([r]) => r === inviteRole)?.[2]}
+              </small>
+            </label>
+            <button className="admin-primary-button" type="submit" disabled={busyKey !== ""}>
+              {busyKey === "invite" ? "Sending…" : "Send invitation"}
+            </button>
           </form>
         </section>
 
@@ -287,7 +307,22 @@ export function AdminDashboard() {
               <button className="admin-danger-button" type="button" disabled={busyKey !== ""} onClick={() => void cancelInvitation(invitation)}>Cancel</button>
             </div>
           ))}
-          {!invitations.length && !invitationsError ? <p className="admin-empty">No pending invitations.</p> : null}
+          {!invitations.length && !invitationsError ? (
+            <p className="admin-empty">No pending invitations. When you invite colleagues or volunteers, their pending invitations will appear here.</p>
+          ) : null}
+        </section>
+
+        <section className="admin-card" style={{ gridColumn: "1 / -1", marginTop: 8 }}>
+          <p className="eyebrow">ACCESS PERMISSIONS REFERENCE</p>
+          <h3 style={{ margin: "4px 0 14px", fontSize: 16 }}>Workspace roles explained</h3>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
+            {roles.map(([id, label, desc]) => (
+              <div key={id} style={{ padding: 12, background: "#f8f9fa", border: "1px solid #e9ecef", borderRadius: 8 }}>
+                <strong style={{ display: "block", color: "#19392f", fontSize: 13 }}>{label}</strong>
+                <small style={{ color: "#5c7162", fontSize: 11, lineHeight: 1.45, display: "block", marginTop: 4 }}>{desc}</small>
+              </div>
+            ))}
+          </div>
         </section>
       </div>
 

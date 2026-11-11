@@ -13,6 +13,39 @@ import { MediaUploadField } from "./media-upload-field";
 type SiteProfile = ChurchSiteSettingsInput["profile"];
 type RowName = "serviceTimes" | "locations" | "ministries" | "faqs" | "coreValues" | "statementOfFaith";
 
+const ROW_HELPERS: Record<RowName, { title: string; hint: string; sample: string }> = {
+  serviceTimes: {
+    title: "Service times",
+    hint: "Label | Day | Time | Optional Note",
+    sample: "Sunday Worship | Sunday | 10:00 AM | Main sanctuary",
+  },
+  locations: {
+    title: "Locations",
+    hint: "Name | Address | Optional Map URL",
+    sample: "Main Campus | 123 Faith Way, Nairobi | https://maps.google.com",
+  },
+  ministries: {
+    title: "Ministries",
+    hint: "Title | Description | Optional Audience",
+    sample: "Youth Ministry | Inspiring the next generation through worship and discipleship | Youth & Young Adults",
+  },
+  faqs: {
+    title: "FAQs",
+    hint: "Question | Answer",
+    sample: "What should I wear? | Come as you are! We welcome everyone in casual or formal attire.",
+  },
+  coreValues: {
+    title: "Core values",
+    hint: "Title | Description | Optional Emoji/Icon",
+    sample: "Biblical Truth | Grounded firmly in scripture and God's living word | 📖",
+  },
+  statementOfFaith: {
+    title: "Statement of faith",
+    hint: "Topic | Belief statement",
+    sample: "The Scriptures | We believe the Bible is the inspired, authoritative, and infallible Word of God.",
+  },
+};
+
 const COLOR_PRESETS = [
   { name: "Forest", primary: "#193a31", secondary: "#315e50", accent: "#8b5b29" },
   { name: "Ocean Navy", primary: "#0f2b48", secondary: "#1e4976", accent: "#7a4d1d" },
@@ -165,7 +198,24 @@ export function SiteSettingsEditor() {
 
   function setSocial<K extends keyof SiteProfile["social"]>(key: K, value: string) {
     if (!profile) return;
-    setProfile({ ...profile, social: { ...profile.social, [key]: value } });
+    let formatted = value.trim();
+    if (key === "whatsapp" && formatted && !formatted.startsWith("http://") && !formatted.startsWith("https://")) {
+      const digits = formatted.replace(/\D/g, "");
+      if (digits.startsWith("0") && digits.length === 10) {
+        formatted = `https://wa.me/254${digits.slice(1)}`;
+      } else if (digits.length >= 9) {
+        formatted = `https://wa.me/${digits}`;
+      }
+    }
+    setProfile({ ...profile, social: { ...profile.social, [key]: formatted } });
+  }
+
+  function appendSampleRow(key: RowName) {
+    setRows((prev) => {
+      const sample = ROW_HELPERS[key].sample;
+      const current = prev[key].trim();
+      return { ...prev, [key]: current ? `${current}\n${sample}` : sample };
+    });
   }
 
   async function save(event: React.FormEvent<HTMLFormElement>) {
@@ -323,7 +373,26 @@ export function SiteSettingsEditor() {
         {settings.navigation.map((item, index) => <article className="ministry-content-entry" key={item.id}>
           <div className="ch-site-settings-grid">
             <label style={labelStyle}>Link label<input required maxLength={50} style={fieldStyle} value={item.label} onChange={(event) => setSettings((current) => updateSiteNavigationItem(current, index, { label: event.target.value }))} /></label>
-            <label style={labelStyle}>Destination<input required maxLength={2048} style={fieldStyle} value={item.href} onChange={(event) => setSettings((current) => updateSiteNavigationItem(current, index, { href: event.target.value }))} placeholder="/about or https://partner.example.org" /></label>
+            <label style={labelStyle}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                <span>Destination</span>
+                <small className="admin-muted">e.g. /about, /sermons, or https://partner.org</small>
+              </div>
+              <input
+                required
+                maxLength={2048}
+                style={fieldStyle}
+                value={item.href}
+                onChange={(event) => {
+                  let href = event.target.value.trim();
+                  if (href && !href.startsWith("/") && !href.startsWith("http://") && !href.startsWith("https://") && !href.startsWith("#")) {
+                    href = `/${href}`;
+                  }
+                  setSettings((current) => updateSiteNavigationItem(current, index, { href }));
+                }}
+                placeholder="/about or https://partner.example.org"
+              />
+            </label>
           </div>
           <button type="button" className="admin-danger-button" onClick={() => setSettings((current) => removeSiteNavigationItem(current, index))}>Remove link</button>
         </article>)}
@@ -335,8 +404,26 @@ export function SiteSettingsEditor() {
       <h2>Visit information</h2>
       <p className="admin-muted">One entry per line. Separate fields with a vertical bar, for example: Sunday Worship | Sunday | 10:00 AM | Main sanctuary.</p>
       <div className="ch-site-settings-grid">
-        <label style={labelStyle}>Service times<textarea style={textareaStyle} value={rows.serviceTimes} onChange={(event) => setRows({ ...rows, serviceTimes: event.target.value })} placeholder="Sunday Worship | Sunday | 10:00 AM | Main sanctuary" /></label>
-        <label style={labelStyle}>Locations<textarea style={textareaStyle} value={rows.locations} onChange={(event) => setRows({ ...rows, locations: event.target.value })} placeholder="Main campus | Street address | https://maps.google.com/…" /></label>
+        <label style={labelStyle}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: 6 }}>
+            <span>{ROW_HELPERS.serviceTimes.title}</span>
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <small className="admin-muted">{ROW_HELPERS.serviceTimes.hint}</small>
+              <button type="button" className="admin-sample-btn" onClick={() => appendSampleRow("serviceTimes")}>+ Insert sample</button>
+            </div>
+          </div>
+          <textarea style={textareaStyle} value={rows.serviceTimes} onChange={(event) => setRows({ ...rows, serviceTimes: event.target.value })} placeholder="Sunday Worship | Sunday | 10:00 AM | Main sanctuary" />
+        </label>
+        <label style={labelStyle}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: 6 }}>
+            <span>{ROW_HELPERS.locations.title}</span>
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <small className="admin-muted">{ROW_HELPERS.locations.hint}</small>
+              <button type="button" className="admin-sample-btn" onClick={() => appendSampleRow("locations")}>+ Insert sample</button>
+            </div>
+          </div>
+          <textarea style={textareaStyle} value={rows.locations} onChange={(event) => setRows({ ...rows, locations: event.target.value })} placeholder="Main campus | Street address | https://maps.google.com/…" />
+        </label>
         <label style={labelStyle}>What to expect<textarea style={textareaStyle} value={settings.visitorInfo.arrival} onChange={(event) => setSettings({ ...settings, visitorInfo: { ...settings.visitorInfo, arrival: event.target.value } })} /></label>
         <label style={labelStyle}>Children and families<textarea style={textareaStyle} value={settings.visitorInfo.children} onChange={(event) => setSettings({ ...settings, visitorInfo: { ...settings.visitorInfo, children: event.target.value } })} /></label>
         <label style={labelStyle}>Accessibility information<textarea style={textareaStyle} value={settings.visitorInfo.accessibility} onChange={(event) => setSettings({ ...settings, visitorInfo: { ...settings.visitorInfo, accessibility: event.target.value } })} /></label>
@@ -347,10 +434,46 @@ export function SiteSettingsEditor() {
     <section style={sectionStyle}>
       <h2>Ministries and common questions</h2>
       <div className="ch-site-settings-grid">
-        <label style={labelStyle}>Ministries (title | description | audience)<textarea style={textareaStyle} value={rows.ministries} onChange={(event) => setRows({ ...rows, ministries: event.target.value })} /></label>
-        <label style={labelStyle}>FAQs (question | answer)<textarea style={textareaStyle} value={rows.faqs} onChange={(event) => setRows({ ...rows, faqs: event.target.value })} /></label>
-        <label style={labelStyle}>Core values (title | description | icon)<textarea style={textareaStyle} value={rows.coreValues} onChange={(event) => setRows({ ...rows, coreValues: event.target.value })} /></label>
-        <label style={labelStyle}>Statement of faith (topic | belief)<textarea style={textareaStyle} value={rows.statementOfFaith} onChange={(event) => setRows({ ...rows, statementOfFaith: event.target.value })} /></label>
+        <label style={labelStyle}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: 6 }}>
+            <span>{ROW_HELPERS.ministries.title}</span>
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <small className="admin-muted">{ROW_HELPERS.ministries.hint}</small>
+              <button type="button" className="admin-sample-btn" onClick={() => appendSampleRow("ministries")}>+ Insert sample</button>
+            </div>
+          </div>
+          <textarea style={textareaStyle} value={rows.ministries} onChange={(event) => setRows({ ...rows, ministries: event.target.value })} />
+        </label>
+        <label style={labelStyle}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: 6 }}>
+            <span>{ROW_HELPERS.faqs.title}</span>
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <small className="admin-muted">{ROW_HELPERS.faqs.hint}</small>
+              <button type="button" className="admin-sample-btn" onClick={() => appendSampleRow("faqs")}>+ Insert sample</button>
+            </div>
+          </div>
+          <textarea style={textareaStyle} value={rows.faqs} onChange={(event) => setRows({ ...rows, faqs: event.target.value })} />
+        </label>
+        <label style={labelStyle}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: 6 }}>
+            <span>{ROW_HELPERS.coreValues.title}</span>
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <small className="admin-muted">{ROW_HELPERS.coreValues.hint}</small>
+              <button type="button" className="admin-sample-btn" onClick={() => appendSampleRow("coreValues")}>+ Insert sample</button>
+            </div>
+          </div>
+          <textarea style={textareaStyle} value={rows.coreValues} onChange={(event) => setRows({ ...rows, coreValues: event.target.value })} />
+        </label>
+        <label style={labelStyle}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: 6 }}>
+            <span>{ROW_HELPERS.statementOfFaith.title}</span>
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <small className="admin-muted">{ROW_HELPERS.statementOfFaith.hint}</small>
+              <button type="button" className="admin-sample-btn" onClick={() => appendSampleRow("statementOfFaith")}>+ Insert sample</button>
+            </div>
+          </div>
+          <textarea style={textareaStyle} value={rows.statementOfFaith} onChange={(event) => setRows({ ...rows, statementOfFaith: event.target.value })} />
+        </label>
         <div className="ministry-content-list">
           <div className="ministry-content-list-heading"><div><strong>Leadership team</strong><small>Add names, roles, biographies, and optional portraits.</small></div><button type="button" className="ministry-media-button" disabled={settings.leadership.length >= 30} onClick={() => setSettings({ ...settings, leadership: [...settings.leadership, { name: "", role: "", bio: "", photoUrl: undefined }] })}>Add leader</button></div>
           {settings.leadership.map((leader, index) => <article className="ministry-content-entry" key={`leader-${index}`}>

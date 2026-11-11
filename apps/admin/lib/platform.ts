@@ -2,7 +2,12 @@ import "server-only";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
-const apiBase = (process.env.API_BASE_URL ?? "http://localhost:4000").replace(/\/$/, "");
+const defaultApiBases = [
+  process.env.API_BASE_URL,
+  "http://localhost:4100",
+  "http://localhost:4000",
+].filter(Boolean).map((u) => u!.replace(/\/$/, ""));
+const uniqueApiBases = Array.from(new Set(defaultApiBases));
 
 type PlatformIdentity = {
   user: { id: string; email: string; name: string; emailVerified: boolean };
@@ -15,14 +20,22 @@ export async function requirePlatformOwner(): Promise<PlatformIdentity> {
   const cookie = (await headers()).get("cookie");
   if (!cookie) redirect("/login?callbackURL=%2F");
 
-  let response: Response;
-  try {
-    response = await fetch(`${apiBase}/v1/auth/me`, {
-      cache: "no-store",
-      headers: { cookie },
-      signal: AbortSignal.timeout(5_000),
-    });
-  } catch {
+  let response: Response | null = null;
+  for (const base of uniqueApiBases) {
+    try {
+      const res = await fetch(`${base}/v1/auth/me`, {
+        cache: "no-store",
+        headers: { cookie },
+        signal: AbortSignal.timeout(5_000),
+      });
+      response = res;
+      break;
+    } catch {
+      // try next candidate
+    }
+  }
+
+  if (!response) {
     redirect("/login?reason=identity-unavailable");
   }
 
@@ -49,14 +62,17 @@ export type Tenant = {
 export async function platformFetch<T>(path: string): Promise<{ data: T | null; status: number }> {
   const incoming = await headers();
   const cookie = incoming.get("cookie");
-  try {
-    const response = await fetch(`${apiBase}/v1/admin/platform/${path}`, {
-      cache: "no-store",
-      headers: cookie ? { cookie } : {},
-    });
-    if (!response.ok) return { data: null, status: response.status };
-    return { data: await response.json() as T, status: response.status };
-  } catch {
-    return { data: null, status: 503 };
+  for (const base of uniqueApiBases) {
+    try {
+      const response = await fetch(`${base}/v1/admin/platform/${path}`, {
+        cache: "no-store",
+        headers: cookie ? { cookie } : {},
+      });
+      if (!response.ok) return { data: null, status: response.status };
+      return { data: await response.json() as T, status: response.status };
+    } catch {
+      // Try next candidate
+    }
   }
+  return { data: null, status: 503 };
 }

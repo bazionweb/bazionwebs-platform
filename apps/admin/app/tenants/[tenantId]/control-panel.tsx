@@ -214,7 +214,7 @@ export function TenantControlPanel(props: {
 
 
     <section className="panel">
-      <div className="panel-head"><div><p className="eyebrow">CUSTOM DOMAINS</p><h2>Tenant domains</h2><p className="muted">Verify domain ownership with a DNS TXT record before the hostname becomes active.</p></div><span className="count">{domains.length} DOMAINS</span></div>
+      <div className="panel-head"><div><p className="eyebrow">CUSTOM DOMAINS</p><h2>Tenant domains</h2><p className="muted">Verify domain ownership with a DNS TXT record before the hostname becomes active.</p><p className="muted" style={{ fontSize: 12, marginTop: 4 }}>💡 In local development, client storefronts are accessible directly at <code>http://localhost:3100/?tenant=&lt;slug&gt;</code> without requiring local hosts/DNS configuration.</p></div><span className="count">{domains.length} DOMAINS</span></div>
       {props.domainsStatus !== 200 && !props.domainsInitial ? <LoadError status={props.domainsStatus} label="custom domains"/> : <>
         <form className="owner-search" onSubmit={addDomain}>
           <label>Hostname<input value={domainInput} onChange={(event) => setDomainInput(event.target.value)} placeholder="shop.example.com" maxLength={253}/></label>
@@ -229,7 +229,22 @@ export function TenantControlPanel(props: {
         <div className="table-wrap">
           <table><thead><tr><th>HOSTNAME</th><th>STATUS</th><th>VERIFIED</th><th>ACTIONS</th></tr></thead>
             <tbody>{domains.map((domain) => <tr key={domain.id}>
-              <td><strong>{domain.hostname}</strong><small>{domain.id}</small></td>
+              <td>
+                <strong>{domain.hostname}</strong>
+                <small>{domain.id}</small>
+                {domain.hostname.endsWith(".localhost") && (
+                  <div style={{ marginTop: 4 }}>
+                    <a
+                      href={`http://localhost:3100/?tenant=${encodeURIComponent(domain.hostname.replace(/\.localhost$/, ""))}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{ fontSize: 11, color: "var(--accent)", textDecoration: "underline" }}
+                    >
+                      Open local workspace site (port 3100) ↗
+                    </a>
+                  </div>
+                )}
+              </td>
               <td><span className={`status status-${domain.status === "active" ? "active" : domain.status === "pending" ? "provisioning" : "suspended"}`}>{domain.status}</span></td>
               <td>{domain.verified_at ? new Date(domain.verified_at).toLocaleString("en-KE") : "—"}</td>
               <td>{domain.status === "pending" ? <button className="secondary" disabled={busy === `domain-verify:${domain.id}`} onClick={() => void verifyDomain(domain)}>{busy === `domain-verify:${domain.id}` ? "Checking…" : "Verify"}</button> : null}

@@ -171,6 +171,179 @@
   text-align: center;
 }
 
+/* Guidance & Self-Help Utilities */
+.tenant-admin-guide-card {
+  margin: 0 0 24px;
+  padding: 16px 20px;
+  border: 1px solid #d3e2d9;
+  border-radius: 12px;
+  background: #f7faf8;
+  color: #1f4236;
+}
+
+.tenant-admin-guide-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  width: 100%;
+  font: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.tenant-admin-guide-header h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #19392f;
+}
+
+.tenant-admin-guide-toggle {
+  font-size: 11px;
+  font-weight: 700;
+  color: #284c3d;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.tenant-admin-guide-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid #e1ece5;
+}
+
+.tenant-admin-guide-step {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 12px 14px;
+  background: #ffffff;
+  border: 1px solid #e1ece5;
+  border-radius: 8px;
+  font-size: 12px;
+}
+
+.tenant-admin-guide-step strong {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #19392f;
+  font-size: 12px;
+}
+
+.tenant-admin-guide-step small {
+  color: #5c7162;
+  line-height: 1.45;
+}
+
+/* Empty State Guidance */
+.admin-empty-guide {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 34px 20px;
+  background: #faf9f6;
+  border: 1px dashed #dcd6c8;
+  border-radius: 14px;
+  margin: 16px 0;
+  gap: 8px;
+}
+
+.admin-empty-icon {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: #ece8dc;
+  color: #7b5b2c;
+  font-size: 20px;
+  margin-bottom: 4px;
+}
+
+.admin-empty-guide h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: #2c4438;
+}
+
+.admin-empty-guide p {
+  margin: 0;
+  max-width: 480px;
+  font-size: 12px;
+  color: #6a746d;
+  line-height: 1.55;
+}
+
+/* Field helper badges */
+.admin-sample-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border: 1px solid #d4cfc3;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #4b6256;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.admin-sample-btn:hover {
+  background: #f1ede4;
+  border-color: #8c6737;
+  color: #19392f;
+}
+
+.admin-field-helper {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+  font-size: 11px;
+  color: #68756c;
+}
+
+.admin-field-alert {
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: #fff5f5;
+  border: 1px solid #fed7d7;
+  color: #c53030;
+  font-size: 12px;
+  line-height: 1.4;
+  margin-top: 6px;
+}
+
+.admin-field-success-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: #e6fffa;
+  color: #234e52;
+  font-size: 11px;
+  font-weight: 600;
+}
+
 @media (max-width: 900px) {
   .tenant-admin-header { align-items: flex-start; flex-direction: column; gap: 12px; }
   .tenant-admin-actions { justify-content: flex-start; flex-wrap: wrap; }

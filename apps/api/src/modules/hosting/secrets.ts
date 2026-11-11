@@ -1,6 +1,6 @@
 import { constants } from "node:fs";
 import { open } from "node:fs/promises";
-import { resolve } from "node:path";
+import { resolve, sep } from "node:path";
 import type { TenantHostingSecretResolver, TenantHostingTemplate } from "@bazion/platform-contracts";
 
 const tenantUuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -49,13 +49,14 @@ export class DockerSecretTenantHostingSecretResolver implements TenantHostingSec
     const template = match[2]!.toLowerCase() as TenantHostingTemplate;
     const name = `bazion-hosting-${tenantId}-${template}`;
     const file = resolve(this.directory, name);
-    if (!file.startsWith(`${this.directory}/`)) throw invalidSecret();
+    const prefix = this.directory.endsWith(sep) ? this.directory : `${this.directory}${sep}`;
+    if (!file.startsWith(prefix) && !file.startsWith(`${this.directory}/`)) throw invalidSecret();
 
     let handle: Awaited<ReturnType<typeof open>> | undefined;
     try {
       handle = await open(file, constants.O_RDONLY | constants.O_NOFOLLOW);
       const info = await handle.stat();
-      if (!info.isFile() || info.size < 2 || info.size > maxSecretBytes || (info.mode & 0o022) !== 0) {
+      if (!info.isFile() || info.size < 2 || info.size > maxSecretBytes || (process.platform !== "win32" && (info.mode & 0o022) !== 0)) {
         throw invalidSecret();
       }
       const raw = await handle.readFile({ encoding: "utf8" });

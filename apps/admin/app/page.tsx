@@ -78,7 +78,15 @@ export default async function Home({
         ) : result.status !== 200 ? (
           <section className="notice-card">
             <h2>Platform API unavailable</h2>
-            <p>Could not load tenant data (HTTP {result.status}). Check API_BASE_URL and API availability.</p>
+            <p>
+              Could not load tenant data (HTTP {result.status}). Ensure the Fastify API backend is running
+              on port 4100 (or 4000) and that <code>API_BASE_URL</code> is reachable.
+            </p>
+            <div style={{ marginTop: 14 }}>
+              <Link className="primary" href="/">
+                Retry Connection ↻
+              </Link>
+            </div>
           </section>
         ) : (
           <>

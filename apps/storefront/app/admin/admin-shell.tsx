@@ -14,6 +14,7 @@ type AdminShellProps = {
 
 export function AdminShell({ tenantName, isPlatformOwner, notice }: AdminShellProps) {
   const [view, setView] = useState<"ministry" | "team">("ministry");
+  const [showGuide, setShowGuide] = useState(false);
   const [commerceEnabled, setCommerceEnabled] = useState(false);
   const organizations = authClient.useListOrganizations();
   const canSwitchTenant = (organizations.data?.length ?? 0) > 1;
@@ -54,6 +55,43 @@ export function AdminShell({ tenantName, isPlatformOwner, notice }: AdminShellPr
 
       <div className="tenant-admin-content">
         {notice && <p className="tenant-admin-notice" role="status">{notice}</p>}
+
+        <div className="tenant-admin-guide-card">
+          <button
+            type="button"
+            className="tenant-admin-guide-header"
+            onClick={() => setShowGuide((prev) => !prev)}
+            aria-expanded={showGuide}
+          >
+            <h3>
+              <span aria-hidden="true">💡</span> Novice Admin Quick-Start Guide &amp; Best Practices
+            </h3>
+            <span className="tenant-admin-guide-toggle">
+              {showGuide ? "Hide tips ▲" : "View quick guide ▼"}
+            </span>
+          </button>
+          {showGuide && (
+            <div className="tenant-admin-guide-grid">
+              <div className="tenant-admin-guide-step">
+                <strong>1. Profile &amp; Branding</strong>
+                <small>Go to <em>Website settings</em> to set your church name, upload your high-resolution logo, choose an accessible color palette, and configure social media links.</small>
+              </div>
+              <div className="tenant-admin-guide-step">
+                <strong>2. Gathering Info</strong>
+                <small>Add your Sunday service times and campus addresses. Use the "+ Insert sample" buttons to easily format your rows with zero errors.</small>
+              </div>
+              <div className="tenant-admin-guide-step">
+                <strong>3. Content &amp; Media</strong>
+                <small>Publish audio/video teachings in <em>Sermons</em> and upcoming conferences or prayer meetings in <em>Events</em>. You can paste any YouTube link directly.</small>
+              </div>
+              <div className="tenant-admin-guide-step">
+                <strong>4. Community &amp; Team</strong>
+                <small>Switch to <em>Team &amp; access</em> to invite co-workers, and review incoming enquiries, prayer requests, and event signups from the sidebar.</small>
+              </div>
+            </div>
+          )}
+        </div>
+
         {view === "ministry" ? <MinistryAdminDashboard /> : <AdminDashboard />}
       </div>
 
