@@ -52,7 +52,7 @@ GRANT UPDATE (
 GRANT INSERT ON public.tenant_hosting_deployment_events TO bazion_hosting_reconciler;
 ```
 
-Set its password using the interactive PostgreSQL `\\password bazion_hosting_reconciler` command, then enable login:
+Set its password using the interactive PostgreSQL `\password bazion_hosting_reconciler` command, then enable login:
 
 ```sql
 ALTER ROLE bazion_hosting_reconciler LOGIN;
