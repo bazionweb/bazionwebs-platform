@@ -33,10 +33,11 @@ interface DeploymentRow {
 
 function rowReference(row: DeploymentRow): TenantHostingDeploymentReference | null {
   if (!row.provider_resource_id) return null;
-  return { provider: row.provider, resourceId: row.provider_resource_id, tenantId: row.tenant_id as TenantId, createdAt: new Date(row.created_at).toISOString() };
+  const createdAt = row.created_at instanceof Date ? row.created_at : new Date(row.created_at);
+  return { provider: row.provider, resourceId: row.provider_resource_id, tenantId: row.tenant_id as TenantId, createdAt: createdAt.toISOString() };
 }
 function leaseActive(value: Date | string | null): boolean {
-  return value !== null && new Date(value).getTime() > Date.now();
+  return value !== null && (value instanceof Date ? value.getTime() : Date.parse(value)) > Date.now();
 }
 
 /** PostgreSQL implementation. All state claims and their history events commit atomically. */
@@ -141,6 +142,11 @@ export class PostgresHostingProvisioningStore implements HostingProvisioningStor
     const client = await this.pool.connect();
     try {
       await client.query("BEGIN");
+      const previous = await client.query<{ state: string }>(
+        "SELECT state FROM public.tenant_hosting_deployments WHERE id=$1 AND lease_token=$2 FOR UPDATE",
+        [input.deploymentId,input.leaseToken],
+      );
+      const previousState = previous.rows[0]?.state ?? null;
       const result = await client.query<{ tenant_id: string }>(
         "UPDATE public.tenant_hosting_deployments SET state='running',error_code=NULL,last_deployed_at=now()," +
         "lease_token=NULL,lease_expires_at=NULL,updated_at=now() " +
@@ -149,7 +155,7 @@ export class PostgresHostingProvisioningStore implements HostingProvisioningStor
       );
       const tenantId = result.rows[0]?.tenant_id;
       if (!tenantId) { await client.query("ROLLBACK"); return false; }
-      await this.appendRawEvent(client,input.deploymentId,tenantId,"hosting.deployment.running",null,"running",
+      await this.appendRawEvent(client,input.deploymentId,tenantId,"hosting.deployment.running",previousState,"running",
         input.actorType,input.actorId,input.requestId,{});
       await client.query("COMMIT"); return true;
     } catch (error) { await client.query("ROLLBACK").catch(() => undefined); throw error; }
@@ -160,6 +166,11 @@ export class PostgresHostingProvisioningStore implements HostingProvisioningStor
     const client = await this.pool.connect();
     try {
       await client.query("BEGIN");
+      const previous = await client.query<{ state: string }>(
+        "SELECT state FROM public.tenant_hosting_deployments WHERE id=$1 AND lease_token=$2 FOR UPDATE",
+        [input.deploymentId,input.leaseToken],
+      );
+      const previousState = previous.rows[0]?.state ?? null;
       const result = await client.query<{ tenant_id: string; state: string; provider_resource_id: string | null }>(
         "UPDATE public.tenant_hosting_deployments SET state=CASE WHEN provider_resource_id IS NULL THEN 'unknown' ELSE 'failed' END," +
         "error_code=$3,lease_token=NULL,lease_expires_at=NULL,updated_at=now() WHERE id=$1 AND lease_token=$2 " +
@@ -170,7 +181,7 @@ export class PostgresHostingProvisioningStore implements HostingProvisioningStor
       if (!row) { await client.query("ROLLBACK"); return; }
       await this.appendRawEvent(client,input.deploymentId,row.tenant_id,
         row.state === "unknown" ? "hosting.provisioning.uncertain" : "hosting.deployment.failed",
-        row.provider_resource_id ? "deploying" : "provisioning",row.state,
+        previousState,row.state,
         input.actorType,input.actorId,input.requestId,{ errorCode: input.errorCode });
       await client.query("COMMIT");
     } catch (error) { await client.query("ROLLBACK").catch(() => undefined); throw error; }
