@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { platformFetch, requirePlatformOwner, type Tenant } from "@/lib/platform";
+import { getTenantStorefrontUrl, getTenantWorkspacePickerUrl } from "@/lib/public-urls";
 import { LifecycleActions } from "./lifecycle-actions";
 import { TenantControlPanel } from "./control-panel";
 import { TenantHostingPanel, type TenantHostingInventory } from "./hosting-panel";
@@ -62,7 +63,7 @@ export default async function TenantDetail({ params }: { params: Promise<{ tenan
           🛠️ Troubleshoot Workspace
         </Link>
         <a
-          href={`http://localhost:3100/?tenant=${tenant.slug}`}
+          href={getTenantStorefrontUrl(tenant.slug)}
           target="_blank"
           rel="noreferrer"
           className="secondary"
@@ -71,7 +72,7 @@ export default async function TenantDetail({ params }: { params: Promise<{ tenan
           Open Storefront ↗
         </a>
         <a
-          href={`http://localhost:3100/workspace?select=${tenant.auth_organization_id ?? ""}&workspace=${tenant.slug}&redirect=/admin`}
+          href={getTenantWorkspacePickerUrl({ slug: tenant.slug, authOrganizationId: tenant.auth_organization_id }, "/admin")}
           target="_blank"
           rel="noreferrer"
           className="primary"

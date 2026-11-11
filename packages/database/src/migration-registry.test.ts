@@ -23,8 +23,19 @@ describe("database migration registry", () => {
     expect(requiredDatabaseMigrations).toContain("0017_hosting_reconciliation_schedule.sql");
     expect(requiredDatabaseMigrations).toContain("0018_product_installations_provisioning_sagas.sql");
     expect(requiredDatabaseMigrations).toContain("0019_commercial_provisioning_delivery.sql");
+    expect(requiredDatabaseMigrations).toContain("0020_phase5_identity_oidc_bff.sql");
     expect(currentDatabaseSchemaVersion).toBe(requiredDatabaseMigrations.at(-1));
-    expect(currentDatabaseSchemaVersion).toBe("0019_commercial_provisioning_delivery.sql");
+    expect(currentDatabaseSchemaVersion).toBe("0020_phase5_identity_oidc_bff.sql");
+  });
+
+  it("enforces federated (issuer, subject) uniqueness, PKCE S256 OIDC state, and single-use claim proofs", () => {
+    const migration = readFileSync(join(migrationsDirectory, "0020_phase5_identity_oidc_bff.sql"), "utf8");
+    expect(migration).toContain("federated_identity_links_issuer_subject_uq");
+    expect(migration).toContain("code_challenge_method = 'S256'");
+    expect(migration).toContain("oidc_bff_sessions");
+    expect(migration).toContain("commercial_order_claim_proofs");
+    expect(migration).toContain("account_email_change_requests");
+    expect(migration).toContain("bazion_tenant_provisioner");
   });
 
   it("enforces inbox uniqueness, outbox safety validation, and provisioner-only delivery access", () => {

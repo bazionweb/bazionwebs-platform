@@ -44,3 +44,10 @@ export async function resetPassword(token: string, newPassword: string): Promise
   if (response.status === 429) throw new Error("Too many attempts. Wait before trying again.");
   throw new Error("The password could not be changed. Check the form and request a fresh reset link if needed.");
 }
+
+export { resolveSafeRedirectTarget } from "./bff-cookies.js";
+export {
+  buildTenantStorefrontUrl,
+  buildTenantWorkspacePickerUrl,
+  resolveConfiguredWorkspaceBaseUrl,
+} from "./deep-links.js";

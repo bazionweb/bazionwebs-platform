@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { getTenantStorefrontUrl, getTenantWorkspacePickerUrl } from "@/lib/public-urls";
 
 function slugify(text: string) {
   return text
@@ -124,10 +125,10 @@ export function CreateTenantModal() {
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                     <div>
                       <strong style={{ display: "block", fontSize: 13 }}>Public Storefront</strong>
-                      <code style={{ fontSize: 12 }}>http://localhost:3100/?tenant={provisioned.slug}</code>
+                      <code style={{ fontSize: 12 }}>{getTenantStorefrontUrl(provisioned.slug)}</code>
                     </div>
                     <a
-                      href={`http://localhost:3100/?tenant=${provisioned.slug}`}
+                      href={getTenantStorefrontUrl(provisioned.slug)}
                       target="_blank"
                       rel="noreferrer"
                       className="primary"
@@ -140,10 +141,12 @@ export function CreateTenantModal() {
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                     <div>
                       <strong style={{ display: "block", fontSize: 13 }}>Tenant Admin Desk</strong>
-                      <code style={{ fontSize: 12 }}>http://localhost:3100/workspace?workspace={provisioned.slug}</code>
+                      <code style={{ fontSize: 12 }}>
+                        {getTenantWorkspacePickerUrl({ slug: provisioned.slug, authOrganizationId: provisioned.orgId }, "/admin")}
+                      </code>
                     </div>
                     <a
-                      href={`http://localhost:3100/workspace?select=${provisioned.orgId ?? ""}&workspace=${provisioned.slug}&redirect=/admin`}
+                      href={getTenantWorkspacePickerUrl({ slug: provisioned.slug, authOrganizationId: provisioned.orgId }, "/admin")}
                       target="_blank"
                       rel="noreferrer"
                       className="secondary"
@@ -195,7 +198,7 @@ export function CreateTenantModal() {
                   />
                   <small className="muted">
                     {slug ? (
-                      <>Local dev URL will be: <code>http://localhost:3100/?tenant={slug}</code></>
+                      <>Storefront URL will be: <code>{getTenantStorefrontUrl(slug)}</code></>
                     ) : (
                       "Lowercase letters, numbers, and dashes only."
                     )}

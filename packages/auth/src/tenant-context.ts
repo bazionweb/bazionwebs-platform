@@ -1,12 +1,11 @@
 import { fromNodeHeaders } from "better-auth/node";
 import type { IncomingHttpHeaders } from "node:http";
-import {
-  auth,
-  resolvePlatformMemberByUserId,
-  resolveTenantByOrganizationId,
-} from "./server.js";
 import { parseOrganizationRoles } from "./permissions.js";
 import { canAccessPlatformPermission, canAccessPlatformTenantScope, type PlatformPermission } from "./security-policy.js";
+
+async function loadAuthServer() {
+  return import("./server.js");
+}
 
 export interface ActiveTenantContext {
   userId: string;
@@ -28,6 +27,7 @@ export interface CurrentIdentity {
 }
 
 export async function getCurrentIdentity(headers: IncomingHttpHeaders): Promise<CurrentIdentity | null> {
+  const { auth, resolvePlatformMemberByUserId, resolveTenantByOrganizationId } = await loadAuthServer();
   const authHeaders = fromNodeHeaders(headers);
   const session = await auth.api.getSession({ headers: authHeaders });
   if (!session) return null;
@@ -87,6 +87,7 @@ export type TenantPermissionRequest = {
 export async function hasActiveTenantPermission(headers: IncomingHttpHeaders, permissions: TenantPermissionRequest): Promise<boolean> {
   const context = await getActiveTenantContext(headers);
   if (!context) return false;
+  const { auth } = await loadAuthServer();
   const result = await auth.api.hasPermission({ headers: fromNodeHeaders(headers), body: { permissions } });
   return result.success === true;
 }

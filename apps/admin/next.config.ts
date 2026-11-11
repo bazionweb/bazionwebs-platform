@@ -4,6 +4,11 @@ const apiBaseUrl = (process.env.API_BASE_URL ?? "http://localhost:4100").replace
 
 const nextConfig: NextConfig = {
   transpilePackages: ["@bazion/auth"],
+  env: {
+    ...(process.env.PUBLIC_STOREFRONT_URL && !process.env.NEXT_PUBLIC_PUBLIC_STOREFRONT_URL
+      ? { NEXT_PUBLIC_PUBLIC_STOREFRONT_URL: process.env.PUBLIC_STOREFRONT_URL }
+      : {}),
+  },
   async rewrites() {
     return [
       { source: "/v1/:path*", destination: `${apiBaseUrl}/v1/:path*` },

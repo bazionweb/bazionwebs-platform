@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { authClient } from "@bazion/auth/client";
+import { authClient, resolveSafeRedirectTarget } from "@bazion/auth/client";
+import { AccountIdentityPanels } from "./account-identity-panels";
 
 type CurrentIdentity = {
   user: { id: string; email: string; name: string; emailVerified: boolean };
@@ -69,7 +70,10 @@ export function WorkspacePicker() {
         document.cookie = `bazion_tenant=${encodeURIComponent(currentIdentity.tenant.slug)}; path=/; samesite=lax`;
       }
       setIdentity(currentIdentity);
-      const redirectTarget = new URLSearchParams(window.location.search).get("redirect") || "/admin";
+      const redirectTarget = resolveSafeRedirectTarget(
+        new URLSearchParams(window.location.search).get("redirect"),
+        { allowedOrigins: [window.location.origin], fallback: "/admin" },
+      );
       window.location.assign(redirectTarget);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Workspace selection failed.");
@@ -91,7 +95,10 @@ export function WorkspacePicker() {
     if (!targetOrg) return;
 
     if (activeOrganization.data?.id === targetOrg.id && identity?.tenant?.status === "active") {
-      const redirectTarget = params.get("redirect") || "/admin";
+      const redirectTarget = resolveSafeRedirectTarget(
+        params.get("redirect"),
+        { allowedOrigins: [window.location.origin], fallback: "/admin" },
+      );
       window.location.assign(redirectTarget);
       return;
     }
@@ -198,6 +205,13 @@ export function WorkspacePicker() {
       {identity?.tenant?.status === "active" && identity.organization?.id === activeOrganization.data?.id && (
         <a className="workspace-admin-link" href="/admin">{identity.platformRole === "platform_owner" ? "Open tenant admin workspace →" : "Open tenant administration →"}</a>
       )}
+      <AccountIdentityPanels
+        currentEmail={session.data.user.email}
+        emailVerified={Boolean(identity?.user.emailVerified ?? session.data.user.emailVerified)}
+        onOrderClaimed={() => {
+          void organizations.refetch();
+        }}
+      />
     </section>
   );
 }

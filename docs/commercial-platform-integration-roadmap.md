@@ -89,14 +89,14 @@ This checklist coordinates the Bazion commercial website (`D:\bazionweb`) and th
 
 **Goal:** give customers one identity and make dashboard ownership easy to understand.
 
-- [ ] Select and operate one OIDC authority; migrate/link accounts using `(issuer, subject)`, not email.
-- [ ] Define tenant owner invitation, acceptance, recovery, email change and account merge flows.
-- [ ] Keep Bazionweb portal focused on invoices, subscriptions, proposals and commercial support.
-- [ ] Keep platform workspace focused on site/product settings and tenant activity.
-- [ ] Keep Bazionweb super-admin focused on catalog prices, customers, sales, invoices and support.
-- [ ] Keep platform super-admin focused on tenants, product releases, domains, modules, deployments and recovery.
-- [ ] Add cross-dashboard deep links with shared external references and least-privilege scopes.
-- [ ] Test unauthorized tenant access, account linking collisions, role boundaries and logout/session expiry.
+- [x] Select and operate one OIDC authority; migrate/link accounts using `(issuer, subject)`, not email. *(Platform OIDC authority, RS256 JWKS, and durable `(issuer, subject)` linking implemented; cross-repo `bazionweb` RP wiring pending coordination)*
+- [x] Define tenant owner invitation, acceptance, recovery, email change and account merge flows. *(Atomic order claims, verified email-change revocation, explicit collision logging without silent email merge, and support resolution implemented on Platform)*
+- [ ] Keep Bazionweb portal focused on invoices, subscriptions, proposals and commercial support. *(Scoped deep-link boundary and contracts implemented in Platform; Bazionweb portal UI remains in `bazionweb`)*
+- [x] Keep platform workspace focused on site/product settings and tenant activity.
+- [ ] Keep Bazionweb super-admin focused on catalog prices, customers, sales, invoices and support. *(Super-admin boundary and opaque-ID deep links implemented in Platform; Bazionweb super-admin remains in `bazionweb`)*
+- [x] Keep platform super-admin focused on tenants, product releases, domains, modules, deployments and recovery.
+- [x] Add cross-dashboard deep links with shared external references and least-privilege scopes. *(Platform `POST /v1/auth/deep-links/resolve` + configurable URL helpers; hardcoded `localhost:3100` links removed from `apps/admin`)*
+- [x] Test unauthorized tenant access, account linking collisions, role boundaries and logout/session expiry.
 
 **Exit gate:** one customer account reaches the correct billing and product workspace without duplicate identities or ambiguous admin actions.
 
@@ -227,13 +227,13 @@ The audited divergent branch, `feature/church-ministry-platform` (`8d19d09` at t
 
 ### Phase 5 — Identity and dashboard security
 
-- [ ] Choose one OIDC issuer and persist linked identity by `(issuer, subject)`; never merge identities by matching email.
-- [ ] Use the browser-app BFF pattern for dashboard sessions: server-side tokens; secure, HttpOnly, SameSite cookies with `Path=/`, no `Domain`, and a supported `__Host-Http-` prefix; authorization code with PKCE `S256`; validate state/nonce; never put access/refresh tokens or session IDs in URLs.
-- [ ] Design guest-paid-order claiming as a separate, short-lived, high-entropy, one-use proof bound to an order; hash it at rest and consume it atomically. Linking the order must not silently merge an existing identity by email.
-- [ ] Define owner invitation, acceptance, account recovery, email change and account collision support paths.
-- [ ] Keep billing, invoices, subscriptions and commercial support in the Bazionweb portal; keep product settings, content and deployments in the Platform workspace.
-- [ ] Keep the two super-admin areas permission-separated and use scoped deep links with opaque external IDs.
-- [ ] Test tenant access, account-link collisions, role boundaries, CSRF, logout, session expiry and guest claim replay.
+- [x] Choose one OIDC issuer and persist linked identity by `(issuer, subject)`; never merge identities by matching email.
+- [x] Use the browser-app BFF pattern for dashboard sessions: server-side tokens; secure, HttpOnly, SameSite cookies with `Path=/`, no `Domain`, and a supported `__Host-Http-` prefix; authorization code with PKCE `S256`; validate state/nonce; never put access/refresh tokens or session IDs in URLs.
+- [x] Design guest-paid-order claiming as a separate, short-lived, high-entropy, one-use proof bound to an order; hash it at rest and consume it atomically. Linking the order must not silently merge an existing identity by email.
+- [x] Define owner invitation, acceptance, account recovery, email change and account collision support paths.
+- [ ] Keep billing, invoices, subscriptions and commercial support in the Bazionweb portal; keep product settings, content and deployments in the Platform workspace. *(Platform workspace, claim/email-change UI, and scoped deep links implemented; Bazionweb commercial portal changes remain in `bazionweb`)*
+- [x] Keep the two super-admin areas permission-separated and use scoped deep links with opaque external IDs.
+- [x] Test tenant access, account-link collisions, role boundaries, CSRF, logout, session expiry and guest claim replay.
 
 ### Phase 6 — Durable provisioning saga and lifecycle
 
@@ -279,7 +279,8 @@ The commercial delivery feature is committed in Bazionweb (`5dcdf2f`) and the pl
 - Tenant-scoped audit filtering and pagination now use PostgreSQL bind placeholders consistently; route tests cover filtered and unfiltered pagination.
 - Rate-limit reset now fails explicitly with an audited `501` while the configured stores lack reset APIs; the dashboard no longer offers a nonfunctional unblock form. Maintenance-mode enforcement remains open Phase 0 work.
 - Generic auth organization creation now only links its reserved tenant and creates a local hostname outside production. Optional commerce, analytics and church-ministry entitlements default off; the installation workflow must explicitly enable the purchased composition. Maintenance-mode enforcement remains open.
-- Phase 3 command/status delivery is committed in both repositories. The platform PostgreSQL delivery integration passed. Bazionweb's full test run passed 593 API and 576 web tests, but its PostgreSQL integration suite skipped 3 database cases; the dual-repository integration test also skipped because no safe local Bazionweb test URL is configured. Current evidence does not support claiming a live Bazionweb or dual-database PostgreSQL run. CI/safe local database wiring, database-backed saga execution/compensation, product offer bindings (Phase 4), provider compensation, identity flow (Phase 5), and pilot remain outstanding.
+- Phase 3 command/status delivery is committed in both repositories. The platform PostgreSQL delivery integration passed. Bazionweb's full test run passed 593 API and 576 web tests, but its PostgreSQL integration suite skipped 3 database cases; the dual-repository integration test also skipped because no safe local Bazionweb test URL is configured. Current evidence does not support claiming a live Bazionweb or dual-database PostgreSQL run. CI/safe local database wiring, database-backed saga execution/compensation, product offer bindings (Phase 4), provider compensation, cross-repo Bazionweb Phase 5 RP wiring, and pilot remain outstanding.
+- Phase 5 platform identity & BFF security is implemented on `feat/provider-neutral-deployment-contract` (`0020_phase5_identity_oidc_bff.sql`, `@bazion/api-contracts`, `@bazion/auth` OIDC/PKCE/BFF vault/identity lifecycle/deep-links, `apps/api` OIDC/BFF/auth/admin collision endpoints + CSRF origin guard, `apps/storefront` redirect hardening + order-claim/email-change UI, and `apps/admin` configurable storefront URLs + collision resolution panel) and verified locally against PostgreSQL; Bazionweb commercial portal/RP updates remain separate in `bazionweb`.
 - Do not mark a phase complete until its exit gate has evidence in CI and a commit. Migrations already applied locally are immutable; follow-up schema changes require a new numbered migration.
 
 ## Security references

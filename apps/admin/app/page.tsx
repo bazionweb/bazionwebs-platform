@@ -3,6 +3,7 @@ import { AdminSidebar } from "@/components/admin-sidebar";
 import { AdminTopbar } from "@/components/admin-topbar";
 import { CreateTenantModal, ReconcileButton } from "@/components/tenant-actions";
 import { platformFetch, requirePlatformOwner, type Tenant } from "@/lib/platform";
+import { getTenantStorefrontUrl, getTenantWorkspacePickerUrl } from "@/lib/public-urls";
 
 type TenantList = { items: Tenant[]; total: number; limit: number; offset: number };
 
@@ -169,8 +170,11 @@ export default async function Home({
                   </thead>
                   <tbody>
                     {filtered.map((tenant) => {
-                      const clientUrl = `http://localhost:3100/?tenant=${tenant.slug}`;
-                      const adminUrl = `http://localhost:3100/workspace?select=${tenant.auth_organization_id ?? ""}&workspace=${tenant.slug}&redirect=/admin`;
+                      const clientUrl = getTenantStorefrontUrl(tenant.slug);
+                      const adminUrl = getTenantWorkspacePickerUrl({
+                        slug: tenant.slug,
+                        authOrganizationId: tenant.auth_organization_id,
+                      }, "/admin");
 
                       return (
                         <tr key={tenant.id}>

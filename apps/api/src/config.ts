@@ -73,6 +73,13 @@ const envSchema = z.object({
   COMMERCIAL_PROVISIONING_COMMAND_SECRET: optionalEnv,
   COMMERCIAL_PROVISIONING_COMMAND_ISSUER: z.string().trim().min(1).default("bazionweb"),
   COMMERCIAL_PROVISIONING_COMMAND_AUDIENCE: z.string().trim().min(1).default("bazion-platform:commercial-provisioning"),
+  PLATFORM_CONSOLE_URL: z.string().url().default("http://localhost:3001"),
+  COMMERCIAL_PORTAL_URL: z.string().url().optional(),
+  OIDC_ISSUER: z.string().url().optional(),
+  OIDC_SIGNING_PRIVATE_KEY_PEM: z.string().min(100).optional(),
+  OIDC_SIGNING_KEY_ID: z.string().trim().min(1).max(64).optional(),
+  OIDC_BFF_CLIENT_ID: z.string().trim().min(1).max(128).default("bazion-bff-platform"),
+  OIDC_BFF_CLIENT_SECRET: z.string().min(32).optional(),
 });
 
 export function loadConfig() {
@@ -177,10 +184,20 @@ export function loadConfig() {
       ["BETTER_AUTH_URL", config.BETTER_AUTH_URL],
       ["AUTH_APP_URL", config.AUTH_APP_URL],
       ["PUBLIC_STOREFRONT_URL", config.PUBLIC_STOREFRONT_URL],
+      ["PLATFORM_CONSOLE_URL", config.PLATFORM_CONSOLE_URL],
     ] as const) {
       if (!value.startsWith("https://")) {
         throw new Error(`Production startup blocked: ${name} must use HTTPS.`);
       }
+    }
+    if (config.COMMERCIAL_PORTAL_URL && !config.COMMERCIAL_PORTAL_URL.startsWith("https://")) {
+      throw new Error("Production startup blocked: COMMERCIAL_PORTAL_URL must use HTTPS.");
+    }
+    if (config.OIDC_ISSUER && !config.OIDC_ISSUER.startsWith("https://")) {
+      throw new Error("Production startup blocked: OIDC_ISSUER must use HTTPS.");
+    }
+    if (!config.OIDC_SIGNING_PRIVATE_KEY_PEM) {
+      throw new Error("Production startup blocked: configure OIDC_SIGNING_PRIVATE_KEY_PEM for OIDC RS256 signing.");
     }
   }
   if (config.NODE_ENV === "production") {
@@ -223,6 +240,15 @@ export function loadConfig() {
       } : null,
     },
     requireEmailVerification: config.AUTH_REQUIRE_EMAIL_VERIFICATION === "true",
+    platformConsoleUrl: config.PLATFORM_CONSOLE_URL,
+    commercialPortalUrl: config.COMMERCIAL_PORTAL_URL,
+    oidc: {
+      issuer: config.OIDC_ISSUER ?? config.BETTER_AUTH_URL,
+      privateKeyPem: config.OIDC_SIGNING_PRIVATE_KEY_PEM,
+      keyId: config.OIDC_SIGNING_KEY_ID,
+      bffClientId: config.OIDC_BFF_CLIENT_ID,
+      bffClientSecret: config.OIDC_BFF_CLIENT_SECRET,
+    },
     commercialProvisioning: {
       enabled: commercialProvisioningEnabled,
       databaseUrl: config.PRODUCT_PROVISIONER_DATABASE_URL,

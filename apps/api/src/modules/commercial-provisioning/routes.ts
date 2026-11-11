@@ -1,5 +1,6 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { PostgresAuditEventWriter } from "@bazion/audit";
+import { issueOrderClaimProofInputSchema } from "@bazion/api-contracts";
 import { requirePlatformRole } from "@bazion/auth";
 import { pool } from "../../lib/database.js";
 import {
@@ -185,4 +186,62 @@ export async function commercialProvisioningRoutes(
       return reply.code(202).send({ outbox: replayed });
     },
   );
+
+  app.post("/internal/commercial/order-claims", async (request, reply) => {
+    const runtime = options.runtime;
+    if (!runtime) {
+      return reply.code(503).send({
+        error: "COMMERCIAL_PROVISIONING_UNCONFIGURED",
+        message: "Commercial integration secret is not configured.",
+      });
+    }
+
+    try {
+      const claims = verifyMachineBearerToken(request.headers as Record<string, unknown>, {
+        secret: runtime.commandAuth.secret,
+        expectedIssuer: runtime.commandAuth.issuer || DEFAULT_COMMAND_ISSUER,
+        expectedAudience: runtime.commandAuth.audience || DEFAULT_COMMAND_AUDIENCE,
+        requiredScopes: ["commercial:order-claims:write"],
+      });
+
+      const parsed = issueOrderClaimProofInputSchema.safeParse(request.body);
+      if (!parsed.success) {
+        return reply.code(400).send({
+          error: "INVALID_INPUT",
+          message: parsed.error.issues[0]?.message ?? "Invalid guest order claim issuance payload.",
+        });
+      }
+
+      const { issueGuestOrderClaim } = await import("@bazion/auth/server");
+      const issued = await issueGuestOrderClaim({
+        externalOrderId: parsed.data.externalOrderId,
+        externalCustomerId: parsed.data.externalCustomerId,
+        tenantId: parsed.data.tenantId,
+        installationId: parsed.data.installationId ?? null,
+        issuedByClient: claims.sub,
+        expiresInSeconds: parsed.data.expiresInSeconds,
+      });
+
+      await auditWriter.append({
+        actorType: "service",
+        actorId: claims.sub,
+        tenantId: parsed.data.tenantId,
+        action: "commercial.order_claim.issued",
+        resourceType: "commercial_order_claim_proof",
+        resourceId: issued.claimId,
+        outcome: "succeeded",
+        requestId: request.id,
+        metadata: { externalOrderId: parsed.data.externalOrderId },
+      }).catch(() => undefined);
+
+      return reply.code(201).send({
+        claimId: issued.claimId,
+        proofToken: issued.proofToken,
+        expiresAt: issued.expiresAt,
+        claimPath: "/workspace?claim=1",
+      });
+    } catch (error) {
+      return sendRouteError(reply, error);
+    }
+  });
 }

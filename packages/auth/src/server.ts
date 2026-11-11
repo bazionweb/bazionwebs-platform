@@ -1249,3 +1249,115 @@ export async function generateEmergencyPasswordResetUrl(userIdOrEmail: string): 
 }
 
 export { requirePlatformRole, requirePlatformPermission } from "./tenant-context.js";
+
+import {
+  claimPlatformGuestOrder,
+  confirmPlatformEmailChange,
+  getPlatformOidcAuthority,
+  issuePlatformGuestOrderClaimProof,
+  listPlatformIdentityCollisions,
+  requestPlatformEmailChange,
+  resolvePlatformFederatedIdentity,
+  resolvePlatformIdentityCollision,
+  type PlatformPhase5Deps,
+} from "./phase5-server.js";
+
+async function ensureTenantOwnerMembershipInAuth(organizationId: string, userId: string): Promise<void> {
+  const client = await authPool.connect();
+  try {
+    await client.query("BEGIN");
+    const locked = await client.query(
+      'SELECT id, role FROM "member" WHERE "organizationId" = $1 AND "userId" = $2 LIMIT 1 FOR UPDATE',
+      [organizationId, userId],
+    );
+    const existing = locked.rows[0] as { id?: string; role?: string } | undefined;
+    if (existing?.id) {
+      const roles = String(existing.role ?? "")
+        .split(",")
+        .map((r) => r.trim())
+        .filter(Boolean);
+      if (!roles.includes("owner")) {
+        await client.query('UPDATE "member" SET role = $1 WHERE id = $2', [
+          ["owner", ...roles].join(","),
+          existing.id,
+        ]);
+      }
+      await client.query("COMMIT");
+      return;
+    }
+    await client.query("ROLLBACK");
+  } catch (error) {
+    try { await client.query("ROLLBACK"); } catch { /* ignore */ }
+    throw error;
+  } finally {
+    client.release();
+  }
+
+  await auth.api.addMember({
+    body: { organizationId, userId, role: "owner" },
+  });
+}
+
+const phase5Deps: PlatformPhase5Deps = {
+  identityPool: tenantProvisionerPool,
+  authPool,
+  ensureTenantOwnerMembership: ensureTenantOwnerMembershipInAuth,
+};
+
+export function getOidcAuthority(config?: Parameters<typeof getPlatformOidcAuthority>[1]) {
+  return getPlatformOidcAuthority(phase5Deps, config);
+}
+
+export async function issueGuestOrderClaim(
+  input: Parameters<typeof issuePlatformGuestOrderClaimProof>[1],
+) {
+  return issuePlatformGuestOrderClaimProof(phase5Deps, input);
+}
+
+export async function claimGuestOrder(
+  input: Parameters<typeof claimPlatformGuestOrder>[1],
+) {
+  return claimPlatformGuestOrder(phase5Deps, input);
+}
+
+export async function requestEmailChange(
+  input: Parameters<typeof requestPlatformEmailChange>[1],
+) {
+  return requestPlatformEmailChange(phase5Deps, input);
+}
+
+export async function confirmEmailChange(
+  input: Parameters<typeof confirmPlatformEmailChange>[1],
+) {
+  return confirmPlatformEmailChange(phase5Deps, input);
+}
+
+export async function listIdentityCollisionsForSupport(
+  input?: Parameters<typeof listPlatformIdentityCollisions>[1],
+) {
+  return listPlatformIdentityCollisions(phase5Deps, input);
+}
+
+export async function resolveIdentityCollisionForSupport(
+  input: Parameters<typeof resolvePlatformIdentityCollision>[1],
+) {
+  return resolvePlatformIdentityCollision(phase5Deps, input);
+}
+
+export async function resolveFederatedSubjectLink(
+  input: Parameters<typeof resolvePlatformFederatedIdentity>[1],
+) {
+  return resolvePlatformFederatedIdentity(phase5Deps, input);
+}
+
+export { IdentityLifecycleError } from "./identity-lifecycle.js";
+export {
+  OidcSecurityError,
+  assertNoSandboxImpersonation,
+  computePkceS256Challenge,
+  exportPublicJwks,
+  loadOrGenerateOidcSigningKey,
+  signOidcJwt,
+  verifyOidcJwt,
+  verifyPkceS256,
+} from "./oidc.js";

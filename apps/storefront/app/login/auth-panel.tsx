@@ -2,19 +2,14 @@
 
 import { useState } from "react";
 import type { FormEvent } from "react";
-import { authClient } from "@bazion/auth/client";
+import { authClient, resolveSafeRedirectTarget } from "@bazion/auth/client";
 
 function getSafeCallbackUrl(): string {
-  const requested = new URLSearchParams(window.location.search).get("callbackURL");
-  if (!requested) return new URL("/workspace", window.location.origin).toString();
-  try {
-    const destination = new URL(requested, window.location.origin);
-    return destination.origin === window.location.origin
-      ? destination.toString()
-      : new URL("/workspace", window.location.origin).toString();
-  } catch {
-    return new URL("/workspace", window.location.origin).toString();
-  }
+  const safePathOrUrl = resolveSafeRedirectTarget(
+    new URLSearchParams(window.location.search).get("callbackURL"),
+    { allowedOrigins: [window.location.origin], fallback: "/workspace" },
+  );
+  return new URL(safePathOrUrl, window.location.origin).toString();
 }
 
 export function AuthPanel() {

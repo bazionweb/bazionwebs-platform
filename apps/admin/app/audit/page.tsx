@@ -1,6 +1,7 @@
 import { AdminSidebar } from "@/components/admin-sidebar";
 import { AdminTopbar } from "@/components/admin-topbar";
 import { AuditPanel } from "@/components/audit-panel";
+import { IdentityCollisionsPanel } from "@/components/identity-collisions-panel";
 import { platformFetch, requirePlatformOwner, type Tenant } from "@/lib/platform";
 
 type TenantList = { items: Tenant[]; total: number; limit: number; offset: number };
@@ -37,6 +38,7 @@ export default async function AuditPage() {
         </div>
 
         <AuditPanel tenants={tenants} />
+        <IdentityCollisionsPanel />
 
         <footer>
           BAZION WEB PLATFORM <span>Append-only security audit events.</span>

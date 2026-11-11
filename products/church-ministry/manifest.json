@@ -29,5 +29,5 @@
     "schemaVersion": "1.0.0",
     "sourcePath": "packages/church-ministry-contracts/src/index.ts"
   },
-  "databaseSchemaVersion": "0019_commercial_provisioning_delivery.sql"
+  "databaseSchemaVersion": "0020_phase5_identity_oidc_bff.sql"
 }

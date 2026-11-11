@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import { getPublicStorefrontBaseUrl, getTenantStorefrontUrl } from "@/lib/public-urls";
 
 type Candidate = { userId: string; name: string; email: string; emailVerified: boolean; roles: string[] };
 type OwnerState = { currentOwners: Candidate[]; candidates: Candidate[]; total: number; limit: number; offset: number };
@@ -214,7 +215,7 @@ export function TenantControlPanel(props: {
 
 
     <section className="panel">
-      <div className="panel-head"><div><p className="eyebrow">CUSTOM DOMAINS</p><h2>Tenant domains</h2><p className="muted">Verify domain ownership with a DNS TXT record before the hostname becomes active.</p><p className="muted" style={{ fontSize: 12, marginTop: 4 }}>💡 In local development, client storefronts are accessible directly at <code>http://localhost:3100/?tenant=&lt;slug&gt;</code> without requiring local hosts/DNS configuration.</p></div><span className="count">{domains.length} DOMAINS</span></div>
+      <div className="panel-head"><div><p className="eyebrow">CUSTOM DOMAINS</p><h2>Tenant domains</h2><p className="muted">Verify domain ownership with a DNS TXT record before the hostname becomes active.</p><p className="muted" style={{ fontSize: 12, marginTop: 4 }}>💡 Without custom DNS configuration, client storefronts remain accessible via <code>{`${getPublicStorefrontBaseUrl()}/?tenant=<slug>`}</code>.</p></div><span className="count">{domains.length} DOMAINS</span></div>
       {props.domainsStatus !== 200 && !props.domainsInitial ? <LoadError status={props.domainsStatus} label="custom domains"/> : <>
         <form className="owner-search" onSubmit={addDomain}>
           <label>Hostname<input value={domainInput} onChange={(event) => setDomainInput(event.target.value)} placeholder="shop.example.com" maxLength={253}/></label>
@@ -235,12 +236,12 @@ export function TenantControlPanel(props: {
                 {domain.hostname.endsWith(".localhost") && (
                   <div style={{ marginTop: 4 }}>
                     <a
-                      href={`http://localhost:3100/?tenant=${encodeURIComponent(domain.hostname.replace(/\.localhost$/, ""))}`}
+                      href={getTenantStorefrontUrl(domain.hostname.replace(/\.localhost$/, ""))}
                       target="_blank"
                       rel="noreferrer"
                       style={{ fontSize: 11, color: "var(--accent)", textDecoration: "underline" }}
                     >
-                      Open local workspace site (port 3100) ↗
+                      Open tenant workspace storefront ↗
                     </a>
                   </div>
                 )}

@@ -23,9 +23,13 @@ export {
 
 export {
   canAccessPlatformPermission,
+  canAccessPlatformTenantScope,
   getPlatformPermissions,
   platformPermissions,
   normalizeTenantHostname,
   type PlatformPermission,
   type PlatformRole,
 } from "./security-policy.js";
+
+export * from "./bff-cookies.js";
+export * from "./deep-links.js";

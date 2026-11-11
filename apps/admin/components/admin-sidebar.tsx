@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { getDefaultTenantAdminUrl, getPublicStorefrontBaseUrl } from "@/lib/public-urls";
 
 export function AdminSidebar({
   userEmail,
@@ -86,7 +87,7 @@ export function AdminSidebar({
         <p className="side-label" style={{ marginTop: "24px" }}>QUICK ACCESS</p>
         <a
           className="side-link side-link-subtle"
-          href="http://localhost:3100"
+          href={getPublicStorefrontBaseUrl()}
           target="_blank"
           rel="noreferrer"
         >
@@ -95,12 +96,12 @@ export function AdminSidebar({
         </a>
         <a
           className="side-link side-link-subtle"
-          href="http://localhost:3100/admin"
+          href={getDefaultTenantAdminUrl()}
           target="_blank"
           rel="noreferrer"
         >
           <span className="side-icon">↗</span>
-          <span>GMFC Church Desk</span>
+          <span>Tenant Admin Desk</span>
         </a>
       </div>
 
