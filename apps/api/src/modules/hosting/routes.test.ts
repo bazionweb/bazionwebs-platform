@@ -37,6 +37,7 @@ function makeRuntime(): HostingProvisioningRuntime {
       composeFile: "services:\n  app:\n    image: ${APP_IMAGE:?required}\n",
       templateVersion: "sha256:" + "a".repeat(64),
     })),
+    inspect: vi.fn(async (reference) => ({ reference, state: "running" as const, lastDeployedAt: null })),
     provision: vi.fn(async () => ({
       reference,
       state: "deploying" as const,
