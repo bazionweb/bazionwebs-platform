@@ -4,7 +4,7 @@ import { requirePlatformRole } from "@bazion/auth";
 import { getPlatformTenant } from "@bazion/auth/server";
 import { pool } from "../../lib/database.js";
 import { tenantHostingDockerSecretReference } from "./secrets.js";
-import { hostingProvisionInputSchema } from "./policy.js";
+import { hostingLifecycleActionSchema, hostingProvisionInputSchema } from "./policy.js";
 import type { HostingProvisioningRuntime } from "./runtime.js";
 
 const auditWriter = new PostgresAuditEventWriter(pool);
@@ -19,18 +19,25 @@ function errorCode(error: unknown): string {
 
 function errorStatus(code: string): number {
   switch (code) {
-    case "TENANT_NOT_FOUND": return 404;
+    case "TENANT_NOT_FOUND":
+    case "HOSTING_DEPLOYMENT_NOT_FOUND": return 404;
     case "TENANT_NOT_ACTIVE":
     case "HOSTING_PROVISIONING_IN_PROGRESS":
     case "HOSTING_RECONCILIATION_REQUIRED":
     case "HOSTING_IDEMPOTENCY_CONFLICT":
+    case "TENANT_NOT_CLOSED":
+    case "HOSTING_LIFECYCLE_IN_PROGRESS":
+    case "HOSTING_LIFECYCLE_STATE_INVALID":
+    case "HOSTING_DEPLOYMENT_REMOVED":
+    case "HOSTING_PROVIDER_MISMATCH":
     case "HOSTING_SECRET_INVALID":
     case "HOSTING_IMAGE_REFERENCE_INVALID": return 409;
     case "HOSTING_TEMPLATE_UNAVAILABLE":
     case "HOSTING_SECRET_UNAVAILABLE":
     case "HOSTING_SECRET_REFERENCE_INVALID":
     case "HOSTING_NOT_CONFIGURED": return 503;
-    case "HOSTING_DEPLOYMENT_FAILED": return 502;
+    case "HOSTING_DEPLOYMENT_FAILED":
+    case "HOSTING_PROVIDER_ACTION_FAILED": return 502;
     default: return 500;
   }
 }
@@ -126,6 +133,105 @@ export async function hostingRoutes(
           metadata: safeMetadata(row.metadata),
         })),
       });
+    },
+  );
+
+  app.post<{ Params: { tenantId: string; deploymentId: string } }>(
+    "/admin/platform/tenants/:tenantId/hosting/deployments/:deploymentId/actions",
+    async (request, reply) => {
+      const tenantId = request.params.tenantId.trim();
+      const deploymentId = request.params.deploymentId.trim();
+      if (!tenantIdPattern.test(tenantId) || !tenantIdPattern.test(deploymentId)) {
+        return reply.code(400).send({ error: "INVALID_INPUT" });
+      }
+      const parsed = hostingLifecycleActionSchema.safeParse(request.body ?? {});
+      if (!parsed.success) return reply.code(400).send({ error: "INVALID_INPUT", details: parsed.error.flatten() });
+
+      const operator = await requirePlatformRole(request.headers, ["platform_owner"]);
+      const tenant = await getPlatformTenant(tenantId);
+      if (!tenant) return reply.code(404).send({ error: "TENANT_NOT_FOUND" });
+      const { action } = parsed.data;
+      if ((action === "start" || action === "redeploy") && tenant.status !== "active") {
+        await auditWriter.append({
+          actorType: "user", actorId: operator.userId, actorRole: operator.role,
+          tenantId, resourceType: "tenant_hosting_deployment", resourceId: deploymentId,
+          action: "tenant.hosting.lifecycle.denied", outcome: "denied", requestId: request.id,
+          metadata: { action, reason: "tenant_not_active" },
+        });
+        return reply.code(409).send({ error: "TENANT_NOT_ACTIVE" });
+      }
+      if (action === "remove" && tenant.status !== "closed") {
+        await auditWriter.append({
+          actorType: "user", actorId: operator.userId, actorRole: operator.role,
+          tenantId, resourceType: "tenant_hosting_deployment", resourceId: deploymentId,
+          action: "tenant.hosting.lifecycle.denied", outcome: "denied", requestId: request.id,
+          metadata: { action, reason: "tenant_not_closed" },
+        });
+        return reply.code(409).send({ error: "TENANT_NOT_CLOSED" });
+      }
+      const runtime = options.runtime;
+      if (!runtime) return reply.code(503).send({ error: "HOSTING_NOT_CONFIGURED" });
+
+      const auditBase = {
+        actorType: "user" as const,
+        actorId: operator.userId,
+        actorRole: operator.role,
+        tenantId,
+        resourceType: "tenant_hosting_deployment",
+        resourceId: deploymentId,
+        requestId: request.id,
+      };
+      // The audit intent is persisted before any provider mutation is attempted.
+      await auditWriter.append({
+        ...auditBase,
+        action: "tenant.hosting.lifecycle." + action + ".requested",
+        outcome: "succeeded",
+        metadata: { action, provider: runtime.providerId },
+      });
+
+      try {
+        const result = await runtime.lifecycle({
+          tenantId, deploymentId, action, actorId: operator.userId, requestId: request.id,
+        });
+        await auditWriter.append({
+          ...auditBase,
+          action: "tenant.hosting.lifecycle." + action + ".completed",
+          outcome: "succeeded",
+          metadata: { action, state: result.state, confirmed: result.confirmed, already: result.already },
+        }).catch((auditError: unknown) => {
+          request.log.error({
+            auditAction: "tenant.hosting.lifecycle.completed",
+            errorType: auditError instanceof Error ? auditError.name : "UnknownError",
+          }, "Hosting lifecycle completion audit could not be persisted");
+        });
+        return reply.code(result.confirmed ? 200 : 202).send({
+          deployment: {
+            id: deploymentId,
+            action: result.action,
+            state: result.state,
+            confirmed: result.confirmed,
+            already: result.already,
+          },
+        });
+      } catch (error) {
+        const code = errorCode(error);
+        await auditWriter.append({
+          ...auditBase,
+          action: "tenant.hosting.lifecycle." + action + ".failed",
+          outcome: "failed",
+          metadata: { action, errorCode: code },
+        }).catch((auditError: unknown) => {
+          request.log.error({
+            auditAction: "tenant.hosting.lifecycle.failed",
+            errorType: auditError instanceof Error ? auditError.name : "UnknownError",
+          }, "Hosting lifecycle failure audit could not be persisted");
+        });
+        const status = errorStatus(code);
+        return reply.code(status).send({
+          error: code,
+          message: status >= 500 ? "The hosting provider action could not be confirmed." : "The hosting lifecycle request could not be completed.",
+        });
+      }
     },
   );
 
