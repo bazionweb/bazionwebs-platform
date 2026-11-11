@@ -144,7 +144,7 @@ export async function hostingRoutes(
           ...auditBase,
           action: "tenant.hosting.provision.failed",
           outcome: "failed",
-          metadata: { template: parsed.data.template, provider: options.runtime.providerId, errorCode: code },
+          metadata: { template: parsed.data.template, provider: runtime.providerId, errorCode: code },
         }).catch((auditError: unknown) => {
           request.log.error({
             auditAction: "tenant.hosting.provision.failed",
