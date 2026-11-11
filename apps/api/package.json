@@ -17,6 +17,7 @@
     "@bazion/church-ministry-contracts": "workspace:*",
     "@bazion/commerce-domain": "workspace:*",
     "@bazion/database": "workspace:*",
+    "@bazion/deployment-dokploy": "workspace:*",
     "@bazion/payments": "workspace:*",
     "@bazion/storage": "workspace:*",
     "@bazion/platform-contracts": "workspace:*",

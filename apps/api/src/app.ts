@@ -10,6 +10,8 @@ import { commerceAdminRoutes } from "./modules/commerce/admin-routes.js";
 import { authRoutes } from "./modules/auth/routes.js";
 import { adminRoutes } from "./modules/admin/routes.js";
 import { churchRoutes } from "./modules/church/routes.js";
+import { hostingRoutes } from "./modules/hosting/routes.js";
+import { createHostingProvisioningRuntime } from "./modules/hosting/runtime.js";
 
 const MEDIA_UPLOAD_LIMIT_BYTES = 8 * 1024 * 1024;
 
@@ -103,6 +105,10 @@ export async function buildApp(config: AppConfig) {
   await app.register(commerceRoutes, { prefix: "/v1", config });
   await app.register(commerceAdminRoutes, { prefix: "/v1" });
   await app.register(churchRoutes, { prefix: "/v1", config });
+  await app.register(hostingRoutes, {
+    prefix: "/v1",
+    runtime: createHostingProvisioningRuntime(config.hosting),
+  });
 
   app.setErrorHandler((error, request, reply) => {
     const candidate = error as { statusCode?: unknown; code?: unknown };

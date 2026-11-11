@@ -30,6 +30,36 @@ describe("API runtime configuration", () => {
     vi.unstubAllEnvs();
   });
 
+  it("keeps tenant hosting disabled unless a provider is explicitly configured", () => {
+    expect(loadConfig().hosting.provider).toBe("disabled");
+    expect(loadConfig().hosting.dokploy).toBeNull();
+  });
+
+  it("requires complete secure Dokploy configuration before enabling hosting", () => {
+    vi.stubEnv("HOSTING_PROVIDER", "dokploy");
+    expect(() => loadConfig()).toThrow(/requires DOKPLOY_BASE_URL/);
+
+    vi.stubEnv("DOKPLOY_BASE_URL", "https://server.example.test");
+    vi.stubEnv("DOKPLOY_API_KEY", "test-api-key");
+    vi.stubEnv("DOKPLOY_ENVIRONMENT_ID", "environment-1");
+    expect(loadConfig().hosting).toMatchObject({
+      provider: "dokploy",
+      dokploy: { baseUrl: "https://server.example.test", environmentId: "environment-1" },
+    });
+  });
+
+  it("rejects insecure Dokploy URLs and relative secret directories", () => {
+    vi.stubEnv("HOSTING_PROVIDER", "dokploy");
+    vi.stubEnv("DOKPLOY_BASE_URL", "http://server.example.test");
+    vi.stubEnv("DOKPLOY_API_KEY", "test-api-key");
+    vi.stubEnv("DOKPLOY_ENVIRONMENT_ID", "environment-1");
+    expect(() => loadConfig()).toThrow(/HTTPS URL/);
+
+    vi.stubEnv("DOKPLOY_BASE_URL", "https://server.example.test");
+    vi.stubEnv("HOSTING_SECRET_DIRECTORY", "secrets");
+    expect(() => loadConfig()).toThrow(/absolute path/);
+  });
+
   it("accepts a canonical Base64 32-byte notification key", () => {
     expect(loadConfig().NOTIFICATION_ENCRYPTION_KEY).toBe(testKey);
   });

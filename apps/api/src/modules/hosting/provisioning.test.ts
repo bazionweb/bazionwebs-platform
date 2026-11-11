@@ -21,6 +21,7 @@ function setup(beginResult?: BeginHostingProvisionResult) {
       leaseToken: "lease-1", attemptCount: 1, reference: null,
     })),
     attachReference: vi.fn(async () => true),
+    markDeploying: vi.fn(async () => true),
     markRunning: vi.fn(async () => true),
     markFailed: vi.fn(async () => undefined),
   };
@@ -76,6 +77,23 @@ describe("TenantHostingProvisioningService", () => {
     expect(store.attachReference).not.toHaveBeenCalled();
     expect(result.reused).toBe(true);
     expect(result.attemptCount).toBe(2);
+  });
+
+  it("keeps an accepted deployment in deploying until Dokploy confirms it is running", async () => {
+    const { service, store, provider } = setup();
+    vi.mocked(provider.inspect).mockResolvedValueOnce({
+      reference, state: "deploying", lastDeployedAt: null,
+    });
+
+    const result = await service.provision(input);
+
+    expect(provider.deploy).toHaveBeenCalledWith(reference);
+    expect(provider.inspect).toHaveBeenCalledWith(reference);
+    expect(store.markDeploying).toHaveBeenCalledWith(expect.objectContaining({
+      deploymentId: "deployment-1", leaseToken: "lease-1",
+    }));
+    expect(store.markRunning).not.toHaveBeenCalled();
+    expect(result).toEqual({ reference, state: "deploying", attemptCount: 1, reused: false });
   });
 
   it("returns an existing running deployment without contacting the provider", async () => {
