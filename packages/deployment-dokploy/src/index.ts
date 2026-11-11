@@ -23,6 +23,9 @@ interface DokployResource {
   status?: string;
   updatedAt?: string;
   createdAt?: string;
+  name?: string;
+  appName?: string;
+  environmentId?: string;
 }
 
 function resourceId(payload: unknown): string {
@@ -159,10 +162,20 @@ export class DokployComposeProvider implements TenantHostingProvider {
     this.assertReference(reference);
     const payload = await this.request(`compose.one?composeId=${encodeURIComponent(reference.resourceId)}`, "GET") as DokployResource | null;
     if (!payload) throw new Error("DOKPLOY_RESOURCE_NOT_FOUND");
+    if (resourceId(payload) !== reference.resourceId) throw new Error("DOKPLOY_RESOURCE_ID_MISMATCH");
+    if (typeof payload.environmentId === "string" && payload.environmentId !== this.config.environmentId) {
+      throw new Error("DOKPLOY_RESOURCE_ENVIRONMENT_MISMATCH");
+    }
     return {
       reference,
       state: deploymentState(payload.composeStatus ?? payload.status),
       lastDeployedAt: payload.updatedAt ?? null,
+      ...(typeof payload.name === "string" && payload.name.trim()
+        ? { providerResourceName: payload.name }
+        : {}),
+      ...(typeof payload.environmentId === "string" && payload.environmentId.trim()
+        ? { providerEnvironmentId: payload.environmentId }
+        : {}),
     };
   }
 
