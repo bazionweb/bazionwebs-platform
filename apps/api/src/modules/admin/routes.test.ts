@@ -670,7 +670,7 @@ describe("platform tenant control-plane extensions", () => {
     } finally { await app.close(); }
   });
 
-  it("returns manifest-backed module metadata and default effective entitlements", async () => {
+  it("returns optional product modules disabled until explicit provisioning", async () => {
     const app = await makeApp();
     try {
       const response = await app.inject({
@@ -679,7 +679,9 @@ describe("platform tenant control-plane extensions", () => {
       });
       expect(response.statusCode).toBe(200);
       expect(mocks.requirePlatformPermission).toHaveBeenCalledWith(expect.any(Object), "tenant.modules.read", "11111111-1111-4111-8111-111111111111");
-      expect(response.json().modules.find((item: { id: string }) => item.id === "commerce").enabled).toBe(true);
+      expect(response.json().modules.find((item: { id: string }) => item.id === "commerce").enabled).toBe(false);
+      expect(response.json().modules.find((item: { id: string }) => item.id === "analytics").enabled).toBe(false);
+      expect(response.json().modules.find((item: { id: string }) => item.id === "church-ministry").enabled).toBe(false);
       expect(response.json().modules.find((item: { id: string }) => item.id === "contacts-crm").canManage).toBe(false);
     } finally { await app.close(); }
   });

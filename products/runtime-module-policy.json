@@ -14,7 +14,7 @@
       "id": "commerce",
       "displayName": "Commerce",
       "description": "Product catalogue, guest carts, checkout, orders and payment boundary.",
-      "defaultEnabled": true,
+      "defaultEnabled": false,
       "required": false,
       "tenantAssignable": true,
       "entitlementDependencies": ["platform-identity"]
@@ -23,7 +23,7 @@
       "id": "analytics",
       "displayName": "Analytics",
       "description": "Tenant workspace metrics and analytics authorization surface.",
-      "defaultEnabled": true,
+      "defaultEnabled": false,
       "required": false,
       "tenantAssignable": true,
       "entitlementDependencies": ["platform-identity"]
@@ -68,7 +68,7 @@
       "id": "church-ministry",
       "displayName": "Church & Ministry Platform",
       "description": "Tenant-scoped sermons, events, registrations, donations, enquiries and prayer requests; broader ministry operations remain in progress.",
-      "defaultEnabled": true,
+      "defaultEnabled": false,
       "required": false,
       "tenantAssignable": true,
       "entitlementDependencies": ["platform-identity"]

@@ -53,6 +53,12 @@ describe.skipIf(!enabled)("commerce checkout PostgreSQL integration", () => {
     tenantId = tenant.rows[0]!.id;
     host = `checkout-${unique.slice(0, 8)}.example.test`;
 
+    await migrationPool.query(
+      `INSERT INTO public.tenant_module_entitlements (tenant_id, module_id, enabled, updated_by)
+       VALUES ($1, 'commerce', true, 'integration-test')`,
+      [tenantId],
+    );
+
     await withTenant(migrationPool, tenantId, async (client) => {
       await client.query(
         "INSERT INTO public.commerce_store_settings (tenant_id, supported_currencies, default_currency, shipping_rates, shipping_countries) VALUES ($1, ARRAY['KES'], 'KES', '{\"KES\":250}'::jsonb, ARRAY['KE'])",
@@ -102,6 +108,7 @@ describe.skipIf(!enabled)("commerce checkout PostgreSQL integration", () => {
         await client.query("DELETE FROM public.products WHERE tenant_id = $1", [tenantId]);
         await client.query("DELETE FROM public.commerce_store_settings WHERE tenant_id = $1", [tenantId]);
       });
+      await migrationPool.query("DELETE FROM public.tenant_module_entitlements WHERE tenant_id = $1", [tenantId]);
       await migrationPool.query("DELETE FROM public.tenants WHERE id = $1", [tenantId]);
     }
     await Promise.all([

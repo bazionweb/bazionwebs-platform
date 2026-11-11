@@ -35,7 +35,7 @@ export const platformModuleCatalog: readonly PlatformModuleCatalogItem[] = [
       "platform-identity"
     ],
     "description": "Product catalogue, guest carts, checkout, orders and payment boundary.",
-    "defaultEnabled": true,
+    "defaultEnabled": false,
     "required": false,
     "tenantAssignable": true
   },
@@ -49,7 +49,7 @@ export const platformModuleCatalog: readonly PlatformModuleCatalogItem[] = [
       "platform-identity"
     ],
     "description": "Tenant workspace metrics and analytics authorization surface.",
-    "defaultEnabled": true,
+    "defaultEnabled": false,
     "required": false,
     "tenantAssignable": true
   },
@@ -119,7 +119,7 @@ export const platformModuleCatalog: readonly PlatformModuleCatalogItem[] = [
       "platform-identity"
     ],
     "description": "Tenant-scoped sermons, events, registrations, donations, enquiries and prayer requests; broader ministry operations remain in progress.",
-    "defaultEnabled": true,
+    "defaultEnabled": false,
     "required": false,
     "tenantAssignable": true
   }

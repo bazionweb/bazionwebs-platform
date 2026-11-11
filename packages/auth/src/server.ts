@@ -11,6 +11,7 @@ import {
   normalizeTenantHostname,
   resolveTrustedOriginsForRequest,
 } from "./security-policy.js";
+import { createAfterCreateOrganizationHook } from "./organization-provisioning.js";
 
 function required(name: string): string {
   const value = process.env[name];
@@ -152,60 +153,10 @@ async function beforeCreateOrganization({ organization: org, user }: {
   if (result.rowCount !== 1) throw new Error("Could not reserve the client tenant slug.");
 }
 
-async function afterCreateOrganization({ organization: org }: {
-  organization: { id: string; slug?: string; name?: string };
-}): Promise<void> {
-  const organizationId = org.id;
-  const slug = org.slug?.trim();
-  const name = org.name?.trim();
-  if (!organizationId || !slug || !name) {
-    throw new Error("Organization was created without the required Bazion tenant mapping fields.");
-  }
-  const result = await tenantProvisionerPool.query<{ id: string }>(
-    `UPDATE public.tenants
-        SET auth_organization_id = $1, name = $2, status = 'active', updated_at = now()
-      WHERE slug = $3
-        AND status IN ('provisioning', 'active')
-        AND (auth_organization_id IS NULL OR auth_organization_id = $1)
-      RETURNING id`,
-    [organizationId, name, slug],
-  );
-  if (result.rowCount !== 1) {
-    throw new Error("Organization was created but its Bazion tenant mapping needs reconciliation.");
-  }
-
-  const tenantId = result.rows[0]?.id;
-  if (tenantId) {
-    // Seed baseline profile, settings, module entitlements, and local dev domain
-    await tenantProvisionerPool.query(
-      `INSERT INTO public.ministry_profiles (tenant_id, ministry_name, description, vision, mission, outreach, telephone_numbers, social_links)
-       VALUES ($1, $2, $3, 'To love God and serve people.', 'Preach truth, hope and love.', 'Community outreach and fellowship.', '[]'::jsonb, '{}'::jsonb)
-       ON CONFLICT (tenant_id) DO NOTHING`,
-      [tenantId, name, `Welcome to ${name}`],
-    ).catch(() => {});
-
-    await tenantProvisionerPool.query(
-      `INSERT INTO public.ministry_settings (tenant_id, setting_key, setting_value)
-       VALUES ($1, 'public_site', '{"theme":{"primaryColor":"#193a31","secondaryColor":"#315e50","accentColor":"#8b5b29"},"pages":{"sermons":true,"events":true,"give":true,"ministries":true,"about":true,"contact":true}}')
-       ON CONFLICT (tenant_id, setting_key) DO NOTHING`,
-      [tenantId],
-    ).catch(() => {});
-
-    await tenantProvisionerPool.query(
-      `INSERT INTO public.tenant_module_entitlements (tenant_id, module_id, enabled, updated_by)
-       VALUES ($1, 'church-ministry', true, 'system:provisioning')
-       ON CONFLICT (tenant_id, module_id) DO NOTHING`,
-      [tenantId],
-    ).catch(() => {});
-
-    await tenantProvisionerPool.query(
-      `INSERT INTO public.tenant_domains (tenant_id, hostname, status, verified_at)
-       VALUES ($1, $2, 'active', now())
-       ON CONFLICT (hostname) DO NOTHING`,
-      [tenantId, `${slug}.localhost`],
-    ).catch(() => {});
-  }
-}
+const afterCreateOrganization = createAfterCreateOrganizationHook(
+  { query: (sql, values) => tenantProvisionerPool.query(sql, values) },
+  nodeEnv,
+);
 
 export const auth = betterAuth({
   appName: "Bazion Web",
