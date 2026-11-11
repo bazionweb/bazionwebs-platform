@@ -46,6 +46,18 @@ export function AdminSidebar({
       icon: "⚡",
       isActive: pathname.startsWith("/system"),
     },
+    {
+      href: "/troubleshoot",
+      label: "Troubleshooting Hub",
+      icon: "🛠️",
+      isActive: pathname.startsWith("/troubleshoot"),
+    },
+    {
+      href: "/audit",
+      label: "Audit & Logs",
+      icon: "📜",
+      isActive: pathname.startsWith("/audit"),
+    },
   ];
 
   const initial = (userName || userEmail || "A").charAt(0).toUpperCase();

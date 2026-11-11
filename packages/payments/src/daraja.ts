@@ -21,6 +21,15 @@ export interface DarajaStkPushResult {
   customerMessage: string;
 }
 
+export interface DarajaStkPushQueryResult {
+  responseCode: string;
+  responseDescription: string;
+  merchantRequestId: string;
+  checkoutRequestId: string;
+  resultCode: string;
+  resultDesc: string;
+}
+
 type JsonObject = Record<string, unknown>;
 
 export class DarajaRequestError extends Error {
@@ -148,6 +157,47 @@ export class DarajaClient {
       merchantRequestId: payload.MerchantRequestID,
       checkoutRequestId: payload.CheckoutRequestID,
       customerMessage: typeof payload.CustomerMessage === "string" ? payload.CustomerMessage : "Payment request sent.",
+    };
+  }
+
+  async queryStkPushStatus(checkoutRequestId: string): Promise<DarajaStkPushQueryResult> {
+    const trimmedId = checkoutRequestId.trim();
+    if (!trimmedId) {
+      throw new Error("CheckoutRequestID is required for status query.");
+    }
+    const timestamp = timestampNairobi();
+    const password = Buffer.from(`${this.config.businessShortCode}${this.config.passkey}${timestamp}`).toString("base64");
+    const accessToken = await this.getAccessToken();
+    let response: Response;
+    try {
+      response = await this.fetcher(`${this.baseUrl}/mpesa/stkpushquery/v1/query`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+        signal: AbortSignal.timeout(15_000),
+        body: JSON.stringify({
+          BusinessShortCode: this.config.businessShortCode,
+          Password: password,
+          Timestamp: timestamp,
+          CheckoutRequestID: trimmedId,
+        }),
+      });
+    } catch {
+      throw new DarajaRequestError("Safaricom STK query endpoint was unreachable.", "unknown");
+    }
+    const payload = asObject(await response.json().catch(() => null));
+    if (!payload) {
+      throw new DarajaRequestError("Safaricom returned an invalid response for the STK query.", "unknown");
+    }
+    return {
+      responseCode: String(payload.ResponseCode ?? payload.responseCode ?? ""),
+      responseDescription: String(payload.ResponseDescription ?? payload.responseDescription ?? ""),
+      merchantRequestId: String(payload.MerchantRequestID ?? payload.merchantRequestId ?? ""),
+      checkoutRequestId: String(payload.CheckoutRequestID ?? payload.checkoutRequestId ?? trimmedId),
+      resultCode: String(payload.ResultCode ?? payload.resultCode ?? ""),
+      resultDesc: String(payload.ResultDesc ?? payload.resultDesc ?? payload.errorMessage ?? ""),
     };
   }
 

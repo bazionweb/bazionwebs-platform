@@ -120,4 +120,24 @@ describe("Daraja STK Push", () => {
     expect(() => new DarajaClient({ ...config, callbackUrl: "http://payments.example.org/callback" })).toThrow("must use HTTPS");
     expect(() => new DarajaClient({ ...config, callbackUrl: "http://localhost:4000/callback" })).not.toThrow();
   });
+
+  it("queries Daraja STK push status", async () => {
+    const fetcher = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(jsonResponse({ access_token: "token-abc", expires_in: "3600" }))
+      .mockResolvedValueOnce(jsonResponse({
+        ResponseCode: "0",
+        ResponseDescription: "The service request has been accepted successfully",
+        MerchantRequestID: "merch-1",
+        CheckoutRequestID: "ws_CO_test",
+        ResultCode: "0",
+        ResultDesc: "The service request is processed successfully.",
+      }));
+
+    const client = new DarajaClient(config, fetcher);
+    const result = await client.queryStkPushStatus("ws_CO_test");
+
+    expect(result.resultCode).toBe("0");
+    expect(result.checkoutRequestId).toBe("ws_CO_test");
+    expect(result.resultDesc).toContain("successfully");
+  });
 });

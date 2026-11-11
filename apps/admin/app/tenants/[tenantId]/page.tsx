@@ -55,7 +55,10 @@ export default async function TenantDetail({ params }: { params: Promise<{ tenan
         <h1>{tenant.name}</h1>
         <p className="muted">{tenant.slug} · {tenant.id}</p>
       </div>
-      <div style={{ display: "flex", gap: "10px", marginTop: "12px" }}>
+      <div style={{ display: "flex", gap: "10px", marginTop: "12px", alignItems: "center", flexWrap: "wrap" }}>
+        <Link href={`/troubleshoot?tenantId=${tenant.id}`} className="secondary" style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
+          🛠️ Troubleshoot Workspace
+        </Link>
         {tenant.slug === "global-mission-fc" ? (
           <>
             <a href="http://localhost:3100" target="_blank" rel="noreferrer" className="secondary">
