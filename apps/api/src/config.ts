@@ -130,7 +130,7 @@ export function loadConfig() {
   if (config.HOSTING_PROVIDER === "dokploy" && dokployConfiguredCount !== dokployValues.length) {
     throw new Error("HOSTING_PROVIDER=dokploy requires DOKPLOY_BASE_URL, DOKPLOY_API_KEY and DOKPLOY_ENVIRONMENT_ID.");
   }
-  if (config.HOSTING_PROVIDER === "disabled" && dokployConfiguredCount > 0) {
+  if (config.HOSTING_PROVIDER === "disabled" && (dokployConfiguredCount > 0 || config.DOKPLOY_SERVER_ID)) {
     throw new Error("DOKPLOY_* credentials are configured while HOSTING_PROVIDER is disabled.");
   }
   if (config.HOSTING_PROVIDER === "dokploy") {
