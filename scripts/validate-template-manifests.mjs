@@ -35,7 +35,9 @@ function safeFile(path, label) {
 }
 
 const templateRoot = join(root, "templates");
-const directories = readdirSync(templateRoot, { withFileTypes: true }).filter((entry) => entry.isDirectory());
+const directories = readdirSync(templateRoot, { withFileTypes: true }).filter((entry) =>
+  entry.isDirectory() && entry.name !== "node_modules" && !entry.name.startsWith("."),
+);
 const seenIds = new Set();
 const workspacePackages = new Map();
 for (const workspaceRoot of ["apps", "packages"]) {
