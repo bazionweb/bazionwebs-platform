@@ -1,9 +1,11 @@
 import { isIP } from "node:net";
-import { isAbsolute } from "node:path";
+import { dirname, isAbsolute, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { z } from "zod";
 import type { DarajaConfig } from "@bazion/payments";
 
 const optionalEnv = z.preprocess((value) => value === "" ? undefined : value, z.string().trim().min(1).optional());
+const defaultHostingTemplateDirectory = resolve(dirname(fileURLToPath(import.meta.url)), "../../../deploy/client-templates");
 
 function validateCallbackUrl(value: string, production: boolean): void {
   const url = new URL(value);
@@ -65,7 +67,7 @@ const envSchema = z.object({
   DOKPLOY_ENVIRONMENT_ID: optionalEnv,
   DOKPLOY_SERVER_ID: optionalEnv,
   HOSTING_SECRET_DIRECTORY: z.string().trim().min(1).default("/run/secrets"),
-  HOSTING_TEMPLATE_DIRECTORY: z.string().trim().min(1).default("deploy/client-templates"),
+  HOSTING_TEMPLATE_DIRECTORY: z.string().trim().min(1).default(defaultHostingTemplateDirectory),
 });
 
 export function loadConfig() {
