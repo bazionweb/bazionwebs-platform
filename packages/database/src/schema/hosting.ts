@@ -18,12 +18,16 @@ export const tenantHostingDeployments = pgTable("tenant_hosting_deployments", {
   leaseToken: uuid("lease_token"),
   leaseExpiresAt: timestamp("lease_expires_at", { withTimezone: true }),
   lastDeployedAt: timestamp("last_deployed_at", { withTimezone: true }),
+  nextReconcileAt: timestamp("next_reconcile_at", { withTimezone: true }).notNull().defaultNow(),
+  lastInspectedAt: timestamp("last_inspected_at", { withTimezone: true }),
+  reconcileFailureCount: integer("reconcile_failure_count").notNull().default(0),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
   check("tenant_hosting_deployments_template_ck", sql`${table.template} in ('wordpress', 'node-nextjs', 'ecommerce')`),
   check("tenant_hosting_deployments_state_ck", sql`${table.state} in ('provisioning', 'ready', 'deploying', 'running', 'stopped', 'failed', 'unknown')`),
   check("tenant_hosting_deployments_attempt_ck", sql`${table.attemptCount} >= 1`),
+  check("tenant_hosting_deployments_reconcile_failure_ck", sql`${table.reconcileFailureCount} >= 0`),
   check("tenant_hosting_deployments_lease_ck", sql`(${table.leaseToken} is null) = (${table.leaseExpiresAt} is null)`),
   uniqueIndex("tenant_hosting_deployments_idempotency_uq").on(table.tenantId, table.idempotencyKey),
   uniqueIndex("tenant_hosting_deployments_id_tenant_uq").on(table.id, table.tenantId),
@@ -32,6 +36,9 @@ export const tenantHostingDeployments = pgTable("tenant_hosting_deployments", {
   index("tenant_hosting_deployments_tenant_created_idx").on(table.tenantId, table.createdAt),
   index("tenant_hosting_deployments_recovery_idx").on(table.state, table.leaseExpiresAt)
     .where(sql`${table.state} in ('provisioning', 'deploying', 'unknown')`),
+  index("tenant_hosting_deployments_reconcile_due_idx")
+    .on(table.provider, table.nextReconcileAt, table.leaseExpiresAt, table.createdAt)
+    .where(sql`${table.providerResourceId} is not null`),
 ]);
 
 export const tenantHostingDeploymentEvents = pgTable("tenant_hosting_deployment_events", {

@@ -74,14 +74,16 @@ describe("platform tenant hosting route", () => {
         id: "deployment-1", provider: "dokploy", template: "node-nextjs",
         template_version: "sha256:" + "a".repeat(64), provider_resource_id: "compose-123",
         state: "deploying", attempt_count: 1, error_code: null,
-        last_deployed_at: null, created_at: new Date("2026-11-11T08:00:00.000Z"),
+        last_deployed_at: null, last_inspected_at: new Date("2026-11-11T08:02:00.000Z"),
+        next_reconcile_at: new Date("2026-11-11T08:03:00.000Z"), reconcile_failure_count: 0,
+        created_at: new Date("2026-11-11T08:00:00.000Z"),
         updated_at: new Date("2026-11-11T08:01:00.000Z"),
       }] })
       .mockResolvedValueOnce({ rows: [{
         id: "event-1", deployment_id: "deployment-1", event_type: "hosting.deployment.deploying",
         from_state: "ready", to_state: "deploying", actor_type: "user", actor_id: "platform-owner",
         occurred_at: new Date("2026-11-11T08:01:00.000Z"),
-        metadata: { template: "node-nextjs", attempt: 1, secret: "must-not-leak" },
+        metadata: { template: "node-nextjs", attempt: 1, providerState: "deploying", failureCount: 2, retryInSeconds: 60, secret: "must-not-leak" },
       }] });
     const app = await makeApp();
     try {
@@ -99,13 +101,16 @@ describe("platform tenant hosting route", () => {
           id: "deployment-1", provider: "dokploy", template: "node-nextjs",
           templateVersion: "sha256:" + "a".repeat(64), resourceId: "compose-123",
           state: "deploying", attemptCount: 1, errorCode: null,
-          lastDeployedAt: null, createdAt: "2026-11-11T08:00:00.000Z",
-          updatedAt: "2026-11-11T08:01:00.000Z",
+          lastDeployedAt: null, lastInspectedAt: "2026-11-11T08:02:00.000Z",
+          nextReconcileAt: "2026-11-11T08:03:00.000Z", reconcileFailureCount: 0,
+          createdAt: "2026-11-11T08:00:00.000Z", updatedAt: "2026-11-11T08:01:00.000Z",
         }],
         events: [{
           id: "event-1", deploymentId: "deployment-1", eventType: "hosting.deployment.deploying",
           fromState: "ready", toState: "deploying", actorType: "user", actorId: "platform-owner",
-          occurredAt: "2026-11-11T08:01:00.000Z", metadata: { template: "node-nextjs", attempt: 1 },
+          occurredAt: "2026-11-11T08:01:00.000Z", metadata: {
+            template: "node-nextjs", attempt: 1, providerState: "deploying", failureCount: 2, retryInSeconds: 60,
+          },
         }],
       });
       expect(response.payload).not.toContain("must-not-leak");
