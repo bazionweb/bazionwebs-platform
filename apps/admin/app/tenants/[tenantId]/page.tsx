@@ -49,9 +49,29 @@ export default async function TenantDetail({ params }: { params: Promise<{ tenan
 
   return <main className="detail-shell">
     <header className="topbar"><Link href="/">← All tenants</Link><span>Platform / Tenant detail</span></header>
-    <p className="eyebrow">WORKSPACE RECORD</p>
-    <h1>{tenant.name}</h1>
-    <p className="muted">{tenant.slug} · {tenant.id}</p>
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "16px" }}>
+      <div>
+        <p className="eyebrow">WORKSPACE RECORD</p>
+        <h1>{tenant.name}</h1>
+        <p className="muted">{tenant.slug} · {tenant.id}</p>
+      </div>
+      <div style={{ display: "flex", gap: "10px", marginTop: "12px" }}>
+        {tenant.slug === "global-mission-fc" ? (
+          <>
+            <a href="http://localhost:3100" target="_blank" rel="noreferrer" className="secondary">
+              Open Storefront ↗
+            </a>
+            <a href="http://localhost:3100/admin" target="_blank" rel="noreferrer" className="primary">
+              Open Tenant Desk ↗
+            </a>
+          </>
+        ) : (
+          <a href={`http://${tenant.slug}.localhost:3000`} target="_blank" rel="noreferrer" className="secondary">
+            Visit Storefront ↗
+          </a>
+        )}
+      </div>
+    </div>
     <section className="detail-grid">
       <article><span>STATUS</span><strong className={`status status-${tenant.status}`}>{tenant.status}</strong></article>
       <article><span>DEFAULT CURRENCY</span><strong>{tenant.default_currency}</strong></article>

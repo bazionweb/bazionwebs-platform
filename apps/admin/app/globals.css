@@ -6,3 +6,54 @@
 @media(max-width:620px){.owner-search,.owner-transfer-form{align-items:stretch;flex-direction:column}.settings-form{grid-template-columns:1fr}.settings-footer{align-items:start;flex-direction:column}.module-row{align-items:start;gap:12px}.module-title{align-items:start;flex-direction:column;gap:6px}.usage-grid{grid-template-columns:1fr}.tenant-controls .panel{padding:16px}}
 
 .domain-challenge{margin-top:16px}.domain-challenge code{overflow-wrap:anywhere;word-break:break-word}
+
+/* Superadmin Extended Architecture & Component Styles */
+.topbar-left{display:flex;align-items:center;gap:12px}
+.topbar-crumb{font-weight:600;color:var(--ink)}
+.topbar-right{display:flex;align-items:center;gap:16px}
+.topbar-user{display:flex;align-items:center;gap:10px;background:#fff;padding:6px 12px;border:1px solid var(--line);border-radius:20px;font-size:12px}
+.topbar-status-dot{width:7px;height:7px;border-radius:50%;background:#236b4c;box-shadow:0 0 0 2px #d7eddf}
+.topbar-user-email{font-weight:500;color:var(--ink)}
+.topbar-role-badge{font:9px ui-monospace,monospace;background:#e5f2e9;color:#236b4c;padding:2px 6px;border-radius:10px;text-transform:uppercase;letter-spacing:.5px}
+.topbar-signout{background:none;border:none;color:var(--muted);font:inherit;font-size:11px;cursor:pointer;padding:2px 4px;margin-left:4px}
+.topbar-signout:hover{color:var(--red)}
+
+.side-nav{display:grid;gap:4px}
+.side-icon{font-size:14px;display:inline-block;width:18px;text-align:center}
+.side-quick-links{margin-top:auto;border-top:1px solid #294236;padding-top:16px}
+.side-link-subtle{color:#9db8a5;font-size:12px;opacity:.85}
+.side-link-subtle:hover{opacity:1;background:#20352a}
+.side-user-meta{min-width:0;flex:1}
+.side-role-pill{display:inline-block;font:9px ui-monospace,monospace;background:#234a36;color:#a3c5b0;padding:1px 5px;border-radius:3px;margin-top:4px}
+.side-signout-btn{background:none;border:1px solid #34483d;color:#a3c5b0;border-radius:4px;padding:4px 7px;cursor:pointer;font-size:14px}
+.side-signout-btn:hover{background:#34483d;color:#fff}
+
+.panel-actions{display:flex;align-items:center;gap:10px}
+.create-workspace-btn{display:inline-flex;align-items:center;gap:6px;font-weight:600}
+.reconcile-wrap{display:inline-flex;align-items:center;gap:8px}
+.reconcile-btn{font-size:11px;padding:9px 12px}
+.reconcile-feedback{font:10px ui-monospace,monospace;color:var(--green);background:#e5f2e9;padding:4px 8px;border-radius:4px}
+
+.metric-card-link{text-decoration:none;display:block}
+.metric-card-link article{transition:border-color .15s ease, transform .15s ease}
+.metric-card-link:hover article{border-color:var(--green);transform:translateY(-1px)}
+
+.secondary-btn-sm{padding:4px 8px;font-size:11px;border:1px solid var(--line);background:#fff;border-radius:4px;color:var(--ink);text-decoration:none}
+.secondary-btn-sm:hover{background:#f0f2ee;border-color:#c8d1c7}
+.row-link-primary{font-weight:600;color:var(--green);font-size:12px;text-decoration:none}
+.row-link-primary:hover{text-decoration:underline}
+.mono-id{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:-.2px}
+
+/* Modal Window */
+.modal-backdrop{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(20,35,29,.6);backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;z-index:999;padding:20px}
+.modal-content{background:#fff;border-radius:12px;max-width:520px;width:100%;box-shadow:0 20px 45px rgba(0,0,0,.2);border:1px solid var(--line);padding:28px;position:relative}
+.modal-header{display:flex;justify-content:space-between;align-items:flex-start}
+.modal-header h2{font-size:24px;letter-spacing:-.8px;margin:6px 0 4px}
+.modal-close{background:none;border:none;font-size:16px;color:var(--muted);cursor:pointer;padding:4px 8px;border-radius:4px}
+.modal-close:hover{background:#f0f2ee;color:var(--ink)}
+.modal-form{display:grid;gap:16px;margin-top:22px}
+.modal-form label{display:grid;gap:6px;font-size:12px;font-weight:600;color:var(--ink)}
+.modal-form input,.modal-form select{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:6px;font:inherit;font-size:13px}
+.modal-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:10px}
+.success-notice{background:#e5f2e9;border-color:#b9dcbf;color:#214a35}
+.error-notice{background:#fdf2f2;border-color:#f5c6c6;color:#9b2c2c}

@@ -30,7 +30,6 @@ export async function requireTenantDashboardAccess(): Promise<AdminIdentity> {
   const identity = await loadAdminIdentity();
   if (!identity) redirect("/login?callbackURL=%2Fadmin");
   if (!identity.organization || !identity.tenant || identity.tenant.status !== "active") {
-    if (identity.platformRole === "platform_owner") redirect("/platform");
     redirect("/workspace?reason=tenant-access-required");
   }
   return identity;
