@@ -29,5 +29,5 @@
     "schemaVersion": "1.0.0",
     "sourcePath": "packages/church-ministry-contracts/src/index.ts"
   },
-  "databaseSchemaVersion": "0016_tenant_hosting_deployments.sql"
+  "databaseSchemaVersion": "0017_hosting_reconciliation_schedule.sql"
 }
