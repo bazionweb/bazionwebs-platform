@@ -62,6 +62,20 @@ export class PostgresHostingProvisioningStore implements HostingProvisioningStor
       if (!tenant) { await client.query("ROLLBACK"); return { kind: "tenant_not_found" }; }
       if (tenant.status !== "active") { await client.query("ROLLBACK"); return { kind: "tenant_inactive" }; }
 
+      // The tenant row lock serializes provisioning requests for this tenant.
+      // A different idempotency key must not create a second resource with the
+      // same deterministic Dokploy tenant/template name.
+      const existingTemplate = await client.query<{ idempotency_key: string }>(
+        "SELECT idempotency_key FROM public.tenant_hosting_deployments " +
+        "WHERE tenant_id=$1 AND provider=$2 AND template=$3 " +
+        "ORDER BY created_at DESC LIMIT 1 FOR UPDATE",
+        [input.tenantId,input.provider,input.template],
+      );
+      if (existingTemplate.rows[0] && existingTemplate.rows[0].idempotency_key !== input.idempotencyKey) {
+        await client.query("ROLLBACK");
+        return { kind: "idempotency_conflict" };
+      }
+
       const leaseToken = randomUUID();
       const inserted = await client.query<DeploymentRow>(
         "INSERT INTO public.tenant_hosting_deployments " +
