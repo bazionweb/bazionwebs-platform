@@ -8,6 +8,7 @@ This package is the first hosting-provider adapter for Bazion. The platform depe
 - Resolves environment variables just in time from `TenantHostingSecretResolver`, then saves them through Dokploy's protected API.
 - Deploys, inspects, stops and removes a Compose resource.
 - Returns provider-reported Compose name and environment ID from `compose.one` as non-secret identity metadata, allowing the control plane to verify tenant/template ownership during recovery. Missing identity fields remain absent and must fail closed in recovery workflows.
+- Retries only read-only `GET` inspection calls for bounded transient HTTP/network failures, with bounded `Retry-After` support. Mutating `POST` calls (create, deploy, environment update, stop, delete) are never replayed automatically because a timeout can leave the provider-side result ambiguous.
 - Never returns environment values or raw provider payloads.
 - Resource removal preserves volumes (`deleteVolumes: false`); data deletion must be a separate, explicitly approved workflow.
 
