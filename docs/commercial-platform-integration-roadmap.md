@@ -67,7 +67,7 @@ This checklist coordinates the Bazion commercial website (`D:\bazionweb`) and th
 - [x] Store platform status events in an outbox in the same transaction as operation state transitions. (`AFTER INSERT` trigger on `product_provisioning_operation_events` writes `product_provisioning_status_outbox` atomically.)
 - [x] Deliver status callbacks to Bazionweb with signatures, event IDs, replay protection and retry/replay tools. (Signed `X-Bazion-Signature` callbacks with timestamps, `eventId` inbox deduplication, replay window enforcement, monotonic `PlatformProvisioningProjection`, and operator replay.)
 - [x] Add reconciliation for accepted-without-status, duplicate, stale and permanently-failed messages. (Platform and Bazionweb admin reconciliation reports plus lagging-operation polling.)
-- [ ] Add PostgreSQL-backed integration tests for transaction atomicity, duplicate delivery and service downtime. (Platform live PostgreSQL tests pass in `delivery.integration.test.ts`; Bazionweb atomic outbox/worker/callback/reconciliation specs in `platform-provisioning-delivery.spec.ts` currently run with mocked Prisma delegates because no local Bazionweb PostgreSQL instance is provisioned yet.)
+- [x] Add PostgreSQL-backed integration tests for transaction atomicity, duplicate delivery and service downtime. (Verified locally against both PostgreSQL databases: `delivery.integration.test.ts` on `bazion_platform`, `platform-provisioning-postgres.integration.spec.ts` on `bazionweb_test`, and `cross-repo-e2e.integration.test.ts` running live HTTP + dual-PostgreSQL end-to-end across both repos; CI pipeline DB wiring remains open before closing the phase gate.)
 
 **Exit gate:** neither a lost message nor duplicate delivery can lose or multiply a paid provisioning request.
 
@@ -212,7 +212,7 @@ The audit also found a divergent local branch, `feature/church-ministry-platform
 - [x] In the platform, append status events to an outbox in the same transaction as operation changes; send signed callbacks with replay protection.
 - [x] In Bazionweb, verify signatures/timestamps/event IDs and upsert a commercial status projection idempotently.
 - [x] Add reconciliation for accepted-without-status, callback lag, repeated events, dead letters and order/platform mismatches.
-- [ ] Test transaction atomicity and system downtime with PostgreSQL and both service adapters. (Platform live PostgreSQL delivery integration tests pass; Bazionweb specs pass against mocked Prisma delegates and still need a live Bazionweb PostgreSQL run once provisioned.)
+- [x] Test transaction atomicity and system downtime with PostgreSQL and both service adapters. (Verified locally across `platform-provisioning-postgres.integration.spec.ts` on `bazionweb_test` and `delivery.integration.test.ts` + `cross-repo-e2e.integration.test.ts` against `bazionweb_test` + `bazion_platform` over live NestJS and Fastify HTTP; note that Bazionweb's historical `20250601000000_init` -> `20261001000000_paystack_provider` chain requires `prisma db push` hydration before applying `20261111000000_platform_provisioning_outbox/migration.sql`.)
 
 ### Phase 4 — Offer resolution and hosting authority
 
@@ -269,7 +269,7 @@ The audit also found a divergent local branch, `feature/church-ministry-platform
 - Tenant-scoped audit filtering and pagination now use PostgreSQL bind placeholders consistently; route tests cover filtered and unfiltered pagination.
 - Rate-limit reset now fails explicitly with an audited `501` while the configured stores lack reset APIs; the dashboard no longer offers a nonfunctional unblock form. Maintenance-mode enforcement remains open Phase 0 work.
 - Generic auth organization creation now only links its reserved tenant and creates a local hostname outside production. Optional commerce, analytics and church-ministry entitlements default off; the installation workflow must explicitly enable the purchased composition. Maintenance-mode enforcement remains open.
-- The database-backed saga adapter, inbox/outbox delivery, authenticated API routes, commercial sender/callback projection, product offer bindings, provider compensation adapter, identity flow and pilot remain outstanding.
+- Phase 3 durable command and status delivery is implemented locally across both repositories and verified against both local PostgreSQL databases (`bazion_platform` migration `0019_commercial_provisioning_delivery.sql` and `bazionweb_test` with `20261111000000_platform_provisioning_outbox/migration.sql` checked via `prisma migrate diff --exit-code`) and live NestJS/Fastify HTTP endpoints (`cross-repo-e2e.integration.test.ts` and `platform-provisioning-postgres.integration.spec.ts`). Note that on a blank Bazionweb database, historical migration `20261001000000_paystack_provider` fails without `prisma db push` hydration; CI integration wiring, database-backed saga compensation, product offer bindings (Phase 4), provider compensation adapter, identity flow (Phase 5), and pilot remain outstanding.
 - Do not mark a phase complete until its exit gate has evidence in CI and a commit. Migrations already applied locally are immutable; follow-up schema changes require a new numbered migration.
 
 ## Security references
