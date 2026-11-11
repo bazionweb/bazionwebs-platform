@@ -28,6 +28,7 @@ const createdAt = new Date("2026-11-11T08:00:00.000Z");
 function makeRuntime(): HostingProvisioningRuntime {
   return {
     providerId: "dokploy",
+    environmentId: "environment-1",
     loadTemplate: vi.fn(async () => ({
       template: "node-nextjs" as const, composeFile: "services: {}", templateVersion: "sha256:" + "a".repeat(64),
     })),
@@ -38,6 +39,7 @@ function makeRuntime(): HostingProvisioningRuntime {
     inspect: vi.fn(async (reference) => ({
       reference, state: "running" as const, lastDeployedAt: "2026-11-11T08:05:00.000Z",
       providerResourceName: "alpha-node-nextjs",
+      providerEnvironmentId: "environment-1",
     })),
   };
 }
