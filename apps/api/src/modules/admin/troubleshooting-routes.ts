@@ -1352,6 +1352,7 @@ export async function troubleshootingRoutes(app: FastifyInstance): Promise<void>
       ],
       status: "active",
       store: "memory",
+      resetSupported: false,
     });
   });
 
@@ -1377,18 +1378,9 @@ export async function troubleshootingRoutes(app: FastifyInstance): Promise<void>
         tenantId: null,
       },
       async () => {
-        try {
-          if (typeof (app as any).rateLimit?.resetKey === "function") {
-            (app as any).rateLimit.resetKey(parsed.data.target);
-          }
-        } catch {
-          // memory fallback
-        }
-        return reply.send({
-          success: true,
-          target: parsed.data.target,
-          scope: parsed.data.scope,
-          message: `Rate limit restrictions for ${parsed.data.target} were cleared.`,
+        throw Object.assign(new Error("The configured rate-limit stores do not support targeted counter resets."), {
+          statusCode: 501,
+          code: "RATE_LIMIT_RESET_UNAVAILABLE",
         });
       },
     );

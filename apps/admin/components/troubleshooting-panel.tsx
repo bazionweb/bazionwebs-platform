@@ -140,6 +140,7 @@ interface RateLimitsData {
   policies: RateLimitPolicy[];
   status: string;
   store: string;
+  resetSupported: boolean;
 }
 
 interface TenantModuleItem {
@@ -246,10 +247,6 @@ export function TroubleshootingPanel({
   // Tab 8: Rate Limits State
   const [rateLimitsData, setRateLimitsData] = useState<RateLimitsData | null>(null);
   const [loadingRateLimits, setLoadingRateLimits] = useState(false);
-  const [resetTarget, setResetTarget] = useState("");
-  const [resetScope, setResetScope] = useState<"all" | "auth" | "api">("all");
-  const [resetReason, setResetReason] = useState("");
-  const [resettingRateLimit, setResettingRateLimit] = useState(false);
 
   function notify(type: "success" | "error", text: string) {
     setNotification({ type, text });
@@ -744,34 +741,6 @@ export function TroubleshootingPanel({
       }
     } finally {
       setSavingQuota(false);
-    }
-  }
-
-  // Rate Limits Reset Action
-  async function handleResetRateLimit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!resetTarget.trim()) return;
-    setResettingRateLimit(true);
-    try {
-      const res = await fetch(`/v1/admin/platform/troubleshoot/rate-limits/reset`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          target: resetTarget.trim(),
-          scope: resetScope,
-          reason: resetReason.trim(),
-        }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        notify("success", data.message || `Rate limits reset for ${resetTarget}.`);
-        setResetTarget("");
-        setResetReason("");
-      } else {
-        notify("error", "Failed to reset rate limit restrictions.");
-      }
-    } finally {
-      setResettingRateLimit(false);
     }
   }
 
@@ -1933,15 +1902,15 @@ export function TroubleshootingPanel({
         </section>
       )}
 
-      {/* ─── TAB 8: RATE LIMITS & UNBLOCK ───────────────────────────────────────── */}
+      {/* ─── TAB 8: RATE LIMITS ─────────────────────────────────────────────────── */}
       {activeTab === "ratelimits" && (
         <section className="panel">
           <div className="panel-head">
             <div>
-              <p className="eyebrow">TRAFFIC CONTROL, ABUSE PROTECTION & IP UNBLOCK</p>
-              <h2>Rate Limiting & Client Unblock Tool</h2>
+              <p className="eyebrow">TRAFFIC CONTROL & ABUSE PROTECTION</p>
+              <h2>Rate Limiting</h2>
               <p className="muted">
-                Inspect active throttling rules across API endpoints and Better-Auth routes, and immediately unblock throttled client IPs or accounts.
+                Inspect the configured throttling rules for API endpoints and authentication routes.
               </p>
             </div>
             <button className="secondary" onClick={loadRateLimits} style={{ fontSize: "11px", padding: "8px 14px" }}>
@@ -1950,59 +1919,12 @@ export function TroubleshootingPanel({
           </div>
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px", marginTop: "18px" }}>
-            {/* Unblock Tool Card */}
+            {/* Manual reset is intentionally unavailable until both stores support it. */}
             <div className="diag-card" style={{ margin: 0 }}>
-              <h3 style={{ margin: "0 0 6px", fontSize: "15px" }}>Emergency Client Unblock</h3>
-              <p className="muted" style={{ margin: "0 0 16px", fontSize: "12px" }}>
-                Instantly clear throttling counters or account lockouts for a blocked IP address or email:
+              <h3 style={{ margin: "0 0 6px", fontSize: "15px" }}>Manual counter reset unavailable</h3>
+              <p className="muted" role="status" style={{ margin: "0 0 16px", fontSize: "12px" }}>
+                Current API and authentication rate-limit stores expire counters automatically but do not expose targeted reset operations.
               </p>
-              <form onSubmit={handleResetRateLimit} style={{ display: "grid", gap: "12px" }}>
-                <label style={{ display: "grid", gap: "4px", fontSize: "12px", fontWeight: 600 }}>
-                  Target (Client IP, Email Address, or "all"):
-                  <input
-                    type="text"
-                    placeholder="e.g. 197.232.10.45 or user@example.org or all"
-                    value={resetTarget}
-                    onChange={(e) => setResetTarget(e.target.value)}
-                    required
-                    style={{ padding: "8px 10px", border: "1px solid var(--line)", borderRadius: "4px", fontSize: "12px" }}
-                  />
-                </label>
-
-                <label style={{ display: "grid", gap: "4px", fontSize: "12px", fontWeight: 600 }}>
-                  Throttling Scope:
-                  <select
-                    value={resetScope}
-                    onChange={(e) => setResetScope(e.target.value as any)}
-                    style={{ padding: "8px 10px", border: "1px solid var(--line)", borderRadius: "4px", fontSize: "12px" }}
-                  >
-                    <option value="all">All Rate Limit Stores (API & Auth)</option>
-                    <option value="auth">Authentication Throttle Only (/api/auth/*)</option>
-                    <option value="api">Global API Gateway Throttle Only</option>
-                  </select>
-                </label>
-
-                <label style={{ display: "grid", gap: "4px", fontSize: "12px", fontWeight: 600 }}>
-                  Operator Justification (Audited):
-                  <input
-                    type="text"
-                    placeholder="e.g. Legitimate office IP triggered lockout after network reconnect"
-                    value={resetReason}
-                    onChange={(e) => setResetReason(e.target.value)}
-                    required
-                    style={{ padding: "8px 10px", border: "1px solid var(--line)", borderRadius: "4px", fontSize: "12px" }}
-                  />
-                </label>
-
-                <button
-                  type="submit"
-                  className="primary"
-                  disabled={resettingRateLimit}
-                  style={{ justifySelf: "start", fontSize: "12px", padding: "8px 16px", marginTop: "4px" }}
-                >
-                  {resettingRateLimit ? "Unblocking..." : "Clear Throttling Restrictions"}
-                </button>
-              </form>
             </div>
 
             {/* Active Policies Table */}

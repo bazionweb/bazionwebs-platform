@@ -608,9 +608,10 @@ describe("Superadmin Troubleshooting Routes", () => {
       const body = response.json();
       expect(body.policies).toHaveLength(5);
       expect(body.status).toBe("active");
+      expect(body.resetSupported).toBe(false);
     });
 
-    it("resets rate limit restrictions for an IP or target", async () => {
+    it("does not claim to reset counters when the configured stores lack reset support", async () => {
       const response = await app.inject({
         method: "POST",
         url: "/admin/platform/troubleshoot/rate-limits/reset",
@@ -621,9 +622,12 @@ describe("Superadmin Troubleshooting Routes", () => {
         },
       });
 
-      expect(response.statusCode).toBe(200);
-      expect(response.json().success).toBe(true);
-      expect(response.json().target).toBe("192.168.1.100");
+      expect(response.statusCode).toBe(501);
+      expect(response.json().message).toBe("The configured rate-limit stores do not support targeted counter resets.");
+      expect(mocks.appendAuditEvent).toHaveBeenCalledWith(expect.objectContaining({
+        action: "ratelimit.troubleshoot.reset.failed",
+        outcome: "failed",
+      }));
     });
   });
 
