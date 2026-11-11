@@ -92,11 +92,14 @@ describe("DokployComposeProvider", () => {
 
   it("inspects provider state without exposing the raw response", async () => {
     const { provider } = setup(() => new Response(JSON.stringify({
-      composeId: "compose-123", composeStatus: "done", updatedAt: "2026-11-11T01:00:00.000Z",
+      composeId: "compose-123", name: "alpha-node-nextjs", appName: "bz-alpha-node-nextjs",
+      environmentId: "environment-1", composeStatus: "done", updatedAt: "2026-11-11T01:00:00.000Z",
       env: "SHOULD_NOT_ESCAPE",
     }), { status: 200 }));
     const result = await provider.inspect(reference);
     expect(result.state).toBe("running");
+    expect(result.providerResourceName).toBe("alpha-node-nextjs");
+    expect(result.providerEnvironmentId).toBe("environment-1");
     expect(JSON.stringify(result)).not.toContain("SHOULD_NOT_ESCAPE");
   });
 });
