@@ -16,7 +16,11 @@ export interface BeginHostingProvisionInput {
 export type BeginHostingProvisionResult =
   | { kind: "claimed"; deploymentId: string; tenantSlug: string; leaseToken: string; attemptCount: number; reference: TenantHostingDeploymentReference | null }
   | { kind: "already_running"; reference: TenantHostingDeploymentReference; attemptCount: number }
-  | { kind: "in_progress" | "reconciliation_required" | "tenant_not_found" | "tenant_inactive" | "idempotency_conflict" };
+  | { kind: "in_progress" }
+  | { kind: "reconciliation_required" }
+  | { kind: "tenant_not_found" }
+  | { kind: "tenant_inactive" }
+  | { kind: "idempotency_conflict" };
 
 export interface HostingProvisioningStore {
   begin(input: BeginHostingProvisionInput): Promise<BeginHostingProvisionResult>;
@@ -238,7 +242,7 @@ export class TenantHostingProvisioningService {
     const started = await this.store.begin({
       tenantId: input.tenantId, provider: this.providerId, template: input.template,
       templateVersion: input.templateVersion, idempotencyKey: input.idempotencyKey,
-      actorType: input.actorType, actorId: input.actorId, requestId: input.requestId,
+      actorType: input.actorType, actorId: input.actorId, ...(input.requestId !== undefined ? { requestId: input.requestId } : {}),
     });
     if (started.kind === "already_running") return { reference: started.reference, state: "running", attemptCount: started.attemptCount, reused: true };
     if (started.kind === "in_progress") throw new Error("HOSTING_PROVISIONING_IN_PROGRESS");
@@ -260,14 +264,14 @@ export class TenantHostingProvisioningService {
         }
         const persisted = await this.store.attachReference({
           deploymentId: started.deploymentId, leaseToken: started.leaseToken, reference,
-          actorType: input.actorType, actorId: input.actorId, requestId: input.requestId,
+          actorType: input.actorType, actorId: input.actorId, ...(input.requestId !== undefined ? { requestId: input.requestId } : {}),
         });
         if (!persisted) throw new Error("HOSTING_DEPLOYMENT_LEASE_LOST");
       }
       await this.provider.deploy(reference);
       const running = await this.store.markRunning({
         deploymentId: started.deploymentId, leaseToken: started.leaseToken,
-        actorType: input.actorType, actorId: input.actorId, requestId: input.requestId,
+        actorType: input.actorType, actorId: input.actorId, ...(input.requestId !== undefined ? { requestId: input.requestId } : {}),
       });
       if (!running) throw new Error("HOSTING_DEPLOYMENT_LEASE_LOST");
       return { reference, state: "running", attemptCount: started.attemptCount, reused: Boolean(started.reference) };
@@ -275,7 +279,7 @@ export class TenantHostingProvisioningService {
       await this.store.markFailed({
         deploymentId: started.deploymentId, leaseToken: started.leaseToken,
         errorCode: safeProviderErrorCode(error), actorType: input.actorType,
-        actorId: input.actorId, requestId: input.requestId,
+        actorId: input.actorId, ...(input.requestId !== undefined ? { requestId: input.requestId } : {}),
       }).catch(() => undefined);
       throw new Error("HOSTING_DEPLOYMENT_FAILED");
     }
