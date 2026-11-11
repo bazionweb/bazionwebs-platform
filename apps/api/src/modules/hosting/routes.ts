@@ -85,7 +85,7 @@ export async function hostingRoutes(
       const allowedMetadata = new Set([
         "template", "attempt", "reason", "provider", "errorCode",
         "templateVersion", "state", "attemptCount", "reused", "providerState",
-        "lastDeployedAt", "failureCount", "retryInSeconds",
+        "lastDeployedAt", "failureCount", "retryInSeconds", "action", "confirmed", "already",
       ]);
       const safeMetadata = (value: unknown): Record<string, string | number | boolean | null> => {
         if (!value || typeof value !== "object" || Array.isArray(value)) return {};
