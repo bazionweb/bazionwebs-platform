@@ -53,7 +53,7 @@ test("rejects path traversal in template entrypoints", () => {
     writeFileSync(path, JSON.stringify(manifest));
     const result = run(root);
     assert.notEqual(result.status, 0);
-    assert.match(result.stderr, /safe repository-relative path/);
+    assert.match(result.stderr, /implementation\\.entrypoint does not match/);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
