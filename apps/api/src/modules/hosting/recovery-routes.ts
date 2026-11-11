@@ -132,6 +132,7 @@ export async function hostingRecoveryRoutes(
     if (observed.reference.provider !== reference.provider ||
         observed.reference.resourceId !== reference.resourceId ||
         observed.reference.tenantId !== reference.tenantId ||
+        observed.providerResourceName !== expectedName ||
         !recoverableStates.has(observed.state)) {
       return reply.code(409).send({ error: "HOSTING_RESOURCE_NOT_VERIFIABLE" });
     }
