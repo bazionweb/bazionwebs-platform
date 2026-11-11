@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { platformFetch, requirePlatformOwner, type Tenant } from "@/lib/platform";
 import { LifecycleActions } from "./lifecycle-actions";
 import { TenantControlPanel } from "./control-panel";
+import { TenantHostingPanel, type TenantHostingInventory } from "./hosting-panel";
 
 type OwnerCandidate = { userId: string; name: string; email: string; emailVerified: boolean; roles: string[] };
 type ModuleItem = {
@@ -34,7 +35,7 @@ export default async function TenantDetail({ params }: { params: Promise<{ tenan
   if (!result.data) return <main className="detail-shell"><Link href="/">← Back to tenants</Link><section className="notice-card"><h1>Unable to load tenant</h1><p>Request failed with HTTP {result.status}. You may need platform tenant-read permission.</p></section></main>;
   const tenant = result.data.tenant;
 
-  const [owner, modules, settings, audit, usage, domains] = await Promise.all([
+  const [owner, modules, settings, audit, usage, domains, hosting] = await Promise.all([
     platformFetch<{ currentOwners: OwnerCandidate[]; candidates: OwnerCandidate[]; total: number; limit: number; offset: number }>(
       `tenants/${encodeURIComponent(tenantId)}/owner-candidates?limit=50`,
     ),
@@ -45,6 +46,7 @@ export default async function TenantDetail({ params }: { params: Promise<{ tenan
     ),
     platformFetch<Usage>(`tenants/${encodeURIComponent(tenantId)}/usage`),
     platformFetch<TenantDomains>(`tenants/${encodeURIComponent(tenantId)}/domains`),
+    platformFetch<TenantHostingInventory>(`tenants/${encodeURIComponent(tenantId)}/hosting`),
   ]);
 
   return <main className="detail-shell">
@@ -58,6 +60,12 @@ export default async function TenantDetail({ params }: { params: Promise<{ tenan
       <article><span>CREATED</span><strong>{new Date(tenant.created_at).toLocaleString("en-KE")}</strong></article>
     </section>
     <section className="panel"><p className="eyebrow">LIFECYCLE MANAGEMENT</p><h2>Workspace status</h2><p className="muted">Lifecycle changes are permission-checked and audited by the platform API. Closing a tenant is terminal.</p><LifecycleActions tenantId={tenant.id} status={tenant.status}/></section>
+    <TenantHostingPanel
+      tenantId={tenant.id}
+      tenantStatus={tenant.status}
+      initial={hosting.data}
+      status={hosting.status}
+    />
     <TenantControlPanel
       tenantId={tenant.id}
       ownerInitial={owner.data}
