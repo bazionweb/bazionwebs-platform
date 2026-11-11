@@ -56,10 +56,11 @@ export async function hostingRoutes(
           id: string; provider: string; template: string; template_version: string;
           provider_resource_id: string | null; state: string; attempt_count: number;
           error_code: string | null; last_deployed_at: Date | string | null;
-          created_at: Date | string; updated_at: Date | string;
+          last_inspected_at: Date | string | null; next_reconcile_at: Date | string;
+          reconcile_failure_count: number; created_at: Date | string; updated_at: Date | string;
         }>(
           "SELECT id::text,provider,template,template_version,provider_resource_id,state,attempt_count," +
-          "error_code,last_deployed_at,created_at,updated_at " +
+          "error_code,last_deployed_at,last_inspected_at,next_reconcile_at,reconcile_failure_count,created_at,updated_at " +
           "FROM public.tenant_hosting_deployments WHERE tenant_id=$1 ORDER BY created_at DESC LIMIT 20",
           [tenantId],
         ),
@@ -76,7 +77,8 @@ export async function hostingRoutes(
 
       const allowedMetadata = new Set([
         "template", "attempt", "reason", "provider", "errorCode",
-        "templateVersion", "state", "attemptCount", "reused",
+        "templateVersion", "state", "attemptCount", "reused", "providerState",
+        "lastDeployedAt", "failureCount", "retryInSeconds",
       ]);
       const safeMetadata = (value: unknown): Record<string, string | number | boolean | null> => {
         if (!value || typeof value !== "object" || Array.isArray(value)) return {};
@@ -106,6 +108,9 @@ export async function hostingRoutes(
           attemptCount: row.attempt_count,
           errorCode: row.error_code,
           lastDeployedAt: iso(row.last_deployed_at),
+          lastInspectedAt: iso(row.last_inspected_at),
+          nextReconcileAt: iso(row.next_reconcile_at),
+          reconcileFailureCount: row.reconcile_failure_count,
           createdAt: iso(row.created_at),
           updatedAt: iso(row.updated_at),
         })),
