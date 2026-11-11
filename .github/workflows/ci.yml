@@ -35,6 +35,8 @@ jobs:
       TENANT_PROVISIONER_DATABASE_URL: postgres://bazion_tenant_provisioner:bazion_tenant_provisioner_local_only@localhost:5432/bazion_platform
       NOTIFICATION_ENQUEUER_DATABASE_URL: postgres://bazion_notification_enqueuer:bazion_notification_enqueuer_local_only@localhost:5432/bazion_platform
       NOTIFICATION_WORKER_DATABASE_URL: postgres://bazion_notification_worker:bazion_notification_worker_local_only@localhost:5432/bazion_platform
+      HOSTING_RECONCILER_DATABASE_URL: postgres://bazion_hosting_reconciler:bazion_hosting_reconciler_local_only@localhost:5432/bazion_platform
+      BAZION_HOSTING_RECONCILER_PASSWORD: bazion_hosting_reconciler_local_only
       NOTIFICATION_ENCRYPTION_KEY: MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=
       BETTER_AUTH_URL: http://localhost:4000
       BETTER_AUTH_SECRET: ci-only-bazion-auth-secret-that-is-long-enough-2026
