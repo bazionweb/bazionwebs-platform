@@ -18,7 +18,7 @@ This checklist coordinates the Bazion commercial website (`D:\bazionweb`) and th
 
 - [x] Confirm Bazionweb as commercial system of record and Bazion Platform as product/runtime control plane.
 - [x] Confirm tenant and product installation are distinct; tenants may have zero or more installations.
-- [ ] Record the exact base commit and clean/dirty status of both repositories before each cross-repository slice.
+- [x] Record the exact base commit and clean/dirty status of both repositories before each cross-repository slice. The 2026-11-12 checkpoint is recorded below; repeat before every later cross-repository change.
 - [ ] Assign a stable `externalCustomerId` and `externalOrderId` mapping; do not use email or hostname as keys.
 - [ ] Record environment, service URL, service identity, secret owner and database owner for each system.
 - [ ] Choose the single OIDC identity authority and document account-linking and recovery policy.
@@ -67,7 +67,7 @@ This checklist coordinates the Bazion commercial website (`D:\bazionweb`) and th
 - [x] Store platform status events in an outbox in the same transaction as operation state transitions. (`AFTER INSERT` trigger on `product_provisioning_operation_events` writes `product_provisioning_status_outbox` atomically.)
 - [x] Deliver status callbacks to Bazionweb with signatures, event IDs, replay protection and retry/replay tools. (Signed `X-Bazion-Signature` callbacks with timestamps, `eventId` inbox deduplication, replay window enforcement, monotonic `PlatformProvisioningProjection`, and operator replay.)
 - [x] Add reconciliation for accepted-without-status, duplicate, stale and permanently-failed messages. (Platform and Bazionweb admin reconciliation reports plus lagging-operation polling.)
-- [x] Add PostgreSQL-backed integration tests for transaction atomicity, duplicate delivery and service downtime. (Verified locally against both PostgreSQL databases: `delivery.integration.test.ts` on `bazion_platform`, `platform-provisioning-postgres.integration.spec.ts` on `bazionweb_test`, and `cross-repo-e2e.integration.test.ts` running live HTTP + dual-PostgreSQL end-to-end across both repos; CI pipeline DB wiring remains open before closing the phase gate.)
+- [x] Add PostgreSQL-backed integration tests for transaction atomicity, duplicate delivery and service downtime. The platform PostgreSQL delivery integration ran in the current validation. Bazionweb's PostgreSQL suite and the dual-repository HTTP/PostgreSQL suite are implemented, but their 3 database tests were skipped because `BAZIONWEB_TEST_DATABASE_URL` is unset. The available local `bazionweb_test` database has no tables and `bazion_migrator` cannot create objects in `public`; the configured Bazionweb `.env` points to remote Neon and must not be used for local tests. A dedicated local test database or CI database wiring remains an exit-gate requirement.
 
 **Exit gate:** neither a lost message nor duplicate delivery can lose or multiply a paid provisioning request.
 
@@ -261,6 +261,15 @@ The audit also found a divergent local branch, `feature/church-ministry-platform
 - [ ] Canary one customer, maintain a rollback window and dual-read reconciliation, then expand by offer and tenant cohort.
 - [ ] Remove legacy provisioning only after all mismatches are resolved, rollback is tested, and the hosting authority has a completed recovery drill.
 
+## Cross-repository checkpoint — 2026-11-12
+
+| Repository | Branch | Commit at checkpoint | Working tree | Database evidence |
+| --- | --- | --- | --- | --- |
+| Bazion Platform | `feat/provider-neutral-deployment-contract` | `80ef1dea7ab128570b579e8633f4df44a54d1c79` | Only pre-existing untracked `.agents/` audit artifacts; preserved | Local `bazion_platform` includes migration `0019_commercial_provisioning_delivery.sql`; platform PostgreSQL integration tests pass. |
+| Bazionweb | `main` | `50bc5595631bce5e40533f2792bc1f7fded1a5c3` | Clean | The new outbox migration is committed but not applied to the empty local `bazionweb_test`; do not use the remote Neon URL for tests. |
+
+The commercial delivery feature is committed in Bazionweb (`5dcdf2f`) and the platform (`355f7d7`, with the dual-system test harness in `80ef1de`). The standalone SSL test determinism fix is `4e41822`; billing test injection updates are `50bc559`.
+
 ## Current implementation status
 
 - Phase 1's strict request/operation/event contract and generated JSON Schema are committed. The uppercase catalog-ID validator drift is corrected and covered by tests. The fixture-sharing, offer binding, and compatibility tasks remain open.
@@ -269,7 +278,7 @@ The audit also found a divergent local branch, `feature/church-ministry-platform
 - Tenant-scoped audit filtering and pagination now use PostgreSQL bind placeholders consistently; route tests cover filtered and unfiltered pagination.
 - Rate-limit reset now fails explicitly with an audited `501` while the configured stores lack reset APIs; the dashboard no longer offers a nonfunctional unblock form. Maintenance-mode enforcement remains open Phase 0 work.
 - Generic auth organization creation now only links its reserved tenant and creates a local hostname outside production. Optional commerce, analytics and church-ministry entitlements default off; the installation workflow must explicitly enable the purchased composition. Maintenance-mode enforcement remains open.
-- Phase 3 durable command and status delivery is implemented locally across both repositories and verified against both local PostgreSQL databases (`bazion_platform` migration `0019_commercial_provisioning_delivery.sql` and `bazionweb_test` with `20261111000000_platform_provisioning_outbox/migration.sql` checked via `prisma migrate diff --exit-code`) and live NestJS/Fastify HTTP endpoints (`cross-repo-e2e.integration.test.ts` and `platform-provisioning-postgres.integration.spec.ts`). Note that on a blank Bazionweb database, historical migration `20261001000000_paystack_provider` fails without `prisma db push` hydration; CI integration wiring, database-backed saga compensation, product offer bindings (Phase 4), provider compensation adapter, identity flow (Phase 5), and pilot remain outstanding.
+- Phase 3 command/status delivery is committed in both repositories. The platform PostgreSQL delivery integration passed. Bazionweb's full test run passed 593 API and 576 web tests, but its PostgreSQL integration suite skipped 3 database cases; the dual-repository integration test also skipped because no safe local Bazionweb test URL is configured. Current evidence does not support claiming a live Bazionweb PostgreSQL run. CI database wiring, database-backed saga execution/compensation, product offer bindings (Phase 4), provider compensation, identity flow (Phase 5), and pilot remain outstanding.
 - Do not mark a phase complete until its exit gate has evidence in CI and a commit. Migrations already applied locally are immutable; follow-up schema changes require a new numbered migration.
 
 ## Security references
