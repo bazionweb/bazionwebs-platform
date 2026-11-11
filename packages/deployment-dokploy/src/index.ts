@@ -219,6 +219,17 @@ export class DokployComposeProvider implements TenantHostingProvider {
     await this.request("compose.deploy", "POST", { composeId: reference.resourceId, freshVolumes: false });
   }
 
+  async start(reference: TenantHostingDeploymentReference): Promise<void> {
+    this.assertReference(reference);
+    await this.request("compose.start", "POST", { composeId: reference.resourceId });
+  }
+
+  async redeploy(reference: TenantHostingDeploymentReference): Promise<void> {
+    this.assertReference(reference);
+    // Explicitly preserve existing persistent volumes during operator-triggered redeploys.
+    await this.request("compose.redeploy", "POST", { composeId: reference.resourceId, freshVolumes: false });
+  }
+
   async inspect(reference: TenantHostingDeploymentReference): Promise<TenantHostingDeployment> {
     this.assertReference(reference);
     const payload = await this.request(`compose.one?composeId=${encodeURIComponent(reference.resourceId)}`, "GET") as DokployResource | null;
