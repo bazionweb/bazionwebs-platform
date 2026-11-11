@@ -19,6 +19,23 @@ const tenantDirectoryPool = new Pool({
   connectionTimeoutMillis: 5_000,
 });
 
+let tenantBackupPool: Pool | undefined;
+
+function getTenantBackupPool(): Pool {
+  if (tenantBackupPool) return tenantBackupPool;
+  const connectionString = process.env.TENANT_BACKUP_DATABASE_URL?.trim();
+  if (!connectionString) throw routingError("TENANT_BACKUP_DATABASE_NOT_CONFIGURED");
+  tenantBackupPool = new Pool({
+    connectionString,
+    max: 3,
+    idleTimeoutMillis: 30_000,
+    connectionTimeoutMillis: 5_000,
+    application_name: "bazion-tenant-backup",
+  });
+  return tenantBackupPool;
+}
+
+
 function createDatabase(connectionPool: Pool) {
   return drizzle(connectionPool, { schema });
 }
@@ -306,14 +323,107 @@ export async function withTenantTransaction<T>(
   }
 }
 
+export interface TenantBackupTransactionOptions {
+  allowInactive?: boolean;
+  repeatableReadOnly?: boolean;
+}
+
+/**
+ * Uses the dedicated backup role for shared databases and the dedicated
+ * database's migration credential for single-tenant databases. Both paths
+ * retain FORCE ROW LEVEL SECURITY and set the tenant context transaction-locally.
+ */
+export async function withTenantBackupTransaction<T>(
+  tenantId: string,
+  callback: (tx: TenantTransaction) => Promise<T>,
+  options: TenantBackupTransactionOptions = {},
+): Promise<T> {
+  const backupPool = getTenantBackupPool();
+  const bindingResult = await backupPool.query<{
+    tenant_id: string;
+    tenant_status: string;
+    tier: "shared" | "dedicated";
+    state: "shared" | "provisioning" | "ready" | "failed" | "draining";
+    migration_secret_ref: string | null;
+    schema_version: string | null;
+  }>(
+    `SELECT t.id::text AS tenant_id, t.status AS tenant_status,
+            COALESCE(b.tier, 'shared') AS tier, COALESCE(b.state, 'shared') AS state,
+            b.migration_secret_ref, b.schema_version
+       FROM public.tenants t
+       LEFT JOIN public.tenant_database_bindings b ON b.tenant_id = t.id
+      WHERE t.id = $1
+      LIMIT 1`,
+    [tenantId],
+  );
+  const binding = bindingResult.rows[0];
+  if (!binding) throw routingError("TENANT_DATABASE_TENANT_NOT_FOUND");
+  if (!options.allowInactive && binding.tenant_status !== "active") {
+    throw routingError("TENANT_DATABASE_TENANT_INACTIVE");
+  }
+
+  if (binding.tier === "shared" && binding.state === "shared") {
+    return inTenantTransaction(createDatabase(backupPool), tenantId, callback, {
+      ...(options.repeatableReadOnly ? { repeatableReadOnly: true } : {}),
+    });
+  }
+  if (binding.tier !== "dedicated" || binding.state !== "ready" ||
+      !binding.migration_secret_ref || binding.schema_version !== currentDatabaseSchemaVersion) {
+    throw routingError("TENANT_BACKUP_DATABASE_BINDING_NOT_READY");
+  }
+
+  let connectionString: string;
+  try {
+    connectionString = await secretResolver.resolveDatabaseUrl(binding.migration_secret_ref);
+    const url = new URL(connectionString);
+    if (url.protocol !== "postgres:" && url.protocol !== "postgresql:") throw new Error("Invalid database URL protocol.");
+  } catch {
+    throw routingError("TENANT_BACKUP_DATABASE_SECRET_UNAVAILABLE");
+  }
+
+  const dedicatedBackupPool = new Pool({
+    connectionString,
+    max: 2,
+    idleTimeoutMillis: 30_000,
+    connectionTimeoutMillis: 5_000,
+    application_name: "bazion-tenant-dedicated-backup",
+  });
+  try {
+    const verification = await dedicatedBackupPool.query<{
+      tenant_count: number;
+      matching_tenant_count: number;
+      applied_migrations_count: number;
+    }>(
+      `SELECT count(*)::int AS tenant_count,
+              count(*) FILTER (WHERE id = $1)::int AS matching_tenant_count,
+              (SELECT count(*)::int FROM public.schema_migrations WHERE version = ANY($2::varchar[])) AS applied_migrations_count
+         FROM public.tenants`,
+      [tenantId, requiredDatabaseMigrations],
+    );
+    const row = verification.rows[0];
+    if (!row || row.tenant_count !== 1 || row.matching_tenant_count !== 1 ||
+        row.applied_migrations_count !== requiredDatabaseMigrations.length) {
+      throw routingError("TENANT_BACKUP_DATABASE_VERIFICATION_FAILED");
+    }
+    return await inTenantTransaction(createDatabase(dedicatedBackupPool), tenantId, callback, {
+      ...(options.repeatableReadOnly ? { repeatableReadOnly: true } : {}),
+    });
+  } finally {
+    await dedicatedBackupPool.end().catch(() => undefined);
+  }
+}
+
 export async function closeTenantDatabaseResources(): Promise<void> {
   await Promise.allSettled([...pendingPools.values()]);
   bindingCache.clear();
   const entries = [...allDedicatedPools];
   allDedicatedPools.clear();
   dedicatedPools.clear();
+  const backupPool = tenantBackupPool;
+  tenantBackupPool = undefined;
   await Promise.all([
     tenantDirectoryPool.end(),
+    ...(backupPool ? [backupPool.end().catch(() => undefined)] : []),
     ...entries.map((entry) => entry.pool.end().catch(() => undefined)),
   ]);
 }
