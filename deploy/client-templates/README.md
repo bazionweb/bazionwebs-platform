@@ -18,7 +18,7 @@ These Compose files are portable deployment blueprints for Dokploy-managed clien
 
 - [WordPress + MariaDB](wordpress/README.md) — managed CMS website.
 - [Node.js / Next.js](node-nextjs/README.md) — portable full-stack application runtime.
-- E-commerce — planned.
+- [E-commerce + PostgreSQL](ecommerce/README.md) — application, private database, persistent database volume, and commerce launch gates.
 
 ## Dokploy workflow
 
@@ -26,5 +26,5 @@ These Compose files are portable deployment blueprints for Dokploy-managed clien
 2. Add a Compose service and import the relevant Compose file.
 3. Add the environment variables from the template's `.env.example` in Dokploy (replace all placeholders).
 4. Deploy without publishing container ports.
-5. In the app service's Domains settings, route the client's hostname to its internal application port (WordPress: 80; Node/Next.js: 3000) and enable HTTPS.
+5. In the app service's Domains settings, route the client's hostname to its internal application port (WordPress: 80; Node/Next.js and e-commerce: 3000) and enable HTTPS.
 6. Verify health, TLS, persistence, isolation, and restore readiness before handing over access.
