@@ -178,7 +178,7 @@ export class PostgresHostingLifecycleStore implements HostingLifecycleStore {
     const client = await this.pool.connect();
     try {
       await client.query("BEGIN");
-      const isRemoved = input.action === "remove";
+      const isRemoved = input.action === "remove" || input.state === "removed";
       const result = await client.query<{ tenant_id: string; state: string }>(
         "UPDATE public.tenant_hosting_deployments SET state=$3," +
         "provider_resource_id=CASE WHEN $4 THEN NULL ELSE provider_resource_id END," +
