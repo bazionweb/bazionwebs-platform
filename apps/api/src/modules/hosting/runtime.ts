@@ -22,6 +22,7 @@ export interface HostingProvisioningRuntime {
   providerId: string;
   provision(input: ProvisionTenantHostingInput): Promise<ProvisionTenantHostingResult>;
   loadTemplate(template: TenantHostingTemplate): ReturnType<typeof loadTenantHostingTemplate>;
+  inspect(reference: import("@bazion/platform-contracts").TenantHostingDeploymentReference): ReturnType<import("@bazion/platform-contracts").TenantHostingProvider["inspect"]>;
 }
 
 export function createHostingProvisioningRuntime(config: HostingRuntimeConfig): HostingProvisioningRuntime | null {
@@ -38,5 +39,6 @@ export function createHostingProvisioningRuntime(config: HostingRuntimeConfig): 
     providerId: "dokploy",
     provision: (input) => service.provision(input),
     loadTemplate: (template) => loadTenantHostingTemplate(template, templateDirectory),
+    inspect: (reference) => provider.inspect(reference),
   };
 }
