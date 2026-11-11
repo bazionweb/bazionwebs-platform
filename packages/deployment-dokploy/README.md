@@ -6,9 +6,9 @@ This package is the first hosting-provider adapter for Bazion. The platform depe
 
 - Creates an isolated Dokploy Compose resource in a pre-provisioned environment.
 - Resolves environment variables just in time from `TenantHostingSecretResolver`, then saves them through Dokploy's protected API.
-- Deploys, inspects, stops and removes a Compose resource.
+- Deploys, starts, inspects, stops, redeploys and removes a Compose resource. Start/stop/redeploy use dedicated Dokploy endpoints; redeploy explicitly keeps `freshVolumes: false`.
 - Returns provider-reported Compose name and environment ID from `compose.one` as non-secret identity metadata, allowing the control plane to verify tenant/template ownership during recovery. Missing identity fields remain absent and must fail closed in recovery workflows.
-- Retries only read-only `GET` inspection calls for bounded transient HTTP/network failures, with bounded `Retry-After` support. Mutating `POST` calls (create, deploy, environment update, stop, delete) are never replayed automatically because a timeout can leave the provider-side result ambiguous.
+- Retries only read-only `GET` inspection calls for bounded transient HTTP/network failures, with bounded `Retry-After` support. Mutating `POST` calls (create, deploy, start, redeploy, environment update, stop, delete) are never replayed automatically because a timeout can leave the provider-side result ambiguous.
 - Never returns environment values or raw provider payloads.
 - Resource removal preserves volumes (`deleteVolumes: false`); data deletion must be a separate, explicitly approved workflow.
 
@@ -28,4 +28,10 @@ The adapter does not create projects/environments, generate secrets, attach doma
 
 ## Dokploy API
 
-The adapter uses the documented `compose.create`, `compose.saveEnvironment`, `compose.deploy`, `compose.one`, `compose.stop` and `compose.delete` endpoints. Dokploy API reference: https://docs.dokploy.com/docs/api/compose
+The adapter uses the documented `compose.create`, `compose.saveEnvironment`, `compose.deploy`, `compose.start`, `compose.redeploy`, `compose.one`, `compose.stop` and `compose.delete` endpoints. Dokploy API reference: https://docs.dokploy.com/docs/api/compose
+
+## Operator lifecycle controls
+
+The platform exposes audited, platform-owner-only actions for start, stop and redeploy. Start and redeploy are permitted only while the tenant is active. Provider resource removal is more restrictive: the tenant must be closed and the deployment must already be stopped. Removal calls `compose.delete` with `deleteVolumes: false`; the tenant's persistent volumes are not deleted by this action.
+
+Every action is serialized using a database lease and writes append-only deployment events. After start, stop or redeploy, the platform inspects the resource and stores the observed state. An ambiguous mutation failure is never automatically replayed; the deployment is marked `unknown` for the read-only reconciler. A provider 404 is reconciled to the terminal `removed` state and clears the stale provider resource reference.
