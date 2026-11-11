@@ -25,6 +25,7 @@ export type BeginHostingProvisionResult =
 export interface HostingProvisioningStore {
   begin(input: BeginHostingProvisionInput): Promise<BeginHostingProvisionResult>;
   attachReference(input: { deploymentId: string; leaseToken: string; reference: TenantHostingDeploymentReference; actorType: HostingActorType; actorId: string; requestId?: string }): Promise<boolean>;
+  markDeploying(input: { deploymentId: string; leaseToken: string; actorType: HostingActorType; actorId: string; requestId?: string }): Promise<boolean>;
   markRunning(input: { deploymentId: string; leaseToken: string; actorType: HostingActorType; actorId: string; requestId?: string }): Promise<boolean>;
   markFailed(input: { deploymentId: string; leaseToken: string; errorCode: string; actorType: HostingActorType; actorId: string; requestId?: string }): Promise<void>;
 }
@@ -142,6 +143,29 @@ export class PostgresHostingProvisioningStore implements HostingProvisioningStor
     finally { client.release(); }
   }
 
+  async markDeploying(input: { deploymentId: string; leaseToken: string; actorType: HostingActorType; actorId: string; requestId?: string }): Promise<boolean> {
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      const previous = await client.query<{ state: string }>(
+        "SELECT state FROM public.tenant_hosting_deployments WHERE id=$1 AND lease_token=$2 FOR UPDATE",
+        [input.deploymentId,input.leaseToken],
+      );
+      const previousState = previous.rows[0]?.state ?? null;
+      const result = await client.query<{ tenant_id: string }>(
+        "UPDATE public.tenant_hosting_deployments SET state='deploying',updated_at=now() " +
+        "WHERE id=$1 AND lease_token=$2 AND state IN ('ready','deploying') RETURNING tenant_id",
+        [input.deploymentId,input.leaseToken],
+      );
+      const tenantId = result.rows[0]?.tenant_id;
+      if (!tenantId) { await client.query("ROLLBACK"); return false; }
+      await this.appendRawEvent(client,input.deploymentId,tenantId,"hosting.deployment.deploying",previousState,"deploying",
+        input.actorType,input.actorId,input.requestId,{});
+      await client.query("COMMIT"); return true;
+    } catch (error) { await client.query("ROLLBACK").catch(() => undefined); throw error; }
+    finally { client.release(); }
+  }
+
   async markRunning(input: { deploymentId: string; leaseToken: string; actorType: HostingActorType; actorId: string; requestId?: string }): Promise<boolean> {
     const client = await this.pool.connect();
     try {
@@ -220,7 +244,7 @@ export interface ProvisionTenantHostingInput {
   composeFile: string; environmentSecretRef: string; actorType: HostingActorType; actorId: string; requestId?: string;
 }
 export interface ProvisionTenantHostingResult {
-  reference: TenantHostingDeploymentReference; state: "running"; attemptCount: number; reused: boolean;
+  reference: TenantHostingDeploymentReference; state: "running" | "deploying"; attemptCount: number; reused: boolean;
 }
 
 /**
@@ -269,12 +293,32 @@ export class TenantHostingProvisioningService {
         if (!persisted) throw new Error("HOSTING_DEPLOYMENT_LEASE_LOST");
       }
       await this.provider.deploy(reference);
-      const running = await this.store.markRunning({
+      const deploying = await this.store.markDeploying({
         deploymentId: started.deploymentId, leaseToken: started.leaseToken,
         actorType: input.actorType, actorId: input.actorId, ...(input.requestId !== undefined ? { requestId: input.requestId } : {}),
       });
-      if (!running) throw new Error("HOSTING_DEPLOYMENT_LEASE_LOST");
-      return { reference, state: "running", attemptCount: started.attemptCount, reused: Boolean(started.reference) };
+      if (!deploying) throw new Error("HOSTING_DEPLOYMENT_LEASE_LOST");
+
+      // Dokploy's deploy endpoint acknowledges the request; only compose.one can
+      // confirm that the workload has reached the running state.
+      let observedRunning = false;
+      try {
+        const observed = await this.provider.inspect(reference);
+        if (observed.state === "failed") throw new Error("HOSTING_PROVIDER_REPORTED_FAILURE");
+        observedRunning = observed.state === "running";
+      } catch (error) {
+        if (error instanceof Error && error.message === "HOSTING_PROVIDER_REPORTED_FAILURE") throw error;
+        // An unavailable status read is inconclusive, not proof of a failed deployment.
+      }
+
+      if (observedRunning) {
+        const running = await this.store.markRunning({
+          deploymentId: started.deploymentId, leaseToken: started.leaseToken,
+          actorType: input.actorType, actorId: input.actorId, ...(input.requestId !== undefined ? { requestId: input.requestId } : {}),
+        });
+        if (!running) throw new Error("HOSTING_DEPLOYMENT_LEASE_LOST");
+      }
+      return { reference, state: observedRunning ? "running" : "deploying", attemptCount: started.attemptCount, reused: Boolean(started.reference) };
     } catch (error) {
       await this.store.markFailed({
         deploymentId: started.deploymentId, leaseToken: started.leaseToken,
