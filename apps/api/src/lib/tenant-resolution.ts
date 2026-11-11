@@ -6,16 +6,16 @@ export async function resolveTenantId(
   config: AppConfig,
   explicitTenantSlugOrId?: string,
 ): Promise<string> {
-  const cleanHost = (hostname || "").split(":", 1)[0]!.trim().toLowerCase();
+  const rawHost = (hostname || "").trim().toLowerCase();
+  const cleanHost = rawHost === "::1"
+    ? rawHost
+    : rawHost.startsWith("[") && rawHost.includes("]")
+      ? rawHost.slice(1, rawHost.indexOf("]"))
+      : rawHost.split(":", 1)[0]!;
+  const isLoopbackHost = cleanHost === "localhost" || cleanHost === "127.0.0.1" || cleanHost === "::1";
 
-  // 1. If explicit tenant slug or ID is requested (e.g. from x-bazion-tenant header)
-  if (explicitTenantSlugOrId) {
-    const cleanExplicit = explicitTenantSlugOrId.trim().toLowerCase();
-    const bySlug = await resolvePublicTenantBySlug(cleanExplicit);
-    if (bySlug) return bySlug.id;
-  }
-
-  // 2. Check if host has a subdomain (e.g. joe-ministries.localhost)
+  // Host mapping is authoritative. A caller-supplied tenant header must never
+  // override a verified custom domain or a tenant-specific local hostname.
   if (cleanHost.endsWith(".localhost")) {
     const subdomain = cleanHost.slice(0, -".localhost".length);
     if (subdomain && subdomain !== "www") {
@@ -24,12 +24,20 @@ export async function resolveTenantId(
     }
   }
 
-  // 3. Check verified domain directory (e.g. custom client domain)
   const tenant = await resolvePublicTenantByHostname(cleanHost);
   if (tenant) return tenant.id;
 
-  // 4. In static mode or local development, fall back to DEFAULT_TENANT_ID for naked localhost
-  if (config.TENANT_RESOLUTION_MODE === "static" || cleanHost === "localhost" || cleanHost === "127.0.0.1") {
+  // The explicit selector exists only for local development against a naked
+  // loopback host. It is not a production tenant-routing mechanism.
+  if (config.NODE_ENV !== "production" && isLoopbackHost && explicitTenantSlugOrId) {
+    const cleanExplicit = explicitTenantSlugOrId.trim().toLowerCase();
+    const bySlug = await resolvePublicTenantBySlug(cleanExplicit);
+    if (bySlug) return bySlug.id;
+  }
+
+  // In static mode or local development, fall back to DEFAULT_TENANT_ID for
+  // a naked loopback host. Production startup independently rejects static mode.
+  if (config.TENANT_RESOLUTION_MODE === "static" || isLoopbackHost) {
     if (config.NODE_ENV === "production" && config.TENANT_RESOLUTION_MODE === "static") {
       throw Object.assign(new Error("Static tenant resolution is disabled in production."), {
         statusCode: 503,

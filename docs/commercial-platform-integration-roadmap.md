@@ -142,7 +142,7 @@ The audit also found a divergent local branch, `feature/church-ministry-platform
 
 ### Verified pre-sync risks
 
-- In `apps/api/src/lib/tenant-resolution.ts`, an explicit `x-bazion-tenant` selector is resolved before the verified hostname. Startup rejects static resolution in production, but this does not disable the explicit selector in `verified_domain` mode. Public routes can therefore select a tenant independently of the verified host. Restrict the selector to development/static mode or to a separately authorized membership flow, and test production spoofing.
+- In `apps/api/src/lib/tenant-resolution.ts`, an explicit `x-bazion-tenant` selector was resolved before the verified hostname. This is fixed in the current slice: mapped hostnames take precedence, and the explicit selector is accepted only on non-production loopback hosts. Tests cover production spoofing, unknown production hosts, local selection, tenant-specific localhost precedence and non-loopback development hosts.
 - In `apps/api/src/modules/admin/routes.ts`, the tenant audit action filter emits `ILIKE 2` instead of a parameter placeholder. Pagination values are also passed as bind parameters while the query renders their numeric positions as literals, so PostgreSQL receives unused parameters. Test the route with and without filters and repair parameter binding.
 - The troubleshooting API writes `maintenance_mode`, but no storefront/API reader enforces it. The rate-limit reset route reports success even when the optional `app.rateLimit.resetKey` hook is absent or does nothing. Connect each control to a real, scoped behavior or remove the misleading control; never report success for a no-op.
 - The generated module catalogue currently defaults optional `commerce`, `analytics`, and `church-ministry` modules on. `afterCreateOrganization` seeds church content, a church entitlement, and an active `<slug>.localhost` domain for every new organization. Move product-specific initialization to an explicit, idempotent product workflow; keep local hostname behavior development-only and derive entitlements from the purchased composition.
@@ -160,7 +160,8 @@ The audit also found a divergent local branch, `feature/church-ministry-platform
 - [ ] Keep Bazionweb as the only owner of prices, invoices, paid-order settlement, subscriptions and commercial customer support.
 - [ ] Keep Bazion Platform as the only owner of tenant lifecycle, product installations, module entitlements, verified domains and runtime deployments.
 - [ ] Document which service owns each credential, signing key, database role and provider account; store only references to secrets in control-plane rows.
-- [ ] Fix the production tenant-selector bypass, admin audit parameter bug, ineffective maintenance/rate-limit controls and implicit church defaults before enabling commercial commands.
+- [x] Fix the production tenant-selector bypass before enabling commercial commands; verified hostname routing now wins and explicit selection is local-development-only.
+- [ ] Fix the admin audit parameter bug, ineffective maintenance/rate-limit controls and implicit church defaults before enabling commercial commands.
 - [ ] Verify and either fix or explicitly defer the commercial sandbox mutation guard and domain-bind application identity; test both.
 - [ ] Confirm whether npm workspaces use only the root `package-lock.json`; make `npm ci`/lockfile policy explicit in CI.
 - [ ] Agree that an order can provision one installation in v1. Add a stable order-line reference before allowing several installations from one order.
@@ -261,6 +262,7 @@ The audit also found a divergent local branch, `feature/church-ministry-platform
 
 - Phase 1's strict request/operation/event contract and generated JSON Schema are committed. The uppercase catalog-ID validator drift is corrected and covered by tests. The fixture-sharing, offer binding, and compatibility tasks remain open.
 - Phase 2 is in progress: a platform installation/operation/saga journal migration, dedicated database role, Drizzle declarations and PostgreSQL integration test are implemented in the current slice. Migration `0018_product_installations_provisioning_sagas.sql` applied locally. The full workspace suite, including PostgreSQL-backed registry integration, passes locally; CI evidence and remaining registry/API authorization cases are still required before closing the phase.
+- The audited tenant-selector bypass is fixed in the current working slice; six focused tests verify production host authority and local-only explicit selection. The admin audit query, maintenance/rate-limit controls and default church initialization are still open Phase 0 blockers.
 - The database-backed saga adapter, inbox/outbox delivery, authenticated API routes, commercial sender/callback projection, product offer bindings, provider compensation adapter, identity flow and pilot remain outstanding.
 - Do not mark a phase complete until its exit gate has evidence in CI and a commit. Migrations already applied locally are immutable; follow-up schema changes require a new numbered migration.
 
