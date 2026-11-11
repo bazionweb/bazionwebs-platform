@@ -70,7 +70,7 @@ export async function hostingRecoveryRoutes(
     try {
       const result = await client.query<RecoveryRow>(
         "SELECT id::text,provider,template,state,provider_resource_id,created_at,lease_expires_at " +
-        "FROM public.tenant_hosting_deployments WHERE id=$1 AND tenant_id=$2 FOR UPDATE",
+        "FROM public.tenant_hosting_deployments WHERE id=$1 AND tenant_id=$2",
         [deploymentId, tenantId],
       );
       deployment = result.rows[0];
@@ -82,7 +82,9 @@ export async function hostingRecoveryRoutes(
     if (deployment.state !== "unknown" || deployment.provider_resource_id !== null) {
       return reply.code(409).send({ error: "HOSTING_DEPLOYMENT_NOT_RECOVERABLE" });
     }
-    if (deployment.lease_expires_at && new Date(deployment.lease_expires_at).getTime() > Date.now()) {
+    const leaseExpiry = deployment.lease_expires_at === null ? null :
+      deployment.lease_expires_at instanceof Date ? deployment.lease_expires_at.getTime() : Date.parse(deployment.lease_expires_at);
+    if (leaseExpiry !== null && leaseExpiry > Date.now()) {
       return reply.code(409).send({ error: "HOSTING_PROVISIONING_IN_PROGRESS" });
     }
     if (!templates.has(deployment.template)) return reply.code(409).send({ error: "HOSTING_TEMPLATE_INVALID" });
