@@ -9,6 +9,12 @@ import {
 } from "./provisioning.js";
 import { DockerSecretTenantHostingSecretResolver } from "./secrets.js";
 import { loadTenantHostingTemplate } from "./templates.js";
+import {
+  PostgresHostingLifecycleStore,
+  TenantHostingLifecycleService,
+  type TenantHostingLifecycleInput,
+  type TenantHostingLifecycleResult,
+} from "./lifecycle.js";
 import type { TenantHostingTemplate } from "@bazion/platform-contracts";
 
 export interface HostingRuntimeConfig {
@@ -29,6 +35,7 @@ export interface HostingProvisioningRuntime {
   providerId: string;
   environmentId: string;
   provision(input: ProvisionTenantHostingInput): Promise<ProvisionTenantHostingResult>;
+  lifecycle(input: TenantHostingLifecycleInput): Promise<TenantHostingLifecycleResult>;
   loadTemplate(template: TenantHostingTemplate): ReturnType<typeof loadTenantHostingTemplate>;
   inspect(reference: import("@bazion/platform-contracts").TenantHostingDeploymentReference): Promise<HostingRecoveryInspection>;
 }
@@ -41,12 +48,14 @@ export function createHostingProvisioningRuntime(config: HostingRuntimeConfig): 
   const provider = new DokployComposeProvider(config.dokploy, secrets);
   const store = new PostgresHostingProvisioningStore(pool);
   const service = new TenantHostingProvisioningService(store, provider, "dokploy");
+  const lifecycleService = new TenantHostingLifecycleService(new PostgresHostingLifecycleStore(pool), provider, "dokploy");
   const templateDirectory = resolve(config.templateDirectory);
 
   return {
     providerId: "dokploy",
     environmentId: config.dokploy.environmentId,
     provision: (input) => service.provision(input),
+    lifecycle: (input) => lifecycleService.execute(input),
     loadTemplate: (template) => loadTenantHostingTemplate(template, templateDirectory),
     inspect: async (reference) => await provider.inspect(reference) as HostingRecoveryInspection,
   };
