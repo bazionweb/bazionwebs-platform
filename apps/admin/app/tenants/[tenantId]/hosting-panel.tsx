@@ -13,6 +13,8 @@ type Deployment = {
   attemptCount: number;
   errorCode: string | null;
   lastDeployedAt: string | null;
+  lastInspectedAt: string | null;
+  reconcileFailureCount: number;
   createdAt: string | null;
   updatedAt: string | null;
 };
@@ -126,7 +128,7 @@ export function TenantHostingPanel({
 
       <div className="table-wrap">
         <table>
-          <thead><tr><th>TEMPLATE / RESOURCE</th><th>PROVIDER</th><th>STATE</th><th>ATTEMPTS</th><th>LAST DEPLOYED</th></tr></thead>
+          <thead><tr><th>TEMPLATE / RESOURCE</th><th>PROVIDER</th><th>STATE</th><th>ATTEMPTS</th><th>LAST DEPLOYED</th><th>LAST CHECKED</th></tr></thead>
           <tbody>
             {initial.deployments.map((deployment) => <tr key={deployment.id}>
               <td>
@@ -141,8 +143,12 @@ export function TenantHostingPanel({
               </td>
               <td>{deployment.attemptCount}</td>
               <td>{deployment.lastDeployedAt ? new Date(deployment.lastDeployedAt).toLocaleString("en-KE") : "—"}</td>
+              <td>
+                {deployment.lastInspectedAt ? new Date(deployment.lastInspectedAt).toLocaleString("en-KE") : "Not checked yet"}
+                {deployment.reconcileFailureCount > 0 && <small>{deployment.reconcileFailureCount} consecutive inspection failures</small>}
+              </td>
             </tr>)}
-            {initial.deployments.length === 0 && <tr><td className="empty" colSpan={5}>No hosting deployments have been provisioned for this tenant.</td></tr>}
+            {initial.deployments.length === 0 && <tr><td className="empty" colSpan={6}>No hosting deployments have been provisioned for this tenant.</td></tr>}
           </tbody>
         </table>
       </div>
