@@ -43,6 +43,7 @@ describe("Church & Ministry Module Routes", () => {
     return {
       putObject: vi.fn(async () => undefined),
       listObjects: vi.fn(async () => []),
+      listObjectsPage: vi.fn(async () => ({ objects: [], nextCursor: null })),
       getObject: vi.fn(async () => null),
       deleteObject: vi.fn(async () => undefined),
       publicUrl: vi.fn((key) => `https://media.example.test/${key}`),
