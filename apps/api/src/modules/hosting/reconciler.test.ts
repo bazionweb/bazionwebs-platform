@@ -103,7 +103,10 @@ describe("PostgresHostingReconciliationStore", () => {
     expect(result).toEqual({ changed: true, state: "running" });
     expect(statements.some((statement) => statement.includes("lease_token=NULL,lease_expires_at=NULL"))).toBe(true);
     expect(statements.some((statement) => statement.includes("hosting.reconciliation.state_changed"))).toBe(true);
-    expect(parameters.at(-1)?.[5]).toContain('"providerState":"running"');
+    const eventMetadata = parameters.find((values) =>
+      typeof values[5] === "string" && values[5].includes('"providerState":"running"'),
+    )?.[5];
+    expect(eventMetadata).toContain('"providerState":"running"');
   });
 
   it("does not append a transition event when the provider state is unchanged", async () => {
