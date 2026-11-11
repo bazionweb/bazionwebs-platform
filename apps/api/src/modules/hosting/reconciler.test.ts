@@ -177,6 +177,18 @@ describe("TenantHostingDeploymentReconciler", () => {
     expect(result).toEqual({ claimed: 1, inspected: 1, changed: 1, failed: 0, leaseLost: 0 });
   });
 
+  it("records an absent provider resource as removed and clears its provider reference", async () => {
+    const port = provider({
+      inspect: vi.fn(async () => ({ reference, state: "removed" as const, lastDeployedAt: null })),
+    });
+    const { reconciler, store } = setup(port);
+    const result = await reconciler.runBatch();
+    expect(store.recordInspection).toHaveBeenCalledWith(expect.objectContaining({
+      deploymentId: "deployment-1", state: "removed",
+    }));
+    expect(result).toEqual({ claimed: 1, inspected: 1, changed: 1, failed: 0, leaseLost: 0 });
+  });
+
   it("backs off an unknown provider state without overwriting the last known deployment state", async () => {
     const port = provider({
       inspect: vi.fn(async () => ({ reference, state: "unknown" as const, lastDeployedAt: null })),
