@@ -35,7 +35,7 @@ This checklist coordinates the Bazion commercial website (`D:\bazionweb`) and th
 - [x] Include external customer/order/offer references, pinned product/solution/template versions, idempotency, event and correlation identifiers.
 - [x] Exclude pricing, payment instruments, secrets and provider credentials from the platform command.
 - [x] Validate strict fields, identifier formats, hostnames, contact email and ready/failed status invariants.
-- [ ] Publish a versioned OpenAPI/JSON Schema artifact usable from the NestJS commercial repository.
+- [x] Publish a versioned JSON Schema artifact and verify it stays synchronized with the runtime validator.
 - [ ] Add cross-repository consumer/provider contract tests against the same examples.
 - [ ] Document additive and breaking-change rules, deprecation window and minimum supported contract version.
 
@@ -136,4 +136,4 @@ This checklist coordinates the Bazion commercial website (`D:\bazionweb`) and th
 
 ## Current implementation slice
 
-Phase 1 has started in `packages/api-contracts/src/provisioning.ts`. The v1 schemas and validation tests define the boundary but do not yet deliver OpenAPI publication, the platform persistence/API, a Bazionweb sender, a durable outbox or the saga worker. Do not mark a phase complete until its exit gate has evidence in CI and a commit.
+Phase 1 is in progress in `packages/api-contracts/src/provisioning.ts`. The v1 schemas, validation tests and generated JSON Schema artifact define the request boundary. Cross-repository consumer/provider tests, the platform persistence/API, a Bazionweb sender, durable outboxes and the saga worker remain outstanding. Do not mark a phase complete until its exit gate has evidence in CI and a commit.

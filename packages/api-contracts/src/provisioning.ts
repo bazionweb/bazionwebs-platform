@@ -20,7 +20,6 @@ const versionSchema = z.string()
 
 const hostnameSchema = z.string()
   .trim()
-  .toLowerCase()
   .max(253)
   .regex(
     /^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/,
@@ -49,7 +48,7 @@ export const provisionProductRequestV1Schema = z.object({
     displayName: z.string().trim().min(1).max(180),
     primaryContact: z.object({
       name: z.string().trim().min(1).max(120),
-      email: z.email().max(254).transform((value) => value.toLowerCase()),
+      email: z.email().max(254).regex(/^[^A-Z]*$/, "Send contact email in lowercase."),
     }).strict(),
   }).strict(),
   order: z.object({
@@ -66,6 +65,16 @@ export const provisionProductRequestV1Schema = z.object({
 }).strict();
 
 export type ProvisionProductRequestV1 = z.infer<typeof provisionProductRequestV1Schema>;
+
+/** Machine-readable request schema published for the independently deployed commercial API. */
+export function getProvisionProductRequestV1JsonSchema() {
+  return {
+    ...z.toJSONSchema(provisionProductRequestV1Schema, { target: "draft-2020-12" }),
+    $id: "https://schemas.bazionweb.com/platform/provision-product-request/1.0.0",
+    title: "Bazion product provisioning request v1",
+    description: "A paid Bazion commercial order requesting a version-pinned product installation. Do not include prices, payment credentials, secrets or database credentials.",
+  };
+}
 
 export const provisioningOperationStatusSchema = z.enum([
   "accepted",

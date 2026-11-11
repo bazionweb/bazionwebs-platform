@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
 import {
+  getProvisionProductRequestV1JsonSchema,
   provisionProductRequestV1Schema,
   provisioningOperationV1Schema,
   provisioningStatusEventV1Schema,
@@ -15,7 +17,7 @@ const request = {
   customer: {
     externalCustomerId: "customer-1008",
     displayName: "Grace Community Church",
-    primaryContact: { name: "Grace Admin", email: "ADMIN@EXAMPLE.ORG" },
+  primaryContact: { name: "Grace Admin", email: "admin@example.org" },
   },
   order: {
     externalOrderId: "order-2026-0042",
@@ -31,10 +33,15 @@ const request = {
 };
 
 describe("Bazion commercial-to-platform provisioning contract v1", () => {
-  it("parses a valid request and canonicalizes the contact email and hostname", () => {
+  it("parses a valid request with normalized contact email and hostname", () => {
     const parsed = provisionProductRequestV1Schema.parse(request);
     expect(parsed.customer.primaryContact.email).toBe("admin@example.org");
     expect(parsed.requestedDomain).toBe("www.grace.example.org");
+  });
+
+  it("keeps the published JSON Schema artifact synchronized with the runtime validator", () => {
+    const artifact = JSON.parse(readFileSync(new URL("../contracts/provision-product-request-v1.schema.json", import.meta.url), "utf8"));
+    expect(artifact).toEqual(getProvisionProductRequestV1JsonSchema());
   });
 
   it("rejects unknown fields and unsupported contract versions", () => {
@@ -50,6 +57,10 @@ describe("Bazion commercial-to-platform provisioning contract v1", () => {
     expect(provisionProductRequestV1Schema.safeParse({
       ...request,
       customer: { ...request.customer, primaryContact: { name: "Admin", email: "not-an-email" } },
+    }).success).toBe(false);
+    expect(provisionProductRequestV1Schema.safeParse({
+      ...request,
+      customer: { ...request.customer, primaryContact: { name: "Admin", email: "ADMIN@example.org" } },
     }).success).toBe(false);
     expect(provisionProductRequestV1Schema.safeParse({ ...request, requestedDomain: "https://example.org/path" }).success).toBe(false);
   });
