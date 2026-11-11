@@ -18,10 +18,19 @@ export interface HostingRuntimeConfig {
   dokploy: DokployConfig | null;
 }
 
+export type HostingRecoveryInspection =
+  Awaited<ReturnType<import("@bazion/platform-contracts").TenantHostingProvider["inspect"]>> & {
+    /** Must come from provider metadata, never from the operator-supplied request body. */
+    providerResourceName?: string;
+    providerEnvironmentId?: string;
+  };
+
 export interface HostingProvisioningRuntime {
   providerId: string;
+  environmentId: string;
   provision(input: ProvisionTenantHostingInput): Promise<ProvisionTenantHostingResult>;
   loadTemplate(template: TenantHostingTemplate): ReturnType<typeof loadTenantHostingTemplate>;
+  inspect(reference: import("@bazion/platform-contracts").TenantHostingDeploymentReference): Promise<HostingRecoveryInspection>;
 }
 
 export function createHostingProvisioningRuntime(config: HostingRuntimeConfig): HostingProvisioningRuntime | null {
@@ -36,7 +45,9 @@ export function createHostingProvisioningRuntime(config: HostingRuntimeConfig): 
 
   return {
     providerId: "dokploy",
+    environmentId: config.dokploy.environmentId,
     provision: (input) => service.provision(input),
     loadTemplate: (template) => loadTenantHostingTemplate(template, templateDirectory),
+    inspect: async (reference) => await provider.inspect(reference) as HostingRecoveryInspection,
   };
 }

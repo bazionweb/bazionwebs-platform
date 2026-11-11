@@ -11,6 +11,7 @@ import { authRoutes } from "./modules/auth/routes.js";
 import { adminRoutes } from "./modules/admin/routes.js";
 import { churchRoutes } from "./modules/church/routes.js";
 import { hostingRoutes } from "./modules/hosting/routes.js";
+import { hostingRecoveryRoutes } from "./modules/hosting/recovery-routes.js";
 import { createHostingProvisioningRuntime } from "./modules/hosting/runtime.js";
 
 const MEDIA_UPLOAD_LIMIT_BYTES = 8 * 1024 * 1024;
@@ -105,9 +106,14 @@ export async function buildApp(config: AppConfig) {
   await app.register(commerceRoutes, { prefix: "/v1", config });
   await app.register(commerceAdminRoutes, { prefix: "/v1" });
   await app.register(churchRoutes, { prefix: "/v1", config });
+  const hostingRuntime = createHostingProvisioningRuntime(config.hosting);
   await app.register(hostingRoutes, {
     prefix: "/v1",
-    runtime: createHostingProvisioningRuntime(config.hosting),
+    runtime: hostingRuntime,
+  });
+  await app.register(hostingRecoveryRoutes, {
+    prefix: "/v1",
+    runtime: hostingRuntime,
   });
 
   app.setErrorHandler((error, request, reply) => {
