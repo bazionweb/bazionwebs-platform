@@ -32,7 +32,7 @@ Reviewed 10 November 2026. This status describes the repository snapshot and its
 ## Production release gates
 
 - Set `PAYMENT_PROVIDER=mpesa`, use live Daraja credentials and `MPESA_ENVIRONMENT=production`; production startup rejects the mock and sandbox settings.
-- Apply migrations 0001–0015 with the migration role, provision the least-privilege database roles and run the production preflight. The API derives the required tenant schema marker from the migration registry and rejects dedicated bindings that are stale or missing any registered migration.
+- Apply migrations through `0018_product_installations_provisioning_sagas.sql` with the migration role, provision the least-privilege database roles and run the production preflight. The API derives the required tenant schema marker from the migration registry and rejects dedicated bindings that are stale or missing any registered migration.
 - Complete Safaricom sandbox checkout and donation flows, including callback retries, failed transactions and verified receipts. Confirm the callback URL and merchant setup with the live account before accepting real payments.
 - Add an operator reconciliation process for provider callbacks that never arrive. Do not treat a pending order or donation as paid.
 - Provision production notification roles, secrets and authenticated TLS SMTP; verify delivery and expired-lease recovery with the worker.

@@ -33,7 +33,7 @@ const request = {
 };
 
 describe("Bazion commercial-to-platform provisioning contract v1", () => {
-  it("parses a valid request with normalized contact email and hostname", () => {
+  it("parses a valid request with lowercase contact email and hostname", () => {
     const parsed = provisionProductRequestV1Schema.parse(request);
     expect(parsed.customer.primaryContact.email).toBe("admin@example.org");
     expect(parsed.requestedDomain).toBe("www.grace.example.org");
@@ -63,6 +63,17 @@ describe("Bazion commercial-to-platform provisioning contract v1", () => {
       customer: { ...request.customer, primaryContact: { name: "Admin", email: "ADMIN@example.org" } },
     }).success).toBe(false);
     expect(provisionProductRequestV1Schema.safeParse({ ...request, requestedDomain: "https://example.org/path" }).success).toBe(false);
+  });
+
+  it("keeps catalog identifier casing identical to the published JSON Schema", () => {
+    expect(provisionProductRequestV1Schema.safeParse({
+      ...request,
+      order: { ...request.order, offerId: "Church-Ministry-Launch" },
+    }).success).toBe(false);
+    expect(provisionProductRequestV1Schema.safeParse({
+      ...request,
+      composition: { ...request.composition, product: { id: "Church-Ministry", version: "1.0.0" } },
+    }).success).toBe(false);
   });
 
   it("requires tenant and installation identifiers before reporting ready", () => {

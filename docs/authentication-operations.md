@@ -8,6 +8,7 @@
 | `bazion_app` | Commerce/API business operations | Explicitly granted business-table access; tenant-owned tables remain protected by RLS |
 | `bazion_tenant_resolver` | Resolve verified hostnames and platform-member roles | Read-only tenant registry views/tables |
 | `bazion_tenant_provisioner` | Organization hook and registry writes | SELECT/INSERT/UPDATE on tenant registry, tenant domains and platform members only |
+| `bazion_product_provisioner` | Authenticated commercial command receiver and saga worker | Tenant-scoped installation DML plus provisioning operations, attempts and event history; no commerce or auth records |
 | `bazion_migrator` | Numbered SQL and Better Auth schema migrations | DDL; never used as an application runtime role |
 
 The auth tables are placed in PostgreSQL's `auth` schema using the connection's `search_path`. The Better Auth runtime pool uses `AUTH_DATABASE_URL`; the CLI migration process uses `AUTH_MIGRATION_DATABASE_URL` and the migrator role.
@@ -38,6 +39,28 @@ GRANT USAGE ON SCHEMA public TO bazion_tenant_resolver, bazion_tenant_provisione
 ```
 
 The numbered application migration grants registry permissions after creating `tenant_domains` and `platform_members`. Do not grant the provisioner role access to products, carts, orders or payment tables.
+
+Migration `0018_product_installations_provisioning_sagas.sql` also grants access to `bazion_product_provisioner` when that role exists. On a database volume created before the role was added, provision it with a unique local password before starting the provisioning API. If migration 0018 has already been applied while the role was absent, run the following grants as the local PostgreSQL administrator after creating the role; the role remains subject to forced RLS on `product_installations` and must set the transaction-local `app.tenant_id` for installation access:
+
+```sql
+CREATE ROLE bazion_product_provisioner LOGIN PASSWORD 'REPLACE_PRODUCT_PROVISIONER_PASSWORD'
+  NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS;
+GRANT CONNECT ON DATABASE bazion_platform TO bazion_product_provisioner;
+GRANT USAGE ON SCHEMA public TO bazion_product_provisioner;
+GRANT REFERENCES (id) ON public.tenants TO bazion_product_provisioner;
+GRANT REFERENCES (id, tenant_id) ON public.product_installations TO bazion_product_provisioner;
+GRANT REFERENCES ON public.product_provisioning_operations TO bazion_product_provisioner;
+GRANT SELECT, INSERT, UPDATE ON public.product_installations,
+  public.product_provisioning_operations, public.product_provisioning_step_attempts
+  TO bazion_product_provisioner;
+GRANT SELECT, INSERT ON public.product_provisioning_operation_events TO bazion_product_provisioner;
+GRANT EXECUTE ON FUNCTION public.enforce_product_installation_update() TO bazion_product_provisioner;
+GRANT EXECUTE ON FUNCTION public.enforce_product_provisioning_operation_update() TO bazion_product_provisioner;
+GRANT EXECUTE ON FUNCTION public.record_product_provisioning_operation_event() TO bazion_product_provisioner;
+GRANT EXECUTE ON FUNCTION public.is_safe_product_provisioning_effect(jsonb) TO bazion_product_provisioner;
+```
+
+Set `PRODUCT_PROVISIONER_DATABASE_URL` and `BAZION_PRODUCT_PROVISIONER_PASSWORD` to the matching credential. Never reuse the API, tenant-provisioner or migration password. The normal Docker role initializer creates the role only for a fresh empty volume.
 
 ## Migration order
 

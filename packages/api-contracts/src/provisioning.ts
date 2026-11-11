@@ -10,7 +10,7 @@ const catalogIdSchema = z.string()
   .trim()
   .min(1)
   .max(120)
-  .regex(/^[a-z0-9][a-z0-9._-]*$/i, "Use a catalog-safe identifier.");
+  .regex(/^[a-z0-9][a-z0-9._-]*$/, "Use a lowercase catalog-safe identifier.");
 
 const versionSchema = z.string()
   .trim()

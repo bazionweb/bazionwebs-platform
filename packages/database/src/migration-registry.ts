@@ -20,6 +20,7 @@ export const requiredDatabaseMigrations = [
   "0015_commerce_inventory_reservation_guard.sql",
   "0016_tenant_hosting_deployments.sql",
   "0017_hosting_reconciliation_schedule.sql",
+  "0018_product_installations_provisioning_sagas.sql",
 ] as const;
 
 /** Current tenant database release marker; updates automatically with the registry. */

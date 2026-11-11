@@ -13,7 +13,8 @@ psql \
   --set=provisioner_password="$BAZION_TENANT_PROVISIONER_PASSWORD" \
   --set=notification_enqueuer_password="$BAZION_NOTIFICATION_ENQUEUER_PASSWORD" \
   --set=notification_worker_password="$BAZION_NOTIFICATION_WORKER_PASSWORD" \
-  --set=hosting_reconciler_password="$BAZION_HOSTING_RECONCILER_PASSWORD" <<'SQL'
+  --set=hosting_reconciler_password="$BAZION_HOSTING_RECONCILER_PASSWORD" \
+  --set=product_provisioner_password="$BAZION_PRODUCT_PROVISIONER_PASSWORD" <<'SQL'
 CREATE ROLE bazion_app
   LOGIN PASSWORD :'app_password'
   NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS;
@@ -46,16 +47,20 @@ CREATE ROLE bazion_hosting_reconciler
   LOGIN PASSWORD :'hosting_reconciler_password'
   NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS;
 
+CREATE ROLE bazion_product_provisioner
+  LOGIN PASSWORD :'product_provisioner_password'
+  NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS;
+
 GRANT CONNECT ON DATABASE bazion_platform
   TO bazion_app, bazion_migrator, bazion_auth_runtime,
      bazion_tenant_resolver, bazion_tenant_provisioner,
      bazion_notification_enqueuer, bazion_notification_worker,
-     bazion_hosting_reconciler;
+     bazion_hosting_reconciler, bazion_product_provisioner;
 
 GRANT USAGE ON SCHEMA public
   TO bazion_app, bazion_tenant_resolver, bazion_tenant_provisioner,
      bazion_notification_enqueuer, bazion_notification_worker,
-     bazion_hosting_reconciler;
+     bazion_hosting_reconciler, bazion_product_provisioner;
 GRANT USAGE, CREATE ON SCHEMA public TO bazion_migrator;
 
 -- Better Auth gets a dedicated schema. Its runtime role receives DML only;

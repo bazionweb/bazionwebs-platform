@@ -1,4 +1,4 @@
-import { readdirSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
@@ -21,7 +21,20 @@ describe("database migration registry", () => {
     expect(requiredDatabaseMigrations).toContain("0015_commerce_inventory_reservation_guard.sql");
     expect(requiredDatabaseMigrations).toContain("0016_tenant_hosting_deployments.sql");
     expect(requiredDatabaseMigrations).toContain("0017_hosting_reconciliation_schedule.sql");
+    expect(requiredDatabaseMigrations).toContain("0018_product_installations_provisioning_sagas.sql");
     expect(currentDatabaseSchemaVersion).toBe(requiredDatabaseMigrations.at(-1));
-    expect(currentDatabaseSchemaVersion).toBe("0017_hosting_reconciliation_schedule.sql");
+    expect(currentDatabaseSchemaVersion).toBe("0018_product_installations_provisioning_sagas.sql");
+  });
+
+  it("persists installation identity and inspectable saga evidence without customer contact data", () => {
+    const migration = readFileSync(join(migrationsDirectory, "0018_product_installations_provisioning_sagas.sql"), "utf8");
+    expect(migration).toContain("product_installations_tenant_isolation");
+    expect(migration).toContain("product_provisioning_operations_idempotency_uq");
+    expect(migration).toContain("product_provisioning_step_attempts_number_uq");
+    expect(migration).toContain("product_provisioning_events_immutable");
+    expect(migration).toContain("is_safe_product_provisioning_effect");
+    expect(migration).toContain("bazion_product_provisioner");
+    const operationColumns = migration.split("CREATE TABLE public.product_provisioning_operations (")[1]?.split("\n);")[0] ?? "";
+    expect(operationColumns).not.toMatch(/^\s*(email|contact_email|password|secret|payment_token)\s/m);
   });
 });

@@ -15,6 +15,7 @@ services:
       BAZION_NOTIFICATION_ENQUEUER_PASSWORD: ${BAZION_NOTIFICATION_ENQUEUER_PASSWORD:-bazion_notification_enqueuer_local_only}
       BAZION_NOTIFICATION_WORKER_PASSWORD: ${BAZION_NOTIFICATION_WORKER_PASSWORD:-bazion_notification_worker_local_only}
       BAZION_HOSTING_RECONCILER_PASSWORD: ${BAZION_HOSTING_RECONCILER_PASSWORD:-bazion_hosting_reconciler_local_only}
+      BAZION_PRODUCT_PROVISIONER_PASSWORD: ${BAZION_PRODUCT_PROVISIONER_PASSWORD:-bazion_product_provisioner_local_only}
     ports:
       - "127.0.0.1:5432:5432"
     volumes:
