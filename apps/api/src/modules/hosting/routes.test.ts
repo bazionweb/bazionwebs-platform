@@ -32,6 +32,7 @@ const reference = {
 function makeRuntime(): HostingProvisioningRuntime {
   return {
     providerId: "dokploy",
+    environmentId: "environment-1",
     loadTemplate: vi.fn(async (_template: TenantHostingTemplate): Promise<LoadedTenantHostingTemplate> => ({
       template: "node-nextjs",
       composeFile: "services:\n  app:\n    image: ${APP_IMAGE:?required}\n",
