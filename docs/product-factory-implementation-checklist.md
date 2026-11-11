@@ -58,6 +58,7 @@ Foundational completed slices: `cbe1851` product manifests, `e2271ac` runtime ca
 - [x] Move primary website navigation to a template-neutral shared primitive while preserving the Church/Ministry configuration adapter.
 - [ ] Continue replacing church-only layout and form styles as product slices adopt the shared primitives.
 - [x] Create a reusable SME website package foundation with tenant-owned page content, privacy-gated enquiry UI, same-origin endpoint validation, and shared SEO/navigation/UI contracts. Its server endpoint and persistence remain open below.
+- [x] Add tenant-scoped enquiry persistence, privacy-consent metadata, rate limiting and honeypot controls, owner/admin authorization, bounded export and deletion, and scheduled retention cleanup. The collection endpoint requires a published tenant privacy policy; PostgreSQL integration coverage proves isolation for both enquiry records and policies.
 - [x] Define a constrained, versioned website configuration contract for branding, navigation, SEO and allowed page sections in `@bazion/website-contracts`; Church/Ministry settings reuse the schemas, apply a backwards-compatible `1.0.0` default, and preserve tenant-specific navigation in the domain port.
 - [x] Bind public navigation to tenant site settings; disabled or unconfigured internal pages and unsafe destinations are filtered, while valid HTTPS partner links remain available.
 - [x] Expose tenant page visibility and navigation editing in the admin UI; validate the saved site contract and keep the home page enabled.
@@ -68,6 +69,8 @@ Foundational completed slices: `cbe1851` product manifests, `e2271ac` runtime ca
 - [ ] Configure two tenants with different brands/content/navigation using the same runtime and template.
 - [ ] Verify feature entitlement changes protect API operations as well as UI links.
 - [ ] Add visual/accessibility checks and PostgreSQL cross-tenant denial coverage for the SME slice.
+
+**Forms/lead capture evidence (2026-11-11):** `@bazion/forms` and `forms-leads` are registered as a reusable domain/API module. The public endpoint validates submissions, requires an enabled published tenant notice and matching notice version, assigns consent/retention metadata server-side, and applies per-IP rate limits plus a honeypot. Owner/admin routes manage policy, list/export and delete records; a bounded cleanup job includes inactive tenants. PostgreSQL tenant isolation passed for enquiries and policy rows with cross-tenant spoof writes denied. `pnpm typecheck`, `pnpm catalog:validate`, full `pnpm test` (32 Turborepo tasks, including database 15/15 and API 120/120), and `pnpm build` passed against the disposable PostgreSQL cluster.
 
 **Exit gate:** a second site can be configured without copying application code or adding a customer branch; both tenants pass route, accessibility and RLS checks.
 

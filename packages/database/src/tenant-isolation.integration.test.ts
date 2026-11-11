@@ -12,6 +12,8 @@ type TenantFixture = {
   publicSiteSetting: string;
   sermonTitle: string;
   ministryModuleEnabled: boolean;
+  siteEnquiryName: string;
+  siteEnquiryPolicyNotice: string;
   hostname: string;
   pendingHostname: string;
 };
@@ -66,6 +68,8 @@ describe.skipIf(!enabled)("PostgreSQL tenant isolation (real roles and RLS)", ()
       publicSiteSetting: JSON.stringify({ ministryName: `RLS ${label} ministry ${suffix}`, heroTitle: `Welcome ${label}` }),
       sermonTitle: `RLS ${label} sermon ${suffix}`,
       ministryModuleEnabled: label === "alpha",
+      siteEnquiryName: `Website enquiry ${label} ${suffix}`,
+      siteEnquiryPolicyNotice: `Tenant ${label} uses enquiry contact details only to respond and removes them after the stated retention period.`,
       hostname: `${label}-${suffix}.verified.example.test`,
       pendingHostname: `${label}-${suffix}.pending.example.test`,
     };
@@ -117,6 +121,19 @@ describe.skipIf(!enabled)("PostgreSQL tenant isolation (real roles and RLS)", ()
         `INSERT INTO public.ministry_settings (tenant_id, setting_key, setting_value)
          VALUES ($1, 'public_site', $2)`,
         [tenantId, fixture.publicSiteSetting],
+      );
+      await client.query(
+        `INSERT INTO public.site_enquiries
+          (tenant_id, form_id, full_name, email, message, privacy_consent_at,
+           privacy_notice_version, retention_expires_at)
+         VALUES ($1, 'contact', $2, $3, 'Please contact me about this service.', now(), '1.0.0', now() + interval '180 days')`,
+        [tenantId, fixture.siteEnquiryName, `${label}-${suffix}@enquiries.example.test`],
+      );
+      await client.query(
+        `INSERT INTO public.site_enquiry_policies
+          (tenant_id, enabled, privacy_notice, privacy_notice_version, retention_days, published_at)
+         VALUES ($1, true, $2, '1.0.0', 180, now())`,
+        [tenantId, fixture.siteEnquiryPolicyNotice],
       );
       await client.query(
         `INSERT INTO public.sermons (tenant_id, title, slug, speaker, description)
@@ -184,6 +201,8 @@ describe.skipIf(!enabled)("PostgreSQL tenant isolation (real roles and RLS)", ()
       try {
         await withTenant(migrationPool, fixture.tenantId, async (client) => {
           await client.query("DELETE FROM public.sermons WHERE tenant_id = $1", [fixture.tenantId]);
+          await client.query("DELETE FROM public.site_enquiries WHERE tenant_id = $1", [fixture.tenantId]);
+          await client.query("DELETE FROM public.site_enquiry_policies WHERE tenant_id = $1", [fixture.tenantId]);
           await client.query("DELETE FROM public.ministry_settings WHERE tenant_id = $1", [fixture.tenantId]);
           await client.query("DELETE FROM public.ministry_profiles WHERE tenant_id = $1", [fixture.tenantId]);
           await client.query("DELETE FROM public.idempotency_records WHERE tenant_id = $1", [fixture.tenantId]);
@@ -210,7 +229,7 @@ describe.skipIf(!enabled)("PostgreSQL tenant isolation (real roles and RLS)", ()
   });
 
   it("forces RLS on every tenant-owned table and keeps the runtime role unprivileged", async () => {
-    const tables = ["products", "commerce_store_settings", "carts", "cart_items", "orders", "order_items", "payment_attempts", "webhook_events", "idempotency_records", "ministry_profiles", "ministry_settings", "sermons"];
+    const tables = ["products", "commerce_store_settings", "carts", "cart_items", "orders", "order_items", "payment_attempts", "webhook_events", "idempotency_records", "ministry_profiles", "ministry_settings", "sermons", "site_enquiries", "site_enquiry_policies"];
     const flags = await migrationPool.query<{ relname: string; relrowsecurity: boolean; relforcerowsecurity: boolean }>(
       `SELECT c.relname, c.relrowsecurity, c.relforcerowsecurity
          FROM pg_class c
@@ -245,7 +264,7 @@ describe.skipIf(!enabled)("PostgreSQL tenant isolation (real roles and RLS)", ()
   it("isolates reads across all tenant-owned business tables", async () => {
     const alpha = fixtures[0]!;
     const beta = fixtures[1]!;
-    const tables = ["products", "commerce_store_settings", "carts", "cart_items", "orders", "order_items", "payment_attempts", "webhook_events", "idempotency_records", "ministry_profiles", "ministry_settings", "sermons"];
+    const tables = ["products", "commerce_store_settings", "carts", "cart_items", "orders", "order_items", "payment_attempts", "webhook_events", "idempotency_records", "ministry_profiles", "ministry_settings", "sermons", "site_enquiries", "site_enquiry_policies"];
     const result = await withTenant(appPool, alpha.tenantId, async (client) => {
       const counts: Record<string, number> = {};
       for (const table of tables) {
@@ -270,10 +289,14 @@ describe.skipIf(!enabled)("PostgreSQL tenant isolation (real roles and RLS)", ()
         "SELECT setting_value FROM public.ministry_settings WHERE setting_key = 'public_site'",
       );
       const sermons = await client.query<{ title: string }>("SELECT title FROM public.sermons");
+      const enquiries = await client.query<{ full_name: string; email: string }>("SELECT full_name, email FROM public.site_enquiries");
+      const policies = await client.query<{ privacy_notice: string }>("SELECT privacy_notice FROM public.site_enquiry_policies");
       return {
         profile: profile.rows.map((row) => row.ministry_name),
         settings: settings.rows.map((row) => row.setting_value),
         sermons: sermons.rows.map((row) => row.title),
+        enquiries: enquiries.rows.map((row) => ({ fullName: row.full_name, email: row.email })),
+        policies: policies.rows.map((row) => row.privacy_notice),
       };
     });
 
@@ -281,9 +304,13 @@ describe.skipIf(!enabled)("PostgreSQL tenant isolation (real roles and RLS)", ()
       profile: [alpha.ministryName],
       settings: [alpha.publicSiteSetting],
       sermons: [alpha.sermonTitle],
+      enquiries: [{ fullName: alpha.siteEnquiryName, email: expect.stringContaining("alpha-") }],
+      policies: [alpha.siteEnquiryPolicyNotice],
     });
     expect(JSON.stringify(content)).not.toContain(beta.ministryName);
     expect(JSON.stringify(content)).not.toContain(beta.sermonTitle);
+    expect(JSON.stringify(content)).not.toContain(beta.siteEnquiryName);
+    expect(JSON.stringify(content)).not.toContain(beta.siteEnquiryPolicyNotice);
 
     const entitlements = await resolverPool.query<{ tenant_id: string; enabled: boolean }>(
       `SELECT tenant_id, enabled FROM public.tenant_module_entitlements
@@ -301,6 +328,10 @@ describe.skipIf(!enabled)("PostgreSQL tenant isolation (real roles and RLS)", ()
     expect(result.rows[0]?.count).toBe("0");
     const ministryProfiles = await appPool.query<{ count: string }>("SELECT count(*)::text AS count FROM public.ministry_profiles");
     expect(ministryProfiles.rows[0]?.count).toBe("0");
+    const enquiries = await appPool.query<{ count: string }>("SELECT count(*)::text AS count FROM public.site_enquiries");
+    expect(enquiries.rows[0]?.count).toBe("0");
+    const policies = await appPool.query<{ count: string }>("SELECT count(*)::text AS count FROM public.site_enquiry_policies");
+    expect(policies.rows[0]?.count).toBe("0");
   });
 
   it("prevents tenant-id spoofing on writes and silently scopes updates to the current tenant", async () => {
@@ -319,21 +350,35 @@ describe.skipIf(!enabled)("PostgreSQL tenant isolation (real roles and RLS)", ()
     );
     expect(ministryUpdated.rowCount).toBe(0);
 
-    const client = await appPool.connect();
-    try {
-      await client.query("BEGIN");
-      await client.query("SELECT set_config('app.tenant_id', $1, true)", [alpha.tenantId]);
-      await expect(client.query(
-        `INSERT INTO public.carts (tenant_id, currency, guest_token_hash, expires_at)
-         VALUES ($1, 'KES', $2, now() + interval '1 day')`,
-        [beta.tenantId, "d".repeat(64)],
-      )).rejects.toMatchObject({ code: "42501" });
-      await client.query("ROLLBACK");
-    } catch (error) {
-      await client.query("ROLLBACK").catch(() => undefined);
-      throw error;
-    } finally {
-      client.release();
+    const spoofWrites: Array<{ query: string; values: unknown[] }> = [
+      {
+        query: `INSERT INTO public.carts (tenant_id, currency, guest_token_hash, expires_at)
+                VALUES ($1, 'KES', $2, now() + interval '1 day')`,
+        values: [beta.tenantId, "d".repeat(64)],
+      },
+      {
+        query: `INSERT INTO public.site_enquiries
+          (tenant_id, full_name, email, message, privacy_consent_at, privacy_notice_version, retention_expires_at)
+         VALUES ($1, 'Spoofed Tenant', 'spoof@example.test', 'A message long enough for the database check.', now(), '1.0.0', now() + interval '180 days')`,
+        values: [beta.tenantId],
+      },
+      {
+        query: `INSERT INTO public.site_enquiry_policies
+          (tenant_id, enabled, privacy_notice, privacy_notice_version, retention_days, published_at)
+         VALUES ($1, true, 'A complete tenant privacy notice of more than forty characters.', '1.0.0', 180, now())`,
+        values: [beta.tenantId],
+      },
+    ];
+    for (const spoofWrite of spoofWrites) {
+      const client = await appPool.connect();
+      try {
+        await client.query("BEGIN");
+        await client.query("SELECT set_config('app.tenant_id', $1, true)", [alpha.tenantId]);
+        await expect(client.query(spoofWrite.query, spoofWrite.values)).rejects.toMatchObject({ code: "42501" });
+      } finally {
+        await client.query("ROLLBACK").catch(() => undefined);
+        client.release();
+      }
     }
   });
 

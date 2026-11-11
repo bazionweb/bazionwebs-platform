@@ -200,6 +200,7 @@ export const WEBSITE_ENQUIRY_PRIVACY_NOTICE_VERSION = "1.0.0" as const;
 /** Public website enquiry payload. Tenant identity and retention policy are assigned by the API. */
 export const websiteEnquirySchema = z.object({
   formId: z.string().trim().min(1).max(80).default("contact"),
+  privacyNoticeVersion: z.string().max(40).regex(/^\d+\.\d+\.\d+$/).default(WEBSITE_ENQUIRY_PRIVACY_NOTICE_VERSION),
   fullName: z.string().trim().min(2).max(160),
   email: z.string().trim().email().max(254).or(z.literal("")).optional(),
   telephone: z.string().trim().max(30).regex(/^\+?[()\d\s.-]*$/)

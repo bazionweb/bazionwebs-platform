@@ -33,4 +33,14 @@ describe("Bazion organization role policy", () => {
     expect(rolePermissionMap.owner.order).toContain("refund");
     expect(rolePermissionMap.admin.order).not.toContain("refund");
   });
+
+  it("restricts enquiry access, export and deletion to tenant owners and admins", () => {
+    expect(rolePermissionMap.owner.enquiry).toEqual(["read", "export", "delete"]);
+    expect(rolePermissionMap.admin.enquiry).toEqual(["read", "export", "delete"]);
+    expect("enquiry" in rolePermissionMap.viewer).toBe(false);
+    expect("enquiry" in rolePermissionMap.contentEditor).toBe(false);
+    expect(rolePermissionMap.owner.enquiryPolicy).toEqual(["read", "update"]);
+    expect(rolePermissionMap.admin.enquiryPolicy).toEqual(["read", "update"]);
+    expect("enquiryPolicy" in rolePermissionMap.viewer).toBe(false);
+  });
 });

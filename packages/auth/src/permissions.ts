@@ -9,6 +9,8 @@ export const statement = {
   customer: ["read", "update"],
   store: ["read", "update"],
   churchprivate: ["read", "update"],
+  enquiry: ["read", "export", "delete"],
+  enquiryPolicy: ["read", "update"],
   analytics: ["read"],
 } as const;
 
@@ -23,6 +25,8 @@ export const owner = ac.newRole({
   customer: ["read", "update"],
   store: ["read", "update"],
   churchprivate: ["read", "update"],
+  enquiry: ["read", "export", "delete"],
+  enquiryPolicy: ["read", "update"],
   analytics: ["read"],
 });
 
@@ -34,6 +38,8 @@ export const admin = ac.newRole({
   customer: ["read", "update"],
   store: ["read", "update"],
   churchprivate: ["read", "update"],
+  enquiry: ["read", "export", "delete"],
+  enquiryPolicy: ["read", "update"],
   analytics: ["read"],
 });
 
@@ -80,6 +86,8 @@ export const rolePermissionMap = {
     customer: ["read", "update"],
     store: ["read", "update"],
     churchprivate: ["read", "update"],
+    enquiry: ["read", "export", "delete"],
+    enquiryPolicy: ["read", "update"],
     analytics: ["read"],
   },
   admin: {
@@ -90,6 +98,8 @@ export const rolePermissionMap = {
     customer: ["read", "update"],
     store: ["read", "update"],
     churchprivate: ["read", "update"],
+    enquiry: ["read", "export", "delete"],
+    enquiryPolicy: ["read", "update"],
     analytics: ["read"],
   },
   member: {},

@@ -72,12 +72,13 @@
     {
       "id": "forms-leads",
       "name": "Forms, lead capture and submissions",
-      "classification": "roadmap-capability",
+      "classification": "module",
       "sourcePath": [
-        "packages/forms"
+        "packages/forms",
+        "apps/api/src/modules/forms-leads"
       ],
-      "status": "planned",
-      "scope": "Schema-based forms, conditional logic, uploads, spam controls, consent and routing."
+      "status": "partial",
+      "scope": "Tenant-isolated website enquiries now have consent validation, protected paginated export and scheduled retention cleanup. Advanced forms, uploads, routing and a tenant inbox UI remain planned."
     },
     {
       "id": "contacts-crm",

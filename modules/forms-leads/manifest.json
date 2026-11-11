@@ -1,0 +1,38 @@
+{
+  "id": "forms-leads",
+  "name": "Forms and lead capture",
+  "version": "0.1.0",
+  "owner": "website",
+  "status": "partial",
+  "entrypoints": {
+    "domain": "packages/forms",
+    "api": "apps/api/src/modules/forms-leads"
+  },
+  "implementation": { "mode": "hybrid", "packageName": "@bazion/forms" },
+  "tenantModel": "tenant-owned",
+  "permissions": [
+    { "resource": "enquiry", "actions": ["read", "export", "delete"] },
+    { "resource": "enquiryPolicy", "actions": ["read", "update"] }
+  ],
+  "dependencies": ["platform-identity"],
+  "tables": [
+    { "name": "site_enquiries", "owner": "forms-leads", "tenantScoped": true, "rls": "forced", "migration": "0016_forms_leads_site_enquiries.sql" },
+    { "name": "site_enquiry_policies", "owner": "forms-leads", "tenantScoped": true, "rls": "forced", "migration": "0016_forms_leads_site_enquiries.sql" }
+  ],
+  "migrations": ["0016_forms_leads_site_enquiries.sql"],
+  "events": [],
+  "jobs": ["apps/api/scripts/expire-site-enquiries.ts"],
+  "tests": [
+    "packages/forms/src/index.test.ts",
+    "apps/api/src/modules/forms-leads/routes.test.ts",
+    "packages/database/src/tenant-isolation.integration.test.ts"
+  ],
+  "docs": ["packages/forms/README.md"],
+  "operations": {
+    "logs": true,
+    "metrics": false,
+    "retention": "Delete records after the configured retention deadline by scheduling @bazion/api db:expire-site-enquiries. The 180-day default must be reviewed for the tenant and its collection purpose.",
+    "recovery": "Export live tenant records through the protected paginated JSON endpoint before offboarding; restore from tenant-scoped backups only while the tenant has a valid processing purpose.",
+    "enableDisable": "Disable public form collection through the forms-leads entitlement; preserve authorized export and deletion controls until tenant data is exported or removed."
+  }
+}

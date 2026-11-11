@@ -267,9 +267,13 @@ async function inTenantTransaction<T>(
 }
 
 /** Resolve the tenant binding before every transaction; dedicated failures never fall back to shared data. */
-export async function withTenantTransaction<T>(tenantId: string, callback: (tx: TenantTransaction) => Promise<T>): Promise<T> {
+async function runTenantTransaction<T>(
+  tenantId: string,
+  callback: (tx: TenantTransaction) => Promise<T>,
+  allowInactiveTenant: boolean,
+): Promise<T> {
   const binding = await resolveBinding(tenantId);
-  if (binding.tenantStatus !== "active") throw routingError("TENANT_DATABASE_TENANT_INACTIVE");
+  if (!allowInactiveTenant && binding.tenantStatus !== "active") throw routingError("TENANT_DATABASE_TENANT_INACTIVE");
 
   if (binding.tier === "shared" && binding.state === "shared") {
     const staleDedicatedPool = dedicatedPools.get(tenantId);
@@ -288,6 +292,23 @@ export async function withTenantTransaction<T>(tenantId: string, callback: (tx: 
   } finally {
     lease.release();
   }
+}
+
+export async function withTenantTransaction<T>(tenantId: string, callback: (tx: TenantTransaction) => Promise<T>): Promise<T> {
+  return runTenantTransaction(tenantId, callback, false);
+}
+
+/** Maintenance is allowed to expire records after a tenant is suspended or disabled. */
+export async function withTenantMaintenanceTransaction<T>(tenantId: string, callback: (tx: TenantTransaction) => Promise<T>): Promise<T> {
+  return runTenantTransaction(tenantId, callback, true);
+}
+
+/** Enumerate tenant IDs for supervised all-tenant jobs; business work remains tenant-scoped. */
+export async function listTenantIdsForMaintenance(): Promise<string[]> {
+  const result = await tenantDirectoryPool.query<{ tenant_id: string }>(
+    "SELECT id::text AS tenant_id FROM public.tenants ORDER BY id",
+  );
+  return result.rows.map(({ tenant_id }) => tenant_id);
 }
 
 export async function closeTenantDatabaseResources(): Promise<void> {

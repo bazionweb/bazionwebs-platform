@@ -13,6 +13,7 @@ describe("SME website template", () => {
     expect(config.website.pages.map(({ id }) => id)).toContain("privacy");
     expect(config.business.services).toHaveLength(3);
     expect(config.business.privacyNotice).toBe("");
+    expect(config.business.privacyNoticeVersion).toBe("1.0.0");
   });
 
   it("rejects malformed services, invalid business details, and unknown configuration data", () => {

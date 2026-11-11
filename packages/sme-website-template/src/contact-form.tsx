@@ -2,11 +2,12 @@
 
 import { useId, useState, type FormEvent } from "react";
 import { TextAreaField, TextField } from "@bazion/ui";
-import { websiteEnquirySchema, websitePathSchema } from "@bazion/website-contracts";
+import { WEBSITE_ENQUIRY_PRIVACY_NOTICE_VERSION, websiteEnquirySchema, websitePathSchema } from "@bazion/website-contracts";
 
 export interface SmeContactFormProps {
   endpoint?: string;
   privacyNoticeHref?: string;
+  privacyNoticeVersion?: string;
 }
 
 const initialFields = { fullName: "", email: "", telephone: "", subject: "", message: "" };
@@ -18,7 +19,7 @@ export function getSmeEnquiryEndpoint(endpoint?: string): string {
   return parsed.success ? parsed.data : DEFAULT_ENQUIRY_ENDPOINT;
 }
 
-export function SmeContactForm({ endpoint, privacyNoticeHref = "/privacy" }: SmeContactFormProps) {
+export function SmeContactForm({ endpoint, privacyNoticeHref = "/privacy", privacyNoticeVersion = WEBSITE_ENQUIRY_PRIVACY_NOTICE_VERSION }: SmeContactFormProps) {
   const id = useId().replace(/:/g, "");
   const [fields, setFields] = useState(initialFields);
   const [privacyConsent, setPrivacyConsent] = useState(false);
@@ -38,7 +39,7 @@ export function SmeContactForm({ endpoint, privacyNoticeHref = "/privacy" }: Sme
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSubmissionError("");
-    const parsed = websiteEnquirySchema.safeParse({ ...fields, privacyConsent, companyWebsite });
+    const parsed = websiteEnquirySchema.safeParse({ ...fields, privacyConsent, companyWebsite, privacyNoticeVersion });
     if (!parsed.success) {
       setSubmissionError(parsed.error.issues[0]?.message ?? "Check the details and try again.");
       return;

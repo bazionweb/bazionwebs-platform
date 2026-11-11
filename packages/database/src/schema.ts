@@ -293,6 +293,41 @@ export const churchContactMessages = pgTable("church_contact_messages", {
   index("church_contact_msg_tenant_status_idx").on(table.tenantId, table.status),
 ]);
 
+/** Generic website contact submissions, separate from the Church/Ministry inbox. */
+export const siteEnquiries = pgTable("site_enquiries", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
+  formId: varchar("form_id", { length: 80 }).notNull().default("contact"),
+  fullName: varchar("full_name", { length: 160 }).notNull(),
+  email: varchar("email", { length: 254 }),
+  telephone: varchar("telephone", { length: 30 }),
+  subject: varchar("subject", { length: 200 }),
+  message: text("message").notNull(),
+  privacyConsentAt: timestamp("privacy_consent_at", { withTimezone: true }).notNull(),
+  privacyNoticeVersion: varchar("privacy_notice_version", { length: 40 }).notNull(),
+  retentionExpiresAt: timestamp("retention_expires_at", { withTimezone: true }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  check("site_enquiries_contact_ck", sql`${table.email} is not null or ${table.telephone} is not null`),
+  check("site_enquiries_retention_ck", sql`${table.retentionExpiresAt} > ${table.createdAt}`),
+  index("site_enquiries_tenant_created_idx").on(table.tenantId, table.createdAt, table.id),
+  index("site_enquiries_expiration_idx").on(table.tenantId, table.retentionExpiresAt),
+]);
+
+export const siteEnquiryPolicies = pgTable("site_enquiry_policies", {
+  tenantId: uuid("tenant_id").primaryKey().references(() => tenants.id),
+  enabled: boolean("enabled").notNull().default(false),
+  privacyNotice: text("privacy_notice").notNull().default(""),
+  privacyNoticeVersion: varchar("privacy_notice_version", { length: 40 }).notNull().default("1.0.0"),
+  retentionDays: integer("retention_days").notNull().default(180),
+  publishedAt: timestamp("published_at", { withTimezone: true }),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  check("site_enquiry_policies_retention_ck", sql`${table.retentionDays} between 1 and 3650`),
+  check("site_enquiry_policies_version_ck", sql`${table.privacyNoticeVersion} ~ '^[0-9]+\\.[0-9]+\\.[0-9]+$'`),
+  check("site_enquiry_policies_publish_ck", sql`not ${table.enabled} or (length(btrim(${table.privacyNotice})) >= 40 and ${table.publishedAt} is not null)`),
+]);
+
 export const churchPrayerRequests = pgTable("church_prayer_requests", {
   id: uuid("id").defaultRandom().primaryKey(),
   tenantId: uuid("tenant_id").notNull().references(() => tenants.id),

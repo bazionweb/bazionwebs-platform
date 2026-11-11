@@ -65,6 +65,15 @@
       "entitlementDependencies": ["platform-identity"]
     },
     {
+      "id": "forms-leads",
+      "displayName": "Forms and lead capture",
+      "description": "Public tenant website enquiry forms, protected lead access and retention.",
+      "defaultEnabled": false,
+      "required": false,
+      "tenantAssignable": true,
+      "entitlementDependencies": ["platform-identity"]
+    },
+    {
       "id": "church-ministry",
       "displayName": "Church & Ministry Platform",
       "description": "Tenant-scoped sermons, events, registrations, donations, enquiries and prayer requests; broader ministry operations remain in progress.",

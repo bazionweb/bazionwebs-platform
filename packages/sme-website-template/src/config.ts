@@ -1,5 +1,6 @@
 import { z } from "zod";
 import {
+  WEBSITE_ENQUIRY_PRIVACY_NOTICE_VERSION,
   WEBSITE_CONFIGURATION_VERSION,
   websiteConfigurationSchema,
 } from "@bazion/website-contracts";
@@ -24,6 +25,7 @@ export const smeBusinessContentSchema = z.object({
     address: z.string().trim().max(500).optional(),
   }).strict(),
   privacyNotice: z.string().trim().max(10000).default(""),
+  privacyNoticeVersion: z.string().regex(/^\d+\.\d+\.\d+$/).default(WEBSITE_ENQUIRY_PRIVACY_NOTICE_VERSION),
 }).strict();
 
 export const smeWebsiteTemplateConfigSchema = z.object({

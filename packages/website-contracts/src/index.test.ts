@@ -128,6 +128,7 @@ describe("public website enquiry contract", () => {
 
     expect(parsed.fullName).toBe("Amina Otieno");
     expect(parsed.formId).toBe("contact");
+    expect(parsed.privacyNoticeVersion).toBe(WEBSITE_ENQUIRY_PRIVACY_NOTICE_VERSION);
     expect(parsed.subject).toBe("Service question");
     expect(parsed.companyWebsite).toBe("");
     expect(WEBSITE_ENQUIRY_PRIVACY_NOTICE_VERSION).toBe("1.0.0");
@@ -135,6 +136,8 @@ describe("public website enquiry contract", () => {
 
   it("requires consent and one valid contact method, and constrains user input", () => {
     expect(websiteEnquirySchema.safeParse({ ...validEnquiry, privacyConsent: false }).success).toBe(false);
+    expect(websiteEnquirySchema.safeParse({ ...validEnquiry, privacyNoticeVersion: "not-versioned" }).success).toBe(false);
+    expect(websiteEnquirySchema.safeParse({ ...validEnquiry, privacyNoticeVersion: "1".repeat(41) }).success).toBe(false);
     expect(websiteEnquirySchema.safeParse({ ...validEnquiry, email: "", telephone: "" }).success).toBe(false);
     expect(websiteEnquirySchema.safeParse({ ...validEnquiry, email: "not-an-email" }).success).toBe(false);
     expect(websiteEnquirySchema.safeParse({ ...validEnquiry, email: "", telephone: "+1" }).success).toBe(false);

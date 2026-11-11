@@ -146,7 +146,11 @@ export function SmeContactPage({ config, endpoint, privacyNoticeHref = "/privacy
               {config.business.contact.address && <p><strong>Address</strong><br />{config.business.contact.address}</p>}
             </aside>
             {canCollectEnquiries
-              ? <SmeContactForm {...(endpoint ? { endpoint } : {})} privacyNoticeHref={privacyNoticeHref} />
+              ? <SmeContactForm
+                  {...(endpoint ? { endpoint } : {})}
+                  privacyNoticeHref={privacyNoticeHref}
+                  privacyNoticeVersion={config.business.privacyNoticeVersion}
+                />
               : <p className="sme-contact-unavailable" role="status">Enquiries are temporarily unavailable. Please contact the business using the details provided while its privacy notice is being prepared.</p>}
           </Grid>
         </Container>

@@ -10,6 +10,7 @@ import { commerceAdminRoutes } from "./modules/commerce/admin-routes.js";
 import { authRoutes } from "./modules/auth/routes.js";
 import { adminRoutes } from "./modules/admin/routes.js";
 import { churchRoutes } from "./modules/church/routes.js";
+import { formsLeadsRoutes } from "./modules/forms-leads/routes.js";
 
 const MEDIA_UPLOAD_LIMIT_BYTES = 8 * 1024 * 1024;
 
@@ -55,7 +56,7 @@ export async function buildApp(config: AppConfig) {
         .catch((error: Error) => callback(error, false));
     },
     credentials: true,
-    methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization", "Idempotency-Key", "X-Donation-Status-Token", "X-Payment-Status-Token", "X-Requested-With"],
   });
   await app.register(rateLimit, { max: 120, timeWindow: "1 minute" });
@@ -103,6 +104,7 @@ export async function buildApp(config: AppConfig) {
   await app.register(commerceRoutes, { prefix: "/v1", config });
   await app.register(commerceAdminRoutes, { prefix: "/v1" });
   await app.register(churchRoutes, { prefix: "/v1", config });
+  await app.register(formsLeadsRoutes, { prefix: "/v1", config });
 
   app.setErrorHandler((error, request, reply) => {
     const candidate = error as { statusCode?: unknown; code?: unknown };

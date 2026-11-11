@@ -78,6 +78,8 @@ export type TenantPermissionRequest = {
   customer?: Array<"read" | "update">;
   store?: Array<"read" | "update">;
   churchprivate?: Array<"read" | "update">;
+  enquiry?: Array<"read" | "export" | "delete">;
+  enquiryPolicy?: Array<"read" | "update">;
   analytics?: Array<"read">;
   organization?: Array<"update">;
   member?: Array<"create" | "update" | "delete">;
