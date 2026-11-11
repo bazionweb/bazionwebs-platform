@@ -186,7 +186,7 @@ async function afterCreateOrganization({ organization: org }: {
 
     await tenantProvisionerPool.query(
       `INSERT INTO public.ministry_settings (tenant_id, setting_key, setting_value)
-       VALUES ($1, 'public_site', '{"theme":{"primaryColor":"#1a365d","secondaryColor":"#d69e2e"},"pages":{"sermons":true,"events":true,"give":true,"ministries":true,"about":true,"contact":true}}')
+       VALUES ($1, 'public_site', '{"theme":{"primaryColor":"#193a31","secondaryColor":"#315e50","accentColor":"#8b5b29"},"pages":{"sermons":true,"events":true,"give":true,"ministries":true,"about":true,"contact":true}}')
        ON CONFLICT (tenant_id, setting_key) DO NOTHING`,
       [tenantId],
     ).catch(() => {});
