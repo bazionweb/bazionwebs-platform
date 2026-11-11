@@ -143,6 +143,7 @@ export class PostgresHostingReconciliationStore implements HostingReconciliation
       const changed = row.state !== input.state;
       const updated = await client.query(
         "UPDATE public.tenant_hosting_deployments SET state=$3," +
+        "provider_resource_id=CASE WHEN $3='removed' THEN NULL ELSE provider_resource_id END," +
         "error_code=CASE WHEN $3='failed' THEN error_code ELSE NULL END," +
         "last_deployed_at=COALESCE($4::timestamptz,last_deployed_at)," +
         "last_inspected_at=now(),next_reconcile_at=now()+($5::integer*interval '1 second')," +
