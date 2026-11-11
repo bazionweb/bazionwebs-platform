@@ -16,7 +16,7 @@ const reference: TenantHostingDeploymentReference = {
 
 function setup(beginResult?: BeginHostingProvisionResult) {
   const store: HostingProvisioningStore = {
-    begin: vi.fn(async () => beginResult ?? ({
+    begin: vi.fn(async (_input: Parameters<HostingProvisioningStore["begin"]>[0]): Promise<BeginHostingProvisionResult> => beginResult ?? ({
       kind: "claimed", deploymentId: "deployment-1", tenantSlug: "acme",
       leaseToken: "lease-1", attemptCount: 1, reference: null,
     })),
@@ -27,7 +27,7 @@ function setup(beginResult?: BeginHostingProvisionResult) {
   const provider: TenantHostingProvider = {
     provision: vi.fn(async () => reference),
     deploy: vi.fn(async () => undefined),
-    inspect: vi.fn(async () => ({ reference, state: "running", lastDeployedAt: null })),
+    inspect: vi.fn(async () => ({ reference, state: "running" as const, lastDeployedAt: null })),
     stop: vi.fn(async () => undefined),
     remove: vi.fn(async () => undefined),
   };
@@ -79,7 +79,7 @@ describe("TenantHostingProvisioningService", () => {
   });
 
   it("returns an existing running deployment without contacting the provider", async () => {
-    const { service, provider } = setup({ kind: "already_running", reference });
+    const { service, provider } = setup({ kind: "already_running", reference, attemptCount: 1 });
     const result = await service.provision(input);
 
     expect(provider.provision).not.toHaveBeenCalled();
