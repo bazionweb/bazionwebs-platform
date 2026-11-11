@@ -23,6 +23,9 @@ interface DokployResource {
   status?: string;
   updatedAt?: string;
   createdAt?: string;
+  name?: string;
+  appName?: string;
+  environmentId?: string;
 }
 
 function resourceId(payload: unknown): string {
@@ -163,6 +166,12 @@ export class DokployComposeProvider implements TenantHostingProvider {
       reference,
       state: deploymentState(payload.composeStatus ?? payload.status),
       lastDeployedAt: payload.updatedAt ?? null,
+      ...(typeof payload.name === "string" && payload.name.trim()
+        ? { providerResourceName: payload.name }
+        : {}),
+      ...(typeof payload.environmentId === "string" && payload.environmentId.trim()
+        ? { providerEnvironmentId: payload.environmentId }
+        : {}),
     };
   }
 
