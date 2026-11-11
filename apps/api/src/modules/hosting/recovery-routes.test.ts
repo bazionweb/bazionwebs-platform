@@ -75,8 +75,10 @@ describe("operator-assisted hosting recovery", () => {
         id: deploymentId, provider: "dokploy", template: "node-nextjs", state: "unknown",
         provider_resource_id: null, created_at: createdAt, lease_expires_at: null,
       }], rowCount: 1 })
+      .mockResolvedValueOnce({ rows: [], rowCount: null }) // BEGIN
       .mockResolvedValueOnce({ rows: [{ id: deploymentId }], rowCount: 1 })
-      .mockResolvedValueOnce({ rows: [], rowCount: 1 });
+      .mockResolvedValueOnce({ rows: [], rowCount: 1 }) // append event
+      .mockResolvedValueOnce({ rows: [], rowCount: null }); // COMMIT
 
     const runtime = makeRuntime();
     const app = await makeApp(runtime);
