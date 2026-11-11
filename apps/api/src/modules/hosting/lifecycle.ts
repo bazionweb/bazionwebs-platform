@@ -27,6 +27,7 @@ export interface TenantHostingLifecycleResult {
   already: boolean;
 }
 export interface HostingLifecycleClaim {
+  deploymentId: string;
   leaseToken: string;
   reference: TenantHostingDeploymentReference;
   previousState: TenantHostingDeploymentState;
@@ -147,6 +148,7 @@ export class PostgresHostingLifecycleStore implements HostingLifecycleStore {
       return {
         kind: "claimed",
         claim: {
+          deploymentId: row.id,
           leaseToken,
           previousState: row.state,
           reference: {
@@ -183,7 +185,7 @@ export class PostgresHostingLifecycleStore implements HostingLifecycleStore {
         "last_inspected_at=CASE WHEN $4 THEN last_inspected_at ELSE now() END," +
         "next_reconcile_at=now()+interval '30 seconds',lease_token=NULL,lease_expires_at=NULL,updated_at=now() " +
         "WHERE id=$1 AND lease_token=$2 RETURNING tenant_id::text,state",
-        [input.claim.reference.resourceId === "" ? "" : input.claim.reference.resourceId, input.claim.leaseToken,
+        [input.claim.deploymentId, input.claim.leaseToken,
           isRemoved ? "removed" : input.state, isRemoved, input.lastDeployedAt],
       );
       const row = result.rows[0];
@@ -193,7 +195,7 @@ export class PostgresHostingLifecycleStore implements HostingLifecycleStore {
         "INSERT INTO public.tenant_hosting_deployment_events " +
         "(deployment_id,tenant_id,event_type,from_state,to_state,actor_type,actor_id,request_id,metadata) " +
         "VALUES ($1,$2,$3,$4,$5,'user',$6,$7,$8::jsonb)",
-        [input.claim.reference.resourceId === "" ? "" : undefined, row.tenant_id, eventType,
+        [input.claim.deploymentId, row.tenant_id, eventType,
           input.claim.previousState, row.state, input.actorId, input.requestId ?? null,
           JSON.stringify({ action: input.action, confirmed: input.confirmed, provider: input.claim.reference.provider })],
       );
@@ -219,7 +221,7 @@ export class PostgresHostingLifecycleStore implements HostingLifecycleStore {
         "UPDATE public.tenant_hosting_deployments SET state='unknown',error_code=$3," +
         "lease_token=NULL,lease_expires_at=NULL,last_inspected_at=now(),next_reconcile_at=now(),updated_at=now() " +
         "WHERE id=$1 AND lease_token=$2 RETURNING tenant_id::text",
-        [input.claim.reference.resourceId === "" ? "" : undefined, input.claim.leaseToken, input.errorCode],
+        [input.claim.deploymentId, input.claim.leaseToken, input.errorCode],
       );
       const tenantId = result.rows[0]?.tenant_id;
       if (tenantId) {
@@ -227,7 +229,7 @@ export class PostgresHostingLifecycleStore implements HostingLifecycleStore {
           "INSERT INTO public.tenant_hosting_deployment_events " +
           "(deployment_id,tenant_id,event_type,from_state,to_state,actor_type,actor_id,request_id,metadata) " +
           "VALUES ($1,$2,$3,$4,'unknown','user',$5,$6,$7::jsonb)",
-          [input.claim.reference.resourceId === "" ? "" : undefined, tenantId,
+          [input.claim.deploymentId, tenantId,
             "hosting.lifecycle." + input.action + ".failed", input.claim.previousState,
             input.actorId, input.requestId ?? null, JSON.stringify({ errorCode: input.errorCode })],
         );
