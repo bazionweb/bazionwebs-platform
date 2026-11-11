@@ -114,7 +114,7 @@ export async function hostingRoutes(
           outcome: "succeeded",
           metadata: {
             template: parsed.data.template,
-            provider: options.runtime.providerId,
+            provider: runtime.providerId,
             templateVersion: loaded.templateVersion,
             state: result.state,
             attemptCount: result.attemptCount,
