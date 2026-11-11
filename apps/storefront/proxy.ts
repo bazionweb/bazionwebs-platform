@@ -21,11 +21,24 @@ export function proxy(request: NextRequest) {
   requestHeaders.set("x-forwarded-host", request.nextUrl.host);
   requestHeaders.set("x-forwarded-proto", request.nextUrl.protocol.replace(/:$/, ""));
 
-  return NextResponse.next({
+  // Forward explicit tenant override if provided via query param or cookie (for local dev / workspace switching)
+  const tenantParam = request.nextUrl.searchParams.get("tenant") || request.cookies.get("bazion_tenant")?.value;
+  if (tenantParam) {
+    requestHeaders.set("x-bazion-tenant", tenantParam);
+  }
+
+  const response = NextResponse.next({
     request: { headers: requestHeaders },
   });
+
+  const explicitQueryTenant = request.nextUrl.searchParams.get("tenant");
+  if (explicitQueryTenant) {
+    response.cookies.set("bazion_tenant", explicitQueryTenant, { path: "/", sameSite: "lax" });
+  }
+
+  return response;
 }
 
 export const config = {
-  matcher: ["/v1/:path*", "/api/auth/:path*"],
+  matcher: ["/((?!_next/static|_next/image|images|favicon.ico).*)"],
 };

@@ -23,11 +23,11 @@ export async function requirePlatformOwner(): Promise<PlatformIdentity> {
       signal: AbortSignal.timeout(5_000),
     });
   } catch {
-    throw new Error("Could not verify platform access. Check the identity API and try again.");
+    redirect("/login?reason=identity-unavailable");
   }
 
   if (response.status === 401) redirect("/login?callbackURL=%2F");
-  if (!response.ok) throw new Error("Could not verify platform access. Try again shortly.");
+  if (!response.ok) redirect("/login?reason=identity-unavailable");
 
   const identity = await response.json() as PlatformIdentity;
   if (identity.platformRole !== "platform_owner") redirect("/login?reason=platform-owner-required");
@@ -43,6 +43,7 @@ export type Tenant = {
   created_at: string;
   suspended_at?: string | null;
   closed_at?: string | null;
+  auth_organization_id?: string | null;
 };
 
 export async function platformFetch<T>(path: string): Promise<{ data: T | null; status: number }> {

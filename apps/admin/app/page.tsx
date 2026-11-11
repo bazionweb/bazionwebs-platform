@@ -161,9 +161,8 @@ export default async function Home({
                   </thead>
                   <tbody>
                     {filtered.map((tenant) => {
-                      const isGmfc = tenant.slug === "global-mission-fc";
-                      const clientUrl = isGmfc ? "http://localhost:3100" : undefined;
-                      const adminUrl = isGmfc ? "http://localhost:3100/admin" : undefined;
+                      const clientUrl = `http://localhost:3100/?tenant=${tenant.slug}`;
+                      const adminUrl = `http://localhost:3100/workspace?select=${tenant.auth_organization_id ?? ""}&workspace=${tenant.slug}&redirect=/admin`;
 
                       return (
                         <tr key={tenant.id}>

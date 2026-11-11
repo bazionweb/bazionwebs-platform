@@ -59,20 +59,24 @@ export default async function TenantDetail({ params }: { params: Promise<{ tenan
         <Link href={`/troubleshoot?tenantId=${tenant.id}`} className="secondary" style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
           🛠️ Troubleshoot Workspace
         </Link>
-        {tenant.slug === "global-mission-fc" ? (
-          <>
-            <a href="http://localhost:3100" target="_blank" rel="noreferrer" className="secondary">
-              Open Storefront ↗
-            </a>
-            <a href="http://localhost:3100/admin" target="_blank" rel="noreferrer" className="primary">
-              Open Tenant Desk ↗
-            </a>
-          </>
-        ) : (
-          <a href={`http://${tenant.slug}.localhost:3000`} target="_blank" rel="noreferrer" className="secondary">
-            Visit Storefront ↗
-          </a>
-        )}
+        <a
+          href={`http://localhost:3100/?tenant=${tenant.slug}`}
+          target="_blank"
+          rel="noreferrer"
+          className="secondary"
+          title={`Visit ${tenant.name} public website`}
+        >
+          Open Storefront ↗
+        </a>
+        <a
+          href={`http://localhost:3100/workspace?select=${tenant.auth_organization_id ?? ""}&workspace=${tenant.slug}&redirect=/admin`}
+          target="_blank"
+          rel="noreferrer"
+          className="primary"
+          title={`Open ${tenant.name} tenant administration desk`}
+        >
+          Open Tenant Desk ↗
+        </a>
       </div>
     </div>
     <section className="detail-grid">

@@ -65,14 +65,39 @@ export function WorkspacePicker() {
       if (currentIdentity.organization?.id !== organizationId || currentIdentity.tenant?.status !== "active") {
         throw new Error("This organization is not linked to an active tenant. Contact Bazion support.");
       }
+      if (currentIdentity.tenant?.slug) {
+        document.cookie = `bazion_tenant=${encodeURIComponent(currentIdentity.tenant.slug)}; path=/; samesite=lax`;
+      }
       setIdentity(currentIdentity);
-      window.location.assign("/admin");
+      const redirectTarget = new URLSearchParams(window.location.search).get("redirect") || "/admin";
+      window.location.assign(redirectTarget);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Workspace selection failed.");
     } finally {
       setBusyId(null);
     }
   }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const selectId = params.get("select");
+    const selectSlug = params.get("workspace");
+    if (!selectId && !selectSlug) return;
+    if (organizations.isPending || organizationList.length === 0 || busyId) return;
+
+    const targetOrg = organizationList.find(
+      (org) => (selectId && org.id === selectId) || (selectSlug && org.slug === selectSlug)
+    );
+    if (!targetOrg) return;
+
+    if (activeOrganization.data?.id === targetOrg.id && identity?.tenant?.status === "active") {
+      const redirectTarget = params.get("redirect") || "/admin";
+      window.location.assign(redirectTarget);
+      return;
+    }
+
+    void selectWorkspace(targetOrg.id);
+  }, [organizations.isPending, organizationList, activeOrganization.data?.id, identity, busyId, selectWorkspace]);
 
   useEffect(() => {
     if (!session.data || !identity || identity.platformRole === "platform_owner" || organizations.isPending || organizationList.length !== 1 || autoRedirectStarted.current) return;

@@ -160,6 +160,11 @@ export async function churchRoutes(app: FastifyInstance, options: RouteOptions) 
       }),
   };
 
+  const tenantForRequest = (request: FastifyRequest) => {
+    const explicit = request.headers["x-bazion-tenant"] as string | undefined;
+    return resolveTenantId(request.hostname, config, explicit);
+  };
+
   // ─────────────────────────────────────────────────────────────────────────────
   // PUBLIC CHURCH ROUTES
   // ─────────────────────────────────────────────────────────────────────────────
@@ -167,7 +172,7 @@ export async function churchRoutes(app: FastifyInstance, options: RouteOptions) 
   // Local development media is served through the same tenant host and public API rewrite.
   // In production, image URLs point to the configured public storage/CDN domain.
   app.get<{ Params: { "*": string } }>("/public/church/media/*", async (request, reply) => {
-    const tenantId = await resolveTenantId(request.hostname, config);
+    const tenantId = await tenantForRequest(request);
     const key = request.params["*"];
     if (!key.startsWith(`${tenantId}/`)) return reply.code(404).send({ error: "MEDIA_NOT_FOUND" });
     const stored = await storage.getObject({ tenantId, key });
@@ -182,7 +187,7 @@ export async function churchRoutes(app: FastifyInstance, options: RouteOptions) 
 
   // GET /v1/public/church/site
   app.get("/public/church/site", async (request, reply) => {
-    const tenantId = await resolveTenantId(request.hostname, config);
+    const tenantId = await tenantForRequest(request);
     await assertChurchEnabled(tenantId);
 
     return withTenantTransaction(tenantId, async (tx) => {
@@ -225,7 +230,7 @@ export async function churchRoutes(app: FastifyInstance, options: RouteOptions) 
   app.get<{
       Querystring: { search?: string; category?: string; limit?: string; offset?: string };
   }>("/public/church/sermons", async (request, reply) => {
-    const tenantId = await resolveTenantId(request.hostname, config);
+    const tenantId = await tenantForRequest(request);
     await assertChurchEnabled(tenantId);
 
     const limit = Math.min(Math.max(Number.parseInt(request.query.limit ?? "20", 10) || 20, 1), 100);
@@ -272,7 +277,7 @@ export async function churchRoutes(app: FastifyInstance, options: RouteOptions) 
 
   // GET /v1/public/church/sermons/:slug
   app.get<{ Params: { slug: string } }>("/public/church/sermons/:slug", async (request, reply) => {
-    const tenantId = await resolveTenantId(request.hostname, config);
+    const tenantId = await tenantForRequest(request);
     await assertChurchEnabled(tenantId);
 
     return withTenantTransaction(tenantId, async (tx) => {
@@ -313,7 +318,7 @@ export async function churchRoutes(app: FastifyInstance, options: RouteOptions) 
   app.get<{ Querystring: { filter?: "upcoming" | "past" | "all"; limit?: string } }>(
     "/public/church/events",
     async (request, reply) => {
-      const tenantId = await resolveTenantId(request.hostname, config);
+      const tenantId = await tenantForRequest(request);
       await assertChurchEnabled(tenantId);
 
       const limit = Math.min(Math.max(Number.parseInt(request.query.limit ?? "20", 10) || 20, 1), 50);
@@ -343,7 +348,7 @@ export async function churchRoutes(app: FastifyInstance, options: RouteOptions) 
 
   // GET /v1/public/church/events/:slug
   app.get<{ Params: { slug: string } }>("/public/church/events/:slug", async (request, reply) => {
-    const tenantId = await resolveTenantId(request.hostname, config);
+    const tenantId = await tenantForRequest(request);
     await assertChurchEnabled(tenantId);
 
     return withTenantTransaction(tenantId, async (tx) => {
@@ -369,7 +374,7 @@ export async function churchRoutes(app: FastifyInstance, options: RouteOptions) 
   app.post<{ Params: { eventId: string } }>(
     "/public/church/events/:eventId/register",
     async (request, reply) => {
-      const tenantId = await resolveTenantId(request.hostname, config);
+      const tenantId = await tenantForRequest(request);
       await assertChurchEnabled(tenantId);
 
       const parsed = eventRegistrationSchema.safeParse(request.body);
@@ -441,7 +446,7 @@ export async function churchRoutes(app: FastifyInstance, options: RouteOptions) 
 
   // GET /v1/public/church/campaigns
   app.get("/public/church/campaigns", async (request, reply) => {
-    const tenantId = await resolveTenantId(request.hostname, config);
+    const tenantId = await tenantForRequest(request);
     await assertChurchEnabled(tenantId);
 
     return withTenantTransaction(tenantId, async (tx) => {
@@ -462,7 +467,7 @@ export async function churchRoutes(app: FastifyInstance, options: RouteOptions) 
 
   // POST /v1/public/church/donations/mpesa-stk
   app.post("/public/church/donations/mpesa-stk", async (request, reply) => {
-    const tenantId = await resolveTenantId(request.hostname, config);
+    const tenantId = await tenantForRequest(request);
     await assertChurchEnabled(tenantId);
     if (!daraja) {
       return reply.code(503).send({ error: "PAYMENT_PROVIDER_UNAVAILABLE", message: "Online M-Pesa giving is not configured. Use the displayed Paybill instructions instead." });
@@ -688,7 +693,7 @@ export async function churchRoutes(app: FastifyInstance, options: RouteOptions) 
 
   // Status lookup uses a client-held capability token and returns no donor data.
   app.get("/public/church/donations/status", async (request, reply) => {
-    const tenantId = await resolveTenantId(request.hostname, config);
+    const tenantId = await tenantForRequest(request);
     await assertChurchEnabled(tenantId);
     const token = request.headers["x-donation-status-token"];
     if (typeof token !== "string" || !/^[A-Za-z0-9_-]{32,160}$/.test(token)) return reply.code(400).send({ error: "INVALID_STATUS_TOKEN" });
@@ -713,7 +718,7 @@ export async function churchRoutes(app: FastifyInstance, options: RouteOptions) 
 
   // POST /v1/public/church/contact
   app.post("/public/church/contact", async (request, reply) => {
-    const tenantId = await resolveTenantId(request.hostname, config);
+    const tenantId = await tenantForRequest(request);
     await assertChurchEnabled(tenantId);
 
     const parsed = contactMessageSchema.safeParse(request.body);
@@ -743,7 +748,7 @@ export async function churchRoutes(app: FastifyInstance, options: RouteOptions) 
 
   // POST /v1/public/church/prayer-requests
   app.post("/public/church/prayer-requests", async (request, reply) => {
-    const tenantId = await resolveTenantId(request.hostname, config);
+    const tenantId = await tenantForRequest(request);
     await assertChurchEnabled(tenantId);
 
     const parsed = prayerRequestSchema.safeParse(request.body);
@@ -772,7 +777,7 @@ export async function churchRoutes(app: FastifyInstance, options: RouteOptions) 
 
   // POST /v1/public/church/newsletter
   app.post("/public/church/newsletter", async (request, reply) => {
-    const tenantId = await resolveTenantId(request.hostname, config);
+    const tenantId = await tenantForRequest(request);
     await assertChurchEnabled(tenantId);
 
     const parsed = newsletterSubscribeSchema.safeParse(request.body);

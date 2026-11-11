@@ -161,16 +161,49 @@ async function afterCreateOrganization({ organization: org }: {
   if (!organizationId || !slug || !name) {
     throw new Error("Organization was created without the required Bazion tenant mapping fields.");
   }
-  const result = await tenantProvisionerPool.query(
+  const result = await tenantProvisionerPool.query<{ id: string }>(
     `UPDATE public.tenants
         SET auth_organization_id = $1, name = $2, status = 'active', updated_at = now()
       WHERE slug = $3
         AND status IN ('provisioning', 'active')
-        AND (auth_organization_id IS NULL OR auth_organization_id = $1)`,
+        AND (auth_organization_id IS NULL OR auth_organization_id = $1)
+      RETURNING id`,
     [organizationId, name, slug],
   );
   if (result.rowCount !== 1) {
     throw new Error("Organization was created but its Bazion tenant mapping needs reconciliation.");
+  }
+
+  const tenantId = result.rows[0]?.id;
+  if (tenantId) {
+    // Seed baseline profile, settings, module entitlements, and local dev domain
+    await tenantProvisionerPool.query(
+      `INSERT INTO public.ministry_profiles (tenant_id, ministry_name, description, vision, mission, outreach, telephone_numbers, social_links)
+       VALUES ($1, $2, $3, 'To love God and serve people.', 'Preach truth, hope and love.', 'Community outreach and fellowship.', '[]'::jsonb, '{}'::jsonb)
+       ON CONFLICT (tenant_id) DO NOTHING`,
+      [tenantId, name, `Welcome to ${name}`],
+    ).catch(() => {});
+
+    await tenantProvisionerPool.query(
+      `INSERT INTO public.ministry_settings (tenant_id, setting_key, setting_value)
+       VALUES ($1, 'public_site', '{"theme":{"primaryColor":"#1a365d","secondaryColor":"#d69e2e"},"pages":{"sermons":true,"events":true,"give":true,"ministries":true,"about":true,"contact":true}}')
+       ON CONFLICT (tenant_id, setting_key) DO NOTHING`,
+      [tenantId],
+    ).catch(() => {});
+
+    await tenantProvisionerPool.query(
+      `INSERT INTO public.tenant_module_entitlements (tenant_id, module_id, enabled, updated_by)
+       VALUES ($1, 'church-ministry', true, 'system:provisioning')
+       ON CONFLICT (tenant_id, module_id) DO NOTHING`,
+      [tenantId],
+    ).catch(() => {});
+
+    await tenantProvisionerPool.query(
+      `INSERT INTO public.tenant_domains (tenant_id, hostname, status, verified_at)
+       VALUES ($1, $2, 'active', now())
+       ON CONFLICT (hostname) DO NOTHING`,
+      [tenantId, `${slug}.localhost`],
+    ).catch(() => {});
   }
 }
 
@@ -332,6 +365,23 @@ export async function resolvePublicTenantByHostname(hostname: string) {
       WHERE d.hostname = $1 AND t.status = 'active'
       LIMIT 1`,
     [host],
+  );
+  return result.rows[0] ?? null;
+}
+
+export async function resolvePublicTenantBySlug(slug: string) {
+  const cleanSlug = slug.trim().toLowerCase();
+  const result = await tenantResolverPool.query<{
+    id: string;
+    slug: string;
+    name: string;
+    default_currency: string;
+  }>(
+    `SELECT t.id, t.slug, t.name, t.default_currency
+       FROM public.tenants t
+      WHERE t.slug = $1 AND t.status = 'active'
+      LIMIT 1`,
+    [cleanSlug],
   );
   return result.rows[0] ?? null;
 }
