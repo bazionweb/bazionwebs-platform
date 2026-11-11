@@ -89,3 +89,43 @@ export function assertTenantMatch(expectedTenantId: string, actualTenantId: stri
     throw new Error("TENANT_CONTEXT_MISMATCH");
   }
 }
+
+export type TenantHostingTemplate = "wordpress" | "node-nextjs" | "ecommerce";
+export type TenantHostingDeploymentState = "provisioning" | "ready" | "deploying" | "running" | "stopped" | "failed" | "unknown";
+
+export interface TenantHostingDeploymentReference {
+  provider: string;
+  resourceId: string;
+  tenantId: TenantId;
+  createdAt: string;
+}
+
+export interface TenantHostingDeployment {
+  reference: TenantHostingDeploymentReference;
+  state: TenantHostingDeploymentState;
+  lastDeployedAt: string | null;
+}
+
+/**
+ * Provider-neutral hosting port. Secret values are resolved at deployment time and
+ * must never be copied into tenant metadata or returned from this interface.
+ */
+export interface TenantHostingProvider {
+  provision(input: {
+    tenantId: TenantId;
+    tenantSlug: string;
+    template: TenantHostingTemplate;
+    composeFile: string;
+    environmentSecretRef: string;
+  }): Promise<TenantHostingDeploymentReference>;
+  deploy(reference: TenantHostingDeploymentReference): Promise<void>;
+  inspect(reference: TenantHostingDeploymentReference): Promise<TenantHostingDeployment>;
+  stop(reference: TenantHostingDeploymentReference): Promise<void>;
+  /** Removes the provider resource but preserves persistent volumes by default. */
+  remove(reference: TenantHostingDeploymentReference): Promise<void>;
+}
+
+/** Resolves environment variables from a managed secret store just in time. */
+export interface TenantHostingSecretResolver {
+  resolveEnvironment(reference: string): Promise<Readonly<Record<string, string>>>;
+}
