@@ -105,6 +105,7 @@ describe("PostgresHostingReconciliationStore", () => {
     expect(result).toEqual({ changed: true, state: "running" });
     expect(statements.some((statement) => statement.includes("lease_token=NULL,lease_expires_at=NULL"))).toBe(true);
     expect(statements.some((statement) => statement.includes("hosting.reconciliation.state_changed"))).toBe(true);
+    expect(statements.some((statement) => statement.includes("provider_resource_id=CASE WHEN $3='removed' THEN NULL"))).toBe(true);
     const eventMetadata = parameters.find((values) =>
       typeof values[5] === "string" && values[5].includes('"providerState":"running"'),
     )?.[5];
