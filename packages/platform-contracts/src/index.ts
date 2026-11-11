@@ -127,7 +127,6 @@ export interface TenantHostingProvider {
   stop(reference: TenantHostingDeploymentReference): Promise<void>;
   redeploy(reference: TenantHostingDeploymentReference): Promise<void>;
   inspect(reference: TenantHostingDeploymentReference): Promise<TenantHostingDeployment>;
-  stop(reference: TenantHostingDeploymentReference): Promise<void>;
   /** Removes the provider resource but preserves persistent volumes by default. */
   remove(reference: TenantHostingDeploymentReference): Promise<void>;
 }
