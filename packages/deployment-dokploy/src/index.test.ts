@@ -169,9 +169,9 @@ describe("DokployComposeProvider", () => {
     expect(result.state).toBe("stopped");
   });
 
-  it("does not retry non-transient read errors", async () => {
+  it("reports a missing compose resource as removed without retrying", async () => {
     const { provider, fetch } = setup(() => new Response("not found", { status: 404 }));
-    await expect(provider.inspect(reference)).rejects.toThrow("DOKPLOY_HTTP_404");
+    await expect(provider.inspect(reference)).resolves.toMatchObject({ state: "removed", reference });
     expect(fetch).toHaveBeenCalledTimes(1);
   });
 
