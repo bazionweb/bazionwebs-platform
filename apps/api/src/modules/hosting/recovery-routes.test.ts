@@ -35,7 +35,10 @@ function makeRuntime(): HostingProvisioningRuntime {
       reference: { provider: "dokploy", resourceId, tenantId: tenantId as never, createdAt: createdAt.toISOString() },
       state: "deploying" as const, attemptCount: 1, reused: false,
     })),
-    inspect: vi.fn(async (reference) => ({ reference, state: "running" as const, lastDeployedAt: "2026-11-11T08:05:00.000Z" })),
+    inspect: vi.fn(async (reference) => ({
+      reference, state: "running" as const, lastDeployedAt: "2026-11-11T08:05:00.000Z",
+      providerResourceName: "alpha-node-nextjs",
+    })),
   };
 }
 
