@@ -39,6 +39,91 @@ export async function hostingRoutes(
   app: FastifyInstance,
   options: { runtime: HostingProvisioningRuntime | null },
 ): Promise<void> {
+  app.get<{ Params: { tenantId: string } }>(
+    "/admin/platform/tenants/:tenantId/hosting",
+    async (request, reply) => {
+      const tenantId = request.params.tenantId.trim();
+      if (!tenantIdPattern.test(tenantId)) return reply.code(400).send({ error: "INVALID_INPUT" });
+
+      // Hosting inventory is part of the global control plane and is restricted
+      // to the same platform-owner role as resource creation.
+      await requirePlatformRole(request.headers, ["platform_owner"]);
+      const tenant = await getPlatformTenant(tenantId);
+      if (!tenant) return reply.code(404).send({ error: "TENANT_NOT_FOUND" });
+
+      const [deployments, events] = await Promise.all([
+        pool.query<{
+          id: string; provider: string; template: string; template_version: string;
+          provider_resource_id: string | null; state: string; attempt_count: number;
+          error_code: string | null; last_deployed_at: Date | string | null;
+          created_at: Date | string; updated_at: Date | string;
+        }>(
+          "SELECT id::text,provider,template,template_version,provider_resource_id,state,attempt_count," +
+          "error_code,last_deployed_at,created_at,updated_at " +
+          "FROM public.tenant_hosting_deployments WHERE tenant_id=$1 ORDER BY created_at DESC LIMIT 20",
+          [tenantId],
+        ),
+        pool.query<{
+          id: string; deployment_id: string; event_type: string; from_state: string | null;
+          to_state: string | null; actor_type: string; actor_id: string; occurred_at: Date | string;
+          metadata: unknown;
+        }>(
+          "SELECT id::text,deployment_id::text,event_type,from_state,to_state,actor_type,actor_id,occurred_at,metadata " +
+          "FROM public.tenant_hosting_deployment_events WHERE tenant_id=$1 ORDER BY occurred_at DESC LIMIT 50",
+          [tenantId],
+        ),
+      ]);
+
+      const allowedMetadata = new Set([
+        "template", "attempt", "reason", "provider", "errorCode",
+        "templateVersion", "state", "attemptCount", "reused",
+      ]);
+      const safeMetadata = (value: unknown): Record<string, string | number | boolean | null> => {
+        if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+        return Object.fromEntries(Object.entries(value as Record<string, unknown>).flatMap(([key, item]) => {
+          if (!allowedMetadata.has(key)) return [];
+          if (item === null || typeof item === "string" || typeof item === "number" || typeof item === "boolean") {
+            return [[key, item]];
+          }
+          return [];
+        }));
+      };
+      const iso = (value: Date | string | null): string | null => {
+        if (value === null) return null;
+        const date = value instanceof Date ? value : new Date(value);
+        return Number.isNaN(date.getTime()) ? null : date.toISOString();
+      };
+
+      return reply.send({
+        providerConfigured: options.runtime !== null,
+        deployments: deployments.rows.map((row) => ({
+          id: row.id,
+          provider: row.provider,
+          template: row.template,
+          templateVersion: row.template_version,
+          resourceId: row.provider_resource_id,
+          state: row.state,
+          attemptCount: row.attempt_count,
+          errorCode: row.error_code,
+          lastDeployedAt: iso(row.last_deployed_at),
+          createdAt: iso(row.created_at),
+          updatedAt: iso(row.updated_at),
+        })),
+        events: events.rows.map((row) => ({
+          id: row.id,
+          deploymentId: row.deployment_id,
+          eventType: row.event_type,
+          fromState: row.from_state,
+          toState: row.to_state,
+          actorType: row.actor_type,
+          actorId: row.actor_id,
+          occurredAt: iso(row.occurred_at),
+          metadata: safeMetadata(row.metadata),
+        })),
+      });
+    },
+  );
+
   app.post<{ Params: { tenantId: string }; Body: { template: "wordpress" | "node-nextjs" | "ecommerce" } }>(
     "/admin/platform/tenants/:tenantId/hosting/provision",
     async (request, reply) => {

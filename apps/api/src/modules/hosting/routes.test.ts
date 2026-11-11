@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   requirePlatformRole: vi.fn(),
   getPlatformTenant: vi.fn(),
   appendAuditEvent: vi.fn(),
+  poolQuery: vi.fn(),
 }));
 
 vi.mock("@bazion/audit", () => ({
@@ -18,7 +19,7 @@ vi.mock("@bazion/audit", () => ({
 }));
 vi.mock("@bazion/auth", () => ({ requirePlatformRole: mocks.requirePlatformRole }));
 vi.mock("@bazion/auth/server", () => ({ getPlatformTenant: mocks.getPlatformTenant }));
-vi.mock("../../lib/database.js", () => ({ pool: { query: vi.fn() } }));
+vi.mock("../../lib/database.js", () => ({ pool: { query: mocks.poolQuery } }));
 
 const tenantId = "11111111-1111-4111-8111-111111111111";
 const reference = {
@@ -56,6 +57,7 @@ beforeEach(() => {
   mocks.requirePlatformRole.mockReset();
   mocks.getPlatformTenant.mockReset();
   mocks.appendAuditEvent.mockReset();
+  mocks.poolQuery.mockReset();
   mocks.requirePlatformRole.mockResolvedValue({
     userId: "platform-owner",
     email: "owner@bazion.test",
@@ -66,6 +68,71 @@ beforeEach(() => {
 });
 
 describe("platform tenant hosting route", () => {
+  it("returns tenant-scoped hosting inventory and sanitized append-only events to the platform owner", async () => {
+    mocks.poolQuery
+      .mockResolvedValueOnce({ rows: [{
+        id: "deployment-1", provider: "dokploy", template: "node-nextjs",
+        template_version: "sha256:" + "a".repeat(64), provider_resource_id: "compose-123",
+        state: "deploying", attempt_count: 1, error_code: null,
+        last_deployed_at: null, created_at: new Date("2026-11-11T08:00:00.000Z"),
+        updated_at: new Date("2026-11-11T08:01:00.000Z"),
+      }] })
+      .mockResolvedValueOnce({ rows: [{
+        id: "event-1", deployment_id: "deployment-1", event_type: "hosting.deployment.deploying",
+        from_state: "ready", to_state: "deploying", actor_type: "user", actor_id: "platform-owner",
+        occurred_at: new Date("2026-11-11T08:01:00.000Z"),
+        metadata: { template: "node-nextjs", attempt: 1, secret: "must-not-leak" },
+      }] });
+    const app = await makeApp();
+    try {
+      const response = await app.inject({
+        method: "GET",
+        url: "/v1/admin/platform/tenants/" + tenantId + "/hosting",
+      });
+      expect(response.statusCode).toBe(200);
+      expect(mocks.requirePlatformRole).toHaveBeenCalledWith(expect.any(Object), ["platform_owner"]);
+      expect(mocks.getPlatformTenant).toHaveBeenCalledWith(tenantId);
+      expect(mocks.poolQuery).toHaveBeenCalledTimes(2);
+      expect(response.json()).toEqual({
+        providerConfigured: true,
+        deployments: [{
+          id: "deployment-1", provider: "dokploy", template: "node-nextjs",
+          templateVersion: "sha256:" + "a".repeat(64), resourceId: "compose-123",
+          state: "deploying", attemptCount: 1, errorCode: null,
+          lastDeployedAt: null, createdAt: "2026-11-11T08:00:00.000Z",
+          updatedAt: "2026-11-11T08:01:00.000Z",
+        }],
+        events: [{
+          id: "event-1", deploymentId: "deployment-1", eventType: "hosting.deployment.deploying",
+          fromState: "ready", toState: "deploying", actorType: "user", actorId: "platform-owner",
+          occurredAt: "2026-11-11T08:01:00.000Z", metadata: { template: "node-nextjs", attempt: 1 },
+        }],
+      });
+      expect(response.payload).not.toContain("must-not-leak");
+      expect(response.payload).not.toContain("idempotency");
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("does not expose hosting inventory to non-owner platform roles", async () => {
+    mocks.requirePlatformRole.mockRejectedValue(Object.assign(new Error("Forbidden"), {
+      statusCode: 403, code: "PLATFORM_PERMISSION_DENIED",
+    }));
+    const app = await makeApp();
+    try {
+      const response = await app.inject({
+        method: "GET",
+        url: "/v1/admin/platform/tenants/" + tenantId + "/hosting",
+      });
+      expect(response.statusCode).toBe(403);
+      expect(mocks.getPlatformTenant).not.toHaveBeenCalled();
+      expect(mocks.poolQuery).not.toHaveBeenCalled();
+    } finally {
+      await app.close();
+    }
+  });
+
   it("requires the platform-owner role, records audit intent, and provisions from a versioned template", async () => {
     const runtime = makeRuntime();
     const app = await makeApp(runtime);
