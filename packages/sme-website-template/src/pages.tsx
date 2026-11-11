@@ -1,7 +1,7 @@
 import type { CSSProperties, ReactNode } from "react";
 import { Cluster, Container, Grid, SiteNavigation } from "@bazion/ui";
 import { getPublicWebsiteNavigation } from "@bazion/website-contracts";
-import { isSmeWebsitePageEnabled, type SmeWebsiteTemplateConfig } from "./config.js";
+import { isSmeEnquiryCollectionAvailable, isSmeWebsitePageEnabled, type SmeWebsiteTemplateConfig } from "./config.js";
 import { SmeContactForm } from "./contact-form.js";
 
 export function SmeWebsiteShell({
@@ -124,13 +124,13 @@ export function SmeServicesPage({ config }: { config: SmeWebsiteTemplateConfig }
   );
 }
 
-export function SmeContactPage({ config, endpoint, privacyNoticeHref = "/privacy" }: {
+export function SmeContactPage({ config, endpoint, privacyNoticeHref = "/privacy", formsLeadsEnabled = false }: {
   config: SmeWebsiteTemplateConfig;
   endpoint?: string;
   privacyNoticeHref?: string;
+  formsLeadsEnabled?: boolean;
 }) {
-  const privacyPage = config.website.pages.find((page) => page.id === "privacy" && page.enabled);
-  const canCollectEnquiries = Boolean(privacyPage && config.business.privacyNotice.trim());
+  const canCollectEnquiries = isSmeEnquiryCollectionAvailable(config, formsLeadsEnabled);
 
   return (
     <main id="main-content">
@@ -151,7 +151,7 @@ export function SmeContactPage({ config, endpoint, privacyNoticeHref = "/privacy
                   privacyNoticeHref={privacyNoticeHref}
                   privacyNoticeVersion={config.business.privacyNoticeVersion}
                 />
-              : <p className="sme-contact-unavailable" role="status">Enquiries are temporarily unavailable. Please contact the business using the details provided while its privacy notice is being prepared.</p>}
+              : <p className="sme-contact-unavailable" role="status">Enquiries are temporarily unavailable. Please contact the business using the details provided.</p>}
           </Grid>
         </Container>
       </section>

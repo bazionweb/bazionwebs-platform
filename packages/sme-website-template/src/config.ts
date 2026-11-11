@@ -25,7 +25,7 @@ export const smeBusinessContentSchema = z.object({
     address: z.string().trim().max(500).optional(),
   }).strict(),
   privacyNotice: z.string().trim().max(10000).default(""),
-  privacyNoticeVersion: z.string().regex(/^\d+\.\d+\.\d+$/).default(WEBSITE_ENQUIRY_PRIVACY_NOTICE_VERSION),
+  privacyNoticeVersion: z.string().max(40).regex(/^\d+\.\d+\.\d+$/).default(WEBSITE_ENQUIRY_PRIVACY_NOTICE_VERSION),
 }).strict();
 
 export const smeWebsiteTemplateConfigSchema = z.object({
@@ -40,6 +40,13 @@ export type SmeWebsiteTemplateConfig = z.infer<typeof smeWebsiteTemplateConfigSc
 
 export function isSmeWebsitePageEnabled(config: SmeWebsiteTemplateConfig, pageId: string): boolean {
   return config.website.pages.some((page) => page.id === pageId && page.enabled);
+}
+
+/** Keep form UI aligned with the tenant module entitlement and published privacy notice. */
+export function isSmeEnquiryCollectionAvailable(config: SmeWebsiteTemplateConfig, formsLeadsEnabled: boolean): boolean {
+  return formsLeadsEnabled
+    && isSmeWebsitePageEnabled(config, "privacy")
+    && config.business.privacyNotice.trim().length >= 40;
 }
 
 /** Demo-safe defaults only. Customer identity and contact data are provided per site. */

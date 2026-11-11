@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { defaultSmeWebsiteTemplateConfig, smeWebsiteTemplateConfigSchema } from "./config.js";
+import { defaultSmeWebsiteTemplateConfig, isSmeEnquiryCollectionAvailable, smeWebsiteTemplateConfigSchema } from "./config.js";
 import { getSmePageMetadata } from "./seo.js";
 import { getSmeEnquiryEndpoint } from "./contact-form.js";
 
@@ -57,5 +57,38 @@ describe("SME website template", () => {
     expect(getSmeEnquiryEndpoint("/custom/enquiry-route")).toBe("/custom/enquiry-route");
     expect(getSmeEnquiryEndpoint("https://outside.example/collect")).toBe("/v1/public/site/enquiries");
     expect(getSmeEnquiryEndpoint("//outside.example/collect")).toBe("/v1/public/site/enquiries");
+  });
+
+  it("shows enquiry collection only when the module and a published privacy page are available", () => {
+    const policy = "We use your contact details only to respond and remove them after the stated retention period.";
+    const configured = smeWebsiteTemplateConfigSchema.parse({
+      business: { ...defaultSmeWebsiteTemplateConfig.business, privacyNotice: policy },
+    });
+    const missingNotice = smeWebsiteTemplateConfigSchema.parse({ business: defaultSmeWebsiteTemplateConfig.business });
+    const hiddenPrivacyPage = smeWebsiteTemplateConfigSchema.parse({
+      website: {
+        pages: defaultSmeWebsiteTemplateConfig.website.pages.map((page) => page.id === "privacy" ? { ...page, enabled: false } : page),
+      },
+      business: { ...defaultSmeWebsiteTemplateConfig.business, privacyNotice: policy },
+    });
+
+    expect(isSmeEnquiryCollectionAvailable(configured, true)).toBe(true);
+    expect(isSmeEnquiryCollectionAvailable(configured, false)).toBe(false);
+    expect(isSmeEnquiryCollectionAvailable(missingNotice, true)).toBe(false);
+    expect(isSmeEnquiryCollectionAvailable(hiddenPrivacyPage, true)).toBe(false);
+  });
+
+  it("keeps two tenants independently branded through the same template configuration", () => {
+    const tenantA = smeWebsiteTemplateConfigSchema.parse({
+      website: { branding: { primaryColor: "#1d4ed8" } },
+      business: { ...defaultSmeWebsiteTemplateConfig.business, name: "Harbour Repairs" },
+    });
+    const tenantB = smeWebsiteTemplateConfigSchema.parse({
+      website: { branding: { primaryColor: "#166534" } },
+      business: { ...defaultSmeWebsiteTemplateConfig.business, name: "Maji Works" },
+    });
+
+    expect([tenantA.business.name, tenantA.website.branding.primaryColor]).toEqual(["Harbour Repairs", "#1d4ed8"]);
+    expect([tenantB.business.name, tenantB.website.branding.primaryColor]).toEqual(["Maji Works", "#166534"]);
   });
 });

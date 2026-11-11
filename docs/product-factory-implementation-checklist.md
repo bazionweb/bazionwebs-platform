@@ -64,13 +64,16 @@ Foundational completed slices: `cbe1851` product manifests, `e2271ac` runtime ca
 - [x] Expose tenant page visibility and navigation editing in the admin UI; validate the saved site contract and keep the home page enabled.
 - [x] Hide disabled routes, including event and sermon detail routes, after tenant settings resolve; set `noindex, nofollow` and show an accessible unavailable state.
 - [x] Return a server-side 404 for disabled public routes, including event and sermon detail routes, so crawlers and direct requests receive correct HTTP behavior.
-- [ ] Implement a small reusable SME website vertical slice: home, service/about page, contact/enquiry form, SEO and accessible responsive states.
+- [x] Implement a reusable SME website vertical slice: home, about, services, contact/enquiry and privacy pages, SEO metadata, responsive theme and accessible rendered states.
 - [ ] Add tenant-scoped enquiry persistence, consent/spam controls, authorization and retention/export behavior.
-- [ ] Configure two tenants with different brands/content/navigation using the same runtime and template.
-- [ ] Verify feature entitlement changes protect API operations as well as UI links.
-- [ ] Add visual/accessibility checks and PostgreSQL cross-tenant denial coverage for the SME slice.
+- [x] Configure two tenants with different brands/content/navigation using the same template components.
+- [x] Verify the forms-leads entitlement protects both the rendered form state and public API operation.
+- [x] Add rendered accessibility-state checks and PostgreSQL cross-tenant denial coverage for the SME slice.
+- [ ] Add browser-based visual regression checks for responsive SME page layouts.
 
 **Forms/lead capture evidence (2026-11-11):** `@bazion/forms` and `forms-leads` are registered as a reusable domain/API module. The public endpoint validates submissions, requires an enabled published tenant notice and matching notice version, assigns consent/retention metadata server-side, and applies per-IP rate limits plus a honeypot. Owner/admin routes manage policy, list/export and delete records; a bounded cleanup job includes inactive tenants. PostgreSQL tenant isolation passed for enquiries and policy rows with cross-tenant spoof writes denied. `pnpm typecheck`, `pnpm catalog:validate`, full `pnpm test` (32 Turborepo tasks, including database 15/15 and API 120/120), and `pnpm build` passed against the disposable PostgreSQL cluster.
+
+**SME template UI evidence (2026-11-11):** the same rendered page components now produce distinct tenant branding, content and navigation from independent validated configurations. The contact page requires an explicit forms entitlement and an enabled privacy page with a sufficiently detailed notice. Server-rendered tests check skip navigation, labelled consent fields and the unavailable state. Workspace typecheck, catalogue validation, full PostgreSQL-backed tests and production builds passed. Browser screenshot regression is still open.
 
 **Exit gate:** a second site can be configured without copying application code or adding a customer branch; both tenants pass route, accessibility and RLS checks.
 
