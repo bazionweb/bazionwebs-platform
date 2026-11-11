@@ -46,23 +46,23 @@ describe("DokployComposeProvider", () => {
     expect(result.resourceId).toBe("compose-123");
     expect(JSON.stringify(result)).not.toContain("postgres://private");
     expect(secrets.resolveEnvironment).toHaveBeenCalledWith("secret://tenant-1/runtime");
-    expect(calls[0].url.pathname).toBe("/api/compose.create");
-    expect(calls[1].url.pathname).toBe("/api/compose.saveEnvironment");
-    expect(JSON.parse(String(calls[1].init.body)).env).toContain("DATABASE_URL=postgres://private");
-    expect((calls[0].init.headers as Record<string, string>)["x-api-key"]).toBe("never-log-this");
+    expect(calls[0]?.url.pathname).toBe("/api/compose.create");
+    expect(calls[1]?.url.pathname).toBe("/api/compose.saveEnvironment");
+    expect(JSON.parse(String(calls[1]?.init.body)).env).toContain("DATABASE_URL=postgres://private");
+    expect((calls[0]?.init.headers as Record<string, string>)?.["x-api-key"]).toBe("never-log-this");
   });
 
   it("deploys without recreating persistent volumes", async () => {
     const { provider, fetch } = setup(() => new Response("{}", { status: 200 }));
     await provider.deploy(reference);
-    const body = JSON.parse(String(fetch.mock.calls[0][1]?.body));
+    const body = JSON.parse(String(fetch.mock.calls[0]?.[1]?.body));
     expect(body).toEqual({ composeId: "compose-123", freshVolumes: false });
   });
 
   it("preserves volumes when removing a tenant resource", async () => {
     const { provider, fetch } = setup(() => new Response("{}", { status: 200 }));
     await provider.remove(reference);
-    expect(JSON.parse(String(fetch.mock.calls[0][1]?.body))).toEqual({
+    expect(JSON.parse(String(fetch.mock.calls[0]?.[1]?.body))).toEqual({
       composeId: "compose-123",
       deleteVolumes: false,
     });
