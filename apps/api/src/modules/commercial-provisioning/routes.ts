@@ -18,6 +18,7 @@ import type {
   OutboxReplayResult,
   PlatformStatusOutboxDispatcher,
 } from "./status-outbox-worker.js";
+import { getProvisioningOfferCatalogV1 } from "./offer-resolution.js";
 
 const auditWriter = new PostgresAuditEventWriter(pool);
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -51,6 +52,28 @@ export async function commercialProvisioningRoutes(
   app: FastifyInstance,
   options: { runtime: CommercialProvisioningRuntime | null },
 ): Promise<void> {
+  app.get("/internal/commercial/provisioning-catalog", async (request, reply) => {
+    const runtime = options.runtime;
+    if (!runtime) {
+      return reply.code(503).send({
+        error: "COMMERCIAL_PROVISIONING_UNCONFIGURED",
+        message: "Commercial provisioning receiver is not configured.",
+      });
+    }
+
+    try {
+      verifyMachineBearerToken(request.headers as Record<string, unknown>, {
+        secret: runtime.commandAuth.secret,
+        expectedIssuer: runtime.commandAuth.issuer || DEFAULT_COMMAND_ISSUER,
+        expectedAudience: runtime.commandAuth.audience || DEFAULT_COMMAND_AUDIENCE,
+        requiredScopes: ["commercial:provisioning:read"],
+      });
+      return reply.header("Cache-Control", "private, max-age=60").send(getProvisioningOfferCatalogV1());
+    } catch (error) {
+      return sendRouteError(reply, error);
+    }
+  });
+
   app.post("/internal/commercial/provisioning-requests", async (request, reply) => {
     const runtime = options.runtime;
     if (!runtime) {

@@ -10,6 +10,7 @@ import {
   ProvisioningOfferResolutionError,
   resolveProvisioningOfferBinding,
   type ProvisioningOfferBinding,
+  type ProvisioningDistributionMode,
 } from "./offer-resolution.js";
 
 export interface SqlResult<T> {
@@ -150,6 +151,7 @@ export class CommercialProvisioningService {
   constructor(
     private readonly pool: CommercialSqlPool,
     private readonly offerBindings: readonly ProvisioningOfferBinding[] = platformProvisioningOfferBindings,
+    private readonly supportedDistributionModes: readonly ProvisioningDistributionMode[] = ["shared-managed"],
   ) {}
 
   async acceptCommand(rawInput: unknown): Promise<AcceptProvisioningCommandResult> {
@@ -284,7 +286,7 @@ export class CommercialProvisioningService {
       try {
         // The platform resolves authority from its own immutable binding before
         // inserting an operation. Client-supplied pins are checked, never trusted.
-        resolveProvisioningOfferBinding(request, this.offerBindings);
+        resolveProvisioningOfferBinding(request, this.offerBindings, this.supportedDistributionModes);
       } catch (error) {
         if (!(error instanceof ProvisioningOfferResolutionError)) throw error;
         throw new CommercialProvisioningError(

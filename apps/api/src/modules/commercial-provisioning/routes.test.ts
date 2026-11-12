@@ -133,6 +133,40 @@ beforeEach(() => {
 });
 
 describe("commercial provisioning HTTP routes", () => {
+  it("publishes the price-free, versioned provisioning catalog to a read-scoped machine client", async () => {
+    const app = await makeApp(makeRuntime());
+    try {
+      const response = await app.inject({
+        method: "GET",
+        url: "/v1/internal/commercial/provisioning-catalog",
+        headers: { authorization: `Bearer ${mintToken()}` },
+      });
+      expect(response.statusCode).toBe(200);
+      expect(response.headers["cache-control"]).toBe("private, max-age=60");
+      expect(response.json()).toMatchObject({ schemaVersion: "1.0.0", bindings: [] });
+      expect(response.json()).toHaveProperty("generatedAt");
+      expect(response.payload).not.toContain("price");
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("requires the commercial provisioning read scope for catalog access", async () => {
+    const app = await makeApp(makeRuntime());
+    try {
+      const response = await app.inject({
+        method: "GET",
+        url: "/v1/internal/commercial/provisioning-catalog",
+        headers: {
+          authorization: `Bearer ${mintToken({ scopes: ["commercial:provisioning:write"] })}`,
+        },
+      });
+      expect(response.statusCode).toBe(403);
+    } finally {
+      await app.close();
+    }
+  });
+
   it("rejects unauthenticated, wrong-audience, expired, overly long-lived, and under-scoped machine tokens", async () => {
     const app = await makeApp(makeRuntime());
     try {

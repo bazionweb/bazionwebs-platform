@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ProvisionProductRequestV1 } from "@bazion/api-contracts";
 import {
+  createProvisioningOfferCatalogV1,
   platformProvisioningOfferBindings,
   ProvisioningOfferResolutionError,
   resolveProvisioningOfferBinding,
@@ -70,7 +71,7 @@ describe("platform provisioning offer bindings", () => {
     }, [binding])).toThrowError(new ProvisioningOfferResolutionError("PROVISIONING_COMPOSITION_MISMATCH"));
   });
 
-  it("rejects retired, unstable, or dedicated bindings", () => {
+  it("rejects retired, unstable, or dedicated bindings until the secret-manager path is ready", () => {
     expect(() => resolveProvisioningOfferBinding(request, [{ ...binding, availability: "retired" }]))
       .toThrowError(new ProvisioningOfferResolutionError("PROVISIONING_OFFER_RETIRED"));
     expect(() => resolveProvisioningOfferBinding(request, [{
@@ -79,5 +80,26 @@ describe("platform provisioning offer bindings", () => {
     }])).toThrowError(new ProvisioningOfferResolutionError("PROVISIONING_OFFER_RELEASE_UNSTABLE"));
     expect(() => resolveProvisioningOfferBinding(request, [{ ...binding, distributionMode: "dedicated" }]))
       .toThrowError(new ProvisioningOfferResolutionError("PROVISIONING_OFFER_DISTRIBUTION_UNSUPPORTED"));
+  });
+
+  it("publishes only active stable shared-managed bindings and keeps the catalog price-free", () => {
+    const unstable = {
+      ...binding,
+      offer: { id: "unstable-offer", version: "1.0.0" },
+      releaseState: { ...binding.releaseState, template: "partial" as const },
+    };
+    const retired = { ...binding, offer: { id: "retired-offer", version: "1.0.0" }, availability: "retired" as const };
+    const dedicated = { ...binding, offer: { id: "dedicated-offer", version: "1.0.0" }, distributionMode: "dedicated" as const };
+    const catalog = createProvisioningOfferCatalogV1(
+      [unstable, retired, dedicated, binding],
+      new Date("2026-11-12T00:00:00.000Z"),
+    );
+
+    expect(catalog).toMatchObject({
+      schemaVersion: "1.0.0",
+      generatedAt: "2026-11-12T00:00:00.000Z",
+      bindings: [{ offer: binding.offer, composition: binding.composition }],
+    });
+    expect(JSON.stringify(catalog)).not.toMatch(/price|amount|currency/i);
   });
 });
