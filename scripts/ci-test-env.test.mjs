@@ -17,3 +17,26 @@ test("Turbo forwards database and auth integration-test activation variables", (
     assert.match(workflow, new RegExp(`^\\s*${variable}:`, "m"), `CI must set ${variable}.`);
   }
 });
+
+test("Lockfile preserves packageManagerDependencies matching package.json and CI pnpm version", () => {
+  const pkg = JSON.parse(readFileSync(join(repoRoot, "package.json"), "utf8"));
+  const workflow = readFileSync(join(repoRoot, ".github/workflows/ci.yml"), "utf8");
+  const lockfileHead = readFileSync(join(repoRoot, "pnpm-lock.yaml"), "utf8").slice(0, 1200);
+
+  const match = /^pnpm@(\d+\.\d+\.\d+)$/.exec(pkg.packageManager ?? "");
+  assert.ok(match, `package.json packageManager must pin an exact pnpm version, got: ${pkg.packageManager}`);
+  const expectedPnpmVersion = match[1];
+
+  assert.match(
+    workflow,
+    new RegExp(`version:\\s*${expectedPnpmVersion.replaceAll(".", "\\.")}\\b`),
+    `CI pnpm/action-setup must use pnpm ${expectedPnpmVersion}.`,
+  );
+  assert.match(
+    lockfileHead,
+    new RegExp(
+      `packageManagerDependencies:\\s*\\r?\\n\\s*pnpm:\\s*\\r?\\n\\s*specifier:\\s*${expectedPnpmVersion.replaceAll(".", "\\.")}\\r?\\n\\s*version:\\s*${expectedPnpmVersion.replaceAll(".", "\\.")}\\b`,
+    ),
+    `pnpm-lock.yaml must include packageManagerDependencies for pnpm@${expectedPnpmVersion} (run corepack pnpm install --lockfile-only, not pnpm 9).`,
+  );
+});
