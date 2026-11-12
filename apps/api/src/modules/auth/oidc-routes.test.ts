@@ -143,6 +143,7 @@ vi.mock("../../lib/database.js", () => ({
 
 const ENV_KEYS = [
   "NODE_ENV",
+  "AUTH_REQUIRE_EMAIL_VERIFICATION",
   "TENANT_RESOLUTION_MODE",
   "TRUSTED_PROXY_ADDRESSES",
   "DATABASE_URL",
@@ -251,6 +252,7 @@ describe("Phase 5 OIDC, BFF cookies, CSRF, claim-order, email lifecycle, and dee
   it("enforces HTTPS URLs and OIDC RS256 private key PEM in production configuration", () => {
     seedBaseTestEnv({
       NODE_ENV: "production",
+      AUTH_REQUIRE_EMAIL_VERIFICATION: "true",
       TENANT_RESOLUTION_MODE: "verified_domain",
       TRUSTED_PROXY_ADDRESSES: "127.0.0.1",
       BETTER_AUTH_URL: "https://api.bazion.co.ke",

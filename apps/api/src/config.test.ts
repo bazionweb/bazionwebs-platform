@@ -75,6 +75,7 @@ describe("API runtime configuration", () => {
 
   it("requires S3-compatible media storage in production", () => {
     vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("AUTH_REQUIRE_EMAIL_VERIFICATION", "true");
     expect(() => loadConfig()).toThrow(/configure S3-compatible object storage/);
   });
 
@@ -103,6 +104,7 @@ describe("API runtime configuration", () => {
     });
 
     vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("AUTH_REQUIRE_EMAIL_VERIFICATION", "true");
     vi.stubEnv("MEDIA_STORAGE_DRIVER", "s3");
     vi.stubEnv("MEDIA_STORAGE_ENDPOINT", "https://r2.cloudflarestorage.com");
     vi.stubEnv("MEDIA_STORAGE_BUCKET", "bazion-media");
