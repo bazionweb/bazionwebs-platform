@@ -11,7 +11,7 @@ This procedure links a Bazionweb `HostingAccount` to its Platform provisioning p
 
 ## Read-only cutover inventory
 
-Bazionweb exposes `GET /api/v1/admin/platform-provisioning/hosting-cutover?page=1&limit=50` to `ADMIN` and `SUPER_ADMIN` operators. The report compares active `HostingAccount` rows against Platform provisioning projections and outbox claims, normalizing domain case, surrounding whitespace, and one trailing dot. It is paginated and performs no writes.
+Bazionweb exposes `GET /api/v1/admin/platform-provisioning/hosting-cutover?page=1&limit=50` to `ADMIN` and `SUPER_ADMIN` operators, with a matching admin view at `/admin/hosting/cutover`. The report compares active `HostingAccount` rows against Platform provisioning projections and outbox claims, normalizing domain case, surrounding whitespace, and one trailing dot. It is paginated and performs no writes.
 
 - `ready_to_map`: exactly one ready Platform projection matches the same client and normalized domain and has both a Platform tenant and deployment ID. This is a review candidate, not an automatic mapping.
 - `platform_claim_not_ready`: a same-client Platform order exists but is still pending, failed, or has no ready deployment projection; `platformClaimStatuses` shows the source outbox/projection states.
