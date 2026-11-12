@@ -1,6 +1,7 @@
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { Pool } from "pg";
+import type { PilotMode } from "@bazion/api-contracts";
 import { PostgresAuditEventWriter } from "@bazion/audit";
 import type { TenantHostingTemplate } from "@bazion/platform-contracts";
 import { LocalPrivateArchiveStorage } from "@bazion/storage";
@@ -11,9 +12,20 @@ import {
   DEFAULT_COMMAND_ISSUER,
 } from "./auth.js";
 import { createDefaultTenantLifecycleAdapter, SubscriptionLifecycleService } from "./lifecycle-service.js";
+import { CommercialProvisioningTelemetry, ProvisioningSloService } from "./observability.js";
 import { InstallationOffboardingService } from "./offboarding-service.js";
-import { platformProvisioningOfferBindings } from "./offer-resolution.js";
+import {
+  defaultSupportedProvisioningDistributionModes,
+  platformProvisioningOfferBindings,
+  type ProvisioningDistributionMode,
+} from "./offer-resolution.js";
 import { CommercialProvisioningOperatorService } from "./operator-service.js";
+import {
+  CutoverReadinessService,
+  getEffectiveOfferBindingsForMode,
+  resolvePilotCohortPolicy,
+} from "./pilot-cutover.js";
+import { CrossEntityReconciliationService } from "./reconciliation-service.js";
 import type { CommercialProvisioningRuntime } from "./routes.js";
 import {
   CommercialProvisioningSagaOrchestrator,
@@ -37,6 +49,14 @@ export interface CommercialProvisioningConfig {
   privateArchiveDirectory?: string | undefined;
   hostingRuntime?: HostingProvisioningRuntime | null | undefined;
   workerId?: string | undefined;
+  nodeEnv?: string | undefined;
+  pilotMode?: PilotMode | undefined;
+  allowedCustomerIds?: readonly string[] | undefined;
+  allowedOffers?: readonly string[] | undefined;
+  hostingMutationsEnabled?: boolean | undefined;
+  legacyFallbackEnabled?: boolean | undefined;
+  dualReadReconciliationEnabled?: boolean | undefined;
+  supportedDistributionModes?: readonly ProvisioningDistributionMode[] | undefined;
 }
 
 const SUPPORTED_HOSTING_TEMPLATES = new Set<TenantHostingTemplate>([
@@ -132,20 +152,55 @@ export function createCommercialProvisioningRuntime(
       })
     : undefined;
 
-  const auditWriter = new PostgresAuditEventWriter(auditPool ?? platformPool ?? provisionerPool);
+  const pilotPolicy = resolvePilotCohortPolicy({
+    pilotMode: config.pilotMode ?? "disabled",
+    nodeEnv: config.nodeEnv ?? process.env.NODE_ENV ?? "development",
+    hostingMutationsEnabled: config.hostingMutationsEnabled ?? Boolean(config.hostingRuntime),
+    legacyFallbackEnabled: config.legacyFallbackEnabled ?? true,
+    dualReadReconciliationEnabled: config.dualReadReconciliationEnabled ?? true,
+    ...(config.allowedCustomerIds ? { allowedCustomerIds: config.allowedCustomerIds } : {}),
+    ...(config.allowedOffers ? { allowedOffers: config.allowedOffers } : {}),
+  });
+  const effectiveOfferBindings =
+    pilotPolicy.pilotMode === "disabled"
+      ? platformProvisioningOfferBindings
+      : getEffectiveOfferBindingsForMode(
+          pilotPolicy.pilotMode,
+          pilotPolicy.allowedOffers,
+          platformProvisioningOfferBindings,
+        );
+  const supportedDistributionModes =
+    config.supportedDistributionModes ?? defaultSupportedProvisioningDistributionModes;
+
+  const auditExecutor = auditPool ?? platformPool ?? provisionerPool;
+  const auditWriter = new PostgresAuditEventWriter(auditExecutor);
   const storage = new LocalPrivateArchiveStorage(
     config.privateArchiveDirectory ?? resolve(tmpdir(), "bazion-private-archives"),
   );
   const tenantAdapter = platformPool ? createDefaultTenantLifecycleAdapter(platformPool) : undefined;
+  const telemetry = new CommercialProvisioningTelemetry();
+  const reconciliationService = new CrossEntityReconciliationService(
+    provisionerPool,
+    platformPool ?? null,
+    effectiveOfferBindings,
+  );
+  const sloService = new ProvisioningSloService(provisionerPool, reconciliationService, telemetry);
+  const cutoverService = new CutoverReadinessService(
+    pilotPolicy,
+    sloService,
+    reconciliationService,
+    auditExecutor,
+  );
 
   const adapters = createDefaultProvisioningStepAdapters({
     provisionerPool,
     ...(platformPool ? { platformPool } : {}),
     hostingRuntime: config.hostingRuntime ? adaptHostingRuntime(config.hostingRuntime) : null,
+    offerBindings: effectiveOfferBindings,
   });
   const orchestrator = new CommercialProvisioningSagaOrchestrator(provisionerPool, adapters, {
     ...(config.workerId ? { workerId: config.workerId } : {}),
-    offerBindings: platformProvisioningOfferBindings,
+    offerBindings: effectiveOfferBindings,
   });
   const operatorService = new CommercialProvisioningOperatorService(
     provisionerPool,
@@ -183,13 +238,23 @@ export function createCommercialProvisioningRuntime(
       issuer: config.commandIssuer || DEFAULT_COMMAND_ISSUER,
       audience: config.commandAudience || DEFAULT_COMMAND_AUDIENCE,
     },
-    service: new CommercialProvisioningService(provisionerPool),
+    service: new CommercialProvisioningService(
+      provisionerPool,
+      effectiveOfferBindings,
+      supportedDistributionModes,
+      pilotPolicy,
+    ),
     dispatcher: new PlatformStatusOutboxDispatcher(provisionerPool),
     orchestrator,
     operatorService,
     lifecycleService,
     lifecycleDispatcher: new PlatformLifecycleOutboxDispatcher(provisionerPool),
     offboardingService,
+    pilotPolicy,
+    telemetry,
+    reconciliationService,
+    sloService,
+    cutoverService,
     close: async () => {
       if (timer) {
         clearInterval(timer);

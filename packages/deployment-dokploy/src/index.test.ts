@@ -59,6 +59,14 @@ describe("DokployComposeProvider", () => {
     expect(body).toEqual({ composeId: "compose-123", freshVolumes: false });
   });
 
+  it("stops the verified compose application without deleting it", async () => {
+    const { provider, fetch } = setup(() => new Response("{}", { status: 200 }));
+    await provider.stop(reference);
+    expect(new URL(fetch.mock.calls[0]?.[0]?.toString() ?? "https://invalid").pathname)
+      .toBe("/api/compose.stop");
+    expect(JSON.parse(String(fetch.mock.calls[0]?.[1]?.body))).toEqual({ composeId: "compose-123" });
+  });
+
   it("preserves volumes when removing a tenant resource", async () => {
     const { provider, fetch } = setup(() => new Response("{}", { status: 200 }));
     await provider.remove(reference);

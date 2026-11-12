@@ -15,7 +15,7 @@ vi.mock("./server.js", () => ({
   resolveTenantByOrganizationId: mocks.resolveTenantByOrganizationId,
 }));
 
-import { requirePlatformPermission } from "./tenant-context.js";
+import { requireActiveTenantPermission, requirePlatformPermission } from "./tenant-context.js";
 
 const requestHeaders = { cookie: "better-auth.session_token=test" };
 
@@ -59,5 +59,24 @@ describe("platform permission tenant scope", () => {
     mocks.platformRole = "platform_owner";
     await expect(requirePlatformPermission(requestHeaders, "tenant.read", "tenant-beta"))
       .resolves.toMatchObject({ role: "platform_owner", tenantId: "tenant-beta" });
+  });
+
+  it("enforces read-only access for impersonated and sandbox platform/tenant permissions", async () => {
+    mocks.getSession.mockResolvedValue({
+      user: { id: "user-admin", email: "admin@example.test", name: "Tenant Admin", emailVerified: true },
+      session: { activeOrganizationId: "org-alpha", impersonatedBy: "support-supervisor-1" },
+    });
+
+    await expect(requirePlatformPermission(requestHeaders, "tenant.read", "tenant-alpha"))
+      .resolves.toMatchObject({ role: "platform_admin", tenantId: "tenant-alpha" });
+    await expect(requirePlatformPermission(requestHeaders, "tenant.suspend", "tenant-alpha"))
+      .rejects.toMatchObject({ code: "SANDBOX_IMPERSONATION_FORBIDDEN", statusCode: 403 });
+
+    await expect(
+      requireActiveTenantPermission(
+        { ...requestHeaders, "x-bazion-sandbox": "true" },
+        { product: ["update"] },
+      ),
+    ).rejects.toMatchObject({ code: "SANDBOX_IMPERSONATION_FORBIDDEN", statusCode: 403 });
   });
 });

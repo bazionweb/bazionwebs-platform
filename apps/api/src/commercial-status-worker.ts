@@ -1,4 +1,10 @@
 import { Pool } from "pg";
+import type { PilotMode } from "@bazion/api-contracts";
+import {
+  getEffectiveOfferBindingsForMode,
+  resolvePilotCohortPolicy,
+} from "./modules/commercial-provisioning/pilot-cutover.js";
+import { platformProvisioningOfferBindings } from "./modules/commercial-provisioning/offer-resolution.js";
 import {
   PlatformLifecycleOutboxDispatcher,
   PlatformStatusOutboxDispatcher,
@@ -66,6 +72,35 @@ const lifecycleCallbackUrlRaw = process.env.COMMERCIAL_LIFECYCLE_CALLBACK_URL?.t
 const lifecycleCallbackUrl = lifecycleCallbackUrlRaw
   ? new URL(lifecycleCallbackUrlRaw)
   : new URL(callbackUrl.toString().replace(/\/provisioning-status\/?$/, "/lifecycle-status"));
+const rawPilotMode = (process.env.COMMERCIAL_PROVISIONING_PILOT_MODE?.trim() || "disabled") as PilotMode;
+if (!["disabled", "staging_pilot", "canary"].includes(rawPilotMode)) {
+  throw new Error("COMMERCIAL_STATUS_WORKER_CONFIG_INVALID_COMMERCIAL_PROVISIONING_PILOT_MODE");
+}
+const pilotPolicy = resolvePilotCohortPolicy({
+  pilotMode: rawPilotMode,
+  nodeEnv: process.env.NODE_ENV ?? "development",
+  hostingMutationsEnabled: process.env.COMMERCIAL_PROVISIONING_HOSTING_MUTATIONS_ENABLED === "true",
+  legacyFallbackEnabled: process.env.COMMERCIAL_PROVISIONING_LEGACY_FALLBACK_ENABLED !== "false",
+  dualReadReconciliationEnabled: process.env.COMMERCIAL_PROVISIONING_DUAL_READ_RECONCILIATION_ENABLED !== "false",
+  allowedCustomerIds: [
+    ...(process.env.COMMERCIAL_PROVISIONING_CANARY_CUSTOMERS?.split(",") ?? []),
+    ...(process.env.COMMERCIAL_PROVISIONING_PILOT_CUSTOMERS?.split(",") ?? []),
+  ]
+    .map((value) => value.trim())
+    .filter(Boolean),
+  allowedOffers: (process.env.COMMERCIAL_PROVISIONING_ALLOWED_OFFERS?.split(",") ?? [])
+    .map((value) => value.trim())
+    .filter(Boolean),
+});
+const effectiveOfferBindings =
+  pilotPolicy.pilotMode === "disabled"
+    ? platformProvisioningOfferBindings
+    : getEffectiveOfferBindingsForMode(
+        pilotPolicy.pilotMode,
+        pilotPolicy.allowedOffers,
+        platformProvisioningOfferBindings,
+      );
+
 const tenantProvisionerUrl = process.env.TENANT_PROVISIONER_DATABASE_URL?.trim();
 const platformPool = tenantProvisionerUrl
   ? new Pool({ connectionString: tenantProvisionerUrl, max: 2, application_name: "bazion-commercial-saga-control" })
@@ -76,7 +111,9 @@ const sagaOrchestrator = process.env.COMMERCIAL_SAGA_WORKER_ENABLED === "true"
       createDefaultProvisioningStepAdapters({
         provisionerPool: pool,
         ...(platformPool ? { platformPool } : {}),
+        offerBindings: effectiveOfferBindings,
       }),
+      { offerBindings: effectiveOfferBindings },
     )
   : null;
 

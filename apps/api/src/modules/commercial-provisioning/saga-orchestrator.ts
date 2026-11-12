@@ -18,6 +18,8 @@ import {
   type ProvisioningStepEffect,
   type ProvisioningStepInspectionResult,
 } from "@bazion/product-installations";
+import type { ProvisioningOfferBinding } from "./offer-resolution.js";
+import { buildProductInitialConfiguration, resolveOfferBindingForOperation } from "./product-configuration.js";
 
 export interface ProvisioningOperationMetadata {
   operationId: string;
@@ -164,6 +166,7 @@ function deriveSafeTenantSlug(externalCustomerId: string, externalOrderId: strin
 export function createDefaultProvisioningStepAdapters(input: {
   provisionerPool: PostgresPoolLike;
   platformPool?: PostgresPoolLike;
+  offerBindings?: readonly ProvisioningOfferBinding[];
   hostingRuntime?: {
     providerId: string;
     provision(args: {
@@ -181,7 +184,7 @@ export function createDefaultProvisioningStepAdapters(input: {
     disableOwned?(tenantId: string, domainId: string): Promise<void>;
   };
 }): ProvisioningStepAdapters {
-  const { provisionerPool, platformPool, hostingRuntime, domainBinder } = input;
+  const { provisionerPool, platformPool, hostingRuntime, domainBinder, offerBindings } = input;
   const controlPool = platformPool ?? provisionerPool;
 
   return {
@@ -438,31 +441,55 @@ export function createDefaultProvisioningStepAdapters(input: {
       if (!context.tenantId || !context.installationId) {
         throw new ProvisioningStepError("INSTALLATION_REQUIRED_FOR_CONFIG", "compensate");
       }
+      const matchedBinding = resolveOfferBindingForOperation(operation, offerBindings);
+      const initialSpec = buildProductInitialConfiguration(operation, matchedBinding);
       const snap = prepareInstallationConfigurationSnapshot({
         tenantId: context.tenantId,
         installationId: context.installationId,
         version: 1,
         configurationSchemaVersion: "1.0.0",
-        configuration: {
-          offerId: operation.offerId,
-          offerVersion: operation.offerVersion,
-          productId: operation.productId,
-          solutionId: operation.solutionId,
-          templateId: operation.templateId,
-        },
+        configuration: initialSpec.configuration,
         createdBy: "commercial-provisioning",
       });
+
+      if (platformPool) {
+        const controlClient = await platformPool.connect();
+        try {
+          await controlClient.query("BEGIN");
+          for (const moduleId of initialSpec.requiredModules) {
+            await controlClient.query(
+              `INSERT INTO public.tenant_module_entitlements (tenant_id, module_id, enabled, updated_by)
+               VALUES ($1, $2, true, 'commercial-provisioning')
+               ON CONFLICT (tenant_id, module_id) DO NOTHING`,
+              [context.tenantId, moduleId],
+            );
+          }
+          await controlClient.query(
+            `INSERT INTO public.tenant_platform_settings (tenant_id, settings, version, updated_by)
+             VALUES ($1, $2::jsonb, 1, 'commercial-provisioning')
+             ON CONFLICT (tenant_id) DO NOTHING`,
+            [context.tenantId, JSON.stringify(initialSpec.tenantPlatformSettingsDefaults)],
+          );
+          await controlClient.query("COMMIT");
+        } catch (error) {
+          await controlClient.query("ROLLBACK").catch(() => undefined);
+          throw error;
+        } finally {
+          controlClient.release();
+        }
+      }
 
       const client = await provisionerPool.connect();
       try {
         await client.query("BEGIN");
         await client.query("SELECT set_config('app.tenant_id', $1, true)", [context.tenantId]);
-        await client.query(
+        const inserted = await client.query<{ checksum: string }>(
           `INSERT INTO public.installation_configuration_versions (
              tenant_id, installation_id, version, configuration_schema_version,
              configuration, checksum, created_by
            ) VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7)
-           ON CONFLICT (installation_id, version) DO NOTHING`,
+           ON CONFLICT (installation_id, version) DO NOTHING
+           RETURNING checksum`,
           [
             snap.tenantId,
             snap.installationId,
@@ -473,6 +500,17 @@ export function createDefaultProvisioningStepAdapters(input: {
             snap.createdBy,
           ],
         );
+        let checksum = inserted.rows[0]?.checksum ?? null;
+        if (!checksum) {
+          const existingRow = await client.query<{ checksum: string }>(
+            `SELECT checksum
+               FROM public.installation_configuration_versions
+              WHERE tenant_id = $1 AND installation_id = $2 AND version = $3
+              LIMIT 1`,
+            [snap.tenantId, snap.installationId, snap.version],
+          );
+          checksum = existingRow.rows[0]?.checksum ?? snap.checksum;
+        }
         await client.query(
           `UPDATE public.product_installations
            SET current_configuration_version = GREATEST(current_configuration_version, 1)
@@ -480,7 +518,7 @@ export function createDefaultProvisioningStepAdapters(input: {
           [context.installationId, context.tenantId],
         );
         await client.query("COMMIT");
-        return { configurationVersion: snap.version, checksum: snap.checksum };
+        return { configurationVersion: snap.version, checksum };
       } catch (error) {
         await client.query("ROLLBACK").catch(() => undefined);
         throw error;
@@ -489,7 +527,7 @@ export function createDefaultProvisioningStepAdapters(input: {
       }
     },
 
-    async inspectConfiguration({ context }) {
+    async inspectConfiguration({ operation, context }) {
       if (!context.tenantId || !context.installationId) return null;
       const client = await provisionerPool.connect();
       try {
@@ -503,9 +541,27 @@ export function createDefaultProvisioningStepAdapters(input: {
           [context.tenantId, context.installationId],
         );
         await client.query("COMMIT");
-        return res.rows[0]
-          ? { configurationVersion: res.rows[0].version, checksum: res.rows[0].checksum }
-          : null;
+        const existingConfig = res.rows[0];
+        if (!existingConfig) return null;
+
+        if (platformPool) {
+          const matchedBinding = resolveOfferBindingForOperation(operation, offerBindings);
+          const initialSpec = buildProductInitialConfiguration(operation, matchedBinding);
+          if (initialSpec.requiredModules.length > 0) {
+            const entitlementRes = await platformPool.query<{ module_id: string }>(
+              `SELECT module_id
+                 FROM public.tenant_module_entitlements
+                WHERE tenant_id = $1 AND module_id = ANY($2::text[])`,
+              [context.tenantId, [...initialSpec.requiredModules]],
+            );
+            const presentModules = new Set(entitlementRes.rows.map((r) => r.module_id));
+            if (initialSpec.requiredModules.some((moduleId) => !presentModules.has(moduleId))) {
+              return null;
+            }
+          }
+        }
+
+        return { configurationVersion: existingConfig.version, checksum: existingConfig.checksum };
       } catch {
         await client.query("ROLLBACK").catch(() => undefined);
         return null;

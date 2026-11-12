@@ -94,6 +94,18 @@ export async function buildApp(config: AppConfig) {
     if (!["POST", "PATCH", "DELETE", "PUT"].includes(request.method)) return;
 
     const pathname = request.url.split("?")[0] ?? request.url;
+    const headerValue = (raw: string | string[] | undefined) => (Array.isArray(raw) ? raw[0] : raw);
+    const sandboxHeader = headerValue(request.headers["x-bazion-sandbox"])?.trim().toLowerCase();
+    const impersonatingHeader = headerValue(request.headers["x-bazion-impersonating"])?.trim().toLowerCase();
+    const allowSandboxLogout = pathname === "/v1/auth/logout" || pathname === "/api/auth/sign-out";
+
+    if (!allowSandboxLogout && (sandboxHeader === "true" || sandboxHeader === "1" || impersonatingHeader === "true" || impersonatingHeader === "1")) {
+      return reply.code(403).send({
+        error: "SANDBOX_IMPERSONATION_FORBIDDEN",
+        message: "Support sandbox or impersonation requests are read-only and cannot perform mutations.",
+      });
+    }
+
     // Machine/webhook backchannel endpoints authenticate via HMAC signatures or client credentials, never browser cookies.
     if (
       pathname.startsWith("/v1/webhooks/")
@@ -103,11 +115,21 @@ export async function buildApp(config: AppConfig) {
       return;
     }
 
-    const headerValue = (raw: string | string[] | undefined) => (Array.isArray(raw) ? raw[0] : raw);
+    const cookieHeader = headerValue(request.headers.cookie) ?? "";
+    if (!allowSandboxLogout && cookieHeader.includes("better-auth.")) {
+      const sessionDetails = await auth.api.getSession({ headers: fromNodeHeaders(request.headers) }).catch(() => null);
+      const impersonatedBy = (sessionDetails as { session?: { impersonatedBy?: unknown } } | null)?.session?.impersonatedBy;
+      if (impersonatedBy) {
+        return reply.code(403).send({
+          error: "SANDBOX_IMPERSONATION_FORBIDDEN",
+          message: "Support impersonation sessions are read-only and cannot perform mutations.",
+        });
+      }
+    }
+
     const originHeader = headerValue(request.headers.origin);
     const refererHeader = headerValue(request.headers.referer);
     const secFetchSiteHeader = headerValue(request.headers["sec-fetch-site"]);
-    const cookieHeader = headerValue(request.headers.cookie) ?? "";
 
     const dynamicTrustedOrigins = [...baseTrustedOrigins];
     if (originHeader && (await originIsAllowed(originHeader))) {
@@ -208,6 +230,7 @@ export async function buildApp(config: AppConfig) {
   });
   const commercialProvisioningRuntime = createCommercialProvisioningRuntime({
     ...config.commercialProvisioning,
+    nodeEnv: config.NODE_ENV,
     tenantProvisionerDatabaseUrl: config.TENANT_PROVISIONER_DATABASE_URL,
     auditDatabaseUrl: config.DATABASE_URL,
     privateArchiveDirectory: config.commercialProvisioning.privateArchiveDir,

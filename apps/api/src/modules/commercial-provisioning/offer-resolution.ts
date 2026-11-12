@@ -1,4 +1,5 @@
 import type { ProvisionProductRequestV1 } from "@bazion/api-contracts";
+import { provisioningOfferCatalogV1Schema, type ProvisioningOfferCatalogV1 } from "@bazion/api-contracts";
 
 export interface ProvisioningOfferReleaseReference {
   id: string;
@@ -23,6 +24,9 @@ export interface ProvisioningOfferBinding {
     template: "stable" | "partial" | "experimental" | "planned" | "deprecated";
   };
 }
+
+export type ProvisioningDistributionMode = ProvisioningOfferBinding["distributionMode"];
+export const defaultSupportedProvisioningDistributionModes: readonly ProvisioningDistributionMode[] = ["shared-managed"];
 
 export type ProvisioningOfferResolutionErrorCode =
   | "PROVISIONING_OFFER_NOT_BOUND"
@@ -50,10 +54,16 @@ function sameRelease(left: ProvisioningOfferReleaseReference, right: Provisionin
   return left.id === right.id && left.version === right.version;
 }
 
+export interface ResolveProvisioningOfferOptions {
+  allowStagingPartialRelease?: boolean;
+}
+
 /** Resolve a commercial offer to a platform-approved immutable composition. */
 export function resolveProvisioningOfferBinding(
   request: ProvisionProductRequestV1,
   bindings: readonly ProvisioningOfferBinding[] = platformProvisioningOfferBindings,
+  supportedDistributionModes: readonly ProvisioningDistributionMode[] = defaultSupportedProvisioningDistributionModes,
+  options?: ResolveProvisioningOfferOptions,
 ): ProvisioningOfferBinding {
   const offerBindings = bindings.filter((binding) => binding.offer.id === request.order.offerId);
   if (offerBindings.length === 0) {
@@ -67,15 +77,22 @@ export function resolveProvisioningOfferBinding(
   if (binding.availability !== "active") {
     throw new ProvisioningOfferResolutionError("PROVISIONING_OFFER_RETIRED");
   }
-  if (
-    binding.releaseState.product !== "stable"
-    || binding.releaseState.solution !== "stable"
-    || binding.releaseState.solutionReadiness !== "buildable"
-    || binding.releaseState.template !== "stable"
-  ) {
+  const allowPartial = options?.allowStagingPartialRelease === true;
+  const releaseValid =
+    binding.releaseState.solutionReadiness === "buildable"
+    && (
+      allowPartial
+        ? (binding.releaseState.product === "stable" || binding.releaseState.product === "partial")
+          && (binding.releaseState.solution === "stable" || binding.releaseState.solution === "partial")
+          && (binding.releaseState.template === "stable" || binding.releaseState.template === "partial")
+        : binding.releaseState.product === "stable"
+          && binding.releaseState.solution === "stable"
+          && binding.releaseState.template === "stable"
+    );
+  if (!releaseValid) {
     throw new ProvisioningOfferResolutionError("PROVISIONING_OFFER_RELEASE_UNSTABLE");
   }
-  if (binding.distributionMode !== "shared-managed" && binding.distributionMode !== "dedicated") {
+  if (!supportedDistributionModes.includes(binding.distributionMode)) {
     throw new ProvisioningOfferResolutionError("PROVISIONING_OFFER_DISTRIBUTION_UNSUPPORTED");
   }
 
@@ -89,4 +106,41 @@ export function resolveProvisioningOfferBinding(
   }
 
   return binding;
+}
+
+/** Build the public catalog view from active stable shared-managed bindings only. */
+export function createProvisioningOfferCatalogV1(
+  sourceBindings: readonly ProvisioningOfferBinding[],
+  generatedAt = new Date(),
+): ProvisioningOfferCatalogV1 {
+  const bindings = sourceBindings
+    .filter((binding) => binding.availability === "active")
+    .filter((binding) => binding.distributionMode === "shared-managed")
+    .filter((binding) =>
+      binding.releaseState.product === "stable"
+      && binding.releaseState.solution === "stable"
+      && binding.releaseState.solutionReadiness === "buildable"
+      && binding.releaseState.template === "stable",
+    )
+    .map(({ offer, composition, requiredModules, optionalModules, distributionMode }) => ({
+      offer,
+      composition,
+      requiredModules,
+      optionalModules,
+      distributionMode,
+    }))
+    .sort((left, right) =>
+      left.offer.id.localeCompare(right.offer.id)
+      || left.offer.version.localeCompare(right.offer.version),
+    );
+
+  return provisioningOfferCatalogV1Schema.parse({
+    schemaVersion: "1.0.0",
+    generatedAt: generatedAt.toISOString(),
+    bindings,
+  });
+}
+
+export function getProvisioningOfferCatalogV1(generatedAt = new Date()): ProvisioningOfferCatalogV1 {
+  return createProvisioningOfferCatalogV1(platformProvisioningOfferBindings, generatedAt);
 }
