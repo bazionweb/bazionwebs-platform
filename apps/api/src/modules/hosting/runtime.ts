@@ -31,6 +31,9 @@ export interface HostingProvisioningRuntime {
   provision(input: ProvisionTenantHostingInput): Promise<ProvisionTenantHostingResult>;
   loadTemplate(template: TenantHostingTemplate): ReturnType<typeof loadTenantHostingTemplate>;
   inspect(reference: import("@bazion/platform-contracts").TenantHostingDeploymentReference): Promise<HostingRecoveryInspection>;
+  stop(reference: import("@bazion/platform-contracts").TenantHostingDeploymentReference): Promise<void>;
+  /** Removes the provider object while preserving its persistent volumes. */
+  remove(reference: import("@bazion/platform-contracts").TenantHostingDeploymentReference): Promise<void>;
 }
 
 export function createHostingProvisioningRuntime(config: HostingRuntimeConfig): HostingProvisioningRuntime | null {
@@ -48,6 +51,17 @@ export function createHostingProvisioningRuntime(config: HostingRuntimeConfig): 
     environmentId: config.dokploy.environmentId,
     provision: (input) => service.provision(input),
     loadTemplate: (template) => loadTenantHostingTemplate(template, templateDirectory),
-    inspect: async (reference) => await provider.inspect(reference) as HostingRecoveryInspection,
+    inspect: async (reference) => {
+      try {
+        return await provider.inspect(reference) as HostingRecoveryInspection;
+      } catch (error) {
+        if (error instanceof Error && error.message === "DOKPLOY_RESOURCE_NOT_FOUND") {
+          throw new Error("HOSTING_RESOURCE_NOT_FOUND");
+        }
+        throw error;
+      }
+    },
+    stop: (reference) => provider.stop(reference),
+    remove: (reference) => provider.remove(reference),
   };
 }

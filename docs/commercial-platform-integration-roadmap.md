@@ -78,16 +78,16 @@ This checklist coordinates the Bazion commercial website (`D:\bazionweb`) and th
 - [x] Keep offer authority in a Platform-owned allowlist; reject unbound offers, version/composition drift, retired or unstable releases, and unsupported distribution before creating a provisioning operation. The active list remains empty until a stable composition is available.
 - [x] Expose `GET /v1/internal/commercial/provisioning-catalog` to machine clients with the `commercial:provisioning:read` scope; the response excludes pricing and only contains active stable shared-managed bindings.
 - [ ] Publish the first real binding only after the product, solution, template and module versions are stable and the manifest consistency test passes. Current church-ministry product, solution and template manifests are `partial`.
-- [ ] Make Bazionweb consume the Platform catalog when composing the purchase quote, persist the selected offer and composition versions on the order line, and use those immutable pins for delivery; remove fallback offer versions and guessed composition pins.
-- [ ] Prove shared-managed provisioning only creates tenant/installation/entitlement records and never calls Dokploy or allocates a tenant database. Add a committed fast unit test in addition to the database integration test.
+- [x] Make Bazionweb consume the Platform catalog at quote time and persist its immutable offer/composition binding on invoice line items. *(The Bazionweb catalog service uses the read-only machine scope, strips caller snapshots, rejects ambiguous versions, requires production HTTPS and fails closed; the delivery builder accepts only that pinned binding.)*
+- [x] Prove shared-managed provisioning only creates tenant/installation/entitlement records and never calls Dokploy or allocates a tenant database. *(Covered by `product-configuration.test.ts` and the Phase 7 integration assertion; the fast test asserts hosting provider methods are never called.)*
 - [ ] For dedicated deployments, keep intake disabled until tenant-scoped credentials are resolved through a production secret manager; Docker secret file mounts are not the production credential contract.
-- [ ] Expose provider inspection and idempotent stop through an authorized Platform API/saga adapter, and expose remove only with verified provider identity, operation ownership, audit history and non-destructive data-retention behavior.
+- [x] Expose provider inspection, idempotent stop and guarded remove through audited Platform owner routes. *(The adapter verifies provider, resource, tenant, environment and expected resource name; removal requires suspension under a row lock and retains persistent volumes.)*
 - [ ] Move purchase-triggered deployment requests behind the platform hosting provider port.
 - [ ] Reuse platform hosting operation, lease, recovery and reconciliation records.
 - [ ] Represent Bazionweb hosting data as a read model keyed by platform deployment ID.
 - [ ] Migrate existing hosting records with an auditable mapping and compare both systems before cutover.
 - [ ] Remove duplicate Dokploy mutation paths only after rollback and recovery are proven.
-- [ ] Keep tenant commerce/donations and Bazion package billing in separate ledgers and webhook identities.
+- [x] Keep tenant commerce/donations and Bazion package billing in separate ledgers and webhook identities. *(Bazionweb owns commercial invoices/payments; Platform never reads or writes that database.)*
 
 **Exit gate:** a product offer resolves deterministically and only the platform can create, update or recover its runtime deployment.
 

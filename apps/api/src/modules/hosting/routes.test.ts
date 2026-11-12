@@ -1,6 +1,7 @@
 import Fastify from "fastify";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { hostingRoutes } from "./routes.js";
+import type { HostingLifecycleService } from "./lifecycle.js";
 import type { TenantHostingTemplate } from "@bazion/platform-contracts";
 import type { HostingProvisioningRuntime } from "./runtime.js";
 import type { LoadedTenantHostingTemplate } from "./templates.js";
@@ -22,6 +23,7 @@ vi.mock("@bazion/auth/server", () => ({ getPlatformTenant: mocks.getPlatformTena
 vi.mock("../../lib/database.js", () => ({ pool: { query: mocks.poolQuery } }));
 
 const tenantId = "11111111-1111-4111-8111-111111111111";
+const deploymentId = "22222222-2222-4222-8222-222222222222";
 const reference = {
   provider: "dokploy",
   resourceId: "compose-123",
@@ -39,6 +41,8 @@ function makeRuntime(): HostingProvisioningRuntime {
       templateVersion: "sha256:" + "a".repeat(64),
     })),
     inspect: vi.fn(async (reference) => ({ reference, state: "running" as const, lastDeployedAt: null })),
+    stop: vi.fn(async () => undefined),
+    remove: vi.fn(async () => undefined),
     provision: vi.fn(async () => ({
       reference,
       state: "deploying" as const,
@@ -48,9 +52,12 @@ function makeRuntime(): HostingProvisioningRuntime {
   };
 }
 
-async function makeApp(runtime: HostingProvisioningRuntime | null = makeRuntime()) {
+async function makeApp(
+  runtime: HostingProvisioningRuntime | null = makeRuntime(),
+  lifecycleService?: Pick<HostingLifecycleService, "inspect" | "stop" | "remove">,
+) {
   const app = Fastify();
-  await app.register(hostingRoutes, { prefix: "/v1", runtime });
+  await app.register(hostingRoutes, { prefix: "/v1", runtime, ...(lifecycleService ? { lifecycleService } : {}) });
   await app.ready();
   return app;
 }
@@ -276,6 +283,119 @@ describe("platform tenant hosting route", () => {
         error: "HOSTING_IDEMPOTENCY_CONFLICT",
         message: "The hosting provisioning request could not be completed.",
       });
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("routes stop through the audited platform lifecycle adapter", async () => {
+    const runtime = makeRuntime();
+    const lifecycleService = {
+      inspect: vi.fn(async () => ({
+        deploymentId, provider: "dokploy", resourceId: "compose-123", deploymentState: "running",
+        providerState: "running", lastDeployedAt: null, inspectedAt: "2026-11-12T00:00:00.000Z",
+      })),
+      stop: vi.fn(async () => ({ deploymentId, state: "stopped" as const, removed: false, alreadyApplied: false })),
+      remove: vi.fn(async () => ({ deploymentId, state: "stopped" as const, removed: true, alreadyApplied: false })),
+    };
+    const app = await makeApp(runtime, lifecycleService);
+    try {
+      const response = await app.inject({
+        method: "POST",
+        url: `/v1/admin/platform/tenants/${tenantId}/hosting/deployments/${deploymentId}/stop`,
+        payload: { reason: "Customer requested hosting pause" },
+      });
+      expect(response.statusCode).toBe(200);
+      expect(lifecycleService.stop).toHaveBeenCalledWith(expect.objectContaining({
+        tenantId, tenantSlug: "alpha", deploymentId, actorId: "platform-owner",
+      }));
+      expect(runtime.stop).not.toHaveBeenCalled();
+      expect(mocks.appendAuditEvent).toHaveBeenCalledWith(expect.objectContaining({
+        action: "tenant.hosting.stop.completed", resourceId: deploymentId, outcome: "succeeded",
+      }));
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("routes provider inspection through the audited Platform lifecycle adapter", async () => {
+    const lifecycleService = {
+      inspect: vi.fn(async () => ({
+        deploymentId, provider: "dokploy", resourceId: "compose-123", deploymentState: "running",
+        providerState: "running", lastDeployedAt: null, inspectedAt: "2026-11-12T00:00:00.000Z",
+      })),
+      stop: vi.fn(async () => ({ deploymentId, state: "stopped" as const, removed: false, alreadyApplied: false })),
+      remove: vi.fn(async () => ({ deploymentId, state: "stopped" as const, removed: true, alreadyApplied: false })),
+    };
+    const app = await makeApp(makeRuntime(), lifecycleService);
+    try {
+      const response = await app.inject({
+        method: "POST",
+        url: `/v1/admin/platform/tenants/${tenantId}/hosting/deployments/${deploymentId}/inspect`,
+        payload: { reason: "Review provider state for support case" },
+      });
+      expect(response.statusCode).toBe(200);
+      expect(response.json().inspection).toMatchObject({ deploymentId, providerState: "running" });
+      expect(lifecycleService.inspect).toHaveBeenCalledWith({ tenantId, tenantSlug: "alpha", deploymentId });
+      expect(mocks.appendAuditEvent).toHaveBeenCalledWith(expect.objectContaining({
+        action: "tenant.hosting.inspect.completed", resourceId: deploymentId, outcome: "succeeded",
+      }));
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("requires a suspended tenant and explicit volume-retention confirmation before removal", async () => {
+    const runtime = makeRuntime();
+    const lifecycleService = { inspect: vi.fn(async () => ({
+      deploymentId, provider: "dokploy", resourceId: "compose-123", deploymentState: "stopped",
+      providerState: "stopped", lastDeployedAt: null, inspectedAt: "2026-11-12T00:00:00.000Z",
+    })), stop: vi.fn(async () => ({
+      deploymentId, state: "stopped" as const, removed: false, alreadyApplied: false,
+    })), remove: vi.fn(async () => ({
+      deploymentId, state: "stopped" as const, removed: true, alreadyApplied: false,
+    })) };
+    const app = await makeApp(runtime, lifecycleService);
+    try {
+      const activeTenant = await app.inject({
+        method: "POST",
+        url: `/v1/admin/platform/tenants/${tenantId}/hosting/deployments/${deploymentId}/remove`,
+        payload: { reason: "Remove old deployment", confirmDataRetained: true },
+      });
+      expect(activeTenant.statusCode).toBe(409);
+      expect(activeTenant.json().error).toBe("HOSTING_TENANT_MUST_BE_SUSPENDED");
+      expect(lifecycleService.remove).not.toHaveBeenCalled();
+      expect(mocks.appendAuditEvent).toHaveBeenCalledWith(expect.objectContaining({
+        action: "tenant.hosting.remove.denied", outcome: "denied",
+      }));
+
+      mocks.getPlatformTenant.mockResolvedValueOnce({ id: tenantId, slug: "alpha", status: "provisioning" });
+      const provisioningTenant = await app.inject({
+        method: "POST",
+        url: `/v1/admin/platform/tenants/${tenantId}/hosting/deployments/${deploymentId}/remove`,
+        payload: { reason: "Remove old deployment", confirmDataRetained: true },
+      });
+      expect(provisioningTenant.statusCode).toBe(409);
+      expect(lifecycleService.remove).not.toHaveBeenCalled();
+
+      mocks.getPlatformTenant.mockResolvedValueOnce({ id: tenantId, slug: "alpha", status: "suspended" });
+      const missingConfirmation = await app.inject({
+        method: "POST",
+        url: `/v1/admin/platform/tenants/${tenantId}/hosting/deployments/${deploymentId}/remove`,
+        payload: { reason: "Remove old deployment" },
+      });
+      expect(missingConfirmation.statusCode).toBe(400);
+      expect(lifecycleService.remove).not.toHaveBeenCalled();
+
+      mocks.getPlatformTenant.mockResolvedValueOnce({ id: tenantId, slug: "alpha", status: "suspended" });
+      const removed = await app.inject({
+        method: "POST",
+        url: `/v1/admin/platform/tenants/${tenantId}/hosting/deployments/${deploymentId}/remove`,
+        payload: { reason: "Remove old deployment", confirmDataRetained: true },
+      });
+      expect(removed.statusCode).toBe(200);
+      expect(removed.json().persistentVolumesRetained).toBe(true);
+      expect(lifecycleService.remove).toHaveBeenCalledOnce();
     } finally {
       await app.close();
     }

@@ -5,6 +5,7 @@ import { getPlatformTenant } from "@bazion/auth/server";
 import { pool } from "../../lib/database.js";
 import { tenantHostingDockerSecretReference } from "./secrets.js";
 import { hostingProvisionInputSchema } from "./policy.js";
+import { HostingLifecycleError, HostingLifecycleService } from "./lifecycle.js";
 import type { HostingProvisioningRuntime } from "./runtime.js";
 
 const auditWriter = new PostgresAuditEventWriter(pool);
@@ -37,8 +38,15 @@ function errorStatus(code: string): number {
 
 export async function hostingRoutes(
   app: FastifyInstance,
-  options: { runtime: HostingProvisioningRuntime | null },
+  options: {
+    runtime: HostingProvisioningRuntime | null;
+    lifecycleService?: Pick<HostingLifecycleService, "inspect" | "stop" | "remove"> | undefined;
+  },
 ): Promise<void> {
+  const lifecycleService = options.lifecycleService ?? (options.runtime
+    ? new HostingLifecycleService(pool, options.runtime)
+    : null);
+
   app.get<{ Params: { tenantId: string } }>(
     "/admin/platform/tenants/:tenantId/hosting",
     async (request, reply) => {
@@ -78,7 +86,8 @@ export async function hostingRoutes(
       const allowedMetadata = new Set([
         "template", "attempt", "reason", "provider", "errorCode",
         "templateVersion", "state", "attemptCount", "reused", "providerState",
-        "lastDeployedAt", "failureCount", "retryInSeconds",
+        "lastDeployedAt", "failureCount", "retryInSeconds", "providerResourceId",
+        "persistentVolumesDeleted", "providerWasAlreadyAbsent",
       ]);
       const safeMetadata = (value: unknown): Record<string, string | number | boolean | null> => {
         if (!value || typeof value !== "object" || Array.isArray(value)) return {};
@@ -128,6 +137,197 @@ export async function hostingRoutes(
       });
     },
   );
+
+  app.post<{
+    Params: { tenantId: string; deploymentId: string };
+    Body: { reason: string };
+  }>(
+    "/admin/platform/tenants/:tenantId/hosting/deployments/:deploymentId/inspect",
+    async (request, reply) => {
+      const tenantId = request.params.tenantId.trim();
+      const deploymentId = request.params.deploymentId.trim();
+      const body = request.body as unknown;
+      if (!tenantIdPattern.test(tenantId) || !tenantIdPattern.test(deploymentId) ||
+          !body || typeof body !== "object" || Array.isArray(body) ||
+          Object.keys(body).join(",") !== "reason" ||
+          typeof (body as Record<string, unknown>).reason !== "string") {
+        return reply.code(400).send({ error: "INVALID_INPUT" });
+      }
+      const reason = (body as { reason: string }).reason.trim();
+      if (reason.length < 8 || reason.length > 500) return reply.code(400).send({ error: "HOSTING_REASON_INVALID" });
+
+      const operator = await requirePlatformRole(request.headers, ["platform_owner"]);
+      const tenant = await getPlatformTenant(tenantId);
+      if (!tenant) return reply.code(404).send({ error: "TENANT_NOT_FOUND" });
+      if (!options.runtime || !lifecycleService) return reply.code(503).send({ error: "HOSTING_NOT_CONFIGURED" });
+
+      const auditBase = {
+        actorType: "user" as const,
+        actorId: operator.userId,
+        actorRole: operator.role,
+        tenantId,
+        resourceType: "tenant_hosting_deployment",
+        resourceId: deploymentId,
+        requestId: request.id,
+        metadata: { provider: options.runtime.providerId, reason },
+      };
+      await auditWriter.append({
+        ...auditBase,
+        action: "tenant.hosting.inspect.requested",
+        outcome: "succeeded",
+      });
+
+      try {
+        const inspection = await lifecycleService.inspect({
+          tenantId,
+          tenantSlug: tenant.slug,
+          deploymentId,
+        });
+        await auditWriter.append({
+          ...auditBase,
+          action: "tenant.hosting.inspect.completed",
+          outcome: "succeeded",
+          metadata: { ...auditBase.metadata, providerState: inspection.providerState },
+        }).catch((auditError: unknown) => {
+          request.log.error({
+            auditAction: "tenant.hosting.inspect.completed",
+            errorType: auditError instanceof Error ? auditError.name : "UnknownError",
+          }, "Hosting inspection completion audit could not be persisted");
+        });
+        return reply.send({ inspection });
+      } catch (error) {
+        if (error instanceof HostingLifecycleError) {
+          await auditWriter.append({
+            ...auditBase,
+            action: "tenant.hosting.inspect.failed",
+            outcome: "failed",
+            metadata: { ...auditBase.metadata, errorCode: error.code },
+          }).catch(() => undefined);
+          return reply.code(error.statusCode).send({ error: error.code });
+        }
+        request.log.error({ errorType: error instanceof Error ? error.name : "UnknownError" }, "Hosting inspection failed unexpectedly");
+        await auditWriter.append({
+          ...auditBase,
+          action: "tenant.hosting.inspect.failed",
+          outcome: "failed",
+          metadata: { ...auditBase.metadata, errorCode: "HOSTING_INSPECTION_FAILED" },
+        }).catch(() => undefined);
+        return reply.code(500).send({ error: "HOSTING_INSPECTION_FAILED" });
+      }
+    },
+  );
+
+  for (const action of ["stop", "remove"] as const) {
+    app.post<{
+      Params: { tenantId: string; deploymentId: string };
+      Body: { reason: string; confirmDataRetained?: true };
+    }>(
+      `/admin/platform/tenants/:tenantId/hosting/deployments/:deploymentId/${action}`,
+      async (request, reply) => {
+        const tenantId = request.params.tenantId.trim();
+        const deploymentId = request.params.deploymentId.trim();
+        const body = request.body as unknown;
+        const expectedKeys = action === "remove" ? "confirmDataRetained,reason" : "reason";
+        if (!tenantIdPattern.test(tenantId) || !tenantIdPattern.test(deploymentId) ||
+            !body || typeof body !== "object" || Array.isArray(body) ||
+            Object.keys(body).sort().join(",") !== expectedKeys ||
+            typeof (body as Record<string, unknown>).reason !== "string" ||
+            (action === "remove" && (body as Record<string, unknown>).confirmDataRetained !== true)) {
+          return reply.code(400).send({ error: "INVALID_INPUT" });
+        }
+        const reason = (body as { reason: string }).reason.trim();
+        if (reason.length < 8 || reason.length > 500) return reply.code(400).send({ error: "HOSTING_REASON_INVALID" });
+
+        const operator = await requirePlatformRole(request.headers, ["platform_owner"]);
+        const tenant = await getPlatformTenant(tenantId);
+        if (!tenant) return reply.code(404).send({ error: "TENANT_NOT_FOUND" });
+        if (action === "remove" && tenant.status !== "suspended") {
+          await auditWriter.append({
+            actorType: "user",
+            actorId: operator.userId,
+            actorRole: operator.role,
+            tenantId,
+            resourceType: "tenant_hosting_deployment",
+            resourceId: deploymentId,
+            requestId: request.id,
+            action: "tenant.hosting.remove.denied",
+            outcome: "denied",
+            metadata: { reason, errorCode: "HOSTING_TENANT_MUST_BE_SUSPENDED" },
+          });
+          return reply.code(409).send({ error: "HOSTING_TENANT_MUST_BE_SUSPENDED" });
+        }
+        if (!options.runtime || !lifecycleService) return reply.code(503).send({ error: "HOSTING_NOT_CONFIGURED" });
+
+        const auditBase = {
+          actorType: "user" as const,
+          actorId: operator.userId,
+          actorRole: operator.role,
+          tenantId,
+          resourceType: "tenant_hosting_deployment",
+          resourceId: deploymentId,
+          requestId: request.id,
+          metadata: {
+            provider: options.runtime.providerId,
+            reason,
+            ...(action === "remove" ? { persistentVolumesDeleted: false } : {}),
+          },
+        };
+        await auditWriter.append({
+          ...auditBase,
+          action: `tenant.hosting.${action}.requested`,
+          outcome: "succeeded",
+        });
+
+        try {
+          const result = await lifecycleService[action]({
+            tenantId,
+            tenantSlug: tenant.slug,
+            deploymentId,
+            actorId: operator.userId,
+            requestId: request.id,
+            reason,
+          });
+          await auditWriter.append({
+            ...auditBase,
+            action: `tenant.hosting.${action}.completed`,
+            outcome: "succeeded",
+            metadata: {
+              ...auditBase.metadata,
+              alreadyApplied: result.alreadyApplied,
+              removed: result.removed,
+            },
+          }).catch((auditError: unknown) => {
+            request.log.error({
+              auditAction: `tenant.hosting.${action}.completed`,
+              errorType: auditError instanceof Error ? auditError.name : "UnknownError",
+            }, "Hosting lifecycle completion audit could not be persisted");
+          });
+          return reply.send({ deployment: result, persistentVolumesRetained: action === "remove" });
+        } catch (error) {
+          if (error instanceof HostingLifecycleError) {
+            await auditWriter.append({
+              ...auditBase,
+              action: `tenant.hosting.${action}.failed`,
+              outcome: "failed",
+              metadata: { ...auditBase.metadata, errorCode: error.code },
+            }).catch(() => undefined);
+            return reply.code(error.statusCode).send({ error: error.code });
+          }
+          request.log.error({
+            action,
+            errorType: error instanceof Error ? error.name : "UnknownError",
+          }, "Hosting lifecycle operation failed unexpectedly");
+          await auditWriter.append({
+            ...auditBase,
+            action: `tenant.hosting.${action}.failed`,
+            outcome: "failed",
+            metadata: { ...auditBase.metadata, errorCode: "HOSTING_LIFECYCLE_OPERATION_FAILED" },
+          }).catch(() => undefined);
+          return reply.code(500).send({ error: "HOSTING_LIFECYCLE_OPERATION_FAILED" });
+        }
+      },
+    );
+  }
 
   app.post<{ Params: { tenantId: string }; Body: { template: "wordpress" | "node-nextjs" | "ecommerce" } }>(
     "/admin/platform/tenants/:tenantId/hosting/provision",

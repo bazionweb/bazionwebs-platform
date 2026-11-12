@@ -41,6 +41,8 @@ function makeRuntime(): HostingProvisioningRuntime {
       providerResourceName: "alpha-node-nextjs",
       providerEnvironmentId: "environment-1",
     })),
+    stop: vi.fn(async () => undefined),
+    remove: vi.fn(async () => undefined),
   };
 }
 
