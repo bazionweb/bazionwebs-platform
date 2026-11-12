@@ -91,7 +91,7 @@ export function assertTenantMatch(expectedTenantId: string, actualTenantId: stri
 }
 
 export type TenantHostingTemplate = "wordpress" | "node-nextjs" | "ecommerce";
-export type TenantHostingDeploymentState = "provisioning" | "ready" | "deploying" | "running" | "stopped" | "failed" | "unknown";
+export type TenantHostingDeploymentState = "provisioning" | "ready" | "deploying" | "running" | "stopped" | "failed" | "unknown" | "removed";
 
 export interface TenantHostingDeploymentReference {
   provider: string;
@@ -123,8 +123,10 @@ export interface TenantHostingProvider {
     environmentSecretRef: string;
   }): Promise<TenantHostingDeploymentReference>;
   deploy(reference: TenantHostingDeploymentReference): Promise<void>;
-  inspect(reference: TenantHostingDeploymentReference): Promise<TenantHostingDeployment>;
+  start(reference: TenantHostingDeploymentReference): Promise<void>;
   stop(reference: TenantHostingDeploymentReference): Promise<void>;
+  redeploy(reference: TenantHostingDeploymentReference): Promise<void>;
+  inspect(reference: TenantHostingDeploymentReference): Promise<TenantHostingDeployment>;
   /** Removes the provider resource but preserves persistent volumes by default. */
   remove(reference: TenantHostingDeploymentReference): Promise<void>;
 }

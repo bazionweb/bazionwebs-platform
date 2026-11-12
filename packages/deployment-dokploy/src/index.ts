@@ -219,9 +219,30 @@ export class DokployComposeProvider implements TenantHostingProvider {
     await this.request("compose.deploy", "POST", { composeId: reference.resourceId, freshVolumes: false });
   }
 
+  async start(reference: TenantHostingDeploymentReference): Promise<void> {
+    this.assertReference(reference);
+    await this.request("compose.start", "POST", { composeId: reference.resourceId });
+  }
+
+  async redeploy(reference: TenantHostingDeploymentReference): Promise<void> {
+    this.assertReference(reference);
+    // Explicitly preserve existing persistent volumes during operator-triggered redeploys.
+    await this.request("compose.redeploy", "POST", { composeId: reference.resourceId, freshVolumes: false });
+  }
+
   async inspect(reference: TenantHostingDeploymentReference): Promise<TenantHostingDeployment> {
     this.assertReference(reference);
-    const payload = await this.request(`compose.one?composeId=${encodeURIComponent(reference.resourceId)}`, "GET") as DokployResource | null;
+    let payload: DokployResource | null;
+    try {
+      payload = await this.request(`compose.one?composeId=${encodeURIComponent(reference.resourceId)}`, "GET") as DokployResource | null;
+    } catch (error) {
+      // A missing provider resource is a terminal operational state, not a transient
+      // inspection outage. The reconciler will clear its stale provider reference.
+      if (error instanceof Error && error.message === "DOKPLOY_HTTP_404") {
+        return { reference, state: "removed", lastDeployedAt: null };
+      }
+      throw error;
+    }
     if (!payload) throw new Error("DOKPLOY_RESOURCE_NOT_FOUND");
     if (resourceId(payload) !== reference.resourceId) throw new Error("DOKPLOY_RESOURCE_ID_MISMATCH");
     if (typeof payload.environmentId === "string" && payload.environmentId !== this.config.environmentId) {

@@ -40,8 +40,10 @@ function provider(overrides: Partial<TenantHostingProvider> = {}): TenantHosting
   return {
     provision: vi.fn(async () => reference),
     deploy: vi.fn(async () => undefined),
-    inspect: vi.fn(async () => ({ reference, state: "running" as const, lastDeployedAt: "2026-11-11T09:00:00.000Z" })),
+    start: vi.fn(async () => undefined),
     stop: vi.fn(async () => undefined),
+    redeploy: vi.fn(async () => undefined),
+    inspect: vi.fn(async () => ({ reference, state: "running" as const, lastDeployedAt: "2026-11-11T09:00:00.000Z" })),
     remove: vi.fn(async () => undefined),
     ...overrides,
   };
@@ -103,6 +105,7 @@ describe("PostgresHostingReconciliationStore", () => {
     expect(result).toEqual({ changed: true, state: "running" });
     expect(statements.some((statement) => statement.includes("lease_token=NULL,lease_expires_at=NULL"))).toBe(true);
     expect(statements.some((statement) => statement.includes("hosting.reconciliation.state_changed"))).toBe(true);
+    expect(statements.some((statement) => statement.includes("provider_resource_id=CASE WHEN $3='removed' THEN NULL"))).toBe(true);
     const eventMetadata = parameters.find((values) =>
       typeof values[5] === "string" && values[5].includes('"providerState":"running"'),
     )?.[5];
@@ -170,6 +173,18 @@ describe("TenantHostingDeploymentReconciler", () => {
     expect(store.recordInspection).toHaveBeenCalledWith(expect.objectContaining({
       deploymentId: "deployment-1", leaseToken: "lease-1", state: "running",
       intervalSeconds: 60, actorId: "hosting-reconciler",
+    }));
+    expect(result).toEqual({ claimed: 1, inspected: 1, changed: 1, failed: 0, leaseLost: 0 });
+  });
+
+  it("records an absent provider resource as removed and clears its provider reference", async () => {
+    const port = provider({
+      inspect: vi.fn(async () => ({ reference, state: "removed" as const, lastDeployedAt: null })),
+    });
+    const { reconciler, store } = setup(port);
+    const result = await reconciler.runBatch();
+    expect(store.recordInspection).toHaveBeenCalledWith(expect.objectContaining({
+      deploymentId: "deployment-1", state: "removed",
     }));
     expect(result).toEqual({ claimed: 1, inspected: 1, changed: 1, failed: 0, leaseLost: 0 });
   });

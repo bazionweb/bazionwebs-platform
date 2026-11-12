@@ -25,7 +25,7 @@ export const tenantHostingDeployments = pgTable("tenant_hosting_deployments", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
   check("tenant_hosting_deployments_template_ck", sql`${table.template} in ('wordpress', 'node-nextjs', 'ecommerce')`),
-  check("tenant_hosting_deployments_state_ck", sql`${table.state} in ('provisioning', 'ready', 'deploying', 'running', 'stopped', 'failed', 'unknown')`),
+  check("tenant_hosting_deployments_state_ck", sql`${table.state} in ('provisioning', 'ready', 'deploying', 'running', 'stopped', 'failed', 'unknown', 'removed')`),
   check("tenant_hosting_deployments_attempt_ck", sql`${table.attemptCount} >= 1`),
   check("tenant_hosting_deployments_reconcile_failure_ck", sql`${table.reconcileFailureCount} >= 0`),
   check("tenant_hosting_deployments_lease_ck", sql`(${table.leaseToken} is null) = (${table.leaseExpiresAt} is null)`),
