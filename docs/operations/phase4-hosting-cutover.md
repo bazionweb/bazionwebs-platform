@@ -18,6 +18,7 @@ Bazionweb exposes `GET /api/v1/admin/platform-provisioning/hosting-cutover?page=
 
 - `ready_to_map`: exactly one ready Platform projection matches the same client and normalized domain and has both a Platform tenant and deployment ID. This is a review candidate, not an automatic mapping.
 - `platform_claim_not_ready`: a same-client Platform order exists but is still pending, failed, or has no ready deployment projection; `platformClaimStatuses` shows the source outbox/projection states.
+- `domainClaimConflict: true`: a matching outbox entry is dead-lettered because another normalized-domain owner exists. The cutover page surfaces this as an operator warning; resolve the competing ownership before replay.
 - `ambiguous_platform_claims`: more than one same-client Platform claim matches the domain.
 - `domain_claimed_by_other_client`: the domain also appears under a different or unresolved Platform client.
 - `linked_*`: an existing link has a missing projection or a detected client/domain/claim conflict.
