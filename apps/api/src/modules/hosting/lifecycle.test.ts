@@ -1,262 +1,207 @@
 import { describe, expect, it, vi } from "vitest";
-import type { HostingProvisioningRuntime } from "./runtime.js";
-import { HostingLifecycleError, HostingLifecycleService, type HostingLifecyclePool } from "./lifecycle.js";
+import type { TenantHostingDeploymentReference, TenantHostingProvider } from "@bazion/platform-contracts";
+import {
+  PostgresHostingLifecycleStore,
+  TenantHostingLifecycleService,
+  type HostingLifecyclePool,
+  type HostingLifecycleClaim,
+  type HostingLifecycleClaimResult,
+  type HostingLifecycleStore,
+} from "./lifecycle.js";
 
-const tenantId = "11111111-1111-4111-8111-111111111111";
-const deploymentId = "22222222-2222-4222-8222-222222222222";
-const resourceId = "compose-123";
-const createdAt = new Date("2026-11-11T08:00:00.000Z");
-
-function deployment(overrides: Record<string, unknown> = {}) {
-  return {
-    id: deploymentId,
-    tenant_id: tenantId,
-    provider: "dokploy",
-    template: "node-nextjs",
-    state: "running",
-    provider_resource_id: resourceId,
-    created_at: createdAt,
-    lease_expires_at: null,
-    ...overrides,
-  };
-}
-
-function makePool(row = deployment(), events: ReadonlySet<string> = new Set(), tenantStatus = "suspended") {
-  const statements: Array<{ sql: string; values?: unknown[] }> = [];
-  const client = {
-    query: vi.fn(async (sql: string, values?: unknown[]) => {
-      statements.push(values === undefined ? { sql } : { sql, values });
-      if (sql.includes("SELECT status FROM public.tenants")) return { rows: [{ status: tenantStatus }], rowCount: 1 };
-      if (sql.includes("SELECT id::text,tenant_id::text,provider,template,state")) return { rows: [row], rowCount: 1 };
-      if (sql.includes("SELECT EXISTS")) {
-        const eventType = sql.match(/event_type='([^']+)'/)?.[1] ?? String(values?.[2] ?? "");
-        return { rows: [{ exists: events.has(eventType) }], rowCount: 1 };
-      }
-      return { rows: [], rowCount: 1 };
-    }),
-    release: vi.fn(),
-  };
-  const pool = { connect: vi.fn(async () => client) } as unknown as HostingLifecyclePool;
-  return { pool, client, statements };
-}
-
-function makeRuntime(): HostingProvisioningRuntime {
-  const reference = {
-    provider: "dokploy",
-    resourceId,
-    tenantId: tenantId as never,
-    createdAt: createdAt.toISOString(),
-  };
-  return {
-    providerId: "dokploy",
-    environmentId: "environment-1",
-    loadTemplate: vi.fn(),
-    provision: vi.fn(),
-    inspect: vi.fn(async () => ({
-      reference,
-      state: "running" as const,
-      lastDeployedAt: null,
-      providerResourceName: "alpha-node-nextjs",
-      providerEnvironmentId: "environment-1",
-    })),
-    stop: vi.fn(async () => undefined),
-    remove: vi.fn(async () => undefined),
-  };
-}
-
-function observed(state: "running" | "stopped" = "running") {
-  return {
-    reference: {
-      provider: "dokploy",
-      resourceId,
-      tenantId: tenantId as never,
-      createdAt: createdAt.toISOString(),
-    },
-    state,
-    lastDeployedAt: null,
-    providerResourceName: "alpha-node-nextjs",
-    providerEnvironmentId: "environment-1",
-  };
-}
-
-const request = {
-  tenantId,
-  tenantSlug: "alpha",
-  deploymentId,
-  actorId: "platform-owner",
-  requestId: "request-1",
-  reason: "Approved customer hosting pause",
+const reference: TenantHostingDeploymentReference = {
+  provider: "dokploy",
+  resourceId: "compose-123",
+  tenantId: "11111111-1111-4111-8111-111111111111" as never,
+  createdAt: "2026-11-11T00:00:00.000Z",
+};
+const claim: HostingLifecycleClaim = {
+  deploymentId: "22222222-2222-4222-8222-222222222222",
+  leaseToken: "lease-1",
+  reference,
+  previousState: "stopped",
 };
 
-describe("platform hosting lifecycle operations", () => {
-  it("inspects a provider resource only after verifying its stored tenant and template identity", async () => {
-    const { pool } = makePool();
-    const runtime = makeRuntime();
-    const service = new HostingLifecycleService(pool, runtime);
+function setup(result: HostingLifecycleClaimResult = { kind: "claimed", claim }) {
+  const store: HostingLifecycleStore = {
+    claim: vi.fn(async () => result),
+    complete: vi.fn(async () => true),
+    fail: vi.fn(async () => undefined),
+  };
+  const provider: TenantHostingProvider = {
+    provision: vi.fn(async () => reference),
+    deploy: vi.fn(async () => undefined),
+    start: vi.fn(async () => undefined),
+    stop: vi.fn(async () => undefined),
+    redeploy: vi.fn(async () => undefined),
+    inspect: vi.fn(async () => ({ reference, state: "running" as const, lastDeployedAt: null })),
+    remove: vi.fn(async () => undefined),
+  };
+  return { service: new TenantHostingLifecycleService(store, provider, "dokploy"), store, provider };
+}
+const input = {
+  tenantId: reference.tenantId as string,
+  deploymentId: claim.deploymentId,
+  action: "start" as const,
+  actorId: "platform-owner",
+  requestId: "req-1",
+};
 
-    await expect(service.inspect({ tenantId, tenantSlug: "alpha", deploymentId })).resolves.toMatchObject({
-      deploymentId,
-      provider: "dokploy",
-      resourceId,
-      deploymentState: "running",
-      providerState: "running",
-      inspectedAt: expect.any(String),
-    });
-    expect(runtime.inspect).toHaveBeenCalledWith(expect.objectContaining({ resourceId, tenantId }));
+describe("PostgresHostingLifecycleStore", () => {
+  it("claims only matching provider resources and records events against the deployment UUID", async () => {
+    const statements: string[] = [];
+    const parameters: unknown[][] = [];
+    const pool = {
+      async connect() {
+        return {
+          async query(statement: string, values: unknown[] = []) {
+            statements.push(statement);
+            parameters.push(values);
+            if (statement.startsWith("SELECT d.id::text")) return {
+              rows: [{
+                id: claim.deploymentId, tenant_id: reference.tenantId, provider: "dokploy",
+                provider_resource_id: reference.resourceId, state: "stopped",
+                created_at: new Date(reference.createdAt), tenant_status: "active", lease_expires_at: null,
+              }],
+              rowCount: 1,
+            };
+            if (statement.startsWith("UPDATE public.tenant_hosting_deployments")) return { rows: [], rowCount: 1 };
+            return { rows: [], rowCount: 1 };
+          },
+          release() {},
+        };
+      },
+    } as HostingLifecyclePool;
+    const store = new PostgresHostingLifecycleStore(pool);
+    const result = await store.claim({ ...input, action: "start", expectedProvider: "dokploy" });
+    expect(result.kind).toBe("claimed");
+    if (result.kind !== "claimed") return;
+    expect(result.claim).toMatchObject({ deploymentId: claim.deploymentId, reference });
+    expect(statements.some((statement) => statement.includes("FOR UPDATE OF d,t"))).toBe(true);
+    expect(parameters.some((values) => values[0] === claim.deploymentId && values[1] === reference.tenantId)).toBe(true);
+    expect(parameters.some((values) => values[0] === claim.deploymentId && values[5] === "platform-owner")).toBe(true);
   });
 
-  it("does not report provider state when resource identity does not match the Platform tenant", async () => {
-    const { pool } = makePool();
-    const runtime = makeRuntime();
-    vi.mocked(runtime.inspect).mockResolvedValue({
-      ...observed(),
-      providerResourceName: "another-tenant-node-nextjs",
+  it("rejects a provider mismatch before leasing or mutating a foreign resource", async () => {
+    const statements: string[] = [];
+    const pool = {
+      async connect() {
+        return {
+          async query(statement: string) {
+            statements.push(statement);
+            if (statement.startsWith("SELECT d.id::text")) return {
+              rows: [{
+                id: claim.deploymentId, tenant_id: reference.tenantId, provider: "another-provider",
+                provider_resource_id: reference.resourceId, state: "stopped",
+                created_at: new Date(reference.createdAt), tenant_status: "active", lease_expires_at: null,
+              }],
+              rowCount: 1,
+            };
+            return { rows: [], rowCount: 1 };
+          },
+          release() {},
+        };
+      },
+    } as HostingLifecyclePool;
+    const result = await new PostgresHostingLifecycleStore(pool).claim({
+      ...input, action: "start", expectedProvider: "dokploy",
     });
-    const service = new HostingLifecycleService(pool, runtime);
-
-    await expect(service.inspect({ tenantId, tenantSlug: "alpha", deploymentId })).rejects.toMatchObject({
-      code: "HOSTING_PROVIDER_IDENTITY_MISMATCH",
-      statusCode: 409,
-    });
+    expect(result).toEqual({ kind: "provider_mismatch" });
+    expect(statements.some((statement) => statement.startsWith("UPDATE"))).toBe(false);
+    expect(statements).toContain("ROLLBACK");
   });
 
-  it("reports a missing provider resource for reconciliation without mutating provider state", async () => {
-    const { pool } = makePool();
-    const runtime = makeRuntime();
-    vi.mocked(runtime.inspect).mockRejectedValue(new Error("HOSTING_RESOURCE_NOT_FOUND"));
-    const service = new HostingLifecycleService(pool, runtime);
-
-    await expect(service.inspect({ tenantId, tenantSlug: "alpha", deploymentId })).resolves.toMatchObject({
-      deploymentId,
-      providerState: "missing",
+  it("requires closed tenants and stopped deployments before resource removal", async () => {
+    const pool = {
+      async connect() {
+        return {
+          async query(statement: string) {
+            if (statement.startsWith("SELECT d.id::text")) return {
+              rows: [{
+                id: claim.deploymentId, tenant_id: reference.tenantId, provider: "dokploy",
+                provider_resource_id: reference.resourceId, state: "running",
+                created_at: new Date(reference.createdAt), tenant_status: "active", lease_expires_at: null,
+              }],
+              rowCount: 1,
+            };
+            return { rows: [], rowCount: 1 };
+          },
+          release() {},
+        };
+      },
+    } as HostingLifecyclePool;
+    const result = await new PostgresHostingLifecycleStore(pool).claim({
+      ...input, action: "remove", expectedProvider: "dokploy",
     });
-    expect(runtime.stop).not.toHaveBeenCalled();
-    expect(runtime.remove).not.toHaveBeenCalled();
+    expect(result).toEqual({ kind: "tenant_not_closed" });
+  });
+});
+
+describe("TenantHostingLifecycleService", () => {
+  it("starts an existing resource and persists provider-confirmed state", async () => {
+    const { service, store, provider } = setup();
+    const result = await service.execute(input);
+    expect(provider.start).toHaveBeenCalledWith(reference);
+    expect(provider.inspect).toHaveBeenCalledWith(reference);
+    expect(store.complete).toHaveBeenCalledWith(expect.objectContaining({
+      claim, action: "start", state: "running", confirmed: true,
+    }));
+    expect(result).toEqual({ action: "start", state: "running", confirmed: true, already: false });
   });
 
-  it("stops only the verified provider resource and records the fenced transition", async () => {
-    const { pool, client, statements } = makePool();
-    const runtime = makeRuntime();
-    vi.mocked(runtime.inspect)
-      .mockResolvedValueOnce(observed("running"))
-      .mockResolvedValueOnce(observed("stopped"));
-
-    const service = new HostingLifecycleService(pool, runtime);
-    const result = await service.stop(request);
-
-    expect(result).toEqual({ deploymentId, state: "stopped", removed: false, alreadyApplied: false });
-    expect(runtime.stop).toHaveBeenCalledWith(expect.objectContaining({ resourceId, tenantId }));
-    expect(runtime.inspect).toHaveBeenCalledTimes(2);
-    expect(statements.some(({ values }) => values?.includes("hosting.deployment.stop_requested"))).toBe(true);
-    expect(statements.some(({ values }) => values?.includes("hosting.deployment.stopped"))).toBe(true);
-    expect(client.release).toHaveBeenCalledTimes(2);
+  it("uses the dedicated stop operation and verifies stopped state", async () => {
+    const { service, store, provider } = setup();
+    vi.mocked(provider.inspect).mockResolvedValueOnce({ reference, state: "stopped", lastDeployedAt: null });
+    const result = await service.execute({ ...input, action: "stop" });
+    expect(provider.stop).toHaveBeenCalledWith(reference);
+    expect(store.complete).toHaveBeenCalledWith(expect.objectContaining({
+      action: "stop", state: "stopped", confirmed: true,
+    }));
+    expect(result.confirmed).toBe(true);
   });
 
-  it("does not stop a resource whose provider metadata does not match its stored tenant/template", async () => {
-    const { pool, statements } = makePool();
-    const runtime = makeRuntime();
-    vi.mocked(runtime.inspect).mockResolvedValue({
-      ...observed(),
-      providerResourceName: "another-tenant-node-nextjs",
-    });
-    const service = new HostingLifecycleService(pool, runtime);
-
-    await expect(service.stop(request)).rejects.toMatchObject({
-      code: "HOSTING_PROVIDER_IDENTITY_MISMATCH",
-      statusCode: 409,
-    } satisfies Partial<HostingLifecycleError>);
-    expect(runtime.stop).not.toHaveBeenCalled();
-    expect(statements.some(({ values }) => values?.includes("hosting.deployment.stop_failed"))).toBe(true);
+  it("uses redeploy without requesting fresh persistent volumes", async () => {
+    const { service, provider } = setup();
+    await service.execute({ ...input, action: "redeploy" });
+    expect(provider.redeploy).toHaveBeenCalledWith(reference);
   });
 
-  it("allows an unknown stop to reconcile only after an earlier stop request", async () => {
-    const { pool } = makePool(
-      deployment({ state: "unknown" }),
-      new Set(["hosting.deployment.stop_requested"]),
-    );
-    const runtime = makeRuntime();
-    vi.mocked(runtime.inspect).mockResolvedValue(observed("stopped"));
-    const service = new HostingLifecycleService(pool, runtime);
-
-    await expect(service.stop(request)).resolves.toEqual({
-      deploymentId,
-      state: "stopped",
-      removed: false,
-      alreadyApplied: true,
-    });
-    expect(runtime.stop).not.toHaveBeenCalled();
+  it("removes only through the store's closed-tenant claim and records removed state", async () => {
+    const { service, store, provider } = setup();
+    const result = await service.execute({ ...input, action: "remove" });
+    expect(provider.remove).toHaveBeenCalledWith(reference);
+    expect(provider.inspect).not.toHaveBeenCalled();
+    expect(store.complete).toHaveBeenCalledWith(expect.objectContaining({
+      action: "remove", state: "removed", confirmed: true,
+    }));
+    expect(result.state).toBe("removed");
   });
 
-  it("does not allow an unrelated unknown deployment to be stopped", async () => {
-    const { pool } = makePool(deployment({ state: "unknown" }));
-    const runtime = makeRuntime();
-    const service = new HostingLifecycleService(pool, runtime);
-
-    await expect(service.stop(request)).rejects.toMatchObject({
-      code: "HOSTING_DEPLOYMENT_NOT_STOPPABLE",
-      statusCode: 409,
-    });
-    expect(runtime.inspect).not.toHaveBeenCalled();
+  it("does not call the provider when the action is already satisfied", async () => {
+    const { service, provider } = setup({ kind: "already", state: "running" });
+    const result = await service.execute(input);
+    expect(result).toEqual({ action: "start", state: "running", confirmed: true, already: true });
+    expect(provider.start).not.toHaveBeenCalled();
   });
 
-  it("removes only a stopped resource, verifies absence, and retains persistent volumes", async () => {
-    const { pool, statements } = makePool(deployment({ state: "stopped" }));
-    const runtime = makeRuntime();
-    vi.mocked(runtime.inspect)
-      .mockResolvedValueOnce(observed("stopped"))
-      .mockRejectedValueOnce(new Error("HOSTING_RESOURCE_NOT_FOUND"));
-    const service = new HostingLifecycleService(pool, runtime);
-
-    const result = await service.remove(request);
-
-    expect(result).toEqual({ deploymentId, state: "stopped", removed: true, alreadyApplied: false });
-    expect(runtime.remove).toHaveBeenCalledWith(expect.objectContaining({ resourceId, tenantId }));
-    expect(statements.some(({ sql, values }) => sql.includes("provider_resource_id=CASE WHEN $5") && values?.[4] === true)).toBe(true);
-    expect(statements.some(({ values }) => values?.includes("hosting.deployment.removed"))).toBe(true);
+  it("does not replay a failed mutating operation and sends the state to reconciliation", async () => {
+    const { service, store, provider } = setup();
+    vi.mocked(provider.start).mockRejectedValueOnce(new Error("DOKPLOY_HTTP_503"));
+    await expect(service.execute(input)).rejects.toThrow("HOSTING_PROVIDER_ACTION_FAILED");
+    expect(store.fail).toHaveBeenCalledWith(expect.objectContaining({
+      claim, action: "start", errorCode: "DOKPLOY_HTTP_503",
+    }));
+    expect(provider.start).toHaveBeenCalledTimes(1);
   });
 
-  it("refuses to remove a running deployment before contacting its provider", async () => {
-    const { pool } = makePool(deployment({ state: "running" }));
-    const runtime = makeRuntime();
-    const service = new HostingLifecycleService(pool, runtime);
-
-    await expect(service.remove(request)).rejects.toMatchObject({
-      code: "HOSTING_REMOVE_REQUIRES_STOPPED_RESOURCE",
-      statusCode: 409,
-    });
-    expect(runtime.inspect).not.toHaveBeenCalled();
-    expect(runtime.remove).not.toHaveBeenCalled();
-  });
-
-  it("rechecks suspension under a tenant row lock before destructive removal", async () => {
-    const { pool, statements } = makePool(deployment({ state: "stopped" }), new Set(), "active");
-    const runtime = makeRuntime();
-    const service = new HostingLifecycleService(pool, runtime);
-
-    await expect(service.remove(request)).rejects.toMatchObject({
-      code: "HOSTING_TENANT_MUST_BE_SUSPENDED",
-      statusCode: 409,
-    });
-    expect(statements.some(({ sql }) => sql.includes("FROM public.tenants WHERE id=$1 FOR UPDATE"))).toBe(true);
-    expect(runtime.inspect).not.toHaveBeenCalled();
-    expect(runtime.remove).not.toHaveBeenCalled();
-  });
-
-  it("treats a repeated removal as idempotent after the live provider reference is cleared", async () => {
-    const { pool } = makePool(
-      deployment({ state: "stopped", provider_resource_id: null }),
-      new Set(["hosting.deployment.removed"]),
-    );
-    const runtime = makeRuntime();
-    const service = new HostingLifecycleService(pool, runtime);
-
-    await expect(service.remove(request)).resolves.toEqual({
-      deploymentId,
-      state: "stopped",
-      removed: true,
-      alreadyApplied: true,
-    });
-    expect(runtime.inspect).not.toHaveBeenCalled();
-    expect(runtime.remove).not.toHaveBeenCalled();
+  it("records uncertain state when inspection fails after an accepted action", async () => {
+    const { service, store, provider } = setup();
+    vi.mocked(provider.inspect).mockRejectedValueOnce(new Error("inspection unavailable"));
+    const result = await service.execute(input);
+    expect(result.state).toBe("unknown");
+    expect(result.confirmed).toBe(false);
+    expect(store.complete).toHaveBeenCalledWith(expect.objectContaining({
+      state: "unknown", confirmed: false,
+    }));
   });
 });

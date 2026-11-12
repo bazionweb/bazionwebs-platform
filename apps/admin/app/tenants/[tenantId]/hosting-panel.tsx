@@ -43,6 +43,7 @@ const templates = [
 
 function statusClass(state: string): string {
   if (state === "running") return "status-active";
+  if (state === "removed") return "status-closed";
   if (["provisioning", "ready", "deploying"].includes(state)) return "status-provisioning";
   return "status-suspended";
 }
@@ -67,6 +68,45 @@ export function TenantHostingPanel({
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const baseUrl = `/v1/admin/platform/tenants/${encodeURIComponent(tenantId)}/hosting`;
+
+  async function operate(
+    deployment: Deployment,
+    action: "start" | "stop" | "redeploy" | "remove",
+  ) {
+    if (!initial?.providerConfigured || busy) return;
+    const warning = action === "remove"
+      ? "Permanently remove the stopped provider resource? The platform will preserve its persistent volumes; volume cleanup remains a separate, explicit operation."
+      : action === "redeploy"
+        ? "Redeploy this tenant's application? Existing persistent volumes will be preserved."
+        : action === "stop"
+          ? "Stop this tenant's application? Its data volumes will be preserved."
+          : "Start this tenant's stopped application?";
+    if (!window.confirm(warning)) return;
+    setBusy(true);
+    setMessage("");
+    try {
+      const response = await fetch(
+        `${baseUrl}/deployments/${encodeURIComponent(deployment.id)}/actions`,
+        {
+          method: "POST",
+          credentials: "include",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ action }),
+        },
+      );
+      const data = await responseData(response);
+      if (!response.ok) throw new Error(String(data.message ?? data.error ?? `Request failed (${response.status})`));
+      const result = data.deployment as { state?: string; confirmed?: boolean } | undefined;
+      setMessage(result?.confirmed
+        ? `${action} completed. The provider reports ${result.state ?? "the updated state"}.`
+        : `${action} was accepted. Provider state is still being verified; check the deployment status shortly.`);
+      router.refresh();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : `Hosting ${action} failed.`);
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function provision(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -128,12 +168,12 @@ export function TenantHostingPanel({
 
       <div className="table-wrap">
         <table>
-          <thead><tr><th>TEMPLATE / RESOURCE</th><th>PROVIDER</th><th>STATE</th><th>ATTEMPTS</th><th>LAST DEPLOYED</th><th>LAST CHECKED</th></tr></thead>
+          <thead><tr><th>TEMPLATE / RESOURCE</th><th>PROVIDER</th><th>STATE</th><th>ATTEMPTS</th><th>LAST DEPLOYED</th><th>LAST CHECKED</th><th>OPERATIONS</th></tr></thead>
           <tbody>
             {initial.deployments.map((deployment) => <tr key={deployment.id}>
               <td>
                 <strong>{deployment.template}</strong>
-                <small>{deployment.resourceId ?? "Provider resource reference unavailable"}</small>
+                <small>{deployment.state === "removed" ? "Provider resource removed" : deployment.resourceId ?? "Provider resource reference unavailable"}</small>
                 <small>{deployment.id}</small>
               </td>
               <td>{deployment.provider}</td>
@@ -147,8 +187,21 @@ export function TenantHostingPanel({
                 {deployment.lastInspectedAt ? new Date(deployment.lastInspectedAt).toLocaleString("en-KE") : "Not checked yet"}
                 {deployment.reconcileFailureCount > 0 && <small>{deployment.reconcileFailureCount} consecutive inspection failures</small>}
               </td>
+              <td>
+                <div className="actions">
+                  {tenantStatus === "active" && ["stopped", "ready", "failed"].includes(deployment.state) &&
+                    <button className="secondary" disabled={busy || !initial.providerConfigured} onClick={() => void operate(deployment, "start")}>Start</button>}
+                  {["running", "deploying", "ready", "failed"].includes(deployment.state) &&
+                    <button className="danger" disabled={busy || !initial.providerConfigured} onClick={() => void operate(deployment, "stop")}>Stop</button>}
+                  {tenantStatus === "active" && ["running", "stopped", "ready", "failed"].includes(deployment.state) &&
+                    <button className="secondary" disabled={busy || !initial.providerConfigured} onClick={() => void operate(deployment, "redeploy")}>Redeploy</button>}
+                  {tenantStatus === "closed" && deployment.state === "stopped" &&
+                    <button className="danger" disabled={busy || !initial.providerConfigured} onClick={() => void operate(deployment, "remove")}>Remove resource</button>}
+                  {deployment.state === "removed" && <small>Removed</small>}
+                </div>
+              </td>
             </tr>)}
-            {initial.deployments.length === 0 && <tr><td className="empty" colSpan={6}>No hosting deployments have been provisioned for this tenant.</td></tr>}
+            {initial.deployments.length === 0 && <tr><td className="empty" colSpan={7}>No hosting deployments have been provisioned for this tenant.</td></tr>}
           </tbody>
         </table>
       </div>

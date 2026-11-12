@@ -1,6 +1,9 @@
 import { randomUUID } from "node:crypto";
-import type { TenantHostingDeploymentReference } from "@bazion/platform-contracts";
-import type { HostingProvisioningRuntime } from "./runtime.js";
+import type {
+  TenantHostingDeploymentReference,
+  TenantHostingDeploymentState,
+  TenantHostingProvider,
+} from "@bazion/platform-contracts";
 
 interface SqlResult<T> { rows: T[]; rowCount: number | null }
 interface SqlClient {
@@ -9,440 +12,325 @@ interface SqlClient {
 }
 export interface HostingLifecyclePool { connect(): Promise<SqlClient> }
 
-interface DeploymentRow {
+export type TenantHostingLifecycleAction = "start" | "stop" | "redeploy" | "remove";
+export interface TenantHostingLifecycleInput {
+  tenantId: string;
+  deploymentId: string;
+  action: TenantHostingLifecycleAction;
+  actorId: string;
+  requestId?: string | undefined;
+}
+export interface TenantHostingLifecycleResult {
+  action: TenantHostingLifecycleAction;
+  state: TenantHostingDeploymentState;
+  confirmed: boolean;
+  already: boolean;
+}
+export interface HostingLifecycleClaim {
+  deploymentId: string;
+  leaseToken: string;
+  reference: TenantHostingDeploymentReference;
+  previousState: TenantHostingDeploymentState;
+}
+export type HostingLifecycleClaimResult =
+  | { kind: "claimed"; claim: HostingLifecycleClaim }
+  | { kind: "already"; state: TenantHostingDeploymentState }
+  | { kind: "not_found" | "tenant_not_active" | "tenant_not_closed" | "in_progress" | "invalid_state" | "removed" | "provider_mismatch" };
+
+export interface HostingLifecycleStore {
+  claim(input: TenantHostingLifecycleInput & { expectedProvider: string }): Promise<HostingLifecycleClaimResult>;
+  complete(input: {
+    claim: HostingLifecycleClaim;
+    action: TenantHostingLifecycleAction;
+    state: TenantHostingDeploymentState;
+    confirmed: boolean;
+    lastDeployedAt: string | null;
+    actorId: string;
+    requestId?: string | undefined;
+  }): Promise<boolean>;
+  fail(input: {
+    claim: HostingLifecycleClaim;
+    action: TenantHostingLifecycleAction;
+    errorCode: string;
+    actorId: string;
+    requestId?: string | undefined;
+  }): Promise<void>;
+}
+
+interface LifecycleRow {
   id: string;
   tenant_id: string;
   provider: string;
-  template: string;
-  state: string;
   provider_resource_id: string | null;
+  state: TenantHostingDeploymentState;
   created_at: Date | string;
+  tenant_status: string;
   lease_expires_at: Date | string | null;
 }
-
-export class HostingLifecycleError extends Error {
-  constructor(public readonly code: string, public readonly statusCode: number) {
-    super(code);
-    this.name = "HostingLifecycleError";
-  }
+function iso(value: Date | string): string {
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) throw new Error("HOSTING_LIFECYCLE_TIMESTAMP_INVALID");
+  return date.toISOString();
 }
-
-function isLeaseActive(value: Date | string | null): boolean {
+function leaseActive(value: Date | string | null): boolean {
   if (value === null) return false;
-  const expiresAt = value instanceof Date ? value.getTime() : Date.parse(value);
-  return Number.isFinite(expiresAt) && expiresAt > Date.now();
+  const timestamp = value instanceof Date ? value.getTime() : Date.parse(value);
+  return Number.isFinite(timestamp) && timestamp > Date.now();
 }
+const canStart = new Set<TenantHostingDeploymentState>(["stopped", "ready", "failed"]);
+const canStop = new Set<TenantHostingDeploymentState>(["running", "deploying", "ready", "failed"]);
+const canRedeploy = new Set<TenantHostingDeploymentState>(["running", "stopped", "ready", "failed"]);
 
-function makeReference(row: DeploymentRow): TenantHostingDeploymentReference {
-  const createdAt = row.created_at instanceof Date ? row.created_at : new Date(row.created_at);
-  if (Number.isNaN(createdAt.getTime()) || !row.provider_resource_id) {
-    throw new HostingLifecycleError("HOSTING_PROVIDER_REFERENCE_MISSING", 409);
+/** Serializes provider operations with the same database lease used by provisioning and reconciliation. */
+export class PostgresHostingLifecycleStore implements HostingLifecycleStore {
+  constructor(private readonly pool: HostingLifecyclePool, private readonly leaseSeconds = 300) {
+    if (!Number.isInteger(leaseSeconds) || leaseSeconds < 60 || leaseSeconds > 900) {
+      throw new Error("HOSTING_LIFECYCLE_LEASE_INVALID");
+    }
   }
-  return {
-    provider: row.provider,
-    resourceId: row.provider_resource_id,
-    tenantId: row.tenant_id as TenantHostingDeploymentReference["tenantId"],
-    createdAt: createdAt.toISOString(),
-  };
-}
 
-function safeReason(reason: string): string {
-  const value = reason.trim();
-  if (value.length < 8 || value.length > 500) throw new HostingLifecycleError("HOSTING_REASON_INVALID", 400);
-  return value;
-}
-
-/**
- * Audited, lease-fenced provider lifecycle operations. Remove always calls the
- * provider's non-volume-deleting operation and clears the live resource pointer
- * only after the provider confirms the resource is absent.
- */
-export class HostingLifecycleService {
-  constructor(
-    private readonly pool: HostingLifecyclePool,
-    private readonly runtime: HostingProvisioningRuntime,
-  ) {}
-
-  async inspect(input: { tenantId: string; tenantSlug: string; deploymentId: string }): Promise<{
-    deploymentId: string;
-    provider: string;
-    resourceId: string;
-    deploymentState: string;
-    providerState: string;
-    lastDeployedAt: string | null;
-    inspectedAt: string;
-  }> {
+  async claim(input: TenantHostingLifecycleInput & { expectedProvider: string }): Promise<HostingLifecycleClaimResult> {
     const client = await this.pool.connect();
-    let row: DeploymentRow | undefined;
-    try {
-      const result = await client.query<DeploymentRow>(
-        "SELECT id::text,tenant_id::text,provider,template,state,provider_resource_id,created_at,lease_expires_at " +
-        "FROM public.tenant_hosting_deployments WHERE id=$1 AND tenant_id=$2",
-        [input.deploymentId, input.tenantId],
-      );
-      row = result.rows[0];
-    } finally {
-      client.release();
-    }
-    if (!row) throw new HostingLifecycleError("HOSTING_DEPLOYMENT_NOT_FOUND", 404);
-    if (row.provider !== this.runtime.providerId) throw new HostingLifecycleError("HOSTING_PROVIDER_MISMATCH", 409);
-    if (isLeaseActive(row.lease_expires_at)) throw new HostingLifecycleError("HOSTING_OPERATION_IN_PROGRESS", 409);
-    const reference = makeReference(row);
-
-    let observed: Awaited<ReturnType<HostingProvisioningRuntime["inspect"]>>;
-    try {
-      observed = await this.runtime.inspect(reference);
-    } catch (error) {
-      if (error instanceof Error && error.message === "HOSTING_RESOURCE_NOT_FOUND") {
-        return {
-          deploymentId: row.id,
-          provider: row.provider,
-          resourceId: reference.resourceId,
-          deploymentState: row.state,
-          providerState: "missing",
-          lastDeployedAt: null,
-          inspectedAt: new Date().toISOString(),
-        };
-      }
-      throw new HostingLifecycleError("HOSTING_PROVIDER_OPERATION_FAILED", 502);
-    }
-    this.assertProviderIdentity(row, reference, observed, input.tenantSlug);
-
-    const lastDeployedAt = observed.lastDeployedAt
-      ? new Date(observed.lastDeployedAt).toISOString()
-      : null;
-    return {
-      deploymentId: row.id,
-      provider: row.provider,
-      resourceId: reference.resourceId,
-      deploymentState: row.state,
-      providerState: observed.state,
-      lastDeployedAt,
-      inspectedAt: new Date().toISOString(),
-    };
-  }
-
-  stop(input: { tenantId: string; tenantSlug: string; deploymentId: string; actorId: string; requestId: string; reason: string }) {
-    return this.run("stop", input);
-  }
-
-  remove(input: { tenantId: string; tenantSlug: string; deploymentId: string; actorId: string; requestId: string; reason: string }) {
-    return this.run("remove", input);
-  }
-
-  private async run(
-    action: "stop" | "remove",
-    input: { tenantId: string; tenantSlug: string; deploymentId: string; actorId: string; requestId: string; reason: string },
-  ): Promise<{ deploymentId: string; state: "stopped"; removed: boolean; alreadyApplied: boolean }> {
-    const reason = safeReason(input.reason);
-    const claimed = await this.claim(action, { ...input, reason });
-    if (claimed.alreadyRemoved) {
-      return { deploymentId: input.deploymentId, state: "stopped", removed: true, alreadyApplied: true };
-    }
-    const { row, reference, leaseToken } = claimed;
-    const lease = this.startLeaseHeartbeat(input, leaseToken);
-    let mutationStarted = false;
-
-    try {
-      let inspected: Awaited<ReturnType<HostingProvisioningRuntime["inspect"]>>;
-      try {
-        inspected = await this.runtime.inspect(reference);
-      } catch (error) {
-        if (action === "remove" && error instanceof Error && error.message === "HOSTING_RESOURCE_NOT_FOUND") {
-          lease.assertHeld();
-          lease.stop();
-          await this.finish(action, input, row, leaseToken, "stopped", {
-            providerResourceId: reference.resourceId,
-            reason,
-            providerWasAlreadyAbsent: true,
-            persistentVolumesDeleted: false,
-          }, { clearProviderReference: true });
-          return { deploymentId: row.id, state: "stopped", removed: true, alreadyApplied: true };
-        }
-        throw error;
-      }
-      this.assertProviderIdentity(row, reference, inspected, input.tenantSlug);
-      lease.assertHeld();
-
-      if (action === "stop") {
-        if (inspected.state !== "stopped") {
-          lease.assertHeld();
-          mutationStarted = true;
-          await this.runtime.stop(reference);
-          lease.assertHeld();
-        }
-        const after = inspected.state === "stopped" ? inspected : await this.runtime.inspect(reference);
-        this.assertProviderIdentity(row, reference, after, input.tenantSlug);
-        lease.assertHeld();
-        if (after.state !== "stopped") throw new HostingLifecycleError("HOSTING_STOP_NOT_CONFIRMED", 502);
-        lease.stop();
-        await this.finish(action, input, row, leaseToken, "stopped", {
-          providerResourceId: reference.resourceId,
-          reason,
-          providerState: after.state,
-        });
-        return { deploymentId: row.id, state: "stopped", removed: false, alreadyApplied: inspected.state === "stopped" };
-      }
-
-      if (inspected.state !== "stopped") {
-        throw new HostingLifecycleError("HOSTING_REMOVE_REQUIRES_STOPPED_RESOURCE", 409);
-      }
-      lease.assertHeld();
-      mutationStarted = true;
-      await this.runtime.remove(reference);
-      lease.assertHeld();
-      let absent = false;
-      try {
-        const after = await this.runtime.inspect(reference);
-        this.assertProviderIdentity(row, reference, after, input.tenantSlug);
-        absent = false;
-      } catch (error) {
-        if (error instanceof Error && error.message === "HOSTING_RESOURCE_NOT_FOUND") absent = true;
-        else throw error;
-      }
-      lease.assertHeld();
-      if (!absent) throw new HostingLifecycleError("HOSTING_REMOVE_NOT_CONFIRMED", 502);
-      lease.stop();
-      await this.finish(action, input, row, leaseToken, "stopped", {
-        providerResourceId: reference.resourceId,
-        reason,
-        persistentVolumesDeleted: false,
-      }, { clearProviderReference: true });
-      return { deploymentId: row.id, state: "stopped", removed: true, alreadyApplied: false };
-    } catch (error) {
-      await this.fail(action, input, row, leaseToken, mutationStarted, reason).catch(() => undefined);
-      if (error instanceof HostingLifecycleError) throw error;
-      throw new HostingLifecycleError("HOSTING_PROVIDER_OPERATION_FAILED", 502);
-    } finally {
-      lease.stop();
-    }
-  }
-
-  private startLeaseHeartbeat(
-    input: { tenantId: string; deploymentId: string },
-    leaseToken: string,
-  ): { assertHeld(): void; stop(): void } {
-    let stopped = false;
-    let lost = false;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const schedule = () => {
-      timer = setTimeout(() => { void renew(); }, 25_000);
-      timer.unref?.();
-    };
-    const renew = async () => {
-      if (stopped) return;
-      const client = await this.pool.connect().catch(() => null);
-      if (!client) {
-        lost = true;
-        return;
-      }
-      try {
-        const result = await client.query(
-          "UPDATE public.tenant_hosting_deployments SET lease_expires_at=now()+interval '90 seconds',updated_at=now() " +
-          "WHERE id=$1 AND tenant_id=$2 AND lease_token=$3 AND lease_expires_at > now()",
-          [input.deploymentId, input.tenantId, leaseToken],
-        );
-        if (result.rowCount !== 1) lost = true;
-      } catch {
-        lost = true;
-      } finally {
-        client.release();
-      }
-      if (!stopped && !lost) schedule();
-    };
-    schedule();
-    return {
-      assertHeld() {
-        if (lost) throw new HostingLifecycleError("HOSTING_OPERATION_LEASE_LOST", 409);
-      },
-      stop() {
-        stopped = true;
-        if (timer) clearTimeout(timer);
-      },
-    };
-  }
-
-  private async claim(
-    action: "stop" | "remove",
-    input: { tenantId: string; tenantSlug: string; deploymentId: string; actorId: string; requestId: string; reason: string },
-  ): Promise<{ row: DeploymentRow; reference: TenantHostingDeploymentReference; leaseToken: string; alreadyRemoved: false } | { alreadyRemoved: true }> {
-    const client = await this.pool.connect();
-    const leaseToken = randomUUID();
     try {
       await client.query("BEGIN");
-      const result = await client.query<DeploymentRow>(
-        "SELECT id::text,tenant_id::text,provider,template,state,provider_resource_id,created_at,lease_expires_at " +
-        "FROM public.tenant_hosting_deployments WHERE id=$1 AND tenant_id=$2 FOR UPDATE",
+      const result = await client.query<LifecycleRow>(
+        "SELECT d.id::text,d.tenant_id::text,d.provider,d.provider_resource_id,d.state,d.created_at," +
+        "d.lease_expires_at,t.status AS tenant_status " +
+        "FROM public.tenant_hosting_deployments d JOIN public.tenants t ON t.id=d.tenant_id " +
+        "WHERE d.id=$1 AND d.tenant_id=$2 FOR UPDATE OF d,t",
         [input.deploymentId, input.tenantId],
       );
       const row = result.rows[0];
-      if (!row) throw new HostingLifecycleError("HOSTING_DEPLOYMENT_NOT_FOUND", 404);
-      if (row.provider !== this.runtime.providerId) throw new HostingLifecycleError("HOSTING_PROVIDER_MISMATCH", 409);
-      if (isLeaseActive(row.lease_expires_at)) throw new HostingLifecycleError("HOSTING_OPERATION_IN_PROGRESS", 409);
-      if (action === "remove") {
-        const tenantResult = await client.query<{ status: string }>(
-          "SELECT status FROM public.tenants WHERE id=$1 FOR UPDATE",
-          [input.tenantId],
-        );
-        if (tenantResult.rows[0]?.status !== "suspended") {
-          throw new HostingLifecycleError("HOSTING_TENANT_MUST_BE_SUSPENDED", 409);
-        }
+      if (!row) { await client.query("ROLLBACK"); return { kind: "not_found" }; }
+      if (row.state === "removed") { await client.query("ROLLBACK"); return { kind: "removed" }; }
+      if (row.provider !== input.expectedProvider) { await client.query("ROLLBACK"); return { kind: "provider_mismatch" }; }
+      if (row.provider_resource_id === null) { await client.query("ROLLBACK"); return { kind: "invalid_state" }; }
+      if (leaseActive(row.lease_expires_at)) { await client.query("ROLLBACK"); return { kind: "in_progress" }; }
+
+      if ((input.action === "start" || input.action === "redeploy") && row.tenant_status !== "active") {
+        await client.query("ROLLBACK"); return { kind: "tenant_not_active" };
+      }
+      if (input.action === "remove" && row.tenant_status !== "closed") {
+        await client.query("ROLLBACK"); return { kind: "tenant_not_closed" };
+      }
+      if (input.action === "start" && row.state === "running") {
+        await client.query("COMMIT"); return { kind: "already", state: row.state };
+      }
+      if (input.action === "stop" && row.state === "stopped") {
+        await client.query("COMMIT"); return { kind: "already", state: row.state };
+      }
+      if (input.action === "remove" && row.state !== "stopped") {
+        await client.query("ROLLBACK"); return { kind: "invalid_state" };
+      }
+      if (input.action === "start" && !canStart.has(row.state)) {
+        await client.query("ROLLBACK"); return { kind: "invalid_state" };
+      }
+      if (input.action === "stop" && !canStop.has(row.state)) {
+        await client.query("ROLLBACK"); return { kind: "invalid_state" };
+      }
+      if (input.action === "redeploy" && !canRedeploy.has(row.state)) {
+        await client.query("ROLLBACK"); return { kind: "invalid_state" };
       }
 
-      if (!row.provider_resource_id) {
-        if (action === "remove" && row.state === "stopped") {
-          const removed = await client.query<{ exists: boolean }>(
-            "SELECT EXISTS (SELECT 1 FROM public.tenant_hosting_deployment_events " +
-            "WHERE deployment_id=$1 AND tenant_id=$2 AND event_type='hosting.deployment.removed') AS exists",
-            [input.deploymentId, input.tenantId],
-          );
-          if (removed.rows[0]?.exists) {
-            await client.query("COMMIT");
-            return { alreadyRemoved: true };
-          }
-        }
-        throw new HostingLifecycleError("HOSTING_PROVIDER_REFERENCE_MISSING", 409);
-      }
-      if (action === "remove" && row.state !== "stopped") {
-        const priorRemoval = row.state === "unknown"
-          ? await this.hasPriorLifecycleRequest(client, input, "remove")
-          : false;
-        if (!priorRemoval) throw new HostingLifecycleError("HOSTING_REMOVE_REQUIRES_STOPPED_RESOURCE", 409);
-      }
-      if (action === "stop" && !["ready", "running", "stopped", "failed"].includes(row.state)) {
-        const priorStop = row.state === "unknown"
-          ? await this.hasPriorLifecycleRequest(client, input, "stop")
-          : false;
-        if (!priorStop) throw new HostingLifecycleError("HOSTING_DEPLOYMENT_NOT_STOPPABLE", 409);
-      }
-
-      const reference = makeReference(row);
-
-      const claimed = await client.query(
-        "UPDATE public.tenant_hosting_deployments SET lease_token=$3,lease_expires_at=now()+interval '90 seconds',updated_at=now() " +
-        "WHERE id=$1 AND tenant_id=$2 AND (lease_expires_at IS NULL OR lease_expires_at <= now())",
-        [input.deploymentId, input.tenantId, leaseToken],
-      );
-      if (claimed.rowCount !== 1) throw new HostingLifecycleError("HOSTING_OPERATION_IN_PROGRESS", 409);
-      await client.query(
-        "INSERT INTO public.tenant_hosting_deployment_events " +
-        "(deployment_id,tenant_id,event_type,from_state,to_state,actor_type,actor_id,request_id,metadata) " +
-        "VALUES ($1,$2,$3,$4,$4,'user',$5,$6,$7::jsonb)",
-        [input.deploymentId, input.tenantId, `hosting.deployment.${action}_requested`, row.state, input.actorId, input.requestId,
-          JSON.stringify({ provider: row.provider, template: row.template, reason: input.reason })],
-      );
-      await client.query("COMMIT");
-      return { row, reference, leaseToken, alreadyRemoved: false };
-    } catch (error) {
-      await client.query("ROLLBACK").catch(() => undefined);
-      throw error;
-    } finally {
-      client.release();
-    }
-  }
-
-  private async hasPriorLifecycleRequest(
-    client: SqlClient,
-    input: { tenantId: string; deploymentId: string },
-    action: "stop" | "remove",
-  ): Promise<boolean> {
-    const result = await client.query<{ exists: boolean }>(
-      "SELECT EXISTS (SELECT 1 FROM public.tenant_hosting_deployment_events " +
-      "WHERE deployment_id=$1 AND tenant_id=$2 AND event_type=$3) AS exists",
-      [input.deploymentId, input.tenantId, `hosting.deployment.${action}_requested`],
-    );
-    return result.rows[0]?.exists === true;
-  }
-
-  private assertProviderIdentity(
-    row: DeploymentRow,
-    reference: TenantHostingDeploymentReference,
-    observed: Awaited<ReturnType<HostingProvisioningRuntime["inspect"]>>,
-    tenantSlug: string,
-  ): void {
-    const expectedName = `${tenantSlug}-${row.template}`;
-    if (
-      observed.reference.provider !== reference.provider ||
-      observed.reference.resourceId !== reference.resourceId ||
-      observed.reference.tenantId !== reference.tenantId ||
-      observed.providerEnvironmentId !== this.runtime.environmentId ||
-      !observed.providerResourceName ||
-      observed.providerResourceName !== expectedName
-    ) {
-      throw new HostingLifecycleError("HOSTING_PROVIDER_IDENTITY_MISMATCH", 409);
-    }
-  }
-
-  private async finish(
-    action: "stop" | "remove",
-    input: { tenantId: string; tenantSlug: string; deploymentId: string; actorId: string; requestId: string; reason: string },
-    row: DeploymentRow,
-    leaseToken: string,
-    state: "stopped",
-    metadata: Record<string, string | number | boolean | null>,
-    options: { clearProviderReference?: boolean } = {},
-  ): Promise<void> {
-    const client = await this.pool.connect();
-    try {
-      await client.query("BEGIN");
+      const leaseToken = randomUUID();
+      const nextState = input.action === "start" || input.action === "redeploy" ? "deploying" : row.state;
       const updated = await client.query(
-        "UPDATE public.tenant_hosting_deployments SET state=$4,error_code=NULL," +
-        "provider_resource_id=CASE WHEN $5 THEN NULL ELSE provider_resource_id END," +
-        "last_inspected_at=now(),lease_token=NULL,lease_expires_at=NULL,updated_at=now() " +
-        "WHERE id=$1 AND tenant_id=$2 AND lease_token=$3",
-        [input.deploymentId, input.tenantId, leaseToken, state, options.clearProviderReference === true],
-      );
-      if (updated.rowCount !== 1) throw new HostingLifecycleError("HOSTING_OPERATION_LEASE_LOST", 409);
-      await client.query(
-        "INSERT INTO public.tenant_hosting_deployment_events " +
-        "(deployment_id,tenant_id,event_type,from_state,to_state,actor_type,actor_id,request_id,metadata) " +
-        "VALUES ($1,$2,$3,$4,$5,'user',$6,$7,$8::jsonb)",
-        [input.deploymentId, input.tenantId, `hosting.deployment.${action === "remove" ? "removed" : "stopped"}`,
-          row.state, state, input.actorId, input.requestId, JSON.stringify(metadata)],
-      );
-      await client.query("COMMIT");
-    } catch (error) {
-      await client.query("ROLLBACK").catch(() => undefined);
-      throw error;
-    } finally {
-      client.release();
-    }
-  }
-
-  private async fail(
-    action: "stop" | "remove",
-    input: { tenantId: string; deploymentId: string; actorId: string; requestId: string; reason: string },
-    row: DeploymentRow,
-    leaseToken: string,
-    mutationStarted: boolean,
-    reason: string,
-  ): Promise<void> {
-    const client = await this.pool.connect();
-    try {
-      await client.query("BEGIN");
-      const nextState = mutationStarted ? "unknown" : row.state;
-      const updated = await client.query(
-        "UPDATE public.tenant_hosting_deployments SET state=$4,error_code=$5,lease_token=NULL,lease_expires_at=NULL,updated_at=now() " +
-        "WHERE id=$1 AND tenant_id=$2 AND lease_token=$3",
-        [input.deploymentId, input.tenantId, leaseToken, nextState, mutationStarted ? "HOSTING_EFFECT_UNCERTAIN" : "HOSTING_PROVIDER_OPERATION_FAILED"],
+        "UPDATE public.tenant_hosting_deployments SET state=$3,lease_token=$4," +
+        "lease_expires_at=now()+($5::integer*interval '1 second'),updated_at=now() " +
+        "WHERE id=$1 AND tenant_id=$2 AND (lease_expires_at IS NULL OR lease_expires_at<=now())",
+        [input.deploymentId,input.tenantId,nextState,leaseToken,this.leaseSeconds],
       );
       if (updated.rowCount !== 1) {
-        await client.query("ROLLBACK");
-        return;
+        await client.query("ROLLBACK"); return { kind: "in_progress" };
       }
+      await this.appendEvent(client, input, row.state, nextState,
+        "hosting.lifecycle." + input.action + ".requested", { provider: row.provider });
+      await client.query("COMMIT");
+      return {
+        kind: "claimed",
+        claim: {
+          deploymentId: row.id,
+          leaseToken,
+          previousState: row.state,
+          reference: {
+            provider: row.provider,
+            resourceId: row.provider_resource_id,
+            tenantId: row.tenant_id as TenantHostingDeploymentReference["tenantId"],
+            createdAt: iso(row.created_at),
+          },
+        },
+      };
+    } catch (error) {
+      await client.query("ROLLBACK").catch(() => undefined);
+      throw error;
+    } finally { client.release(); }
+  }
+
+  async complete(input: {
+    claim: HostingLifecycleClaim;
+    action: TenantHostingLifecycleAction;
+    state: TenantHostingDeploymentState;
+    confirmed: boolean;
+    lastDeployedAt: string | null;
+    actorId: string;
+    requestId?: string | undefined;
+  }): Promise<boolean> {
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      const isRemoved = input.action === "remove" || input.state === "removed";
+      const result = await client.query<{ tenant_id: string; state: string }>(
+        "UPDATE public.tenant_hosting_deployments SET state=$3," +
+        "provider_resource_id=CASE WHEN $4 THEN NULL ELSE provider_resource_id END," +
+        "error_code=NULL,last_deployed_at=COALESCE($5::timestamptz,last_deployed_at)," +
+        "last_inspected_at=CASE WHEN $4 THEN last_inspected_at ELSE now() END," +
+        "next_reconcile_at=now()+interval '30 seconds',lease_token=NULL,lease_expires_at=NULL,updated_at=now() " +
+        "WHERE id=$1 AND lease_token=$2 RETURNING tenant_id::text,state",
+        [input.claim.deploymentId, input.claim.leaseToken,
+          isRemoved ? "removed" : input.state, isRemoved, input.lastDeployedAt],
+      );
+      const row = result.rows[0];
+      if (!row) { await client.query("ROLLBACK"); return false; }
+      const eventType = "hosting.lifecycle." + input.action + ".completed";
       await client.query(
         "INSERT INTO public.tenant_hosting_deployment_events " +
         "(deployment_id,tenant_id,event_type,from_state,to_state,actor_type,actor_id,request_id,metadata) " +
         "VALUES ($1,$2,$3,$4,$5,'user',$6,$7,$8::jsonb)",
-        [input.deploymentId, input.tenantId, `hosting.deployment.${action}_failed`, row.state, nextState, input.actorId, input.requestId,
-          JSON.stringify({ reason, errorCode: mutationStarted ? "HOSTING_EFFECT_UNCERTAIN" : "HOSTING_PROVIDER_OPERATION_FAILED" })],
+        [input.claim.deploymentId, row.tenant_id, eventType,
+          input.claim.previousState, row.state, input.actorId, input.requestId ?? null,
+          JSON.stringify({ action: input.action, confirmed: input.confirmed, provider: input.claim.reference.provider })],
       );
+      await client.query("COMMIT");
+      return true;
+    } catch (error) {
+      await client.query("ROLLBACK").catch(() => undefined);
+      throw error;
+    } finally { client.release(); }
+  }
+
+  async fail(input: {
+    claim: HostingLifecycleClaim;
+    action: TenantHostingLifecycleAction;
+    errorCode: string;
+    actorId: string;
+    requestId?: string | undefined;
+  }): Promise<void> {
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      const result = await client.query<{ tenant_id: string }>(
+        "UPDATE public.tenant_hosting_deployments SET state='unknown',error_code=$3," +
+        "lease_token=NULL,lease_expires_at=NULL,last_inspected_at=now(),next_reconcile_at=now(),updated_at=now() " +
+        "WHERE id=$1 AND lease_token=$2 RETURNING tenant_id::text",
+        [input.claim.deploymentId, input.claim.leaseToken, input.errorCode],
+      );
+      const tenantId = result.rows[0]?.tenant_id;
+      if (tenantId) {
+        await client.query(
+          "INSERT INTO public.tenant_hosting_deployment_events " +
+          "(deployment_id,tenant_id,event_type,from_state,to_state,actor_type,actor_id,request_id,metadata) " +
+          "VALUES ($1,$2,$3,$4,'unknown','user',$5,$6,$7::jsonb)",
+          [input.claim.deploymentId, tenantId,
+            "hosting.lifecycle." + input.action + ".failed", input.claim.previousState,
+            input.actorId, input.requestId ?? null, JSON.stringify({ errorCode: input.errorCode })],
+        );
+      }
       await client.query("COMMIT");
     } catch (error) {
       await client.query("ROLLBACK").catch(() => undefined);
       throw error;
-    } finally {
-      client.release();
+    } finally { client.release(); }
+  }
+
+  private async appendEvent(
+    client: SqlClient, input: TenantHostingLifecycleInput, fromState: string, toState: string,
+    eventType: string, metadata: Record<string, string>,
+  ): Promise<void> {
+    await client.query(
+      "INSERT INTO public.tenant_hosting_deployment_events " +
+      "(deployment_id,tenant_id,event_type,from_state,to_state,actor_type,actor_id,request_id,metadata) " +
+      "VALUES ($1,$2,$3,$4,$5,'user',$6,$7,$8::jsonb)",
+      [input.deploymentId,input.tenantId,eventType,fromState,toState,input.actorId,input.requestId ?? null,JSON.stringify(metadata)],
+    );
+  }
+}
+
+/** Executes one explicit provider action; ambiguous POST failures become unknown and are reconciled, never replayed. */
+export class TenantHostingLifecycleService {
+  constructor(
+    private readonly store: HostingLifecycleStore,
+    private readonly provider: TenantHostingProvider,
+    private readonly providerId: string,
+  ) {
+    if (!providerId.trim()) throw new Error("HOSTING_PROVIDER_ID_REQUIRED");
+  }
+
+  async execute(input: TenantHostingLifecycleInput): Promise<TenantHostingLifecycleResult> {
+    const claimed = await this.store.claim({ ...input, expectedProvider: this.providerId });
+    if (claimed.kind === "already") return { action: input.action, state: claimed.state, confirmed: true, already: true };
+    const errors: Record<Exclude<HostingLifecycleClaimResult["kind"], "claimed" | "already">, string> = {
+      not_found: "HOSTING_DEPLOYMENT_NOT_FOUND",
+      tenant_not_active: "TENANT_NOT_ACTIVE",
+      tenant_not_closed: "TENANT_NOT_CLOSED",
+      in_progress: "HOSTING_LIFECYCLE_IN_PROGRESS",
+      invalid_state: "HOSTING_LIFECYCLE_STATE_INVALID",
+      removed: "HOSTING_DEPLOYMENT_REMOVED",
+      provider_mismatch: "HOSTING_PROVIDER_MISMATCH",
+    };
+    if (claimed.kind !== "claimed") throw new Error(errors[claimed.kind]);
+    const { claim } = claimed;
+    if (claim.reference.provider !== this.providerId) {
+      await this.store.fail({ claim, action: input.action, errorCode: "HOSTING_PROVIDER_MISMATCH", actorId: input.actorId, requestId: input.requestId });
+      throw new Error("HOSTING_PROVIDER_MISMATCH");
     }
+
+    try {
+      switch (input.action) {
+        case "start": await this.provider.start(claim.reference); break;
+        case "stop": await this.provider.stop(claim.reference); break;
+        case "redeploy": await this.provider.redeploy(claim.reference); break;
+        case "remove": await this.provider.remove(claim.reference); break;
+      }
+    } catch (error) {
+      const code = error instanceof Error && /^[A-Z][A-Z0-9_]{1,63}$/.test(error.message)
+        ? error.message : "HOSTING_PROVIDER_ACTION_FAILED";
+      await this.store.fail({ claim, action: input.action, errorCode: code, actorId: input.actorId, requestId: input.requestId });
+      throw new Error("HOSTING_PROVIDER_ACTION_FAILED");
+    }
+
+    if (input.action === "remove") {
+      const saved = await this.store.complete({
+        claim, action: input.action, state: "removed", confirmed: true,
+        lastDeployedAt: null, actorId: input.actorId, requestId: input.requestId,
+      });
+      if (!saved) throw new Error("HOSTING_LIFECYCLE_LEASE_LOST");
+      return { action: input.action, state: "removed", confirmed: true, already: false };
+    }
+
+    let state: TenantHostingDeploymentState = "unknown";
+    let lastDeployedAt: string | null = null;
+    try {
+      const observed = await this.provider.inspect(claim.reference);
+      if (observed.reference.provider !== claim.reference.provider ||
+          observed.reference.resourceId !== claim.reference.resourceId ||
+          observed.reference.tenantId !== claim.reference.tenantId) {
+        throw new Error("HOSTING_PROVIDER_REFERENCE_MISMATCH");
+      }
+      state = observed.state;
+      lastDeployedAt = observed.lastDeployedAt;
+    } catch {
+      // The provider action may have succeeded. Preserve that uncertainty and let
+      // the read-only reconciler determine the actual state on its next poll.
+      state = "unknown";
+    }
+    const confirmed = input.action === "stop"
+      ? state === "stopped"
+      : state === "running" || state === "deploying" || state === "ready";
+    const saved = await this.store.complete({
+      claim, action: input.action, state, confirmed, lastDeployedAt,
+      actorId: input.actorId, requestId: input.requestId,
+    });
+    if (!saved) throw new Error("HOSTING_LIFECYCLE_LEASE_LOST");
+    return { action: input.action, state, confirmed, already: false };
   }
 }

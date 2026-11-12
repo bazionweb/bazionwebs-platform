@@ -61,8 +61,8 @@ const pool = new Pool({
 });
 
 // The reconciler is deliberately given an inspect-only facade. Even if a future
-// code path is added by mistake, this worker cannot create, deploy, stop, or
-// delete Dokploy resources.
+// code path is added by mistake, this worker cannot create, deploy, start,
+// stop, redeploy, or delete Dokploy resources.
 const dokploy = new DokployComposeProvider(dokployConfig, {
   async resolveEnvironment() {
     throw new Error("HOSTING_RECONCILER_SECRET_ACCESS_DISABLED");
@@ -71,8 +71,10 @@ const dokploy = new DokployComposeProvider(dokployConfig, {
 const inspectOnlyProvider: TenantHostingProvider = {
   async provision() { throw new Error("HOSTING_RECONCILER_INSPECT_ONLY"); },
   async deploy() { throw new Error("HOSTING_RECONCILER_INSPECT_ONLY"); },
+  async start() { throw new Error("HOSTING_RECONCILER_INSPECT_ONLY"); },
   inspect: (reference) => dokploy.inspect(reference),
   async stop() { throw new Error("HOSTING_RECONCILER_INSPECT_ONLY"); },
+  async redeploy() { throw new Error("HOSTING_RECONCILER_INSPECT_ONLY"); },
   async remove() { throw new Error("HOSTING_RECONCILER_INSPECT_ONLY"); },
 };
 

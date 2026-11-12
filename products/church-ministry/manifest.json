@@ -29,5 +29,5 @@
     "schemaVersion": "1.0.0",
     "sourcePath": "packages/church-ministry-contracts/src/index.ts"
   },
-  "databaseSchemaVersion": "0021_phase6_saga_leases_lifecycle_archive.sql"
+  "databaseSchemaVersion": "0022_phase4_hosting_deployment_projection.sql"
 }
