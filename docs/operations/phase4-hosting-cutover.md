@@ -33,7 +33,7 @@ The report omits Dokploy provider and workload identifiers. Only manually review
 3. Verify that the Platform status callback or authenticated operation poll has reached Bazionweb. The projection must be `ready` and contain a Platform tenant ID, requested domain, and opaque Platform deployment UUID.
 4. Confirm the Platform order domain and Bazionweb hosting domain are the same after lower-casing and removing one trailing dot. Confirm the projection and hosting row belong to the same Bazionweb client.
 5. Record a change, incident, migration, ticket, drill, or rollback reference. Do not place secrets, provider IDs, or customer details in the reference.
-6. As an `ADMIN` or `SUPER_ADMIN`, call `POST /api/v1/hosting/{hostingAccountId}/platform-deployment-link` with `platformDeploymentId` and `evidenceRef`.
+6. On `/admin/hosting/cutover`, use **Review mapping** for the verified row, confirm the client/domain, and enter the change or migration evidence reference. The form calls `POST /api/v1/hosting/{hostingAccountId}/platform-deployment-link`; an `ADMIN` or `SUPER_ADMIN` may also call that endpoint directly.
 7. Read the account from `/api/v1/hosting/{hostingAccountId}` and confirm both views: the legacy hosting status and the nested `platformProvisioning` status/step/update time. The read response deliberately omits Platform deployment UUID, mapping evidence, and provider resource identifiers.
 8. Record any difference in the change evidence and keep the legacy mutation path available through the approved rollback window.
 
