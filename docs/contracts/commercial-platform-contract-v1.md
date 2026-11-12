@@ -77,8 +77,8 @@ Subscription billing/dunning states remain separate from initial provisioning:
 To prevent in-place corruption of live installations when customers buy add-ons, multi-line orders, or plan upgrades:
 
 1. **Order Line Identity**: Every commercial order line uses deterministic line scoping (`<orderId>:line:<index>`) for both `externalOrderId` and idempotency keys (`bazionweb:order:<invoiceId>:line:<index>:v1`). Never emit bare order IDs when multiple installables or add-ons exist.
-2. **Existing Installation Targeting**: Plan upgrades or add-on entitlements targeting an existing installation must reference its immutable `targetInstallationId` (UUID) rather than overloading initial checkout `order.externalOrderId`.
-3. **Immutable Pinned Composition**: A live installation's `product`, `solution`, `template`, and pinned release versions are **never** mutated in place through `provisionProductRequestV1`. Upgrades/add-ons must pass platform compatibility checks (`targetConfigurationSchemaVersion` / release compatibility rules) before applying module overrides or migrating to a successor release.
+2. **Existing Installation Targeting**: Lifecycle, configuration-schema updates, plan upgrades, or add-on entitlements targeting an existing installation must reference its immutable `installationId` (UUID — as modeled on `subscriptionLifecycleCommandV1`, `provisioningOperationV1`, and `subscriptionLifecycleStatusEventV1`) rather than overloading initial checkout `order.externalOrderId` on `provisionProductRequestV1`.
+3. **Immutable Pinned Composition**: A live installation's `product`, `solution`, `template`, and pinned release versions are **never** mutated in place through `provisionProductRequestV1`. Upgrades/add-ons require a dedicated versioned command keyed by `<orderId>:line:<index>` and `installationId`, and must pass platform compatibility checks (`targetConfigurationSchemaVersion` / release compatibility rules) before applying module overrides or migrating to a successor release.
 
 ---
 

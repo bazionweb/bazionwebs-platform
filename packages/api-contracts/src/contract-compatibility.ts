@@ -25,7 +25,8 @@ export const CONTRACT_COMPATIBILITY_V1 = {
   deprecationWindowDays: 90,
   upgradeIdentificationRule: {
     orderLineKeyFormat: "<orderId>:line:<index>",
-    targetIdentifierField: "targetInstallationId",
+    targetIdentifierField: "installationId",
+    compatibilityField: "targetConfigurationSchemaVersion",
     mutatePinnedCompositionInPlace: false,
   },
   piiBoundaryPolicy: {

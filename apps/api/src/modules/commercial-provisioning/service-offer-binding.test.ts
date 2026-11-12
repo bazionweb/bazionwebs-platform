@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import { CommercialProvisioningService } from "./service.js";
 import type { CommercialSqlPool, SqlClient, SqlResult } from "./service.js";
+import { SubscriptionLifecycleService } from "./lifecycle-service.js";
+import type { PostgresAuditEventWriter } from "@bazion/audit";
 import { integrationOfferBinding } from "./offer-resolution.test-fixtures.js";
 
 const request = {
@@ -104,6 +106,48 @@ describe("provisioning intake offer gate", () => {
     for (const unsupportedVersion of ["2.0.0", "0.9.0", "1.1.0"]) {
       await expect(
         service.acceptCommand({ ...request, schemaVersion: unsupportedVersion }),
+      ).rejects.toMatchObject({
+        statusCode: 400,
+      });
+    }
+    expect(connect).not.toHaveBeenCalled();
+  });
+
+  it("rejects unsupported lifecycle command schemaVersion values before opening a database transaction", async () => {
+    const connect = vi.fn();
+    const pool: CommercialSqlPool = {
+      connect,
+      async query<T = Record<string, unknown>>(): Promise<SqlResult<T>> {
+        return { rows: [], rowCount: 0 };
+      },
+    };
+    const auditWriter = {
+      append: vi.fn(async () => {}),
+    } as unknown as PostgresAuditEventWriter;
+    const lifecycleService = new SubscriptionLifecycleService(pool, auditWriter);
+
+    const baseCommand = {
+      schemaVersion: "1.0.0",
+      eventId: "33333333-3333-4333-8333-333333333333",
+      correlationId: "44444444-4444-4444-8444-444444444444",
+      idempotencyKey: "bazionweb:sub:sub-100:suspend:v1",
+      occurredAt: "2026-11-12T08:00:00.000Z",
+      effectiveAt: "2026-11-12T08:00:00.000Z",
+      source: "bazionweb",
+      action: "suspend",
+      subscriptionId: "sub-100",
+      externalCustomerId: "customer-1008",
+      externalOrderId: "order-2026-0042:line:0",
+      installationId: "4954ba5a-6c50-4881-a3bc-c43076c7abc8",
+      reasonCode: "DUNNING_EXHAUSTED",
+    };
+
+    for (const unsupportedVersion of ["2.0.0", "0.9.0", "1.1.0"]) {
+      await expect(
+        lifecycleService.applySignedCommand(
+          { ...baseCommand, schemaVersion: unsupportedVersion },
+          { requestId: "req-version-check", actorClientId: "bazionweb-test" },
+        ),
       ).rejects.toMatchObject({
         statusCode: 400,
       });

@@ -67,6 +67,23 @@ describe("Commercial <-> Platform Contract v1 parity & compatibility", () => {
     expect(CONTRACT_COMPATIBILITY_V1.currentVersion).toBe("1.0.0");
     expect(CONTRACT_COMPATIBILITY_V1.minimumSupportedVersion).toBe("1.0.0");
     expect(CONTRACT_COMPATIBILITY_V1.deprecationWindowDays).toBe(90);
+    expect(CONTRACT_COMPATIBILITY_V1.upgradeIdentificationRule).toEqual({
+      orderLineKeyFormat: "<orderId>:line:<index>",
+      targetIdentifierField: "installationId",
+      compatibilityField: "targetConfigurationSchemaVersion",
+      mutatePinnedCompositionInPlace: false,
+    });
+    expect(CONTRACT_COMPATIBILITY_V1.piiBoundaryPolicy).toEqual({
+      transientCustomerFields: ["customer.displayName", "customer.primaryContact"],
+      persistedInPlatformDeliveryTables: false,
+      redactedInStructuredLogs: true,
+      normalizePrimaryContactOnEmission: true,
+    });
+    expect(CONTRACT_COMPATIBILITY_V1.evolutionRules.unsupportedVersionBehavior).toContain("400");
+    expect(subscriptionLifecycleCommandV1Schema.shape).toHaveProperty("installationId");
+    expect(subscriptionLifecycleCommandV1Schema.shape).toHaveProperty("targetConfigurationSchemaVersion");
+    expect(provisionProductRequestV1Schema.shape).not.toHaveProperty("installationId");
+    expect(provisionProductRequestV1Schema.shape).not.toHaveProperty("targetInstallationId");
 
     expect(evaluateContractVersionCompatibility("1.0.0")).toMatchObject({
       supported: true,
