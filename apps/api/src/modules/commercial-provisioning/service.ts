@@ -86,8 +86,10 @@ interface OperationRow {
   current_step: string | null;
   tenant_id: string | null;
   installation_id: string | null;
+  requested_domain?: string | null;
   failure_code: string | null;
   failure_retryable: boolean | null;
+  hosting_deployment_id?: string | null;
   failure_disposition?: "retry" | "compensate" | "unknown" | "compensation_failed" | null;
   updated_at: Date | string;
 }
@@ -125,9 +127,11 @@ function mapOperationRow(row: OperationRow): ProvisioningOperationV1 {
     currentStep: row.current_step,
     tenantId: row.tenant_id,
     installationId: row.installation_id,
+    requestedDomain: row.requested_domain ?? null,
     failure: row.failure_code
       ? { code: row.failure_code, retryable: Boolean(row.failure_retryable) }
       : null,
+    hostingDeploymentId: row.hosting_deployment_id ?? null,
     updatedAt: iso(row.updated_at),
   });
 }
@@ -194,8 +198,13 @@ export class CommercialProvisioningService {
                 i.external_order_id AS inbox_external_order_id,
                 i.request_fingerprint AS inbox_request_fingerprint,
                 o.id::text, o.schema_version, o.correlation_id::text, o.external_order_id,
-                o.status, o.current_step, o.tenant_id::text, o.installation_id::text,
-                o.failure_code, o.failure_retryable, o.updated_at
+                o.status, o.current_step, o.tenant_id::text, o.installation_id::text, o.requested_domain,
+                o.failure_code, o.failure_retryable,
+                (SELECT d.id::text FROM public.tenant_hosting_deployments d
+                  WHERE d.tenant_id = o.tenant_id
+                    AND d.idempotency_key = o.id::text || ':provision_hosting:forward'
+                  LIMIT 1) AS hosting_deployment_id,
+                o.updated_at
            FROM public.product_provisioning_inbox i
            JOIN public.product_provisioning_operations o ON o.id = i.operation_id
           WHERE i.source = $1
@@ -238,13 +247,18 @@ export class CommercialProvisioningService {
 
       // Check existing operations directly in case a row existed prior to inbox adoption.
       const legacyMatches = await client.query<LegacyOperationMatchRow>(
-        `SELECT id::text, schema_version, event_id::text, correlation_id::text,
-                idempotency_key, external_order_id,
-                status, current_step, tenant_id::text, installation_id::text,
-                failure_code, failure_retryable, updated_at, request_fingerprint
-           FROM public.product_provisioning_operations
-          WHERE source = $1
-            AND (idempotency_key = $2 OR event_id = $3 OR external_order_id = $4)`,
+        `SELECT o.id::text, o.schema_version, o.event_id::text, o.correlation_id::text,
+                o.idempotency_key, o.external_order_id,
+                o.status, o.current_step, o.tenant_id::text, o.installation_id::text, o.requested_domain,
+                o.failure_code, o.failure_retryable,
+                (SELECT d.id::text FROM public.tenant_hosting_deployments d
+                  WHERE d.tenant_id = o.tenant_id
+                    AND d.idempotency_key = o.id::text || ':provision_hosting:forward'
+                  LIMIT 1) AS hosting_deployment_id,
+                o.updated_at, o.request_fingerprint
+           FROM public.product_provisioning_operations o
+          WHERE o.source = $1
+            AND (o.idempotency_key = $2 OR o.event_id = $3 OR o.external_order_id = $4)`,
         [request.source, request.idempotencyKey, request.eventId, request.order.externalOrderId],
       );
       if (legacyMatches.rows.length > 0) {
@@ -327,7 +341,7 @@ export class CommercialProvisioningService {
            $17, 'accepted', 'accept_command'
          )
          RETURNING id::text, schema_version, correlation_id::text, external_order_id,
-                   status, current_step, tenant_id::text, installation_id::text,
+                   status, current_step, tenant_id::text, installation_id::text, requested_domain,
                    failure_code, failure_retryable, updated_at`,
         [
           request.schemaVersion,
@@ -385,11 +399,16 @@ export class CommercialProvisioningService {
       throw new CommercialProvisioningError(400, "INVALID_OPERATION_ID", "Invalid operation identifier.");
     }
     const result = await this.pool.query<OperationRow>(
-      `SELECT id::text, schema_version, correlation_id::text, external_order_id,
-              status, current_step, tenant_id::text, installation_id::text,
-              failure_code, failure_retryable, updated_at
-         FROM public.product_provisioning_operations
-        WHERE id = $1`,
+      `SELECT o.id::text, o.schema_version, o.correlation_id::text, o.external_order_id,
+              o.status, o.current_step, o.tenant_id::text, o.installation_id::text, o.requested_domain,
+              o.failure_code, o.failure_retryable,
+              (SELECT d.id::text FROM public.tenant_hosting_deployments d
+                WHERE d.tenant_id = o.tenant_id
+                  AND d.idempotency_key = o.id::text || ':provision_hosting:forward'
+                LIMIT 1) AS hosting_deployment_id,
+              o.updated_at
+         FROM public.product_provisioning_operations o
+        WHERE o.id = $1`,
       [operationId],
     );
     const row = result.rows[0];
@@ -479,7 +498,7 @@ export class CommercialProvisioningService {
         : (nextIsFailureState ? current.failure_disposition ?? null : null);
 
       const updatedResult = await client.query<OperationRow>(
-        `UPDATE public.product_provisioning_operations
+        `UPDATE public.product_provisioning_operations AS o
             SET status = $2,
                 current_step = $3,
                 tenant_id = $4,
@@ -487,10 +506,15 @@ export class CommercialProvisioningService {
                 failure_code = $6,
                 failure_retryable = $7,
                 failure_disposition = $8
-          WHERE id = $1
-          RETURNING id::text, schema_version, correlation_id::text, external_order_id,
-                    status, current_step, tenant_id::text, installation_id::text,
-                    failure_code, failure_retryable, updated_at`,
+          WHERE o.id = $1
+          RETURNING o.id::text, o.schema_version, o.correlation_id::text, o.external_order_id,
+                    o.status, o.current_step, o.tenant_id::text, o.installation_id::text, o.requested_domain,
+                    o.failure_code, o.failure_retryable,
+                    (SELECT d.id::text FROM public.tenant_hosting_deployments d
+                      WHERE d.tenant_id = o.tenant_id
+                        AND d.idempotency_key = o.id::text || ':provision_hosting:forward'
+                      LIMIT 1) AS hosting_deployment_id,
+                    o.updated_at`,
         [
           input.operationId,
           input.nextStatus,

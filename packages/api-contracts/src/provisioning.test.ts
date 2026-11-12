@@ -86,10 +86,40 @@ describe("Bazion commercial-to-platform provisioning contract v1", () => {
       currentStep: null,
       tenantId: null,
       installationId: null,
+      hostingDeploymentId: null,
       failure: null,
       updatedAt: "2026-11-11T08:30:00.000Z",
     });
     expect(result.success).toBe(false);
+  });
+
+  it("accepts an optional platform hosting deployment reference only when it is a UUID", () => {
+    const operation = {
+      schemaVersion: "1.0.0",
+      operationId: "76d60c98-a6ee-49fa-ae27-49a6b5920b98",
+      correlationId: "ff46ea3a-a4fb-4f08-8b19-a01a7fbd84a9",
+      externalOrderId: "order-2026-0042",
+      status: "ready",
+      currentStep: null,
+      tenantId: "6b692865-86e6-42b9-934f-94953912a777",
+      installationId: "4954ba5a-6c50-4881-a3bc-c43076c7abc8",
+      failure: null,
+      updatedAt: "2026-11-11T08:30:00.000Z",
+    };
+    expect(provisioningOperationV1Schema.safeParse(operation).success).toBe(true);
+    expect(provisioningOperationV1Schema.safeParse({
+      ...operation,
+      hostingDeploymentId: "not-a-uuid",
+    }).success).toBe(false);
+    expect(provisioningOperationV1Schema.safeParse({
+      ...operation,
+      requestedDomain: "www.example.test",
+      hostingDeploymentId: "22222222-2222-4222-8222-222222222222",
+    }).success).toBe(true);
+    expect(provisioningOperationV1Schema.safeParse({
+      ...operation,
+      requestedDomain: "",
+    }).success).toBe(false);
   });
 
   it("requires a stable failure code and allows explicit compensation states", () => {

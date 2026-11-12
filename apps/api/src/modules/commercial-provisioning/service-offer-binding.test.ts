@@ -28,6 +28,41 @@ const request = {
 };
 
 describe("provisioning intake offer gate", () => {
+  it("returns the control-plane deployment UUID without exposing provider resource identity", async () => {
+    const deploymentId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+    const operationId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+    const query = vi.fn(async (_statement: string) => ({
+      rows: [{
+        id: operationId,
+        schema_version: "1.0.0",
+        correlation_id: request.correlationId,
+        external_order_id: request.order.externalOrderId,
+        status: "ready",
+        current_step: null,
+        tenant_id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+        installation_id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+        requested_domain: "example.com",
+        failure_code: null,
+        failure_retryable: null,
+        hosting_deployment_id: deploymentId,
+        updated_at: "2026-11-12T08:00:01.000Z",
+      }],
+      rowCount: 1,
+    }));
+    const pool: CommercialSqlPool = {
+      connect: vi.fn(),
+      query: query as CommercialSqlPool["query"],
+    };
+    const service = new CommercialProvisioningService(pool, [integrationOfferBinding]);
+
+    const operation = await service.getOperation(operationId);
+
+    expect(operation.hostingDeploymentId).toBe(deploymentId);
+    expect(operation.requestedDomain).toBe("example.com");
+    expect(JSON.stringify(operation)).not.toContain("provider_resource_id");
+    expect(query.mock.calls[0]?.[0]).toContain("tenant_hosting_deployments");
+  });
+
   it("rejects an unbound offer before inserting any provisioning operation", async () => {
     const statements: string[] = [];
     const client: SqlClient = {

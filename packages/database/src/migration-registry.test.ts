@@ -29,6 +29,17 @@ describe("database migration registry", () => {
     expect(currentDatabaseSchemaVersion).toBe("0021_phase6_saga_leases_lifecycle_archive.sql");
   });
 
+
+  it("publishes the Platform hosting deployment ID in commercial provisioning status events", () => {
+    const migration = readFileSync(join(migrationsDirectory, "0022_phase4_hosting_deployment_projection.sql"), "utf8");
+    expect(migration).toContain("tenant_hosting_deployments");
+    expect(migration).toContain("hostingDeploymentId");
+    expect(migration).toContain("requestedDomain");
+    expect(migration).toContain("provision_hosting:forward");
+    expect(migration).toContain("CREATE OR REPLACE FUNCTION public.is_safe_commercial_status_event_payload");
+    expect(migration).toContain("v_op_count NOT IN (10, 11, 12)");
+  });
+
   it("enforces Phase 6 saga lease/fencing tokens, 30-day archive retention, and lifecycle delivery tables", () => {
     const migration = readFileSync(join(migrationsDirectory, "0021_phase6_saga_leases_lifecycle_archive.sql"), "utf8");
     expect(migration).toContain("fencing_token");
