@@ -145,6 +145,62 @@ export const provisioningStatusEventV1Schema = z.object({
 
 export type ProvisioningStatusEventV1 = z.infer<typeof provisioningStatusEventV1Schema>;
 
+const OPERATION_INVARIANTS_ALL_OF = [
+  {
+    if: {
+      properties: { status: { const: "ready" } },
+      required: ["status"],
+    },
+    then: {
+      properties: {
+        tenantId: { not: { type: "null" } },
+        installationId: { not: { type: "null" } },
+      },
+      required: ["tenantId", "installationId"],
+    },
+  },
+  {
+    if: {
+      properties: { status: { enum: ["failed", "compensation_required"] } },
+      required: ["status"],
+    },
+    then: {
+      properties: {
+        failure: { not: { type: "null" } },
+      },
+      required: ["failure"],
+    },
+  },
+] as const;
+
+/** Machine-readable operation snapshot schema for Bazionweb sync polling and response verification. */
+export function getProvisioningOperationV1JsonSchema() {
+  return {
+    ...z.toJSONSchema(provisioningOperationV1Schema, { target: "draft-2020-12" }),
+    $id: "https://schemas.bazionweb.com/platform/provisioning-operation/1.0.0",
+    title: "Bazion provisioning operation snapshot v1",
+    description: "Publicly safe operation snapshot returned on command acceptance and status polling; provider errors and credentials remain excluded.",
+    allOf: OPERATION_INVARIANTS_ALL_OF,
+  };
+}
+
+/** Machine-readable signed webhook event schema emitted from Bazion Platform to Bazionweb. */
+export function getProvisioningStatusEventV1JsonSchema() {
+  const base = z.toJSONSchema(provisioningStatusEventV1Schema, { target: "draft-2020-12" }) as Record<string, unknown>;
+  const properties = { ...(base.properties as Record<string, Record<string, unknown>>) };
+  properties.operation = {
+    ...properties.operation,
+    allOf: OPERATION_INVARIANTS_ALL_OF,
+  };
+  return {
+    ...base,
+    properties,
+    $id: "https://schemas.bazionweb.com/platform/provisioning-status-event/1.0.0",
+    title: "Bazion provisioning status event v1",
+    description: "Signed callback event from Bazion Platform to Bazionweb reporting asynchronous provisioning progress.",
+  };
+}
+
 export const provisioningStepNames = [
   "validate_composition",
   "ensure_tenant",

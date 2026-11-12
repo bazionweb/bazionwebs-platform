@@ -90,4 +90,24 @@ describe("provisioning intake offer gate", () => {
     expect(result).toMatchObject({ deduplicated: false, operation: { status: "accepted" } });
     expect(statements.some((statement) => statement.includes("INSERT INTO public.product_provisioning_operations"))).toBe(true);
   });
+
+  it("rejects unsupported schemaVersion values before opening a database transaction", async () => {
+    const connect = vi.fn();
+    const pool: CommercialSqlPool = {
+      connect,
+      async query<T = Record<string, unknown>>(): Promise<SqlResult<T>> {
+        return { rows: [], rowCount: 0 };
+      },
+    };
+    const service = new CommercialProvisioningService(pool, [integrationOfferBinding]);
+
+    for (const unsupportedVersion of ["2.0.0", "0.9.0", "1.1.0"]) {
+      await expect(
+        service.acceptCommand({ ...request, schemaVersion: unsupportedVersion }),
+      ).rejects.toMatchObject({
+        statusCode: 400,
+      });
+    }
+    expect(connect).not.toHaveBeenCalled();
+  });
 });
