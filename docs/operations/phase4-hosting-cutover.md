@@ -9,6 +9,19 @@ This procedure links a Bazionweb `HostingAccount` to its Platform provisioning p
 - Legacy Dokploy create and remediation paths remain available for unmapped accounts. A mapped account is read-only for Bazionweb status changes and legacy provider remediation.
 - No production customer mapping or rollback drill has been recorded yet. The endpoints below implement the procedure; they are not evidence that a cutover has already occurred.
 
+## Read-only cutover inventory
+
+Bazionweb exposes `GET /api/v1/admin/platform-provisioning/hosting-cutover?page=1&limit=50` to `ADMIN` and `SUPER_ADMIN` operators. The report compares active `HostingAccount` rows against Platform provisioning projections and outbox claims, normalizing domain case, surrounding whitespace, and one trailing dot. It is paginated and performs no writes.
+
+- `ready_to_map`: exactly one ready Platform projection matches the same client and normalized domain and has both a Platform tenant and deployment ID. This is a review candidate, not an automatic mapping.
+- `platform_claim_not_ready`: a same-client Platform order exists but is still pending, failed, or has no ready deployment projection; `platformClaimStatuses` shows the source outbox/projection states.
+- `ambiguous_platform_claims`: more than one same-client Platform claim matches the domain.
+- `domain_claimed_by_other_client`: the domain also appears under a different or unresolved Platform client.
+- `linked_*`: an existing link has a missing projection or a detected client/domain/claim conflict.
+- `linked`: the current link matches the Platform projection without a detected conflict.
+- `legacy_only`: no Platform projection or outbox claim matches the domain.
+
+The report omits Dokploy provider and workload identifiers. Only manually reviewed `ready_to_map` rows should proceed through the evidence-backed mapping procedure below. Never remove or stop a workload based on this report alone.
 ## Mapping and dual-read
 
 1. Deploy Bazionweb's tolerant status contract and apply its nullable projection/mapping migration `20261112133000_phase4_hosting_deployment_projection` first. This lets it accept both old events and the new optional fields.
