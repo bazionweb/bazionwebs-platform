@@ -9,6 +9,7 @@ This procedure links a Bazionweb `HostingAccount` to its Platform provisioning p
 - Legacy Dokploy create and remediation paths remain available for unmapped accounts. A mapped account is read-only for Bazionweb status changes and legacy provider remediation.
 - Bazionweb serializes legacy hosting creation and Platform outbox domain claims with the same PostgreSQL transaction-level advisory lock. A normalized domain can have only one legacy or Platform owner during these writes.
 - If a settled order collides with a legacy hosting row or another Platform order, Bazionweb keeps the payment settlement and records its outbox command as `DEAD` with `PLATFORM_DOMAIN_CLAIM_CONFLICT`; it does not deliver the command. Operator replay checks ownership again and stays blocked until the competing account/order is resolved. Review `/admin/hosting/cutover` and the outbox error before changing ownership.
+- Bazionweb CI now migrates an isolated `bazionweb_test` PostgreSQL service and sets `BAZIONWEB_TEST_DATABASE_URL` so database integration suites can run. Treat this as test wiring only; the first successful CI execution and cross-repository dual-database run are still required evidence.
 - No production customer mapping or rollback drill has been recorded yet. The endpoints below implement the procedure; they are not evidence that a cutover has already occurred.
 
 ## Read-only cutover inventory
