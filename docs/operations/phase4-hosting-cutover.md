@@ -36,7 +36,7 @@ The report omits Dokploy provider and workload identifiers. Only manually review
 7. Read the account from `/api/v1/hosting/{hostingAccountId}` and confirm both views: the legacy hosting status and the nested `platformProvisioning` status/step/update time. The read response deliberately omits Platform deployment UUID, mapping evidence, and provider resource identifiers.
 8. Record any difference in the change evidence and keep the legacy mutation path available through the approved rollback window.
 
-The link operation is idempotent for the same pair, rejects an unready or ambiguous operation, and is one-to-one. Bazionweb writes the link and audit record in one transaction. It does not delete the old workload or clear legacy provider data.
+The link operation is idempotent for the same pair, rejects an unready or ambiguous operation, and is one-to-one. Before a new link, Bazionweb takes the shared domain claim lock and rechecks for competing legacy accounts or Platform orders, so a stale inventory page cannot bypass the ownership check. Bazionweb writes the link and audit record in one transaction. It does not delete the old workload or clear legacy provider data.
 
 ## Rollback
 
