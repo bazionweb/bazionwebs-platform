@@ -28,8 +28,10 @@ function setup(beginResult?: BeginHostingProvisionResult) {
   const provider: TenantHostingProvider = {
     provision: vi.fn(async () => reference),
     deploy: vi.fn(async () => undefined),
-    inspect: vi.fn(async () => ({ reference, state: "running" as const, lastDeployedAt: null })),
+    start: vi.fn(async () => undefined),
     stop: vi.fn(async () => undefined),
+    redeploy: vi.fn(async () => undefined),
+    inspect: vi.fn(async () => ({ reference, state: "running" as const, lastDeployedAt: null })),
     remove: vi.fn(async () => undefined),
   };
   return { service: new TenantHostingProvisioningService(store, provider, "dokploy"), store, provider };

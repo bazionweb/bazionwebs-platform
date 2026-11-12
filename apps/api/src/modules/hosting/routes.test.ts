@@ -45,6 +45,10 @@ function makeRuntime(): HostingProvisioningRuntime {
       attemptCount: 1,
       reused: false,
     })),
+    lifecycle: vi.fn(async (input: Parameters<HostingProvisioningRuntime["lifecycle"]>[0]) => ({
+      action: input.action, state: input.action === "remove" ? "removed" as const : "running" as const,
+      confirmed: true, already: false,
+    })),
   };
 }
 
@@ -276,6 +280,49 @@ describe("platform tenant hosting route", () => {
         error: "HOSTING_IDEMPOTENCY_CONFLICT",
         message: "The hosting provisioning request could not be completed.",
       });
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("runs an audited provider lifecycle action as a platform owner", async () => {
+    const runtime = makeRuntime();
+    const app = await makeApp(runtime);
+    try {
+      const response = await app.inject({
+        method: "POST",
+        url: `/v1/admin/platform/tenants/${tenantId}/hosting/deployments/22222222-2222-4222-8222-222222222222/actions`,
+        payload: { action: "start" },
+      });
+      expect(response.statusCode).toBe(200);
+      expect(runtime.lifecycle).toHaveBeenCalledWith(expect.objectContaining({
+        tenantId, deploymentId: "22222222-2222-4222-8222-222222222222",
+        action: "start", actorId: "platform-owner",
+      }));
+      expect(mocks.appendAuditEvent).toHaveBeenCalledWith(expect.objectContaining({
+        action: "tenant.hosting.lifecycle.start.requested", outcome: "succeeded",
+      }));
+      expect(mocks.appendAuditEvent).toHaveBeenCalledWith(expect.objectContaining({
+        action: "tenant.hosting.lifecycle.start.completed", outcome: "succeeded",
+      }));
+      expect(response.json().deployment).toMatchObject({ action: "start", state: "running", confirmed: true });
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("requires a closed tenant before provider resource removal", async () => {
+    const runtime = makeRuntime();
+    const app = await makeApp(runtime);
+    try {
+      const response = await app.inject({
+        method: "POST",
+        url: `/v1/admin/platform/tenants/${tenantId}/hosting/deployments/22222222-2222-4222-8222-222222222222/actions`,
+        payload: { action: "remove" },
+      });
+      expect(response.statusCode).toBe(409);
+      expect(response.json()).toEqual({ error: "TENANT_NOT_CLOSED" });
+      expect(runtime.lifecycle).not.toHaveBeenCalled();
     } finally {
       await app.close();
     }

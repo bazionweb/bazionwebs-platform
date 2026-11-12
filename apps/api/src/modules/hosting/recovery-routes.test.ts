@@ -41,6 +41,9 @@ function makeRuntime(): HostingProvisioningRuntime {
       providerResourceName: "alpha-node-nextjs",
       providerEnvironmentId: "environment-1",
     })),
+    lifecycle: vi.fn(async (input: Parameters<HostingProvisioningRuntime["lifecycle"]>[0]) => ({
+      action: input.action, state: "running" as const, confirmed: true, already: false,
+    })),
   };
 }
 
