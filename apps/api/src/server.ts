@@ -1,9 +1,13 @@
 import { loadConfig } from "./config.js";
 import { buildApp } from "./app.js";
-import { closeTenantDatabaseResources, pool } from "./lib/database.js";
+import { closeTenantDatabaseResources, configureTenantDatabaseSecretResolver, pool } from "./lib/database.js";
+import { DockerSecretTenantDatabaseSecretResolver } from "./lib/tenant-database-secrets.js";
 import { closeAuthResources } from "@bazion/auth/server";
 
 const config = loadConfig();
+if (config.NODE_ENV === "production") {
+  configureTenantDatabaseSecretResolver(new DockerSecretTenantDatabaseSecretResolver(config.hosting.secretDirectory));
+}
 const app = await buildApp(config);
 
 try {

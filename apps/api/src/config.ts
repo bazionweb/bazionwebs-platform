@@ -94,6 +94,9 @@ const envSchema = z.object({
 
 export function loadConfig() {
   const config = envSchema.parse(process.env);
+  if (config.NODE_ENV === "production" && !isAbsolute(config.HOSTING_SECRET_DIRECTORY)) {
+    throw new Error("HOSTING_SECRET_DIRECTORY must be an absolute path in production.");
+  }
   const mediaStorageValues = [
     config.MEDIA_STORAGE_ENDPOINT,
     config.MEDIA_STORAGE_BUCKET,

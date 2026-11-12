@@ -36,9 +36,9 @@ type ResolvedBinding = {
   schemaVersion: string | null;
 };
 
-/** Provider-neutral hook: a cloud secret manager adapter can be installed by the API bootstrap. */
+/** Provider-neutral hook: the API bootstrap installs the production secret adapter. */
 export interface TenantDatabaseSecretResolver {
-  resolveDatabaseUrl(secretReference: string): Promise<string>;
+  resolveDatabaseUrl(secretReference: string, tenantId: string): Promise<string>;
 }
 
 const localEnvironmentSecretResolver: TenantDatabaseSecretResolver = {
@@ -148,7 +148,7 @@ function reapIdlePools(now: number): void {
 async function buildDedicatedPool(binding: ResolvedBinding, secretReference: string): Promise<DedicatedPoolEntry> {
   let connectionString: string;
   try {
-    connectionString = await secretResolver.resolveDatabaseUrl(secretReference);
+    connectionString = await secretResolver.resolveDatabaseUrl(secretReference, binding.tenantId);
     const url = new URL(connectionString);
     if (url.protocol !== "postgres:" && url.protocol !== "postgresql:") throw new Error("Invalid database URL protocol.");
   } catch {

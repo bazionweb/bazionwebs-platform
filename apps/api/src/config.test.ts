@@ -60,6 +60,12 @@ describe("API runtime configuration", () => {
     expect(() => loadConfig()).toThrow(/absolute path/);
   });
 
+  it("requires an absolute mounted secret directory in production even when hosting is disabled", () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("HOSTING_SECRET_DIRECTORY", "secrets");
+    expect(() => loadConfig()).toThrow(/HOSTING_SECRET_DIRECTORY must be an absolute path in production/);
+  });
+
   it("accepts a canonical Base64 32-byte notification key", () => {
     expect(loadConfig().NOTIFICATION_ENCRYPTION_KEY).toBe(testKey);
   });
