@@ -221,10 +221,12 @@ export async function buildApp(config: AppConfig) {
     const code = typeof candidate.code === "string" ? candidate.code : "INTERNAL_ERROR";
     const errorName = error instanceof Error ? error.name : "UnknownError";
     const message = error instanceof Error ? error.message : "Request failed.";
-    if (statusCode >= 500) request.log.error({ errorName, errorCode: code }, "Unhandled API error");
+    if (statusCode >= 500 && code !== "TENANT_MAINTENANCE") {
+      request.log.error({ errorName, errorCode: code }, "Unhandled API error");
+    }
     return reply.code(statusCode).send({
       error: code,
-      message: statusCode >= 500 ? "An unexpected error occurred." : message,
+      message: code === "TENANT_MAINTENANCE" ? message : statusCode >= 500 ? "An unexpected error occurred." : message,
     });
   });
 

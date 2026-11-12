@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   isTenantModuleEnabled: vi.fn(),
   requireActiveTenantPermission: vi.fn(),
   withTenantTransaction: vi.fn(),
+  getTenantMaintenanceStatus: vi.fn(),
 }));
 
 vi.mock("../../lib/tenant-resolution.js", () => ({
@@ -19,6 +20,10 @@ vi.mock("../../lib/tenant-resolution.js", () => ({
 
 vi.mock("../../lib/tenant-modules.js", () => ({
   isTenantModuleEnabled: mocks.isTenantModuleEnabled,
+}));
+
+vi.mock("../../lib/tenant-maintenance.js", () => ({
+  getTenantMaintenanceStatus: mocks.getTenantMaintenanceStatus,
 }));
 
 vi.mock("@bazion/auth", () => ({
@@ -37,6 +42,7 @@ describe("Church & Ministry Module Routes", () => {
     vi.clearAllMocks();
     mocks.resolveTenantId.mockResolvedValue(tenantId);
     mocks.isTenantModuleEnabled.mockResolvedValue(true);
+    mocks.getTenantMaintenanceStatus.mockResolvedValue({ enabled: false, message: "" });
   });
 
   function createTestStorage(): ObjectStorage {
@@ -66,6 +72,28 @@ describe("Church & Ministry Module Routes", () => {
   }
 
   describe("Public Routes", () => {
+    it("blocks public church pages during tenant maintenance and returns the configured notice", async () => {
+      mocks.getTenantMaintenanceStatus.mockResolvedValueOnce({
+        enabled: true,
+        message: "Scheduled upgrades are in progress.",
+      });
+      const app = await buildTestApp();
+
+      const response = await app.inject({
+        method: "GET",
+        url: "/v1/public/church/site",
+        headers: { host: "grace.test" },
+      });
+
+      expect(response.statusCode).toBe(503);
+      expect(response.json()).toMatchObject({
+        code: "TENANT_MAINTENANCE",
+        message: "Scheduled upgrades are in progress.",
+      });
+      expect(mocks.withTenantTransaction).not.toHaveBeenCalled();
+      await app.close();
+    });
+
     it("does not serve ministry content when church-ministry is disabled for the tenant", async () => {
       mocks.isTenantModuleEnabled.mockResolvedValue(false);
       const app = await buildTestApp();
