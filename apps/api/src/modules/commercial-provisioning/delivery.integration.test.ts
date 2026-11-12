@@ -5,6 +5,7 @@ import { provisioningStatusEventV1Schema } from "@bazion/api-contracts";
 import { CommercialProvisioningError, CommercialProvisioningService } from "./service.js";
 import { PlatformStatusOutboxDispatcher } from "./status-outbox-worker.js";
 import { DEFAULT_CALLBACK_AUDIENCE, DEFAULT_CALLBACK_ISSUER, verifyMachineBearerToken } from "./auth.js";
+import { integrationOfferBinding } from "./offer-resolution.test-fixtures.js";
 
 const enabled = Boolean(
   process.env.MIGRATION_DATABASE_URL && process.env.PRODUCT_PROVISIONER_DATABASE_URL,
@@ -49,7 +50,7 @@ describe.skipIf(!enabled)("PostgreSQL commercial provisioning inbox, outbox, and
   beforeAll(async () => {
     migrationPool = new Pool({ connectionString: process.env.MIGRATION_DATABASE_URL, max: 1 });
     provisionerPool = new Pool({ connectionString: process.env.PRODUCT_PROVISIONER_DATABASE_URL, max: 3 });
-    service = new CommercialProvisioningService(provisionerPool);
+    service = new CommercialProvisioningService(provisionerPool, [integrationOfferBinding]);
     await provisionerPool.query("SELECT 1");
   });
 

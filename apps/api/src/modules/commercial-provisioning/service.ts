@@ -5,6 +5,12 @@ import {
   type ProvisioningOperationV1,
 } from "@bazion/api-contracts";
 import { computeProvisioningRequestFingerprint } from "./fingerprint.js";
+import {
+  platformProvisioningOfferBindings,
+  ProvisioningOfferResolutionError,
+  resolveProvisioningOfferBinding,
+  type ProvisioningOfferBinding,
+} from "./offer-resolution.js";
 
 export interface SqlResult<T> {
   rows: T[];
@@ -141,7 +147,10 @@ const allowedOperationTransitions: Readonly<Record<ProvisioningOperationStatus, 
  * backed by PostgreSQL tables from migrations 0018 and 0019.
  */
 export class CommercialProvisioningService {
-  constructor(private readonly pool: CommercialSqlPool) {}
+  constructor(
+    private readonly pool: CommercialSqlPool,
+    private readonly offerBindings: readonly ProvisioningOfferBinding[] = platformProvisioningOfferBindings,
+  ) {}
 
   async acceptCommand(rawInput: unknown): Promise<AcceptProvisioningCommandResult> {
     const parsed = provisionProductRequestV1Schema.safeParse(rawInput);
@@ -270,6 +279,20 @@ export class CommercialProvisioningService {
           deduplicated: true,
           operation: mapOperationRow(existing),
         };
+      }
+
+      try {
+        // The platform resolves authority from its own immutable binding before
+        // inserting an operation. Client-supplied pins are checked, never trusted.
+        resolveProvisioningOfferBinding(request, this.offerBindings);
+      } catch (error) {
+        if (!(error instanceof ProvisioningOfferResolutionError)) throw error;
+        throw new CommercialProvisioningError(
+          422,
+          error.code,
+          "The requested offer is not currently bound to a supported platform release.",
+          [{ path: "order.offerId", code: error.code }],
+        );
       }
 
       const insertedOperation = await client.query<OperationRow>(

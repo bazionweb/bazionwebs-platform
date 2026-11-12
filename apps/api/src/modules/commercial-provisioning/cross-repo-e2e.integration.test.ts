@@ -17,8 +17,8 @@ import {
   signMachineBearerToken,
 } from "./auth.js";
 import { commercialProvisioningRoutes, type CommercialProvisioningRuntime } from "./routes.js";
-import { createCommercialProvisioningRuntime } from "./runtime.js";
 import { CommercialProvisioningService } from "./service.js";
+import { integrationOfferBinding } from "./offer-resolution.test-fixtures.js";
 import { PlatformStatusOutboxDispatcher } from "./status-outbox-worker.js";
 
 const currentDir = dirname(fileURLToPath(import.meta.url));
@@ -252,19 +252,22 @@ describe.skipIf(!enabled)("Cross-repo live end-to-end commercial-to-platform del
   beforeAll(async () => {
     migrationPool = new Pool({ connectionString: process.env.MIGRATION_DATABASE_URL, max: 2 });
     provisionerPool = new Pool({ connectionString: process.env.PRODUCT_PROVISIONER_DATABASE_URL, max: 4 });
-    service = new CommercialProvisioningService(provisionerPool);
+    service = new CommercialProvisioningService(provisionerPool, [integrationOfferBinding]);
     dispatcher = new PlatformStatusOutboxDispatcher(provisionerPool);
 
     const databaseModule = await import("../../lib/database.js");
     closeTenantDatabaseResources = databaseModule.closeTenantDatabaseResources;
 
-    runtime = createCommercialProvisioningRuntime({
-      enabled: true,
-      databaseUrl: process.env.PRODUCT_PROVISIONER_DATABASE_URL,
-      commandSecret,
-      commandIssuer: DEFAULT_COMMAND_ISSUER,
-      commandAudience: DEFAULT_COMMAND_AUDIENCE,
-    });
+    runtime = {
+      commandAuth: {
+        secret: commandSecret,
+        issuer: DEFAULT_COMMAND_ISSUER,
+        audience: DEFAULT_COMMAND_AUDIENCE,
+      },
+      service,
+      dispatcher,
+      close: async () => undefined,
+    };
 
     platformApp = Fastify({ logger: false });
     await platformApp.register(commercialProvisioningRoutes, {
