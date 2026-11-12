@@ -1,6 +1,7 @@
 import {
   provisionProductRequestV1Schema,
   provisioningOperationV1Schema,
+  type PilotCohortPolicyV1,
   type ProvisioningOperationStatus,
   type ProvisioningOperationV1,
 } from "@bazion/api-contracts";
@@ -12,6 +13,7 @@ import {
   type ProvisioningOfferBinding,
   type ProvisioningDistributionMode,
 } from "./offer-resolution.js";
+import { assertCommandAllowedByCohortPolicy } from "./pilot-cutover.js";
 
 export interface SqlResult<T> {
   rows: T[];
@@ -152,6 +154,7 @@ export class CommercialProvisioningService {
     private readonly pool: CommercialSqlPool,
     private readonly offerBindings: readonly ProvisioningOfferBinding[] = platformProvisioningOfferBindings,
     private readonly supportedDistributionModes: readonly ProvisioningDistributionMode[] = ["shared-managed"],
+    private readonly pilotPolicy?: PilotCohortPolicyV1,
   ) {}
 
   async acceptCommand(rawInput: unknown): Promise<AcceptProvisioningCommandResult> {
@@ -286,8 +289,20 @@ export class CommercialProvisioningService {
       try {
         // The platform resolves authority from its own immutable binding before
         // inserting an operation. Client-supplied pins are checked, never trusted.
-        resolveProvisioningOfferBinding(request, this.offerBindings, this.supportedDistributionModes);
+        if (this.pilotPolicy) {
+          assertCommandAllowedByCohortPolicy(request, this.pilotPolicy);
+        }
+        resolveProvisioningOfferBinding(
+          request,
+          this.offerBindings,
+          this.supportedDistributionModes,
+          {
+            allowStagingPartialRelease:
+              this.pilotPolicy?.pilotMode === "staging_pilot" && this.pilotPolicy.environment !== "production",
+          },
+        );
       } catch (error) {
+        if (error instanceof CommercialProvisioningError) throw error;
         if (!(error instanceof ProvisioningOfferResolutionError)) throw error;
         throw new CommercialProvisioningError(
           422,

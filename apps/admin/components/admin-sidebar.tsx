@@ -59,6 +59,12 @@ export function AdminSidebar({
       icon: "📜",
       isActive: pathname.startsWith("/audit"),
     },
+    {
+      href: "/operations",
+      label: "Provisioning Sagas",
+      icon: "🔄",
+      isActive: pathname.startsWith("/operations"),
+    },
   ];
 
   const initial = (userName || userEmail || "A").charAt(0).toUpperCase();

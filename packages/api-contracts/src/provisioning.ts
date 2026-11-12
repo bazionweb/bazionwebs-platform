@@ -144,3 +144,87 @@ export const provisioningStatusEventV1Schema = z.object({
 });
 
 export type ProvisioningStatusEventV1 = z.infer<typeof provisioningStatusEventV1Schema>;
+
+export const provisioningStepNames = [
+  "validate_composition",
+  "ensure_tenant",
+  "create_installation",
+  "configure_installation",
+  "bind_domain",
+  "provision_hosting",
+  "verify_readiness",
+] as const;
+
+export const provisioningStepNameSchema = z.enum(provisioningStepNames);
+export type ProvisioningStepName = z.infer<typeof provisioningStepNameSchema>;
+
+export const safeEffectRefsSchema = z.record(
+  z.string().regex(/^[a-z][a-z0-9_]{0,63}$/),
+  z.string().trim().min(1).max(255),
+);
+
+export const provisioningStepAttemptV1Schema = z.object({
+  id: z.string().uuid(),
+  stepName: provisioningStepNameSchema,
+  direction: z.enum(["forward", "compensate"]),
+  attemptNumber: z.number().int().min(1),
+  status: z.enum(["running", "succeeded", "failed", "unknown"]),
+  fencingToken: z.number().int().min(0),
+  correlationId: z.string().uuid().nullable(),
+  effectRefs: safeEffectRefsSchema,
+  errorCode: z.string().trim().regex(/^[A-Z][A-Z0-9_]{0,79}$/).nullable(),
+  retryable: z.boolean().nullable(),
+  failureDisposition: z.enum(["retry", "compensate", "unknown", "compensation_failed"]).nullable(),
+  startedAt: z.iso.datetime(),
+  finishedAt: z.iso.datetime().nullable(),
+}).strict();
+
+export type ProvisioningStepAttemptV1 = z.infer<typeof provisioningStepAttemptV1Schema>;
+
+export const provisioningOperationDetailV1Schema = z.object({
+  operation: provisioningOperationV1Schema,
+  source: z.literal("bazionweb"),
+  externalCustomerId: externalIdSchema,
+  offerId: catalogIdSchema,
+  offerVersion: versionSchema,
+  requestedDomain: hostnameSchema.nullable(),
+  lease: z.object({
+    holderWorkerId: z.string().trim().max(128).nullable(),
+    fencingToken: z.number().int().min(0),
+    leaseExpiresAt: z.iso.datetime().nullable(),
+    attemptCount: z.number().int().min(0),
+    retryAfterAt: z.iso.datetime().nullable(),
+  }).strict(),
+  failureDisposition: z.enum(["retry", "compensate", "unknown", "compensation_failed"]).nullable(),
+  manualReviewNote: z.string().max(1000).nullable(),
+  lastOperatorActorId: z.string().max(128).nullable(),
+  acceptedAt: z.iso.datetime(),
+  finishedAt: z.iso.datetime().nullable(),
+  stepAttempts: z.array(provisioningStepAttemptV1Schema),
+  events: z.array(z.object({
+    id: z.string().uuid(),
+    eventType: z.string().min(1).max(32),
+    status: provisioningOperationStatusSchema,
+    currentStep: z.string().nullable(),
+    failureCode: z.string().nullable(),
+    occurredAt: z.iso.datetime(),
+  }).strict()),
+}).strict();
+
+export type ProvisioningOperationDetailV1 = z.infer<typeof provisioningOperationDetailV1Schema>;
+
+export const provisioningOperatorActionRequestSchema = z.object({
+  reason: z.string().trim().min(8).max(500),
+  confirmDestructive: z.boolean().optional(),
+}).strict();
+
+export type ProvisioningOperatorActionRequest = z.infer<typeof provisioningOperatorActionRequestSchema>;
+
+export const provisioningManualReviewRequestSchema = z.object({
+  reason: z.string().trim().min(8).max(500),
+  resolution: z.enum(["mark_failed", "resume_forward", "trigger_compensate"]),
+  note: z.string().trim().min(4).max(1000),
+  confirmDestructive: z.boolean().optional(),
+}).strict();
+
+export type ProvisioningManualReviewRequest = z.infer<typeof provisioningManualReviewRequestSchema>;

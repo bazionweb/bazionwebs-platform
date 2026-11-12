@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { boolean, check, foreignKey, index, integer, jsonb, pgTable, timestamp, unique, uuid, varchar } from "drizzle-orm/pg-core";
+import { bigint, boolean, check, foreignKey, index, integer, jsonb, pgTable, text, timestamp, unique, uuid, varchar } from "drizzle-orm/pg-core";
 import { tenants } from "./tenants.js";
 
 export const productInstallations = pgTable("product_installations", {
@@ -19,6 +19,12 @@ export const productInstallations = pgTable("product_installations", {
   idempotencyKey: varchar("idempotency_key", { length: 200 }).notNull(),
   requestFingerprint: varchar("request_fingerprint", { length: 64 }).notNull(),
   status: varchar("status", { length: 24 }).notNull().default("requested"),
+  currentConfigurationVersion: integer("current_configuration_version").notNull().default(0),
+  createdBy: varchar("created_by", { length: 128 }).notNull().default("commercial-provisioning"),
+  suspendedReason: varchar("suspended_reason", { length: 80 }),
+  offboardingPreviousStatus: varchar("offboarding_previous_status", { length: 24 }),
+  offboardingArchiveId: uuid("offboarding_archive_id"),
+  offboardingStartedAt: timestamp("offboarding_started_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   readyAt: timestamp("ready_at", { withTimezone: true }),
   suspendedAt: timestamp("suspended_at", { withTimezone: true }),
@@ -26,15 +32,53 @@ export const productInstallations = pgTable("product_installations", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
   check("product_installations_source_ck", sql`${table.source} = 'bazionweb'`),
-  check("product_installations_distribution_ck", sql`${table.distributionMode} = 'shared-managed'`),
+  check("product_installations_distribution_ck", sql`${table.distributionMode} in ('shared-managed', 'dedicated')`),
   check("product_installations_status_ck", sql`${table.status} in ('requested', 'provisioning', 'ready', 'suspended', 'failed', 'offboarding', 'offboarded')`),
   check("product_installations_fingerprint_ck", sql`${table.requestFingerprint} ~ '^[a-f0-9]{64}$'`),
-  check("product_installations_ready_ck", sql`${table.status} not in ('ready', 'suspended', 'offboarding', 'offboarded') or ${table.readyAt} is not null`),
+  check("product_installations_ready_ck", sql`${table.status} not in ('ready', 'suspended') or ${table.readyAt} is not null`),
   check("product_installations_offboarded_ck", sql`${table.status} <> 'offboarded' or ${table.offboardedAt} is not null`),
   unique("product_installations_id_tenant_uq").on(table.id, table.tenantId),
   unique("product_installations_source_order_uq").on(table.source, table.externalOrderId),
   unique("product_installations_tenant_idempotency_uq").on(table.tenantId, table.idempotencyKey),
   index("product_installations_tenant_status_idx").on(table.tenantId, table.status, table.createdAt),
+]);
+
+export const installationConfigurationVersions = pgTable("installation_configuration_versions", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id, { onDelete: "restrict" }),
+  installationId: uuid("installation_id").notNull(),
+  version: integer("version").notNull(),
+  configurationSchemaVersion: varchar("configuration_schema_version", { length: 64 }).notNull(),
+  configuration: jsonb("configuration").$type<Record<string, unknown>>().notNull().default({}),
+  checksum: varchar("checksum", { length: 64 }).notNull(),
+  createdBy: varchar("created_by", { length: 128 }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  foreignKey({ columns: [table.installationId, table.tenantId], foreignColumns: [productInstallations.id, productInstallations.tenantId], name: "installation_configuration_versions_installation_fk" }),
+  unique("installation_configuration_versions_uq").on(table.installationId, table.version),
+  index("installation_configuration_versions_tenant_idx").on(table.tenantId, table.installationId, table.version),
+]);
+
+export const installationOffboardingArchives = pgTable("installation_offboarding_archives", {
+  id: uuid("id").primaryKey(),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id, { onDelete: "restrict" }),
+  installationId: uuid("installation_id").notNull(),
+  archiveKey: text("archive_key").notNull(),
+  archiveChecksum: varchar("archive_checksum", { length: 64 }).notNull(),
+  objectChecksum: varchar("object_checksum", { length: 64 }).notNull(),
+  archiveSizeBytes: integer("archive_size_bytes").notNull(),
+  formatVersion: varchar("format_version", { length: 40 }).notNull(),
+  configurationVersion: integer("configuration_version").notNull(),
+  configurationSchemaVersion: varchar("configuration_schema_version", { length: 64 }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  retentionExpiresAt: timestamp("retention_expires_at", { withTimezone: true }).notNull(),
+  recoveredAt: timestamp("recovered_at", { withTimezone: true }),
+  recoveredBy: varchar("recovered_by", { length: 128 }),
+  configurationPurgedAt: timestamp("configuration_purged_at", { withTimezone: true }),
+  archivePurgedAt: timestamp("archive_purged_at", { withTimezone: true }),
+}, (table) => [
+  foreignKey({ columns: [table.installationId, table.tenantId], foreignColumns: [productInstallations.id, productInstallations.tenantId], name: "installation_offboarding_archives_installation_fk" }),
+  index("installation_offboarding_archives_retention_idx").on(table.tenantId, table.retentionExpiresAt),
 ]);
 
 export const productProvisioningOperations = pgTable("product_provisioning_operations", {
@@ -63,6 +107,14 @@ export const productProvisioningOperations = pgTable("product_provisioning_opera
   failureCode: varchar("failure_code", { length: 80 }),
   failureRetryable: boolean("failure_retryable"),
   failureDisposition: varchar("failure_disposition", { length: 24 }),
+  leaseToken: uuid("lease_token"),
+  leaseExpiresAt: timestamp("lease_expires_at", { withTimezone: true }),
+  fencingToken: bigint("fencing_token", { mode: "number" }).notNull().default(0),
+  workerId: varchar("worker_id", { length: 128 }),
+  attemptCount: integer("attempt_count").notNull().default(0),
+  retryAfterAt: timestamp("retry_after_at", { withTimezone: true }),
+  manualReviewNote: text("manual_review_note"),
+  lastOperatorActorId: varchar("last_operator_actor_id", { length: 128 }),
   acceptedAt: timestamp("accepted_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   finishedAt: timestamp("finished_at", { withTimezone: true }),
@@ -85,6 +137,8 @@ export const productProvisioningStepAttempts = pgTable("product_provisioning_ste
   direction: varchar("direction", { length: 12 }).notNull(),
   attemptNumber: integer("attempt_number").notNull(),
   status: varchar("status", { length: 16 }).notNull().default("running"),
+  fencingToken: bigint("fencing_token", { mode: "number" }).notNull().default(0),
+  correlationId: uuid("correlation_id"),
   effectRefs: jsonb("effect_refs").$type<Readonly<Record<string, string>>>().notNull().default({}),
   errorCode: varchar("error_code", { length: 80 }),
   retryable: boolean("retryable"),

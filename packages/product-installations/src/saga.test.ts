@@ -1,5 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { ProvisioningStepError, runProvisioningSaga, type ProvisioningSagaJournal, type ProvisioningSagaSnapshot, type ProvisioningSagaStep, type ProvisioningSagaStepName, type ProvisioningStepEffect } from "./saga.js";
+import {
+  provisioningSagaSteps,
+  ProvisioningStepError,
+  runProvisioningSaga,
+  StaleSagaLeaseError,
+  type ProvisioningSagaJournal,
+  type ProvisioningSagaLease,
+  type ProvisioningSagaSnapshot,
+  type ProvisioningSagaStep,
+  type ProvisioningSagaStepName,
+  type ProvisioningStepEffect,
+} from "./saga.js";
 
 const context = {
   operationId: "operation-1",
@@ -14,38 +25,73 @@ class MemoryJournal implements ProvisioningSagaJournal {
   completedSteps: { name: ProvisioningSagaStepName; effect: ProvisioningStepEffect }[] = [];
   compensatedSteps: ProvisioningSagaStepName[] = [];
   failure: ProvisioningSagaSnapshot["failure"] = null;
+  runningStep: NonNullable<ProvisioningSagaSnapshot["runningStep"]> | null = null;
+  unknownStep: NonNullable<ProvisioningSagaSnapshot["unknownStep"]> | null = null;
   attempts = new Map<string, number>();
+  activeLease: ProvisioningSagaLease | null = null;
+
+  private checkLease(lease?: ProvisioningSagaLease) {
+    if (lease && this.activeLease && (lease.leaseToken !== this.activeLease.leaseToken || lease.fencingToken !== this.activeLease.fencingToken)) {
+      throw new StaleSagaLeaseError(context.operationId, lease.fencingToken);
+    }
+  }
 
   async load(): Promise<ProvisioningSagaSnapshot> {
-    return { status: this.status, completedSteps: [...this.completedSteps], compensatedSteps: [...this.compensatedSteps], failure: this.failure };
+    return {
+      status: this.status,
+      completedSteps: [...this.completedSteps],
+      compensatedSteps: [...this.compensatedSteps],
+      failure: this.failure,
+      runningStep: this.runningStep,
+      unknownStep: this.unknownStep,
+    };
   }
-  async setStatus(_id: string, status: ProvisioningSagaSnapshot["status"], failure: ProvisioningSagaSnapshot["failure"] = null) {
+  async setStatus(_id: string, status: ProvisioningSagaSnapshot["status"], failure: ProvisioningSagaSnapshot["failure"] = null, lease?: ProvisioningSagaLease) {
+    this.checkLease(lease);
     this.status = status;
     this.failure = failure;
   }
-  async startStep(_id: string, step: ProvisioningSagaStepName) {
+  async startStep(_id: string, step: ProvisioningSagaStepName, lease?: ProvisioningSagaLease) {
+    this.checkLease(lease);
     const next = (this.attempts.get(`forward:${step}`) ?? 0) + 1;
     this.attempts.set(`forward:${step}`, next);
+    this.runningStep = { name: step, direction: "forward", attemptNumber: next, fencingToken: lease?.fencingToken ?? 0 };
     return next;
   }
-  async completeStep(_id: string, step: ProvisioningSagaStepName, effect: ProvisioningStepEffect) {
+  async completeStep(_id: string, step: ProvisioningSagaStepName, effect: ProvisioningStepEffect, lease?: ProvisioningSagaLease) {
+    this.checkLease(lease);
     if (!this.completedSteps.some((item) => item.name === step)) this.completedSteps.push({ name: step, effect });
+    if (this.runningStep?.name === step) this.runningStep = null;
+    if (this.unknownStep?.name === step) this.unknownStep = null;
   }
-  async failStep(_id: string, _step: ProvisioningSagaStepName, failure: NonNullable<ProvisioningSagaSnapshot["failure"]>) { this.failure = failure; }
-  async startCompensation(_id: string, step: ProvisioningSagaStepName) {
+  async failStep(_id: string, step: ProvisioningSagaStepName, failure: NonNullable<ProvisioningSagaSnapshot["failure"]>, lease?: ProvisioningSagaLease) {
+    this.checkLease(lease);
+    this.failure = failure;
+    if (this.runningStep?.name === step) this.runningStep = null;
+    if (failure.disposition === "unknown") {
+      this.unknownStep = { name: step, direction: "forward", attemptNumber: this.attempts.get(`forward:${step}`) ?? 1, errorCode: failure.code };
+    }
+  }
+  async startCompensation(_id: string, step: ProvisioningSagaStepName, lease?: ProvisioningSagaLease) {
+    this.checkLease(lease);
     const next = (this.attempts.get(`compensate:${step}`) ?? 0) + 1;
     this.attempts.set(`compensate:${step}`, next);
     return next;
   }
-  async completeCompensation(_id: string, step: ProvisioningSagaStepName) {
+  async completeCompensation(_id: string, step: ProvisioningSagaStepName, lease?: ProvisioningSagaLease) {
+    this.checkLease(lease);
     if (!this.compensatedSteps.includes(step)) this.compensatedSteps.push(step);
   }
-  async failCompensation(_id: string, _step: ProvisioningSagaStepName, failure: NonNullable<ProvisioningSagaSnapshot["failure"]>) { this.failure = failure; }
+  async failCompensation(_id: string, _step: ProvisioningSagaStepName, failure: NonNullable<ProvisioningSagaSnapshot["failure"]>, lease?: ProvisioningSagaLease) {
+    this.checkLease(lease);
+    this.failure = failure;
+  }
 }
 
 function step(name: ProvisioningSagaStepName, behavior: {
-  execute?: ProvisioningSagaStep["execute"];
-  compensate?: ProvisioningSagaStep["compensate"];
+  inspect?: ProvisioningSagaStep["inspect"] | undefined;
+  execute?: ProvisioningSagaStep["execute"] | undefined;
+  compensate?: ProvisioningSagaStep["compensate"] | undefined;
 } = {}): ProvisioningSagaStep {
   const statuses: Record<ProvisioningSagaStepName, ProvisioningSagaStep["status"]> = {
     validate_composition: "validating",
@@ -59,6 +105,7 @@ function step(name: ProvisioningSagaStepName, behavior: {
   return {
     name,
     status: statuses[name],
+    ...(behavior.inspect ? { inspect: behavior.inspect } : {}),
     execute: behavior.execute ?? (async () => ({ resource_ref: `${name}-resource` })),
     compensate: behavior.compensate ?? (async () => undefined),
   };
@@ -166,5 +213,98 @@ describe("durable provisioning saga orchestration", () => {
       journal,
     })).resolves.toMatchObject({ status: "compensation_required", failure: { code: "UNSAFE_EFFECT_REFERENCE" } });
     expect(journal.completedSteps).toHaveLength(0);
+  });
+
+  it("injects terminal failures across every one of all 7 steps and compensates strictly in reverse order", async () => {
+    for (const failingStep of provisioningSagaSteps) {
+      const journal = new MemoryJournal();
+      const compensated: string[] = [];
+      const steps = provisioningSagaSteps.map((name) =>
+        step(name, {
+          execute: async () => {
+            if (name === failingStep) throw new ProvisioningStepError("INJECTED_TERMINAL_FAILURE", "compensate");
+            return { resource_ref: `${name}-ref` };
+          },
+          compensate: async () => {
+            compensated.push(name);
+          },
+        }),
+      );
+
+      const result = await runProvisioningSaga({ context, steps, journal });
+      expect(result.status).toBe("compensated");
+      const failingIndex = provisioningSagaSteps.indexOf(failingStep);
+      const expectedReverse = provisioningSagaSteps.slice(0, failingIndex).reverse();
+      expect(compensated).toEqual(expectedReverse);
+    }
+  });
+
+  it("inspects external state after crash-before-commit and rejects stale workers with fencing errors", async () => {
+    const journal = new MemoryJournal();
+    const staleLease: ProvisioningSagaLease = { leaseToken: "lease-1", fencingToken: 1, workerId: "worker-a" };
+    const newLease: ProvisioningSagaLease = { leaseToken: "lease-2", fencingToken: 2, workerId: "worker-b" };
+    journal.activeLease = staleLease;
+
+    let hostingCreated = 0;
+    let simulatedCrashTriggered = false;
+    const crashingSteps: ProvisioningSagaStep[] = [
+      step("ensure_tenant", {
+        execute: async () => ({ tenant_id: "00000000-0000-4000-8000-000000000001" }),
+      }),
+      step("provision_hosting", {
+        inspect: async () => (hostingCreated > 0 ? { outcome: "completed", effect: { deployment_id: "dep-1" } } : { outcome: "absent" }),
+        execute: async () => {
+          hostingCreated += 1;
+          if (!simulatedCrashTriggered) {
+            simulatedCrashTriggered = true;
+            // Worker B takes over lease while Worker A stalls right after external creation
+            journal.activeLease = newLease;
+            return { deployment_id: "dep-1" };
+          }
+          return { deployment_id: "dep-1" };
+        },
+      }),
+    ];
+
+    // Worker A tries to commit after Worker B took the lease -> must throw StaleSagaLeaseError cleanly
+    await expect(
+      runProvisioningSaga({ context, steps: crashingSteps, journal, lease: staleLease }),
+    ).rejects.toBeInstanceOf(StaleSagaLeaseError);
+    expect(hostingCreated).toBe(1);
+
+    // Worker B resumes with fencing token 2 -> sees interrupted `running` attempt, inspects -> skips duplicate execute!
+    const recoveryResult = await runProvisioningSaga({
+      context,
+      steps: crashingSteps,
+      journal,
+      lease: newLease,
+    });
+    expect(recoveryResult).toEqual({ status: "ready", failure: null });
+    expect(hostingCreated).toBe(1);
+  });
+
+  it("inspects unknown step before compensating so completed external side-effects are rolled back too", async () => {
+    const journal = new MemoryJournal();
+    const compensated: string[] = [];
+    let externalCreated = false;
+    const steps: ProvisioningSagaStep[] = [
+      step("ensure_tenant", { compensate: async () => { compensated.push("ensure_tenant"); } }),
+      step("provision_hosting", {
+        inspect: async () => (externalCreated ? { outcome: "completed", effect: { deployment_id: "dep-99" } } : { outcome: "absent" }),
+        execute: async () => {
+          externalCreated = true;
+          throw new ProvisioningStepError("TIMEOUT_AFTER_SUBMIT", "unknown");
+        },
+        compensate: async () => { compensated.push("provision_hosting"); },
+      }),
+    ];
+
+    const first = await runProvisioningSaga({ context, steps, journal });
+    expect(first.status).toBe("compensation_required");
+    expect(compensated).toEqual([]);
+
+    const resolved = await runProvisioningSaga({ context, steps, journal, resumeCompensation: true });
+    expect(resolved.status).toBe("compensated");
+    expect(compensated).toEqual(["provision_hosting", "ensure_tenant"]);
   });
 });

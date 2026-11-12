@@ -10,6 +10,14 @@ export {
   sanitizeImageFilename,
   type SupportedImageContentType,
 } from "./image-upload.js";
+export {
+  LocalPrivateArchiveStorage,
+  S3PrivateArchiveStorage,
+  type PrivateArchiveResult,
+  type PrivateArchiveStorage,
+  type S3PrivateArchiveStorageConfig,
+  type StoredPrivateArchive,
+} from "./private-archive.js";
 
 export interface StoredObject {
   key: string;

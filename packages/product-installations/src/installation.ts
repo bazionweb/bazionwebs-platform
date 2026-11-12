@@ -37,3 +37,22 @@ export function transitionProductInstallation(
   }
   return next;
 }
+
+const recoverableStatuses: readonly ProductInstallationStatus[] = [
+  "requested",
+  "provisioning",
+  "ready",
+  "suspended",
+  "failed",
+];
+
+/** Recovers an installation during the 30-day offboarding retention window back to its prior status. */
+export function recoverOffboardingInstallation(
+  current: ProductInstallationStatus,
+  previousStatus: ProductInstallationStatus,
+): ProductInstallationStatus {
+  if (current !== "offboarding" || !recoverableStatuses.includes(previousStatus)) {
+    throw new Error(`INVALID_PRODUCT_INSTALLATION_RECOVERY:${current}:${previousStatus}`);
+  }
+  return previousStatus;
+}

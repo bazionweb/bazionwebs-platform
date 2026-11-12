@@ -206,7 +206,13 @@ export async function buildApp(config: AppConfig) {
     prefix: "/v1",
     runtime: hostingRuntime,
   });
-  const commercialProvisioningRuntime = createCommercialProvisioningRuntime(config.commercialProvisioning);
+  const commercialProvisioningRuntime = createCommercialProvisioningRuntime({
+    ...config.commercialProvisioning,
+    tenantProvisionerDatabaseUrl: config.TENANT_PROVISIONER_DATABASE_URL,
+    auditDatabaseUrl: config.DATABASE_URL,
+    privateArchiveDirectory: config.commercialProvisioning.privateArchiveDir,
+    hostingRuntime,
+  });
   await app.register(commercialProvisioningRoutes, {
     prefix: "/v1",
     runtime: commercialProvisioningRuntime,

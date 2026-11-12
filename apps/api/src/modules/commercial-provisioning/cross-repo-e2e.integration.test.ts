@@ -5,6 +5,7 @@ import { createRequire } from "node:module";
 import { dirname, resolve } from "node:path";
 import * as readline from "node:readline";
 import { fileURLToPath } from "node:url";
+import { PostgresAuditEventWriter } from "@bazion/audit";
 import Fastify, { type FastifyInstance } from "fastify";
 import { Pool } from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -17,9 +18,80 @@ import {
   signMachineBearerToken,
 } from "./auth.js";
 import { commercialProvisioningRoutes, type CommercialProvisioningRuntime } from "./routes.js";
+import { createDefaultTenantLifecycleAdapter, SubscriptionLifecycleService } from "./lifecycle-service.js";
+import type { ProvisioningOfferBinding } from "./offer-resolution.js";
 import { CommercialProvisioningService } from "./service.js";
 import { integrationOfferBinding } from "./offer-resolution.test-fixtures.js";
-import { PlatformStatusOutboxDispatcher } from "./status-outbox-worker.js";
+import {
+  PlatformLifecycleOutboxDispatcher,
+  PlatformStatusOutboxDispatcher,
+} from "./status-outbox-worker.js";
+
+async function readTenantAndInstallationStatus(
+  pool: Pool,
+  tenantId: string,
+  installationId: string,
+): Promise<{ t_status: string; i_status: string } | undefined> {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query("SELECT set_config('app.tenant_id', $1, true)", [tenantId]);
+    const res = await client.query<{ t_status: string; i_status: string }>(
+      `SELECT t.status AS t_status, pi.status AS i_status
+         FROM public.tenants t
+         JOIN public.product_installations pi ON pi.tenant_id = t.id
+        WHERE t.id = $1::uuid AND pi.id = $2::uuid`,
+      [tenantId, installationId],
+    );
+    await client.query("COMMIT");
+    return res.rows[0];
+  } catch (error) {
+    await client.query("ROLLBACK").catch(() => undefined);
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+const crossRepoE2eOfferBindings: ProvisioningOfferBinding[] = [
+  integrationOfferBinding,
+  {
+    offer: { id: "website-business", version: "1.0.0" },
+    composition: {
+      product: { id: "bazion-site", version: "1.0.0" },
+      solution: { id: "website-business", version: "1.0.0" },
+      template: { id: "node-nextjs", version: "1.0.0" },
+    },
+    requiredModules: [{ id: "website-content", version: "1.0.0" }],
+    optionalModules: [{ id: "analytics", version: "1.0.0" }],
+    distributionMode: "shared-managed",
+    availability: "active",
+    releaseState: {
+      product: "stable",
+      solution: "stable",
+      solutionReadiness: "buildable",
+      template: "stable",
+    },
+  },
+  {
+    offer: { id: "website-enterprise", version: "1.0.0" },
+    composition: {
+      product: { id: "bazion-site", version: "1.0.0" },
+      solution: { id: "website-enterprise", version: "1.0.0" },
+      template: { id: "node-nextjs", version: "1.0.0" },
+    },
+    requiredModules: [{ id: "website-content", version: "1.0.0" }],
+    optionalModules: [{ id: "analytics", version: "1.0.0" }],
+    distributionMode: "shared-managed",
+    availability: "active",
+    releaseState: {
+      product: "stable",
+      solution: "stable",
+      solutionReadiness: "buildable",
+      template: "stable",
+    },
+  },
+];
 
 const currentDir = dirname(fileURLToPath(import.meta.url));
 const defaultBazionwebApiDir = resolve(currentDir, "../../../../../../../bazionweb/apps/api");
@@ -245,18 +317,27 @@ describe.skipIf(!enabled)("Cross-repo live end-to-end commercial-to-platform del
   let closeTenantDatabaseResources: (() => Promise<void>) | null = null;
   let service: CommercialProvisioningService;
   let dispatcher: PlatformStatusOutboxDispatcher;
+  let lifecycleService: SubscriptionLifecycleService;
+  let lifecycleDispatcher: PlatformLifecycleOutboxDispatcher;
   let bridge: BazionwebBridgeClient;
 
   const createdOperationIds: string[] = [];
+  const createdLifecycleSubscriptionIds: string[] = [];
 
   beforeAll(async () => {
     migrationPool = new Pool({ connectionString: process.env.MIGRATION_DATABASE_URL, max: 2 });
     provisionerPool = new Pool({ connectionString: process.env.PRODUCT_PROVISIONER_DATABASE_URL, max: 4 });
-    service = new CommercialProvisioningService(provisionerPool, [integrationOfferBinding]);
+    service = new CommercialProvisioningService(provisionerPool, crossRepoE2eOfferBindings);
     dispatcher = new PlatformStatusOutboxDispatcher(provisionerPool);
-
     const databaseModule = await import("../../lib/database.js");
     closeTenantDatabaseResources = databaseModule.closeTenantDatabaseResources;
+
+    lifecycleService = new SubscriptionLifecycleService(
+      provisionerPool,
+      new PostgresAuditEventWriter(databaseModule.pool),
+      createDefaultTenantLifecycleAdapter(migrationPool),
+    );
+    lifecycleDispatcher = new PlatformLifecycleOutboxDispatcher(provisionerPool);
 
     runtime = {
       commandAuth: {
@@ -266,6 +347,8 @@ describe.skipIf(!enabled)("Cross-repo live end-to-end commercial-to-platform del
       },
       service,
       dispatcher,
+      lifecycleService,
+      lifecycleDispatcher,
       close: async () => undefined,
     };
 
@@ -302,6 +385,20 @@ describe.skipIf(!enabled)("Cross-repo live end-to-end commercial-to-platform del
                 delivered_at = COALESCE(delivered_at, now())
           WHERE operation_id = ANY($1::uuid[]) AND status <> 'delivered'`,
         [createdOperationIds],
+      ).catch(() => undefined);
+    }
+
+    if (createdLifecycleSubscriptionIds.length > 0 && provisionerPool) {
+      await provisionerPool.query(
+        `UPDATE public.product_subscription_lifecycle_outbox
+            SET status = 'delivered',
+                lease_token = NULL,
+                lease_expires_at = NULL,
+                delivered_at = COALESCE(delivered_at, now())
+          WHERE lifecycle_inbox_id IN (
+            SELECT id FROM public.product_subscription_lifecycle_inbox WHERE subscription_id = ANY($1::text[])
+          ) AND status <> 'delivered'`,
+        [createdLifecycleSubscriptionIds],
       ).catch(() => undefined);
     }
 
@@ -564,5 +661,186 @@ describe.skipIf(!enabled)("Cross-repo live end-to-end commercial-to-platform del
     }>("get_state", { outboxId: settledLag.outbox.id, operationId: lagOpId });
     expect(lagStateAfter.outbox.projection?.status).toBe("ready");
     expect(lagStateAfter.outbox.projection?.installationId).toBe(lagInstallationId);
+  }, 45_000);
+
+  it("executes live Phase 6 dual-DB dunning grace -> suspend -> invoice settlement reactivate synchronization", async () => {
+    const suffix = `p6-${randomUUID().slice(0, 8)}`;
+
+    // 1. Settle initial purchase on Bazionweb & advance Platform tenant/installation to `ready`
+    const settled = await bridge.call<{
+      clientId: string;
+      subscriptionId: string;
+      planId: string;
+      outbox: { id: string; externalOrderId: string };
+    }>("settle_invoice", { suffix, offerId: "website-business" });
+    createdLifecycleSubscriptionIds.push(settled.subscriptionId);
+
+    const deliverInit = await bridge.call<{ accepted: number }>("run_worker_batch", {
+      platformApiBaseUrl: platformBaseUrl,
+    });
+    expect(deliverInit.accepted).toBeGreaterThanOrEqual(1);
+
+    const stateInit = await bridge.call<{ outbox: { platformOperationId: string } }>("get_state", {
+      outboxId: settled.outbox.id,
+    });
+    const opId = stateInit.outbox.platformOperationId;
+    createdOperationIds.push(opId);
+
+    const { tenantId, installationId } = await advanceOperationToReadyWithTenant(
+      migrationPool,
+      provisionerPool,
+      service,
+      opId,
+      `e2e-${suffix}`,
+    );
+
+    const provisionCbUrl = `${bridge.baseUrl}/api/v1/webhooks/platform/provisioning-status`;
+    const lifecycleCbUrl = `${bridge.baseUrl}/api/v1/webhooks/platform/lifecycle-status`;
+    await dispatcher.processDueBatch({
+      callbackUrl: provisionCbUrl,
+      signingSecret: callbackSigningSecret,
+      bearerSigningSecret: callbackBearerSecret,
+      batchSize: 50,
+    });
+
+    // 2. Seed overdue renewal invoice and sweep dunning day 1 -> PAST_DUE grace period (not suspended)
+    const renewal = await bridge.call<{ invoiceId: string }>("create_overdue_renewal", {
+      clientId: settled.clientId,
+      subscriptionId: settled.subscriptionId,
+      planId: settled.planId,
+      offerId: "website-business",
+      dueDateIso: "2026-10-31T00:00:00.000Z",
+      suffix,
+    });
+
+    const graceSweep = await bridge.call<{ gracedCount: number; suspendedCount: number }>("run_dunning_sweep", {
+      nowIso: "2026-11-02T06:00:00.000Z",
+    });
+    expect(graceSweep.gracedCount).toBe(1);
+    expect(graceSweep.suspendedCount).toBe(0);
+
+    const lcDeliverGrace = await bridge.call<{
+      claimed: number;
+      accepted: number;
+      retried: number;
+      deadLettered: number;
+    }>("deliver_lifecycle_outbox", {
+      platformApiBaseUrl: platformBaseUrl,
+    });
+    expect(lcDeliverGrace.accepted).toBe(1);
+
+    await lifecycleDispatcher.processDueBatch({
+      callbackUrl: lifecycleCbUrl,
+      signingSecret: callbackSigningSecret,
+      bearerSigningSecret: callbackBearerSecret,
+      batchSize: 50,
+    });
+
+    const stateAfterGrace = await bridge.call<{
+      subscription: { status: string };
+      projection: { status: string; subscriptionStatus: string | null } | null;
+    }>("get_lifecycle_state", {
+      subscriptionId: settled.subscriptionId,
+      clientId: settled.clientId,
+      externalOrderId: settled.outbox.externalOrderId,
+    });
+    expect(stateAfterGrace.subscription.status).toBe("PAST_DUE");
+    expect(stateAfterGrace.projection?.subscriptionStatus).toBe("PAST_DUE");
+    expect(stateAfterGrace.projection?.status).toBe("ready");
+
+    // 3. Exhaust dunning retries + grace expiry -> SUSPENDED on both Bazionweb and Platform
+    await bridge.call("run_dunning_sweep", { nowIso: "2026-11-05T06:00:00.000Z" });
+    const suspendSweep = await bridge.call<{ suspendedCount: number }>("run_dunning_sweep", {
+      nowIso: "2026-11-10T06:00:00.000Z",
+    });
+    expect(suspendSweep.suspendedCount).toBe(1);
+
+    const lcDeliverSuspend = await bridge.call<{ accepted: number }>("deliver_lifecycle_outbox", {
+      platformApiBaseUrl: platformBaseUrl,
+    });
+    expect(lcDeliverSuspend.accepted).toBe(1);
+
+    await lifecycleDispatcher.processDueBatch({
+      callbackUrl: lifecycleCbUrl,
+      signingSecret: callbackSigningSecret,
+      bearerSigningSecret: callbackBearerSecret,
+      batchSize: 50,
+    });
+
+    const platformSuspended = await readTenantAndInstallationStatus(
+      migrationPool,
+      tenantId,
+      installationId,
+    );
+    expect(platformSuspended?.t_status).toBe("suspended");
+    expect(platformSuspended?.i_status).toBe("suspended");
+
+    const stateAfterSuspend = await bridge.call<{
+      subscription: { status: string };
+      client: { status: string };
+      projection: { status: string; subscriptionStatus: string | null; customerStatusMessage: string | null } | null;
+    }>("get_lifecycle_state", {
+      subscriptionId: settled.subscriptionId,
+      clientId: settled.clientId,
+      externalOrderId: settled.outbox.externalOrderId,
+    });
+    expect(stateAfterSuspend.subscription.status).toBe("SUSPENDED");
+    expect(stateAfterSuspend.client.status).toBe("SUSPENDED");
+    expect(stateAfterSuspend.projection?.status).toBe("suspended");
+    expect(stateAfterSuspend.projection?.subscriptionStatus).toBe("SUSPENDED");
+    expect(stateAfterSuspend.projection?.customerStatusMessage).toContain("temporarily suspended");
+
+    // 4. Customer pays overdue invoice -> reactivates both Bazionweb & Platform without losing tenant/installation data
+    await bridge.call("settle_renewal_invoice", {
+      invoiceId: renewal.invoiceId,
+      clientId: settled.clientId,
+      subscriptionId: settled.subscriptionId,
+      planId: settled.planId,
+      offerId: "website-business",
+      paidAtIso: "2026-11-11T09:00:00.000Z",
+      suffix,
+    });
+
+    const lcDeliverReactivate = await bridge.call<{ accepted: number }>("deliver_lifecycle_outbox", {
+      platformApiBaseUrl: platformBaseUrl,
+    });
+    expect(lcDeliverReactivate.accepted).toBe(1);
+
+    await lifecycleDispatcher.processDueBatch({
+      callbackUrl: lifecycleCbUrl,
+      signingSecret: callbackSigningSecret,
+      bearerSigningSecret: callbackBearerSecret,
+      batchSize: 50,
+    });
+
+    const platformRestored = await readTenantAndInstallationStatus(
+      migrationPool,
+      tenantId,
+      installationId,
+    );
+    expect(platformRestored?.t_status).toBe("active");
+    expect(platformRestored?.i_status).toBe("ready");
+
+    const stateRestored = await bridge.call<{
+      subscription: { status: string; dunningAttemptsCount: number; gracePeriodEnd: string | null };
+      client: { status: string };
+      lifecycleOutboxes: Array<{ action: string; status: string }>;
+      projection: { status: string; subscriptionStatus: string | null } | null;
+    }>("get_lifecycle_state", {
+      subscriptionId: settled.subscriptionId,
+      clientId: settled.clientId,
+      externalOrderId: settled.outbox.externalOrderId,
+    });
+    expect(stateRestored.subscription.status).toBe("ACTIVE");
+    expect(stateRestored.subscription.dunningAttemptsCount).toBe(0);
+    expect(stateRestored.subscription.gracePeriodEnd).toBeNull();
+    expect(stateRestored.client.status).toBe("ACTIVE");
+    expect(stateRestored.lifecycleOutboxes.map((r) => `${r.action}:${r.status}`)).toEqual([
+      "grace:ACCEPTED",
+      "suspend:ACCEPTED",
+      "reactivate:ACCEPTED",
+    ]);
+    expect(stateRestored.projection?.subscriptionStatus).toBe("ACTIVE");
+    expect(stateRestored.projection?.status).toBe("ready");
   }, 45_000);
 });

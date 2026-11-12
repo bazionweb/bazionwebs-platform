@@ -5,6 +5,7 @@ import { getTenantStorefrontUrl, getTenantWorkspacePickerUrl } from "@/lib/publi
 import { LifecycleActions } from "./lifecycle-actions";
 import { TenantControlPanel } from "./control-panel";
 import { TenantHostingPanel, type TenantHostingInventory } from "./hosting-panel";
+import { TenantInstallationsPanel, type TenantInstallationItem } from "./installations-panel";
 
 type OwnerCandidate = { userId: string; name: string; email: string; emailVerified: boolean; roles: string[] };
 type ModuleItem = {
@@ -29,14 +30,14 @@ type TenantDomain = { id: string; hostname: string; status: "pending" | "active"
 type TenantDomains = { items: TenantDomain[] };
 
 export default async function TenantDetail({ params }: { params: Promise<{ tenantId: string }> }) {
-  await requirePlatformOwner();
+  const identity = await requirePlatformOwner();
   const { tenantId } = await params;
   const result = await platformFetch<{ tenant: Tenant }>(`tenants/${encodeURIComponent(tenantId)}`);
   if (result.status === 404) notFound();
   if (!result.data) return <main className="detail-shell"><Link href="/">← Back to tenants</Link><section className="notice-card"><h1>Unable to load tenant</h1><p>Request failed with HTTP {result.status}. You may need platform tenant-read permission.</p></section></main>;
   const tenant = result.data.tenant;
 
-  const [owner, modules, settings, audit, usage, domains, hosting] = await Promise.all([
+  const [owner, modules, settings, audit, usage, domains, hosting, installations] = await Promise.all([
     platformFetch<{ currentOwners: OwnerCandidate[]; candidates: OwnerCandidate[]; total: number; limit: number; offset: number }>(
       `tenants/${encodeURIComponent(tenantId)}/owner-candidates?limit=50`,
     ),
@@ -48,6 +49,7 @@ export default async function TenantDetail({ params }: { params: Promise<{ tenan
     platformFetch<Usage>(`tenants/${encodeURIComponent(tenantId)}/usage`),
     platformFetch<TenantDomains>(`tenants/${encodeURIComponent(tenantId)}/domains`),
     platformFetch<TenantHostingInventory>(`tenants/${encodeURIComponent(tenantId)}/hosting`),
+    platformFetch<{ items: TenantInstallationItem[] }>(`tenants/${encodeURIComponent(tenantId)}/installations`),
   ]);
 
   return <main className="detail-shell">
@@ -93,6 +95,12 @@ export default async function TenantDetail({ params }: { params: Promise<{ tenan
       tenantStatus={tenant.status}
       initial={hosting.data}
       status={hosting.status}
+    />
+    <TenantInstallationsPanel
+      tenantId={tenant.id}
+      initialItems={installations.data?.items ?? []}
+      status={installations.status}
+      platformRole={identity?.platformRole ?? null}
     />
     <TenantControlPanel
       tenantId={tenant.id}

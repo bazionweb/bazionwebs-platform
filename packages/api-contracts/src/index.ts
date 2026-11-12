@@ -4,7 +4,8 @@ import { currencySchema } from "./currency.js";
 export { currencySchema } from "./currency.js";
 export * from "./commerce-admin.js";
 export * from "./provisioning.js";
-export * from "./provisioning-catalog.js";
+export * from "./lifecycle.js";
+export * from "./installation-config.js";
 export * from "./identity.js";
 export const createCartSchema = z.object({ currency: currencySchema.default("KES") });
 export const addCartItemSchema = z.object({

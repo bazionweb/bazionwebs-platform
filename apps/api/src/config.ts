@@ -6,6 +6,7 @@ import type { DarajaConfig } from "@bazion/payments";
 
 const optionalEnv = z.preprocess((value) => value === "" ? undefined : value, z.string().trim().min(1).optional());
 const defaultHostingTemplateDirectory = resolve(dirname(fileURLToPath(import.meta.url)), "../../../deploy/client-templates");
+const defaultPrivateArchiveDirectory = resolve(dirname(fileURLToPath(import.meta.url)), "../../../.private-archives");
 
 function validateCallbackUrl(value: string, production: boolean): void {
   const url = new URL(value);
@@ -69,10 +70,12 @@ const envSchema = z.object({
   HOSTING_SECRET_DIRECTORY: z.string().trim().min(1).default("/run/secrets"),
   HOSTING_TEMPLATE_DIRECTORY: z.string().trim().min(1).default(defaultHostingTemplateDirectory),
   COMMERCIAL_PROVISIONING_ENABLED: z.enum(["true", "false"]).default("false"),
+  COMMERCIAL_PROVISIONING_WORKER_ENABLED: z.enum(["true", "false"]).default("false"),
   PRODUCT_PROVISIONER_DATABASE_URL: optionalEnv,
   COMMERCIAL_PROVISIONING_COMMAND_SECRET: optionalEnv,
   COMMERCIAL_PROVISIONING_COMMAND_ISSUER: z.string().trim().min(1).default("bazionweb"),
   COMMERCIAL_PROVISIONING_COMMAND_AUDIENCE: z.string().trim().min(1).default("bazion-platform:commercial-provisioning"),
+  PRIVATE_ARCHIVE_DIR: optionalEnv,
   PLATFORM_CONSOLE_URL: z.string().url().default("http://localhost:3001"),
   COMMERCIAL_PORTAL_URL: z.string().url().optional(),
   OIDC_ISSUER: z.string().url().optional(),
@@ -172,6 +175,10 @@ export function loadConfig() {
     }
   }
 
+  if (config.PRIVATE_ARCHIVE_DIR && !isAbsolute(config.PRIVATE_ARCHIVE_DIR)) {
+    throw new Error("PRIVATE_ARCHIVE_DIR must be an absolute path.");
+  }
+
   const trustedProxyAddresses = config.TRUSTED_PROXY_ADDRESSES.split(",").map((value) => value.trim()).filter(Boolean);
   if (config.NODE_ENV === "production" && trustedProxyAddresses.length === 0) {
     throw new Error("Production startup blocked: configure the trusted ingress proxy IPs/CIDRs and block direct public access to the API.");
@@ -251,10 +258,12 @@ export function loadConfig() {
     },
     commercialProvisioning: {
       enabled: commercialProvisioningEnabled,
+      workerEnabled: config.COMMERCIAL_PROVISIONING_WORKER_ENABLED === "true",
       databaseUrl: config.PRODUCT_PROVISIONER_DATABASE_URL,
       commandSecret: config.COMMERCIAL_PROVISIONING_COMMAND_SECRET,
       commandIssuer: config.COMMERCIAL_PROVISIONING_COMMAND_ISSUER,
       commandAudience: config.COMMERCIAL_PROVISIONING_COMMAND_AUDIENCE,
+      privateArchiveDir: config.PRIVATE_ARCHIVE_DIR ?? defaultPrivateArchiveDirectory,
     },
     trustProxy: trustedProxyAddresses.length ? trustedProxyAddresses : false,
     mpesa: darajaConfiguredCount === darajaValues.length

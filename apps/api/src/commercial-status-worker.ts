@@ -1,5 +1,12 @@
 import { Pool } from "pg";
-import { PlatformStatusOutboxDispatcher } from "./modules/commercial-provisioning/status-outbox-worker.js";
+import {
+  PlatformLifecycleOutboxDispatcher,
+  PlatformStatusOutboxDispatcher,
+} from "./modules/commercial-provisioning/status-outbox-worker.js";
+import {
+  CommercialProvisioningSagaOrchestrator,
+  createDefaultProvisioningStepAdapters,
+} from "./modules/commercial-provisioning/saga-orchestrator.js";
 
 function required(name: string): string {
   const value = process.env[name]?.trim();
@@ -54,6 +61,24 @@ const pool = new Pool({
 });
 
 const dispatcher = new PlatformStatusOutboxDispatcher(pool);
+const lifecycleDispatcher = new PlatformLifecycleOutboxDispatcher(pool);
+const lifecycleCallbackUrlRaw = process.env.COMMERCIAL_LIFECYCLE_CALLBACK_URL?.trim();
+const lifecycleCallbackUrl = lifecycleCallbackUrlRaw
+  ? new URL(lifecycleCallbackUrlRaw)
+  : new URL(callbackUrl.toString().replace(/\/provisioning-status\/?$/, "/lifecycle-status"));
+const tenantProvisionerUrl = process.env.TENANT_PROVISIONER_DATABASE_URL?.trim();
+const platformPool = tenantProvisionerUrl
+  ? new Pool({ connectionString: tenantProvisionerUrl, max: 2, application_name: "bazion-commercial-saga-control" })
+  : undefined;
+const sagaOrchestrator = process.env.COMMERCIAL_SAGA_WORKER_ENABLED === "true"
+  ? new CommercialProvisioningSagaOrchestrator(
+      pool,
+      createDefaultProvisioningStepAdapters({
+        provisionerPool: pool,
+        ...(platformPool ? { platformPool } : {}),
+      }),
+    )
+  : null;
 
 let stopping = false;
 for (const signal of ["SIGINT", "SIGTERM"] as const) {
@@ -70,6 +95,14 @@ function sleep(ms: number): Promise<void> {
 async function run() {
   while (!stopping) {
     try {
+      let claimedTotal = 0;
+      if (sagaOrchestrator) {
+        const sagaOutcomes = await sagaOrchestrator.processDueOperations(batchSize);
+        if (sagaOutcomes.length > 0) {
+          claimedTotal += sagaOutcomes.length;
+          process.stdout.write(`[bazion-commercial-saga-worker] processed=${sagaOutcomes.length}\n`);
+        }
+      }
       const summary = await dispatcher.processDueBatch({
         callbackUrl: callbackUrl.toString(),
         signingSecret,
@@ -80,12 +113,29 @@ async function run() {
         retryMaxSeconds,
         requestTimeoutMs,
       });
+      claimedTotal += summary.claimed;
       if (summary.claimed > 0) {
         process.stdout.write(
           `[bazion-commercial-status-dispatcher] claimed=${summary.claimed} delivered=${summary.delivered} retried=${summary.retried} dead=${summary.deadLettered}\n`,
         );
       }
-      if (summary.claimed < batchSize && !stopping) {
+      const lifecycleSummary = await lifecycleDispatcher.processDueBatch({
+        callbackUrl: lifecycleCallbackUrl.toString(),
+        signingSecret,
+        bearerSigningSecret,
+        batchSize,
+        leaseSeconds,
+        retryBaseSeconds,
+        retryMaxSeconds,
+        requestTimeoutMs,
+      });
+      claimedTotal += lifecycleSummary.claimed;
+      if (lifecycleSummary.claimed > 0) {
+        process.stdout.write(
+          `[bazion-commercial-lifecycle-dispatcher] claimed=${lifecycleSummary.claimed} delivered=${lifecycleSummary.delivered} retried=${lifecycleSummary.retried} dead=${lifecycleSummary.deadLettered}\n`,
+        );
+      }
+      if (claimedTotal < batchSize && !stopping) {
         await sleep(idleMilliseconds);
       }
     } catch (error) {
@@ -94,7 +144,7 @@ async function run() {
       if (!stopping) await sleep(idleMilliseconds);
     }
   }
-  await pool.end();
+  await Promise.all([pool.end(), platformPool?.end()]);
 }
 
 void run();

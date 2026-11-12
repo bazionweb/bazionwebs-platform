@@ -22,6 +22,7 @@ export interface StatusCallbackDeliveryOptions {
   callbackUrl: string;
   signingSecret: string;
   bearerSigningSecret?: string | undefined;
+  bearerScope?: string | undefined;
   batchSize?: number | undefined;
   leaseSeconds?: number | undefined;
   retryBaseSeconds?: number | undefined;
@@ -90,11 +91,16 @@ function classifyFailure(status: number | null, error: unknown): { retryable: bo
   return { retryable: true, code: "CALLBACK_NETWORK_ERROR" };
 }
 
-/**
- * Bounded lease-fenced dispatcher for PostgreSQL `product_provisioning_status_outbox`.
- */
-export class PlatformStatusOutboxDispatcher {
+interface OutboxDispatchTarget {
+  tableName: "public.product_provisioning_status_outbox" | "public.product_subscription_lifecycle_outbox";
+  referenceColumn: "operation_id" | "lifecycle_inbox_id";
+  bearerSubject: string;
+  defaultBearerScope: string;
+}
+
+class BoundedLeaseOutboxDispatcher {
   constructor(
+    private readonly target: OutboxDispatchTarget,
     private readonly pool: CommercialSqlPool,
     private readonly fetchImpl: FetchLike = (url, init) => fetch(url, init),
     private readonly randomFn: () => number = () => Math.random(),
@@ -102,7 +108,7 @@ export class PlatformStatusOutboxDispatcher {
 
   private async deadLetterExhaustedLeases(): Promise<number> {
     const result = await this.pool.query(
-      `UPDATE public.product_provisioning_status_outbox
+      `UPDATE ${this.target.tableName}
           SET status = 'dead',
               last_error_code = 'CALLBACK_LEASE_EXHAUSTED',
               lease_token = NULL,
@@ -124,9 +130,9 @@ export class PlatformStatusOutboxDispatcher {
     try {
       await client.query("BEGIN");
       const due = await client.query<ClaimRow>(
-        `SELECT id::text, operation_id::text, event_id::text, correlation_id::text,
-                payload, max_attempts
-           FROM public.product_provisioning_status_outbox
+        `SELECT id::text, ${this.target.referenceColumn}::text AS operation_id,
+                event_id::text, correlation_id::text, payload, max_attempts
+           FROM ${this.target.tableName}
           WHERE ((status = 'pending' AND next_attempt_at <= now())
              OR (status = 'processing' AND lease_expires_at <= now()))
             AND attempt_count < max_attempts
@@ -140,7 +146,7 @@ export class PlatformStatusOutboxDispatcher {
       for (const row of due.rows) {
         const leaseToken = randomUUID();
         const updated = await client.query<ClaimedRow>(
-          `UPDATE public.product_provisioning_status_outbox
+          `UPDATE ${this.target.tableName}
               SET status = 'processing',
                   attempt_count = attempt_count + 1,
                   lease_token = $2,
@@ -204,10 +210,10 @@ export class PlatformStatusOutboxDispatcher {
       if (options.bearerSigningSecret) {
         headers.Authorization = `Bearer ${signMachineBearerToken(
           {
-            subject: "bazion-platform-status-dispatcher",
+            subject: this.target.bearerSubject,
             issuer: DEFAULT_CALLBACK_ISSUER,
             audience: DEFAULT_CALLBACK_AUDIENCE,
-            scopes: ["provisioning:status:write"],
+            scopes: [options.bearerScope ?? this.target.defaultBearerScope],
             ttlSeconds: 120,
           },
           options.bearerSigningSecret,
@@ -234,7 +240,7 @@ export class PlatformStatusOutboxDispatcher {
 
       if (deliveredOk) {
         const ack = await this.pool.query(
-          `UPDATE public.product_provisioning_status_outbox
+          `UPDATE ${this.target.tableName}
               SET status = 'delivered',
                   last_http_status = $3,
                   last_error_code = NULL,
@@ -255,7 +261,7 @@ export class PlatformStatusOutboxDispatcher {
 
       if (shouldDeadLetter) {
         const dead = await this.pool.query(
-          `UPDATE public.product_provisioning_status_outbox
+          `UPDATE ${this.target.tableName}
               SET status = 'dead',
                   attempt_count = $3,
                   last_http_status = $4,
@@ -281,7 +287,7 @@ export class PlatformStatusOutboxDispatcher {
       );
 
       const retried = await this.pool.query(
-        `UPDATE public.product_provisioning_status_outbox
+        `UPDATE ${this.target.tableName}
             SET status = 'pending',
                 attempt_count = $3,
                 last_http_status = $4,
@@ -310,7 +316,7 @@ export class PlatformStatusOutboxDispatcher {
       status: string;
       max_attempts: number;
     }>(
-      `UPDATE public.product_provisioning_status_outbox
+      `UPDATE ${this.target.tableName}
           SET status = 'pending',
               next_attempt_at = now(),
               lease_token = NULL,
@@ -320,7 +326,7 @@ export class PlatformStatusOutboxDispatcher {
               updated_at = now()
         WHERE id = $1
           AND (status IN ('dead', 'pending') OR (status = 'processing' AND lease_expires_at <= now()))
-        RETURNING id::text, operation_id::text, status, max_attempts`,
+        RETURNING id::text, ${this.target.referenceColumn}::text AS operation_id, status, max_attempts`,
       [outboxId],
     );
     const row = result.rows[0];
@@ -331,5 +337,51 @@ export class PlatformStatusOutboxDispatcher {
       status: row.status,
       maxAttempts: row.max_attempts,
     };
+  }
+}
+
+/**
+ * Bounded lease-fenced dispatcher for PostgreSQL `product_provisioning_status_outbox`.
+ */
+export class PlatformStatusOutboxDispatcher extends BoundedLeaseOutboxDispatcher {
+  constructor(
+    pool: CommercialSqlPool,
+    fetchImpl: FetchLike = (url, init) => fetch(url, init),
+    randomFn: () => number = () => Math.random(),
+  ) {
+    super(
+      {
+        tableName: "public.product_provisioning_status_outbox",
+        referenceColumn: "operation_id",
+        bearerSubject: "bazion-platform-status-dispatcher",
+        defaultBearerScope: "provisioning:status:write",
+      },
+      pool,
+      fetchImpl,
+      randomFn,
+    );
+  }
+}
+
+/**
+ * Bounded lease-fenced dispatcher for PostgreSQL `product_subscription_lifecycle_outbox`.
+ */
+export class PlatformLifecycleOutboxDispatcher extends BoundedLeaseOutboxDispatcher {
+  constructor(
+    pool: CommercialSqlPool,
+    fetchImpl: FetchLike = (url, init) => fetch(url, init),
+    randomFn: () => number = () => Math.random(),
+  ) {
+    super(
+      {
+        tableName: "public.product_subscription_lifecycle_outbox",
+        referenceColumn: "lifecycle_inbox_id",
+        bearerSubject: "bazion-platform-lifecycle-dispatcher",
+        defaultBearerScope: "provisioning:status:write",
+      },
+      pool,
+      fetchImpl,
+      randomFn,
+    );
   }
 }

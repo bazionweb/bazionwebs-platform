@@ -18,7 +18,6 @@ import type {
   OutboxReplayResult,
   PlatformStatusOutboxDispatcher,
 } from "./status-outbox-worker.js";
-import { getProvisioningOfferCatalogV1 } from "./offer-resolution.js";
 
 const auditWriter = new PostgresAuditEventWriter(pool);
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -31,6 +30,11 @@ export interface CommercialProvisioningRuntime {
   };
   service: Pick<CommercialProvisioningService, "acceptCommand" | "getOperation" | "reconcile">;
   dispatcher: Pick<PlatformStatusOutboxDispatcher, "replayOutboxEntry">;
+  orchestrator?: import("./saga-orchestrator.js").CommercialProvisioningSagaOrchestrator | undefined;
+  operatorService?: import("./operator-service.js").CommercialProvisioningOperatorService | undefined;
+  lifecycleService?: import("./lifecycle-service.js").SubscriptionLifecycleService | undefined;
+  lifecycleDispatcher?: Pick<import("./status-outbox-worker.js").PlatformLifecycleOutboxDispatcher, "processDueBatch" | "replayOutboxEntry"> | undefined;
+  offboardingService?: import("./offboarding-service.js").InstallationOffboardingService | undefined;
   close(): Promise<void>;
 }
 
@@ -52,28 +56,6 @@ export async function commercialProvisioningRoutes(
   app: FastifyInstance,
   options: { runtime: CommercialProvisioningRuntime | null },
 ): Promise<void> {
-  app.get("/internal/commercial/provisioning-catalog", async (request, reply) => {
-    const runtime = options.runtime;
-    if (!runtime) {
-      return reply.code(503).send({
-        error: "COMMERCIAL_PROVISIONING_UNCONFIGURED",
-        message: "Commercial provisioning receiver is not configured.",
-      });
-    }
-
-    try {
-      verifyMachineBearerToken(request.headers as Record<string, unknown>, {
-        secret: runtime.commandAuth.secret,
-        expectedIssuer: runtime.commandAuth.issuer || DEFAULT_COMMAND_ISSUER,
-        expectedAudience: runtime.commandAuth.audience || DEFAULT_COMMAND_AUDIENCE,
-        requiredScopes: ["commercial:provisioning:read"],
-      });
-      return reply.header("Cache-Control", "private, max-age=60").send(getProvisioningOfferCatalogV1());
-    } catch (error) {
-      return sendRouteError(reply, error);
-    }
-  });
-
   app.post("/internal/commercial/provisioning-requests", async (request, reply) => {
     const runtime = options.runtime;
     if (!runtime) {
@@ -267,4 +249,7 @@ export async function commercialProvisioningRoutes(
       return sendRouteError(reply, error);
     }
   });
+
+  const { registerCommercialPhase6Routes } = await import("./phase6-routes.js");
+  await registerCommercialPhase6Routes(app, options);
 }

@@ -24,8 +24,20 @@ describe("database migration registry", () => {
     expect(requiredDatabaseMigrations).toContain("0018_product_installations_provisioning_sagas.sql");
     expect(requiredDatabaseMigrations).toContain("0019_commercial_provisioning_delivery.sql");
     expect(requiredDatabaseMigrations).toContain("0020_phase5_identity_oidc_bff.sql");
+    expect(requiredDatabaseMigrations).toContain("0021_phase6_saga_leases_lifecycle_archive.sql");
     expect(currentDatabaseSchemaVersion).toBe(requiredDatabaseMigrations.at(-1));
-    expect(currentDatabaseSchemaVersion).toBe("0020_phase5_identity_oidc_bff.sql");
+    expect(currentDatabaseSchemaVersion).toBe("0021_phase6_saga_leases_lifecycle_archive.sql");
+  });
+
+  it("enforces Phase 6 saga lease/fencing tokens, 30-day archive retention, and lifecycle delivery tables", () => {
+    const migration = readFileSync(join(migrationsDirectory, "0021_phase6_saga_leases_lifecycle_archive.sql"), "utf8");
+    expect(migration).toContain("fencing_token");
+    expect(migration).toContain("lease_token");
+    expect(migration).toContain("installation_configuration_versions");
+    expect(migration).toContain("installation_offboarding_archives");
+    expect(migration).toContain("product_subscription_lifecycle_inbox");
+    expect(migration).toContain("product_subscription_lifecycle_outbox");
+    expect(migration).toContain("bazion_product_provisioner");
   });
 
   it("enforces federated (issuer, subject) uniqueness, PKCE S256 OIDC state, and single-use claim proofs", () => {

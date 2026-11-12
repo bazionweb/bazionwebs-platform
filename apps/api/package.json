@@ -21,6 +21,7 @@
     "@bazion/database": "workspace:*",
     "@bazion/deployment-dokploy": "workspace:*",
     "@bazion/payments": "workspace:*",
+    "@bazion/product-installations": "workspace:*",
     "@bazion/storage": "workspace:*",
     "@bazion/platform-contracts": "workspace:*",
     "@fastify/cors": "^11.4.0",
