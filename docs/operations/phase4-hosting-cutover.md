@@ -7,6 +7,8 @@ This procedure links a Bazionweb `HostingAccount` to its Platform provisioning p
 - Production offer intake remains closed until a product, solution, template and module release set is stable and its binding has been reviewed.
 - Dedicated distribution remains disabled until Platform has a production secret-manager path with tenant-scoped credentials.
 - Legacy Dokploy create and remediation paths remain available for unmapped accounts. A mapped account is read-only for Bazionweb status changes and legacy provider remediation.
+- Bazionweb serializes legacy hosting creation and Platform outbox domain claims with the same PostgreSQL transaction-level advisory lock. A normalized domain can have only one legacy or Platform owner during these writes.
+- If a settled order collides with a legacy hosting row or another Platform order, Bazionweb keeps the payment settlement and records its outbox command as `DEAD` with `PLATFORM_DOMAIN_CLAIM_CONFLICT`; it does not deliver the command. Operator replay checks ownership again and stays blocked until the competing account/order is resolved. Review `/admin/hosting/cutover` and the outbox error before changing ownership.
 - No production customer mapping or rollback drill has been recorded yet. The endpoints below implement the procedure; they are not evidence that a cutover has already occurred.
 
 ## Read-only cutover inventory
@@ -21,7 +23,7 @@ Bazionweb exposes `GET /api/v1/admin/platform-provisioning/hosting-cutover?page=
 - `linked`: the current link matches the Platform projection without a detected conflict.
 - `legacy_only`: no Platform projection or outbox claim matches the domain.
 
-The report omits Dokploy provider and workload identifiers. Only manually reviewed `ready_to_map` rows should proceed through the evidence-backed mapping procedure below. Never remove or stop a workload based on this report alone.
+The report omits Dokploy provider and workload identifiers. Only manually reviewed `ready_to_map` rows should proceed through the evidence-backed mapping procedure below. A `platform_claim_not_ready` row can include a dead-lettered domain conflict; resolve the existing workload/account ownership before replaying the command. Never remove or stop a workload based on this report alone.
 ## Mapping and dual-read
 
 1. Deploy Bazionweb's tolerant status contract and apply its nullable projection/mapping migration `20261112133000_phase4_hosting_deployment_projection` first. This lets it accept both old events and the new optional fields.
