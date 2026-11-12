@@ -53,45 +53,7 @@ async function readTenantAndInstallationStatus(
   }
 }
 
-const crossRepoE2eOfferBindings: ProvisioningOfferBinding[] = [
-  integrationOfferBinding,
-  {
-    offer: { id: "website-business", version: "1.0.0" },
-    composition: {
-      product: { id: "bazion-site", version: "1.0.0" },
-      solution: { id: "website-business", version: "1.0.0" },
-      template: { id: "node-nextjs", version: "1.0.0" },
-    },
-    requiredModules: [{ id: "website-content", version: "1.0.0" }],
-    optionalModules: [{ id: "analytics", version: "1.0.0" }],
-    distributionMode: "shared-managed",
-    availability: "active",
-    releaseState: {
-      product: "stable",
-      solution: "stable",
-      solutionReadiness: "buildable",
-      template: "stable",
-    },
-  },
-  {
-    offer: { id: "website-enterprise", version: "1.0.0" },
-    composition: {
-      product: { id: "bazion-site", version: "1.0.0" },
-      solution: { id: "website-enterprise", version: "1.0.0" },
-      template: { id: "node-nextjs", version: "1.0.0" },
-    },
-    requiredModules: [{ id: "website-content", version: "1.0.0" }],
-    optionalModules: [{ id: "analytics", version: "1.0.0" }],
-    distributionMode: "shared-managed",
-    availability: "active",
-    releaseState: {
-      product: "stable",
-      solution: "stable",
-      solutionReadiness: "buildable",
-      template: "stable",
-    },
-  },
-];
+const crossRepoE2eOfferBindings: ProvisioningOfferBinding[] = [integrationOfferBinding];
 
 const currentDir = dirname(fileURLToPath(import.meta.url));
 const defaultBazionwebApiDir = resolve(currentDir, "../../../../../../../bazionweb/apps/api");
@@ -457,7 +419,11 @@ describe.skipIf(!enabled)("Cross-repo live end-to-end commercial-to-platform del
     const deliveredBatch = await bridge.call<{ accepted: number }>("run_worker_batch", {
       platformApiBaseUrl: platformBaseUrl,
     });
-    expect(deliveredBatch.accepted).toBeGreaterThanOrEqual(1);
+    const deliveryState = await bridge.call<{
+      outbox: { status: string; lastHttpStatus: number | null; lastErrorCode: string | null };
+    }>("get_state", { outboxId: settled.outbox.id });
+    expect(deliveredBatch.accepted, JSON.stringify({ deliveredBatch, outbox: deliveryState.outbox }))
+      .toBeGreaterThanOrEqual(1);
 
     const stateAfterAccept = await bridge.call<{
       outbox: { status: string; platformOperationId: string | null };
@@ -615,12 +581,16 @@ describe.skipIf(!enabled)("Cross-repo live end-to-end commercial-to-platform del
     const lagSuffix = `${suffix}-lag`;
     const settledLag = await bridge.call<{
       outbox: { id: string };
-    }>("settle_invoice", { suffix: lagSuffix, offerId: "website-enterprise" });
+    }>("settle_invoice", { suffix: lagSuffix, offerId: "website-business" });
 
     const lagBatch = await bridge.call<{ accepted: number }>("run_worker_batch", {
       platformApiBaseUrl: platformBaseUrl,
     });
-    expect(lagBatch.accepted).toBeGreaterThanOrEqual(1);
+    const lagDeliveryState = await bridge.call<{
+      outbox: { lastHttpStatus: number | null; lastErrorCode: string | null };
+    }>("get_state", { outboxId: settledLag.outbox.id });
+    expect(lagBatch.accepted, JSON.stringify({ lagBatch, outbox: lagDeliveryState.outbox }))
+      .toBeGreaterThanOrEqual(1);
 
     const lagStateBefore = await bridge.call<{
       outbox: { platformOperationId: string };
@@ -678,7 +648,11 @@ describe.skipIf(!enabled)("Cross-repo live end-to-end commercial-to-platform del
     const deliverInit = await bridge.call<{ accepted: number }>("run_worker_batch", {
       platformApiBaseUrl: platformBaseUrl,
     });
-    expect(deliverInit.accepted).toBeGreaterThanOrEqual(1);
+    const initDeliveryState = await bridge.call<{
+      outbox: { status: string; lastHttpStatus: number | null; lastErrorCode: string | null };
+    }>("get_state", { outboxId: settled.outbox.id });
+    expect(deliverInit.accepted, JSON.stringify({ deliverInit, outbox: initDeliveryState.outbox }))
+      .toBeGreaterThanOrEqual(1);
 
     const stateInit = await bridge.call<{ outbox: { platformOperationId: string } }>("get_state", {
       outboxId: settled.outbox.id,

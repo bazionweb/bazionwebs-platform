@@ -27,8 +27,17 @@ describe("database migration registry", () => {
     expect(requiredDatabaseMigrations).toContain("0020_phase5_identity_oidc_bff.sql");
     expect(requiredDatabaseMigrations).toContain("0021_phase6_saga_leases_lifecycle_archive.sql");
     expect(requiredDatabaseMigrations).toContain("0022_phase4_hosting_deployment_projection.sql");
+    expect(requiredDatabaseMigrations).toContain("0023_product_provisioner_hosting_identity_read.sql");
     expect(currentDatabaseSchemaVersion).toBe(requiredDatabaseMigrations.at(-1));
-    expect(currentDatabaseSchemaVersion).toBe("0022_phase4_hosting_deployment_projection.sql");
+    expect(currentDatabaseSchemaVersion).toBe("0023_product_provisioner_hosting_identity_read.sql");
+  });
+
+  it("grants the commercial provisioner only the hosting identity columns required for idempotent replay", () => {
+    const migration = readFileSync(join(migrationsDirectory, "0023_product_provisioner_hosting_identity_read.sql"), "utf8");
+    expect(migration).toContain("GRANT SELECT (id, tenant_id, idempotency_key)");
+    expect(migration).toContain("tenant_hosting_deployments");
+    expect(migration).toContain("bazion_product_provisioner");
+    expect(migration).not.toMatch(/GRANT\s+SELECT\s+ON\s+TABLE\s+public\.tenant_hosting_deployments/i);
   });
 
 
