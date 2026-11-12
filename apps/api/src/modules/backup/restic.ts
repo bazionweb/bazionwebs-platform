@@ -113,7 +113,7 @@ export class ResticTenantBackupAdapter implements ResticTenantBackupProvider {
       stdout += chunk;
     });
     const exitCode = await new Promise<number>((resolve, reject) => {
-      child.once("error", (error) => {
+      child.once("error", (error: NodeJS.ErrnoException) => {
         reject(error.code === "ENOENT"
           ? new Error("TENANT_BACKUP_RESTIC_NOT_INSTALLED")
           : new Error("TENANT_BACKUP_RESTIC_EXECUTION_FAILED"));

@@ -53,6 +53,9 @@ CREATE ROLE bazion_tenant_backup
   LOGIN PASSWORD :'tenant_backup_password'
   NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS;
 
+COMMENT ON ROLE bazion_tenant_backup IS
+  'RLS-constrained tenant backup/restore worker; no BYPASSRLS, table ownership or control-plane writes.';
+
 GRANT CONNECT ON DATABASE bazion_platform
   TO bazion_app, bazion_migrator, bazion_auth_runtime,
      bazion_tenant_resolver, bazion_tenant_provisioner,

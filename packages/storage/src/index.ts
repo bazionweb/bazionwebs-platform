@@ -160,38 +160,6 @@ export class S3ObjectStorage implements ObjectStorage {
     };
   }
 
-  async listObjectsPage(input: { tenantId: string; limit?: number; cursor?: string }): Promise<{ objects: StoredObject[]; nextCursor: string | null }> {
-    const tenantPath = resolve(this.directory, input.tenantId);
-    const limit = Math.max(1, Math.min(input.limit ?? 500, 1000));
-    const files: StoredObject[] = [];
-    const walk = async (directory: string): Promise<void> => {
-      let entries;
-      try { entries = await readdir(directory, { withFileTypes: true }); }
-      catch (error) {
-        if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") return;
-        throw error;
-      }
-      for (const entry of entries) {
-        const fullPath = join(directory, entry.name);
-        if (entry.isDirectory()) { await walk(fullPath); continue; }
-        if (!entry.isFile() || entry.name.endsWith(".content-type")) continue;
-        const key = relative(this.directory, fullPath).split(sep).join("/");
-        if (!key.startsWith(`${input.tenantId}/`)) continue;
-        const metadata = await stat(fullPath);
-        let contentType = contentTypeFromKey(key);
-        try { contentType = await readFile(`${fullPath}.content-type`, "utf8"); } catch { /* Extension fallback. */ }
-        files.push({ key, url: this.publicUrl(key), contentType, sizeBytes: metadata.size, lastModified: metadata.mtime.toISOString() });
-      }
-    };
-    await walk(tenantPath);
-    files.sort((left, right) => left.key.localeCompare(right.key));
-    const startIndex = input.cursor ? files.findIndex((file) => file.key > input.cursor!) : 0;
-    const pageStart = startIndex < 0 ? files.length : startIndex;
-    const objects = files.slice(pageStart, pageStart + limit);
-    const hasMore = pageStart + objects.length < files.length;
-    return { objects, nextCursor: hasMore ? objects.at(-1)?.key ?? null : null };
-  }
-
   async getObject(input: { tenantId: string; key: string }): Promise<StoredFile | null> {
     assertTenantKey(input.tenantId, input.key);
     try {
@@ -266,6 +234,38 @@ export class LocalObjectStorage implements ObjectStorage {
     };
     await walk(tenantPath);
     return files.sort((a, b) => b.lastModified.localeCompare(a.lastModified)).slice(0, limit);
+  }
+
+  async listObjectsPage(input: { tenantId: string; limit?: number; cursor?: string }): Promise<{ objects: StoredObject[]; nextCursor: string | null }> {
+    const tenantPath = resolve(this.directory, input.tenantId);
+    const limit = Math.max(1, Math.min(input.limit ?? 500, 1000));
+    const files: StoredObject[] = [];
+    const walk = async (directory: string): Promise<void> => {
+      let entries;
+      try { entries = await readdir(directory, { withFileTypes: true }); }
+      catch (error) {
+        if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") return;
+        throw error;
+      }
+      for (const entry of entries) {
+        const fullPath = join(directory, entry.name);
+        if (entry.isDirectory()) { await walk(fullPath); continue; }
+        if (!entry.isFile() || entry.name.endsWith(".content-type")) continue;
+        const key = relative(this.directory, fullPath).split(sep).join("/");
+        if (!key.startsWith(`${input.tenantId}/`)) continue;
+        const metadata = await stat(fullPath);
+        let contentType = contentTypeFromKey(key);
+        try { contentType = await readFile(`${fullPath}.content-type`, "utf8"); } catch { /* Extension fallback. */ }
+        files.push({ key, url: this.publicUrl(key), contentType, sizeBytes: metadata.size, lastModified: metadata.mtime.toISOString() });
+      }
+    };
+    await walk(tenantPath);
+    files.sort((left, right) => left.key.localeCompare(right.key));
+    const startIndex = input.cursor ? files.findIndex((file) => file.key > input.cursor!) : 0;
+    const pageStart = startIndex < 0 ? files.length : startIndex;
+    const objects = files.slice(pageStart, pageStart + limit);
+    const hasMore = pageStart + objects.length < files.length;
+    return { objects, nextCursor: hasMore ? objects.at(-1)?.key ?? null : null };
   }
 
   async getObject(input: { tenantId: string; key: string }): Promise<StoredFile | null> {

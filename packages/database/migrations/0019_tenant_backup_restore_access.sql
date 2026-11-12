@@ -33,5 +33,5 @@ GRANT SELECT ON public.tenants, public.schema_migrations TO bazion_tenant_backup
 GRANT SELECT (tenant_id, tier, state, migration_secret_ref, schema_version)
   ON public.tenant_database_bindings TO bazion_tenant_backup;
 
-COMMENT ON ROLE bazion_tenant_backup IS
-  'RLS-constrained tenant backup/restore worker; no BYPASSRLS, table ownership or control-plane writes.';
+-- Role description lives in packages/database/init/001-create-roles.sh because
+-- bazion_migrator intentionally runs with NOCREATEROLE.
