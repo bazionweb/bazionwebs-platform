@@ -71,6 +71,13 @@ const envSchema = z.object({
   HOSTING_TEMPLATE_DIRECTORY: z.string().trim().min(1).default(defaultHostingTemplateDirectory),
   COMMERCIAL_PROVISIONING_ENABLED: z.enum(["true", "false"]).default("false"),
   COMMERCIAL_PROVISIONING_WORKER_ENABLED: z.enum(["true", "false"]).default("false"),
+  COMMERCIAL_PROVISIONING_PILOT_MODE: z.enum(["disabled", "staging_pilot", "canary"]).default("disabled"),
+  COMMERCIAL_PROVISIONING_CANARY_CUSTOMERS: optionalEnv,
+  COMMERCIAL_PROVISIONING_PILOT_CUSTOMERS: optionalEnv,
+  COMMERCIAL_PROVISIONING_ALLOWED_OFFERS: optionalEnv,
+  COMMERCIAL_PROVISIONING_HOSTING_MUTATIONS_ENABLED: z.enum(["true", "false"]).optional(),
+  COMMERCIAL_PROVISIONING_LEGACY_FALLBACK_ENABLED: z.enum(["true", "false"]).default("true"),
+  COMMERCIAL_PROVISIONING_DUAL_READ_RECONCILIATION_ENABLED: z.enum(["true", "false"]).default("true"),
   PRODUCT_PROVISIONER_DATABASE_URL: optionalEnv,
   COMMERCIAL_PROVISIONING_COMMAND_SECRET: optionalEnv,
   COMMERCIAL_PROVISIONING_COMMAND_ISSUER: z.string().trim().min(1).default("bazionweb"),
@@ -264,6 +271,22 @@ export function loadConfig() {
       commandIssuer: config.COMMERCIAL_PROVISIONING_COMMAND_ISSUER,
       commandAudience: config.COMMERCIAL_PROVISIONING_COMMAND_AUDIENCE,
       privateArchiveDir: config.PRIVATE_ARCHIVE_DIR ?? defaultPrivateArchiveDirectory,
+      pilotMode: config.COMMERCIAL_PROVISIONING_PILOT_MODE,
+      allowedCustomerIds: [
+        ...(config.COMMERCIAL_PROVISIONING_CANARY_CUSTOMERS?.split(",") ?? []),
+        ...(config.COMMERCIAL_PROVISIONING_PILOT_CUSTOMERS?.split(",") ?? []),
+      ]
+        .map((value) => value.trim())
+        .filter(Boolean),
+      allowedOffers: (config.COMMERCIAL_PROVISIONING_ALLOWED_OFFERS?.split(",") ?? [])
+        .map((value) => value.trim())
+        .filter(Boolean),
+      hostingMutationsEnabled:
+        config.COMMERCIAL_PROVISIONING_HOSTING_MUTATIONS_ENABLED !== undefined
+          ? config.COMMERCIAL_PROVISIONING_HOSTING_MUTATIONS_ENABLED === "true"
+          : config.HOSTING_PROVIDER === "dokploy",
+      legacyFallbackEnabled: config.COMMERCIAL_PROVISIONING_LEGACY_FALLBACK_ENABLED === "true",
+      dualReadReconciliationEnabled: config.COMMERCIAL_PROVISIONING_DUAL_READ_RECONCILIATION_ENABLED === "true",
     },
     trustProxy: trustedProxyAddresses.length ? trustedProxyAddresses : false,
     mpesa: darajaConfiguredCount === darajaValues.length

@@ -18,6 +18,9 @@ import type {
   OutboxReplayResult,
   PlatformStatusOutboxDispatcher,
 } from "./status-outbox-worker.js";
+import { getProvisioningOfferCatalogV1 } from "./offer-resolution.js";
+import { resolveCorrelationId } from "./observability.js";
+import { getProvisioningCatalogForPolicy } from "./pilot-cutover.js";
 
 const auditWriter = new PostgresAuditEventWriter(pool);
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -35,6 +38,11 @@ export interface CommercialProvisioningRuntime {
   lifecycleService?: import("./lifecycle-service.js").SubscriptionLifecycleService | undefined;
   lifecycleDispatcher?: Pick<import("./status-outbox-worker.js").PlatformLifecycleOutboxDispatcher, "processDueBatch" | "replayOutboxEntry"> | undefined;
   offboardingService?: import("./offboarding-service.js").InstallationOffboardingService | undefined;
+  pilotPolicy?: import("@bazion/api-contracts").PilotCohortPolicyV1 | undefined;
+  telemetry?: import("./observability.js").CommercialProvisioningTelemetry | undefined;
+  reconciliationService?: import("./reconciliation-service.js").CrossEntityReconciliationService | undefined;
+  sloService?: import("./observability.js").ProvisioningSloService | undefined;
+  cutoverService?: import("./pilot-cutover.js").CutoverReadinessService | undefined;
   close(): Promise<void>;
 }
 
@@ -56,7 +64,7 @@ export async function commercialProvisioningRoutes(
   app: FastifyInstance,
   options: { runtime: CommercialProvisioningRuntime | null },
 ): Promise<void> {
-  app.post("/internal/commercial/provisioning-requests", async (request, reply) => {
+  app.get("/internal/commercial/provisioning-catalog", async (request, reply) => {
     const runtime = options.runtime;
     if (!runtime) {
       return reply.code(503).send({
@@ -70,16 +78,58 @@ export async function commercialProvisioningRoutes(
         secret: runtime.commandAuth.secret,
         expectedIssuer: runtime.commandAuth.issuer || DEFAULT_COMMAND_ISSUER,
         expectedAudience: runtime.commandAuth.audience || DEFAULT_COMMAND_AUDIENCE,
+        requiredScopes: ["commercial:provisioning:read"],
+      });
+      const catalog = runtime.pilotPolicy
+        ? getProvisioningCatalogForPolicy(runtime.pilotPolicy)
+        : getProvisioningOfferCatalogV1();
+      return reply.header("Cache-Control", "private, max-age=60").send(catalog);
+    } catch (error) {
+      return sendRouteError(reply, error);
+    }
+  });
+
+  app.post("/internal/commercial/provisioning-requests", async (request, reply) => {
+    const runtime = options.runtime;
+    if (!runtime) {
+      return reply.code(503).send({
+        error: "COMMERCIAL_PROVISIONING_UNCONFIGURED",
+        message: "Commercial provisioning receiver is not configured.",
+      });
+    }
+
+    const bodyCorrelationId =
+      request.body && typeof request.body === "object" && "correlationId" in request.body
+        ? (request.body as { correlationId?: unknown }).correlationId
+        : undefined;
+    const correlationId = resolveCorrelationId(request.headers["x-correlation-id"] ?? bodyCorrelationId);
+    reply.header("x-correlation-id", correlationId);
+    const startedAtMs = Date.now();
+    try {
+      verifyMachineBearerToken(request.headers as Record<string, unknown>, {
+        secret: runtime.commandAuth.secret,
+        expectedIssuer: runtime.commandAuth.issuer || DEFAULT_COMMAND_ISSUER,
+        expectedAudience: runtime.commandAuth.audience || DEFAULT_COMMAND_AUDIENCE,
         requiredScopes: ["commercial:provisioning:write"],
       });
 
       const result = await runtime.service.acceptCommand(request.body);
+      runtime.telemetry?.recordCommandAcceptance({
+        durationMs: Date.now() - startedAtMs,
+        succeeded: true,
+      });
       return reply.code(202).send({
         accepted: true,
         deduplicated: result.deduplicated,
         operation: result.operation,
       });
     } catch (error) {
+      if (!(error instanceof CommercialMachineAuthError)) {
+        runtime.telemetry?.recordCommandAcceptance({
+          durationMs: Date.now() - startedAtMs,
+          succeeded: false,
+        });
+      }
       return sendRouteError(reply, error);
     }
   });
@@ -252,4 +302,6 @@ export async function commercialProvisioningRoutes(
 
   const { registerCommercialPhase6Routes } = await import("./phase6-routes.js");
   await registerCommercialPhase6Routes(app, options);
+  const { registerCommercialPhase7Routes } = await import("./phase7-routes.js");
+  await registerCommercialPhase7Routes(app, options);
 }

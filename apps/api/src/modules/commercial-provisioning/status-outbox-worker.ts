@@ -204,6 +204,7 @@ class BoundedLeaseOutboxDispatcher {
       const headers: Record<string, string> = {
         "Content-Type": "application/json",
         "X-Bazion-Event-Id": item.eventId,
+        "X-Correlation-Id": item.correlationId,
         "X-Bazion-Correlation-Id": item.correlationId,
         "X-Bazion-Signature": signature,
       };

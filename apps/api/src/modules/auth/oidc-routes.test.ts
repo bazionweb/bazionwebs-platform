@@ -689,4 +689,49 @@ describe("Phase 5 OIDC, BFF cookies, CSRF, claim-order, email lifecycle, and dee
       await app.close();
     }
   });
+
+  it("blocks sandbox headers and impersonated sessions across mutating API routes while allowing reads and logout", async () => {
+    const app = await buildApp(loadConfig());
+    try {
+      const headerBlocked = await app.inject({
+        method: "POST",
+        url: "/v1/auth/deep-links/resolve",
+        headers: {
+          origin: "http://localhost:3100",
+          "content-type": "application/json",
+          "x-bazion-sandbox": "true",
+        },
+        payload: { area: "commercial_billing", externalRef: "ord_12345" },
+      });
+      expect(headerBlocked.statusCode).toBe(403);
+      expect(headerBlocked.json()).toMatchObject({ error: "SANDBOX_IMPERSONATION_FORBIDDEN" });
+
+      mocks.getSession.mockResolvedValueOnce({
+        user: { id: "user-sandbox-1", email: "sandbox@acme.test", name: "Sandbox User", emailVerified: true },
+        session: { id: "sess-impersonated-1", impersonatedBy: "support-admin-9" },
+      });
+      const sessionBlocked = await app.inject({
+        method: "POST",
+        url: "/v1/auth/deep-links/resolve",
+        headers: {
+          origin: "http://localhost:3100",
+          cookie: "better-auth.session_token=impersonated-session",
+          "content-type": "application/json",
+        },
+        payload: { area: "commercial_billing", externalRef: "ord_12345" },
+      });
+      expect(sessionBlocked.statusCode).toBe(403);
+      expect(sessionBlocked.json()).toMatchObject({ error: "SANDBOX_IMPERSONATION_FORBIDDEN" });
+
+      // Read requests remain allowed
+      const getOk = await app.inject({
+        method: "GET",
+        url: "/health",
+        headers: { "x-bazion-sandbox": "true" },
+      });
+      expect(getOk.statusCode).toBe(200);
+    } finally {
+      await app.close();
+    }
+  });
 });

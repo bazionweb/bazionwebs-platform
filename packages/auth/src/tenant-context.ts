@@ -24,6 +24,29 @@ export interface CurrentIdentity {
   organization: { id: string; role: string } | null;
   tenant: { id: string; slug: string; name: string; currency: string; status: string } | null;
   platformRole: "platform_owner" | "platform_admin" | "platform_support" | null;
+  impersonatedBy: string | null;
+  isSandbox: boolean;
+}
+
+function headerFlagIsTrue(raw: string | string[] | undefined): boolean {
+  const first = Array.isArray(raw) ? raw[0] : raw;
+  if (typeof first !== "string") return false;
+  const normalized = first.trim().toLowerCase();
+  return normalized === "true" || normalized === "1";
+}
+
+export function isSandboxRequestHeaders(headers: IncomingHttpHeaders): boolean {
+  return (
+    headerFlagIsTrue(headers["x-bazion-sandbox"])
+    || headerFlagIsTrue(headers["x-bazion-impersonating"])
+  );
+}
+
+function throwSandboxForbidden(): never {
+  throw Object.assign(
+    new Error("Support sandbox or impersonation sessions are read-only and cannot perform mutations."),
+    { statusCode: 403, code: "SANDBOX_IMPERSONATION_FORBIDDEN" },
+  );
 }
 
 export async function getCurrentIdentity(headers: IncomingHttpHeaders): Promise<CurrentIdentity | null> {
@@ -32,9 +55,14 @@ export async function getCurrentIdentity(headers: IncomingHttpHeaders): Promise<
   const session = await auth.api.getSession({ headers: authHeaders });
   if (!session) return null;
 
-  const activeOrganizationId = (session.session as typeof session.session & {
+  const sessionRecord = session.session as typeof session.session & {
     activeOrganizationId?: string | null;
-  }).activeOrganizationId;
+    impersonatedBy?: string | null;
+  };
+  const activeOrganizationId = sessionRecord.activeOrganizationId;
+  const impersonatedBy = typeof sessionRecord.impersonatedBy === "string" && sessionRecord.impersonatedBy.trim()
+    ? sessionRecord.impersonatedBy.trim()
+    : null;
   const [member, platformMember] = await Promise.all([
     activeOrganizationId ? auth.api.getActiveMember({ headers: authHeaders }) : Promise.resolve(null),
     resolvePlatformMemberByUserId(session.user.id),
@@ -53,6 +81,8 @@ export async function getCurrentIdentity(headers: IncomingHttpHeaders): Promise<
       ? { id: tenant.id, slug: tenant.slug, name: tenant.name, currency: tenant.default_currency, status: tenant.status }
       : null,
     platformRole: platformMember?.role ?? null,
+    impersonatedBy,
+    isSandbox: Boolean(impersonatedBy) || isSandboxRequestHeaders(headers),
   };
 }
 
@@ -92,8 +122,33 @@ export async function hasActiveTenantPermission(headers: IncomingHttpHeaders, pe
   return result.success === true;
 }
 
+function isReadOnlyTenantPermissionRequest(permissions: TenantPermissionRequest): boolean {
+  const actions = Object.values(permissions).flat();
+  return actions.length > 0 && actions.every((action) => action === "read");
+}
+
+function isReadOnlyPlatformPermission(permission: PlatformPermission): boolean {
+  return permission === "tenant.list" || permission.endsWith(".read");
+}
+
 export async function requireActiveTenantPermission(headers: IncomingHttpHeaders, permissions: TenantPermissionRequest): Promise<ActiveTenantContext> {
-  const context = await getActiveTenantContext(headers);
+  const identity = await getCurrentIdentity(headers);
+  if ((identity?.isSandbox || identity?.impersonatedBy || isSandboxRequestHeaders(headers)) && !isReadOnlyTenantPermissionRequest(permissions)) {
+    throwSandboxForbidden();
+  }
+  const context = identity?.organization && identity.tenant && identity.tenant.status === "active"
+    ? {
+        userId: identity.user.id,
+        email: identity.user.email,
+        name: identity.user.name,
+        organizationId: identity.organization.id,
+        tenantId: identity.tenant.id,
+        tenantSlug: identity.tenant.slug,
+        tenantName: identity.tenant.name,
+        currency: identity.tenant.currency,
+        roles: parseOrganizationRoles(identity.organization.role),
+      }
+    : null;
   if (!context) throw Object.assign(new Error("An active organization membership is required."), { statusCode: 403, code: "TENANT_MEMBERSHIP_REQUIRED" });
   if (!(await hasActiveTenantPermission(headers, permissions))) {
     throw Object.assign(new Error("You do not have permission to perform this action."), { statusCode: 403, code: "PERMISSION_DENIED" });
@@ -108,6 +163,9 @@ export async function requirePlatformPermission(headers: IncomingHttpHeaders, pe
       statusCode: 403,
       code: "PLATFORM_PERMISSION_DENIED",
     });
+  }
+  if ((identity.isSandbox || identity.impersonatedBy || isSandboxRequestHeaders(headers)) && !isReadOnlyPlatformPermission(permission)) {
+    throwSandboxForbidden();
   }
   if (identity.platformRole === "platform_owner") {
     return { userId: identity.user.id, email: identity.user.email, role: identity.platformRole, tenantId: targetTenantId ?? null };

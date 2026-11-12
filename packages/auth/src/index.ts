@@ -2,6 +2,7 @@ export {
   getActiveTenantContext,
   getCurrentIdentity,
   hasActiveTenantPermission,
+  isSandboxRequestHeaders,
   requireActiveTenantPermission,
   requirePlatformRole,
   requirePlatformPermission,
