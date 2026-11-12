@@ -1,5 +1,7 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
+  getProvisioningOfferCatalogV1JsonSchema,
   provisioningOfferBindingV1Schema,
   provisioningOfferCatalogV1Schema,
 } from "./provisioning-catalog.js";
@@ -41,5 +43,13 @@ describe("versioned provisioning offer catalog contract", () => {
       bindings: [binding, binding],
     });
     expect(result.success).toBe(false);
+  });
+
+  it("keeps the published JSON Schema artifact synchronized with the runtime contract", () => {
+    const artifact = JSON.parse(readFileSync(
+      new URL("../contracts/provisioning-offer-catalog-v1.schema.json", import.meta.url),
+      "utf8",
+    )) as unknown;
+    expect(artifact).toEqual(getProvisioningOfferCatalogV1JsonSchema());
   });
 });

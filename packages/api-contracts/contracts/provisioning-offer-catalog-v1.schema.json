@@ -1,0 +1,197 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "const": "1.0.0"
+    },
+    "generatedAt": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+    },
+    "bindings": {
+      "maxItems": 1000,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "offer": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 120,
+                "pattern": "^[a-z0-9][a-z0-9._-]*$"
+              },
+              "version": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9.+_-]*$"
+              }
+            },
+            "required": [
+              "id",
+              "version"
+            ],
+            "additionalProperties": false
+          },
+          "composition": {
+            "type": "object",
+            "properties": {
+              "product": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120,
+                    "pattern": "^[a-z0-9][a-z0-9._-]*$"
+                  },
+                  "version": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64,
+                    "pattern": "^[A-Za-z0-9][A-Za-z0-9.+_-]*$"
+                  }
+                },
+                "required": [
+                  "id",
+                  "version"
+                ],
+                "additionalProperties": false
+              },
+              "solution": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120,
+                    "pattern": "^[a-z0-9][a-z0-9._-]*$"
+                  },
+                  "version": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64,
+                    "pattern": "^[A-Za-z0-9][A-Za-z0-9.+_-]*$"
+                  }
+                },
+                "required": [
+                  "id",
+                  "version"
+                ],
+                "additionalProperties": false
+              },
+              "template": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120,
+                    "pattern": "^[a-z0-9][a-z0-9._-]*$"
+                  },
+                  "version": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64,
+                    "pattern": "^[A-Za-z0-9][A-Za-z0-9.+_-]*$"
+                  }
+                },
+                "required": [
+                  "id",
+                  "version"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "product",
+              "solution",
+              "template"
+            ],
+            "additionalProperties": false
+          },
+          "requiredModules": {
+            "minItems": 1,
+            "maxItems": 100,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 120,
+                  "pattern": "^[a-z0-9][a-z0-9._-]*$"
+                },
+                "version": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 64,
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9.+_-]*$"
+                }
+              },
+              "required": [
+                "id",
+                "version"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "optionalModules": {
+            "maxItems": 100,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 120,
+                  "pattern": "^[a-z0-9][a-z0-9._-]*$"
+                },
+                "version": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 64,
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9.+_-]*$"
+                }
+              },
+              "required": [
+                "id",
+                "version"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "distributionMode": {
+            "type": "string",
+            "const": "shared-managed"
+          }
+        },
+        "required": [
+          "offer",
+          "composition",
+          "requiredModules",
+          "optionalModules",
+          "distributionMode"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "generatedAt",
+    "bindings"
+  ],
+  "additionalProperties": false,
+  "$id": "https://schemas.bazionweb.com/platform/provisioning-offer-catalog/1.0.0",
+  "title": "Bazion platform provisioning offer catalog v1",
+  "description": "Price-free, immutable offer-to-product bindings published by the platform."
+}

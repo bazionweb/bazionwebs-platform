@@ -74,7 +74,7 @@ This checklist coordinates the Bazion commercial website (`D:\bazionweb`) and th
 
 **Goal:** map offers to validated product composition and make platform deployments authoritative.
 
-- [x] Define a strict, versioned, price-free catalog contract for offer/version → product/solution/template releases, module entitlements and supported distribution mode (`@bazion/api-contracts`, `provisioning-catalog.ts`).
+- [x] Define a strict, versioned, price-free catalog contract and published JSON Schema for offer/version → product/solution/template releases, module entitlements and supported distribution mode (`@bazion/api-contracts`, `provisioning-catalog.ts`).
 - [x] Keep offer authority in a Platform-owned allowlist; reject unbound offers, version/composition drift, retired or unstable releases, and unsupported distribution before creating a provisioning operation. The active list remains empty until a stable composition is available.
 - [x] Expose `GET /v1/internal/commercial/provisioning-catalog` to machine clients with the `commercial:provisioning:read` scope; the response excludes pricing and only contains active stable shared-managed bindings.
 - [ ] Publish the first real binding only after the product, solution, template and module versions are stable and the manifest consistency test passes. Current church-ministry product, solution and template manifests are `partial`.
