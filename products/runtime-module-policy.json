@@ -72,6 +72,15 @@
       "required": false,
       "tenantAssignable": true,
       "entitlementDependencies": ["platform-identity"]
+    },
+    {
+      "id": "media-storage",
+      "displayName": "Tenant media storage",
+      "description": "Tenant-scoped media uploads, assets library, and object storage adapters.",
+      "defaultEnabled": false,
+      "required": false,
+      "tenantAssignable": true,
+      "entitlementDependencies": ["platform-identity"]
     }
   ]
 }

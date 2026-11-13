@@ -7,7 +7,7 @@ import { platformFetch, requirePlatformOwner, type Tenant } from "@/lib/platform
 type TenantList = { items: Tenant[]; total: number; limit: number; offset: number };
 
 export default async function AuditPage() {
-  const identity = await requirePlatformOwner().catch(() => null);
+  const identity = await requirePlatformOwner();
   const result = await platformFetch<TenantList>("tenants?limit=100");
   const tenants = result.data?.items ?? [];
 

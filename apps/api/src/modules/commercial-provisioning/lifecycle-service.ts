@@ -6,10 +6,13 @@ import {
   type SubscriptionLifecycleStatusEventV1,
 } from "@bazion/api-contracts";
 import { PostgresAuditEventWriter } from "@bazion/audit";
+import type { HostingProvisioningRuntime } from "../hosting/runtime.js";
 import { CommercialProvisioningError, type CommercialSqlPool } from "./service.js";
 
 export interface TenantLifecycleAdapter {
   setTenantStatus(tenantId: string, action: "suspend" | "restore"): Promise<void>;
+  setEntitlementsEnabled?(tenantId: string, enabled: boolean, reasonCode: string): Promise<void>;
+  setHostingStatus?(tenantId: string, action: "stop" | "start"): Promise<void>;
 }
 
 export interface SubscriptionLifecycleApplyResult {
@@ -25,7 +28,10 @@ export interface SubscriptionLifecycleApplyResult {
   callbackEvent: SubscriptionLifecycleStatusEventV1;
 }
 
-export function createDefaultTenantLifecycleAdapter(controlPool: CommercialSqlPool): TenantLifecycleAdapter {
+export function createDefaultTenantLifecycleAdapter(
+  controlPool: CommercialSqlPool,
+  hostingRuntime?: HostingProvisioningRuntime | null,
+): TenantLifecycleAdapter {
   return {
     async setTenantStatus(tenantId, action) {
       const fromStatus = action === "suspend" ? "active" : "suspended";
@@ -39,6 +45,45 @@ export function createDefaultTenantLifecycleAdapter(controlPool: CommercialSqlPo
          WHERE id = $1 AND status = $4`,
         [tenantId, toStatus, suspendedAt, fromStatus],
       );
+    },
+    async setEntitlementsEnabled(tenantId, enabled, _reasonCode) {
+      await controlPool.query(
+        `UPDATE public.tenant_module_entitlements
+         SET enabled = $2,
+             updated_at = now()
+         WHERE tenant_id = $1
+           AND updated_by = 'commercial-provisioning'
+           AND module_id <> 'platform-identity'`,
+        [tenantId, enabled],
+      );
+    },
+    async setHostingStatus(tenantId, action) {
+      if (!hostingRuntime) return;
+      const deployments = await controlPool.query<{ id: string; state: string }>(
+        `SELECT id::text, state
+         FROM public.tenant_hosting_deployments
+         WHERE tenant_id = $1
+           AND provider = $2
+           AND state IN ('ready', 'deploying', 'running', 'stopped')`,
+        [tenantId, hostingRuntime.providerId],
+      );
+      for (const dep of deployments.rows) {
+        if (action === "stop" && dep.state !== "stopped") {
+          await hostingRuntime.lifecycle({
+            tenantId,
+            deploymentId: dep.id,
+            action: "stop",
+            actorId: "commercial-lifecycle-service",
+          });
+        } else if (action === "start" && dep.state === "stopped") {
+          await hostingRuntime.lifecycle({
+            tenantId,
+            deploymentId: dep.id,
+            action: "start",
+            actorId: "commercial-lifecycle-service",
+          });
+        }
+      }
     },
   };
 }
@@ -204,9 +249,13 @@ export class SubscriptionLifecycleService {
               applied = true;
             }
           } else if (command.action === "grace") {
-            // Grace keeps workspace operational while dunning runs in Bazionweb
+            // Grace keeps workspace operational while dunning runs in Bazionweb; preserve entitlements.
             applied = true;
           } else if (command.action === "suspend" || command.action === "cancel") {
+            const suspendedReason =
+              command.action === "cancel"
+                ? `SUBSCRIPTION_CANCELLED:${command.reasonCode}`
+                : command.reasonCode;
             if (installation.status === "ready") {
               const updated = await client.query<{ status: string }>(
                 `UPDATE public.product_installations
@@ -214,7 +263,7 @@ export class SubscriptionLifecycleService {
                      suspended_reason = $3
                  WHERE id = $1 AND tenant_id = $2
                  RETURNING status`,
-                [installationId, tenantId, command.reasonCode],
+                [installationId, tenantId, suspendedReason],
               );
               installationStatus = updated.rows[0]?.status ?? "suspended";
               // Only suspend tenant if no other active/ready installations exist for this tenant
@@ -229,6 +278,14 @@ export class SubscriptionLifecycleService {
               }
               applied = true;
             } else if (installation.status === "suspended") {
+              if (command.action === "cancel") {
+                await client.query(
+                  `UPDATE public.product_installations
+                   SET suspended_reason = $3
+                   WHERE id = $1 AND tenant_id = $2`,
+                  [installationId, tenantId, suspendedReason],
+                );
+              }
               applied = true;
             }
           }
@@ -310,8 +367,48 @@ export class SubscriptionLifecycleService {
 
       await client.query("COMMIT");
 
+      const downstreamFailures: string[] = [];
       if (tenantId && tenantActionNeeded && this.tenantAdapter) {
-        await this.tenantAdapter.setTenantStatus(tenantId, tenantActionNeeded).catch(() => undefined);
+        const enableState = tenantActionNeeded === "restore";
+        try {
+          await this.tenantAdapter.setTenantStatus(tenantId, tenantActionNeeded);
+        } catch (syncError) {
+          downstreamFailures.push(`tenant:${syncError instanceof Error ? syncError.name : "UnknownError"}`);
+        }
+        if (this.tenantAdapter.setEntitlementsEnabled) {
+          try {
+            await this.tenantAdapter.setEntitlementsEnabled(tenantId, enableState, command.reasonCode);
+          } catch (syncError) {
+            downstreamFailures.push(`entitlements:${syncError instanceof Error ? syncError.name : "UnknownError"}`);
+          }
+        }
+        if (this.tenantAdapter.setHostingStatus) {
+          try {
+            await this.tenantAdapter.setHostingStatus(tenantId, enableState ? "start" : "stop");
+          } catch (syncError) {
+            downstreamFailures.push(`hosting:${syncError instanceof Error ? syncError.name : "UnknownError"}`);
+          }
+        }
+      }
+
+      if (downstreamFailures.length > 0) {
+        await this.auditWriter
+          .append({
+            actorType: "service",
+            actorId: context.actorClientId,
+            tenantId,
+            action: `commercial.subscription.${command.action}.downstream_sync_failed`,
+            resourceType: "product_installation",
+            resourceId: installationId ?? command.subscriptionId,
+            outcome: "failed",
+            requestId: context.requestId,
+            metadata: {
+              subscriptionId: command.subscriptionId,
+              reasonCode: command.reasonCode,
+              failures: downstreamFailures.join(","),
+            },
+          })
+          .catch(() => undefined);
       }
 
       await this.auditWriter

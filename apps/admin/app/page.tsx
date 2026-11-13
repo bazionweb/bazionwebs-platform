@@ -16,7 +16,7 @@ export default async function Home({
 }: {
   searchParams: Promise<{ q?: string; status?: string; page?: string }>;
 }) {
-  const identity = await requirePlatformOwner().catch(() => null);
+  const identity = await requirePlatformOwner();
   const params = await searchParams;
   const page = Math.max(0, Number(params.page ?? 0) || 0);
   const query = new URLSearchParams({ limit: "25", offset: String(page * 25) });

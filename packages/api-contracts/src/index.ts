@@ -2,7 +2,9 @@ import { z } from "zod";
 import { currencySchema } from "./currency.js";
 
 export { currencySchema } from "./currency.js";
+export * from "./shared-enums.js";
 export * from "./commerce-admin.js";
+export * from "./contract-compatibility.js";
 export * from "./provisioning.js";
 export * from "./provisioning-catalog.js";
 export * from "./lifecycle.js";

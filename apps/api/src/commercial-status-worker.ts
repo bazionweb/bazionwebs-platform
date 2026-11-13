@@ -1,10 +1,21 @@
+import { tmpdir } from "node:os";
+import { resolve } from "node:path";
 import { Pool } from "pg";
 import type { PilotMode } from "@bazion/api-contracts";
+import { PostgresAuditEventWriter } from "@bazion/audit";
+import {
+  EncryptedPrivateArchiveStorage,
+  LocalPrivateArchiveStorage,
+  type PrivateArchiveStorage,
+} from "@bazion/storage";
+import { createHostingProvisioningRuntime } from "./modules/hosting/runtime.js";
 import {
   getEffectiveOfferBindingsForMode,
   resolvePilotCohortPolicy,
 } from "./modules/commercial-provisioning/pilot-cutover.js";
 import { platformProvisioningOfferBindings } from "./modules/commercial-provisioning/offer-resolution.js";
+import { InstallationOffboardingService } from "./modules/commercial-provisioning/offboarding-service.js";
+import { adaptHostingRuntime } from "./modules/commercial-provisioning/runtime.js";
 import {
   PlatformLifecycleOutboxDispatcher,
   PlatformStatusOutboxDispatcher,
@@ -13,6 +24,17 @@ import {
   CommercialProvisioningSagaOrchestrator,
   createDefaultProvisioningStepAdapters,
 } from "./modules/commercial-provisioning/saga-orchestrator.js";
+
+function validateHttpCallbackUrl(rawUrl: string, errorPrefix: string): URL {
+  const url = new URL(rawUrl);
+  if (!["https:", "http:"].includes(url.protocol) || url.username || url.password || url.search || url.hash) {
+    throw new Error(`${errorPrefix}_INVALID`);
+  }
+  if (process.env.NODE_ENV === "production" && url.protocol !== "https:") {
+    throw new Error(`${errorPrefix}_MUST_BE_HTTPS`);
+  }
+  return url;
+}
 
 function required(name: string): string {
   const value = process.env[name]?.trim();
@@ -34,13 +56,10 @@ if (!["postgres:", "postgresql:"].includes(databaseUrl.protocol)) {
   throw new Error("COMMERCIAL_STATUS_WORKER_DATABASE_URL_INVALID");
 }
 
-const callbackUrl = new URL(required("COMMERCIAL_PROVISIONING_CALLBACK_URL"));
-if (!["https:", "http:"].includes(callbackUrl.protocol) || callbackUrl.username || callbackUrl.password || callbackUrl.search || callbackUrl.hash) {
-  throw new Error("COMMERCIAL_PROVISIONING_CALLBACK_URL_INVALID");
-}
-if (process.env.NODE_ENV === "production" && callbackUrl.protocol !== "https:") {
-  throw new Error("COMMERCIAL_PROVISIONING_CALLBACK_URL_MUST_BE_HTTPS");
-}
+const callbackUrl = validateHttpCallbackUrl(
+  required("COMMERCIAL_PROVISIONING_CALLBACK_URL"),
+  "COMMERCIAL_PROVISIONING_CALLBACK_URL",
+);
 
 const signingSecret = required("COMMERCIAL_PROVISIONING_CALLBACK_SIGNING_SECRET");
 if (signingSecret.length < 32) {
@@ -70,8 +89,11 @@ const dispatcher = new PlatformStatusOutboxDispatcher(pool);
 const lifecycleDispatcher = new PlatformLifecycleOutboxDispatcher(pool);
 const lifecycleCallbackUrlRaw = process.env.COMMERCIAL_LIFECYCLE_CALLBACK_URL?.trim();
 const lifecycleCallbackUrl = lifecycleCallbackUrlRaw
-  ? new URL(lifecycleCallbackUrlRaw)
-  : new URL(callbackUrl.toString().replace(/\/provisioning-status\/?$/, "/lifecycle-status"));
+  ? validateHttpCallbackUrl(lifecycleCallbackUrlRaw, "COMMERCIAL_LIFECYCLE_CALLBACK_URL")
+  : validateHttpCallbackUrl(
+      callbackUrl.toString().replace(/\/provisioning-status\/?$/, "/lifecycle-status"),
+      "COMMERCIAL_LIFECYCLE_CALLBACK_URL",
+    );
 const rawPilotMode = (process.env.COMMERCIAL_PROVISIONING_PILOT_MODE?.trim() || "disabled") as PilotMode;
 if (!["disabled", "staging_pilot", "canary"].includes(rawPilotMode)) {
   throw new Error("COMMERCIAL_STATUS_WORKER_CONFIG_INVALID_COMMERCIAL_PROVISIONING_PILOT_MODE");
@@ -105,17 +127,68 @@ const tenantProvisionerUrl = process.env.TENANT_PROVISIONER_DATABASE_URL?.trim()
 const platformPool = tenantProvisionerUrl
   ? new Pool({ connectionString: tenantProvisionerUrl, max: 2, application_name: "bazion-commercial-saga-control" })
   : undefined;
-const sagaOrchestrator = process.env.COMMERCIAL_SAGA_WORKER_ENABLED === "true"
+
+const hostingRuntime =
+  pilotPolicy.hostingMutationsEnabled && process.env.HOSTING_PROVIDER === "dokploy"
+    ? createHostingProvisioningRuntime({
+        provider: "dokploy",
+        secretDirectory: process.env.HOSTING_SECRET_DIRECTORY?.trim() || "/run/secrets",
+        templateDirectory: process.env.HOSTING_TEMPLATE_DIRECTORY?.trim() || resolve(process.cwd(), "deploy/client-templates"),
+        dokploy: {
+          baseUrl: required("DOKPLOY_BASE_URL"),
+          apiKey: required("DOKPLOY_API_KEY"),
+          environmentId: required("DOKPLOY_ENVIRONMENT_ID"),
+          ...(process.env.DOKPLOY_SERVER_ID?.trim() ? { serverId: process.env.DOKPLOY_SERVER_ID.trim() } : {}),
+        },
+      })
+    : null;
+
+const workerFlagRaw = process.env.COMMERCIAL_PROVISIONING_WORKER_ENABLED?.trim();
+const legacySagaFlagRaw = process.env.COMMERCIAL_SAGA_WORKER_ENABLED?.trim();
+if (legacySagaFlagRaw !== undefined && workerFlagRaw === undefined) {
+  process.stderr.write(
+    "[bazion-commercial-worker] COMMERCIAL_SAGA_WORKER_ENABLED is deprecated; use COMMERCIAL_PROVISIONING_WORKER_ENABLED.\n",
+  );
+}
+const sagaWorkerEnabled = workerFlagRaw === "true" || (workerFlagRaw === undefined && legacySagaFlagRaw === "true");
+
+const sagaOrchestrator = sagaWorkerEnabled
   ? new CommercialProvisioningSagaOrchestrator(
       pool,
       createDefaultProvisioningStepAdapters({
         provisionerPool: pool,
         ...(platformPool ? { platformPool } : {}),
+        ...(hostingRuntime ? { hostingRuntime: adaptHostingRuntime(hostingRuntime, pool, platformPool) } : {}),
         offerBindings: effectiveOfferBindings,
       }),
-      { offerBindings: effectiveOfferBindings },
+      {
+        offerBindings: effectiveOfferBindings,
+        leaseDurationMs: leaseSeconds * 1_000,
+      },
     )
   : null;
+
+const privateArchiveDir = process.env.PRIVATE_ARCHIVE_DIR?.trim();
+const privateArchiveEncryptionKey = process.env.PRIVATE_ARCHIVE_ENCRYPTION_KEY?.trim();
+const retentionPurgeIntervalMs = integer("COMMERCIAL_ARCHIVE_RETENTION_INTERVAL_SECONDS", 900, 60, 86_400) * 1_000;
+let retentionService: InstallationOffboardingService | null = null;
+if (
+  (process.env.NODE_ENV !== "production" || (privateArchiveDir && privateArchiveEncryptionKey))
+  && (privateArchiveDir || process.env.COMMERCIAL_ARCHIVE_RETENTION_WORKER_ENABLED === "true")
+) {
+  const baseStorage: PrivateArchiveStorage = new LocalPrivateArchiveStorage(
+    privateArchiveDir ?? resolve(tmpdir(), "bazion-private-archives"),
+  );
+  const archiveStorage: PrivateArchiveStorage = privateArchiveEncryptionKey
+    ? new EncryptedPrivateArchiveStorage(baseStorage, privateArchiveEncryptionKey)
+    : baseStorage;
+  retentionService = new InstallationOffboardingService(
+    pool,
+    archiveStorage,
+    new PostgresAuditEventWriter(platformPool ?? pool),
+  );
+}
+let nextRetentionRunAtMs = 0;
 
 let stopping = false;
 for (const signal of ["SIGINT", "SIGTERM"] as const) {
@@ -171,6 +244,15 @@ async function run() {
         process.stdout.write(
           `[bazion-commercial-lifecycle-dispatcher] claimed=${lifecycleSummary.claimed} delivered=${lifecycleSummary.delivered} retried=${lifecycleSummary.retried} dead=${lifecycleSummary.deadLettered}\n`,
         );
+      }
+      if (retentionService && Date.now() >= nextRetentionRunAtMs) {
+        nextRetentionRunAtMs = Date.now() + retentionPurgeIntervalMs;
+        const retentionSummary = await retentionService.purgeDueArchivesAcrossTenants();
+        if (retentionSummary.archivesDeleted > 0 || retentionSummary.configurationsDeleted > 0) {
+          process.stdout.write(
+            `[bazion-commercial-retention] tenants=${retentionSummary.tenantsScanned} archivesDeleted=${retentionSummary.archivesDeleted} configsRemoved=${retentionSummary.configurationsDeleted}\n`,
+          );
+        }
       }
       if (claimedTotal < batchSize && !stopping) {
         await sleep(idleMilliseconds);

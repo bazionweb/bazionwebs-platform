@@ -17,7 +17,7 @@ export type PlatformModule = {
 };
 
 export default async function ModulesPage() {
-  const identity = await requirePlatformOwner().catch(() => null);
+  const identity = await requirePlatformOwner();
   const result = await platformFetch<{ modules: PlatformModule[] }>("modules");
   const modules = result.data?.modules ?? [];
 

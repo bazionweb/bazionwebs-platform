@@ -11,6 +11,9 @@ export {
   type SupportedImageContentType,
 } from "./image-upload.js";
 export {
+  EncryptedPrivateArchiveStorage,
+} from "./encrypted-private-archive.js";
+export {
   LocalPrivateArchiveStorage,
   S3PrivateArchiveStorage,
   type PrivateArchiveResult,

@@ -1,10 +1,18 @@
 import { constants } from "node:fs";
 import { open } from "node:fs/promises";
 import { resolve, sep } from "node:path";
-import type { TenantHostingSecretResolver, TenantHostingTemplate } from "@bazion/platform-contracts";
+import {
+  TENANT_HOSTING_TEMPLATES,
+  type TenantHostingSecretResolver,
+  type TenantHostingTemplate,
+} from "@bazion/platform-contracts";
 
 const tenantUuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const templateNames = new Set<TenantHostingTemplate>(["wordpress", "node-nextjs", "ecommerce"]);
+const templateNames = new Set<TenantHostingTemplate>(TENANT_HOSTING_TEMPLATES);
+const secretReferencePattern = new RegExp(
+  `^docker-secret://bazion-hosting-([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})-(${TENANT_HOSTING_TEMPLATES.join("|")})$`,
+  "i",
+);
 const requiredKeys: Record<TenantHostingTemplate, readonly string[]> = {
   wordpress: ["WORDPRESS_IMAGE", "MARIADB_IMAGE", "MARIADB_DATABASE", "MARIADB_USER", "MARIADB_PASSWORD", "MARIADB_ROOT_PASSWORD"],
   "node-nextjs": ["APP_IMAGE"],
@@ -43,7 +51,7 @@ export class DockerSecretTenantHostingSecretResolver implements TenantHostingSec
   }
 
   async resolveEnvironment(reference: string): Promise<Readonly<Record<string, string>>> {
-    const match = /^docker-secret:\/\/bazion-hosting-([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})-(wordpress|node-nextjs|ecommerce)$/i.exec(reference);
+    const match = secretReferencePattern.exec(reference);
     if (!match) throw new Error("HOSTING_SECRET_REFERENCE_INVALID");
     const tenantId = match[1]!.toLowerCase();
     const template = match[2]!.toLowerCase() as TenantHostingTemplate;

@@ -50,3 +50,13 @@ export async function getTenantMaintenanceStatus(tenantId: string): Promise<Tena
     : "";
   return { enabled: true, message: message || defaultNotice };
 }
+
+/** Rejects public storefront, church, or commerce traffic while tenant maintenance mode is enabled. */
+export async function assertTenantNotInMaintenance(tenantId: string): Promise<void> {
+  const maintenance = await getTenantMaintenanceStatus(tenantId);
+  if (!maintenance.enabled) return;
+  throw Object.assign(new Error(maintenance.message), {
+    statusCode: 503,
+    code: "TENANT_MAINTENANCE",
+  });
+}

@@ -201,4 +201,53 @@ describe("DokployComposeProvider", () => {
     }, secrets)).toThrow("DOKPLOY_RETRY_CONFIGURATION_INVALID");
   });
 
+  it("verifies server and resource name ownership on inspect and rotates runtime secrets cleanly", async () => {
+    const fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = new URL(input.toString());
+      if (url.pathname.endsWith("/compose.one")) {
+        return new Response(JSON.stringify({
+          composeId: "compose-123",
+          environmentId: "environment-1",
+          serverId: "server-2",
+          name: "other-tenant-node-nextjs",
+          composeStatus: "done",
+        }), { status: 200 });
+      }
+      if (url.pathname.endsWith("/compose.saveEnvironment")) {
+        return new Response("{}", { status: 200 });
+      }
+      return new Response("{}", { status: 404 });
+    });
+    const secrets: TenantHostingSecretResolver = {
+      resolveEnvironment: vi.fn(async () => ({ APP_KEY: "rotated-secret" })),
+    };
+    const provider = new DokployComposeProvider({
+      baseUrl: "https://server.example.test",
+      apiKey: "never-log-this",
+      environmentId: "environment-1",
+      serverId: "server-1",
+      fetch: fetch as typeof globalThis.fetch,
+    }, secrets);
+
+    await expect(provider.inspect(reference)).rejects.toThrow("DOKPLOY_RESOURCE_SERVER_MISMATCH");
+
+    const providerNoServer = new DokployComposeProvider({
+      baseUrl: "https://server.example.test",
+      apiKey: "never-log-this",
+      environmentId: "environment-1",
+      fetch: fetch as typeof globalThis.fetch,
+    }, secrets);
+
+    await expect(
+      providerNoServer.inspect(reference, { expectedTenantSlug: "alpha", expectedTemplate: "node-nextjs" }),
+    ).rejects.toThrow("DOKPLOY_RESOURCE_NAME_MISMATCH");
+
+    await providerNoServer.rotateEnvironment(reference, "docker-secret://bazion-hosting-tenant-1-node-nextjs");
+    expect(secrets.resolveEnvironment).toHaveBeenCalledWith("docker-secret://bazion-hosting-tenant-1-node-nextjs");
+    expect(fetch).toHaveBeenCalledWith(
+      expect.objectContaining({ pathname: "/api/compose.saveEnvironment" }),
+      expect.objectContaining({ method: "POST" }),
+    );
+  });
+
 });

@@ -202,9 +202,11 @@ describe.skipIf(!enabled)("Phase 6 live PostgreSQL provisioning saga, lifecycle,
       provisionerPool,
       platformPool,
       hostingRuntime: null,
+      offerBindings: [SHARED_OFFER],
     });
     const orchestrator = new CommercialProvisioningSagaOrchestrator(provisionerPool, adapters, {
       workerId: `worker-shared-${suffix}`,
+      offerBindings: [SHARED_OFFER],
     });
     const auditWriter = new PostgresAuditEventWriter(auditPool);
     const operatorService = new CommercialProvisioningOperatorService(provisionerPool, orchestrator, auditWriter);
@@ -344,6 +346,7 @@ describe.skipIf(!enabled)("Phase 6 live PostgreSQL provisioning saga, lifecycle,
     const baseAdapters = createDefaultProvisioningStepAdapters({
       provisionerPool,
       platformPool,
+      offerBindings: [SHARED_OFFER, DEDICATED_OFFER],
       hostingRuntime: {
         providerId: "docker-compose",
         provision: async () => ({ providerDeploymentId: `deploy-${suffix}`, status: "running" }),
@@ -445,9 +448,11 @@ describe.skipIf(!enabled)("Phase 6 live PostgreSQL provisioning saga, lifecycle,
       provisionerPool,
       platformPool,
       hostingRuntime: null,
+      offerBindings: [SHARED_OFFER],
     });
     const orchestrator = new CommercialProvisioningSagaOrchestrator(provisionerPool, adapters, {
       workerId: `worker-life-${suffix}`,
+      offerBindings: [SHARED_OFFER],
     });
     await orchestrator.runOperation(opId);
 
@@ -577,8 +582,10 @@ describe.skipIf(!enabled)("Phase 6 live PostgreSQL provisioning saga, lifecycle,
       bearerSigningSecret: signingSecret,
     });
     expect(batch.delivered).toBeGreaterThanOrEqual(4);
+    const sigMatch = /^t=(\d+),v1=[0-9a-f]{64}$/.exec(deliveredCallbacks[0]!.signature);
+    expect(sigMatch).not.toBeNull();
     expect(deliveredCallbacks[0]!.signature).toBe(
-      createWebhookSignatureHeader(deliveredCallbacks[0]!.body, signingSecret),
+      createWebhookSignatureHeader(deliveredCallbacks[0]!.body, signingSecret, Number(sigMatch![1])),
     );
   });
 
@@ -592,8 +599,13 @@ describe.skipIf(!enabled)("Phase 6 live PostgreSQL provisioning saga, lifecycle,
 
     const orchestrator = new CommercialProvisioningSagaOrchestrator(
       provisionerPool,
-      createDefaultProvisioningStepAdapters({ provisionerPool, platformPool, hostingRuntime: null }),
-      { workerId: `worker-arch-${suffix}` },
+      createDefaultProvisioningStepAdapters({
+        provisionerPool,
+        platformPool,
+        hostingRuntime: null,
+        offerBindings: [SHARED_OFFER],
+      }),
+      { workerId: `worker-arch-${suffix}`, offerBindings: [SHARED_OFFER] },
     );
     await orchestrator.runOperation(opId);
 

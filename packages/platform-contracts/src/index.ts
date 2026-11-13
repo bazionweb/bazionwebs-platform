@@ -90,8 +90,23 @@ export function assertTenantMatch(expectedTenantId: string, actualTenantId: stri
   }
 }
 
-export type TenantHostingTemplate = "wordpress" | "node-nextjs" | "ecommerce";
-export type TenantHostingDeploymentState = "provisioning" | "ready" | "deploying" | "running" | "stopped" | "failed" | "unknown" | "removed";
+export const DISTRIBUTION_MODES = ["shared-managed", "dedicated"] as const;
+export type DistributionMode = (typeof DISTRIBUTION_MODES)[number];
+
+export const TENANT_HOSTING_TEMPLATES = ["wordpress", "node-nextjs", "ecommerce"] as const;
+export type TenantHostingTemplate = (typeof TENANT_HOSTING_TEMPLATES)[number];
+
+export const TENANT_HOSTING_DEPLOYMENT_STATES = [
+  "provisioning",
+  "ready",
+  "deploying",
+  "running",
+  "stopped",
+  "failed",
+  "unknown",
+  "removed",
+] as const;
+export type TenantHostingDeploymentState = (typeof TENANT_HOSTING_DEPLOYMENT_STATES)[number];
 
 export interface TenantHostingDeploymentReference {
   provider: string;

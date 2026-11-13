@@ -210,7 +210,7 @@ export function TroubleshootingPanel({
   const [userItems, setUserItems] = useState<UserItem[]>([]);
   const [userSearch, setUserSearch] = useState("");
   const [loadingUsers, setLoadingUsers] = useState(false);
-  const [generatedResetUrl, setGeneratedResetUrl] = useState<string | null>(null);
+  const [resetDispatchInfo, setResetDispatchInfo] = useState<{ maskedEmail: string; expiresInSeconds: number } | null>(null);
 
   // Tab 5: Tenant Recovery & Overrides State
   const [selectedTenantId, setSelectedTenantId] = useState<string>(defaultTenantId || initialTenants[0]?.id || "");
@@ -591,9 +591,12 @@ export function TroubleshootingPanel({
     const res = await fetch(`/v1/admin/platform/troubleshoot/users/${userId}/emergency-reset-link`, { method: "POST" });
     if (res.ok) {
       const data = await res.json();
-      setGeneratedResetUrl(data.resetUrl);
+      setResetDispatchInfo({
+        maskedEmail: data.maskedEmail ?? "user's verified email",
+        expiresInSeconds: Number(data.expiresInSeconds ?? 3600),
+      });
     } else {
-      notify("error", "Could not generate emergency reset link.");
+      notify("error", "Could not queue emergency password reset email.");
     }
   }
 
@@ -2324,42 +2327,26 @@ export function TroubleshootingPanel({
         </div>
       )}
 
-      {/* ─── MODAL: EMERGENCY PASSWORD RESET URL ─────────────────────────────── */}
-      {generatedResetUrl && (
-        <div className="modal-backdrop" onClick={() => setGeneratedResetUrl(null)}>
+      {/* ─── MODAL: EMERGENCY PASSWORD RESET DISPATCHED ──────────────────────── */}
+      {resetDispatchInfo && (
+        <div className="modal-backdrop" onClick={() => setResetDispatchInfo(null)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: "560px" }}>
             <div className="modal-header">
               <div>
-                <p className="eyebrow">EMERGENCY CREDENTIAL LINK GENERATED</p>
-                <h2>Password Reset Link Ready</h2>
+                <p className="eyebrow">EMERGENCY RESET DISPATCHED</p>
+                <h2>Password Reset Email Queued</h2>
               </div>
-              <button className="modal-close" onClick={() => setGeneratedResetUrl(null)}>✕</button>
+              <button className="modal-close" onClick={() => setResetDispatchInfo(null)}>✕</button>
             </div>
-            <div style={{ marginTop: "16px", fontSize: "12px" }}>
-              <p className="muted" style={{ margin: "0 0 10px" }}>
-                Provide this verified one-time URL directly to the client. Better-Auth will validate the token on submission. Link expires in 1 hour:
+            <div style={{ marginTop: "16px", fontSize: "13px" }}>
+              <p className="muted" style={{ margin: 0 }}>
+                A verified one-time password reset email has been queued for delivery directly to{" "}
+                <strong>{resetDispatchInfo.maskedEmail}</strong>. For credential security, raw reset tokens are never exposed to the admin API or browser session. The link expires in{" "}
+                {Math.round(resetDispatchInfo.expiresInSeconds / 60)} minutes.
               </p>
-              <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
-                <input
-                  type="text"
-                  readOnly
-                  value={generatedResetUrl}
-                  style={{ flex: 1, padding: "8px 10px", border: "1px solid var(--line)", borderRadius: "4px", fontFamily: "monospace", fontSize: "11px" }}
-                />
-                <button
-                  className="primary"
-                  onClick={() => {
-                    navigator.clipboard.writeText(generatedResetUrl);
-                    notify("success", "Reset link copied to clipboard.");
-                  }}
-                  style={{ fontSize: "11px", padding: "8px 12px" }}
-                >
-                  Copy Link
-                </button>
-              </div>
             </div>
             <div className="modal-actions" style={{ marginTop: "18px" }}>
-              <button className="secondary" onClick={() => setGeneratedResetUrl(null)}>Close</button>
+              <button className="secondary" onClick={() => setResetDispatchInfo(null)}>Close</button>
             </div>
           </div>
         </div>

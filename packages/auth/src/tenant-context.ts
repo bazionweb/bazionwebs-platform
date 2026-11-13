@@ -203,10 +203,14 @@ export async function requirePlatformPermission(headers: IncomingHttpHeaders, pe
 export async function requirePlatformRole(
   headers: IncomingHttpHeaders,
   allowedRoles: readonly ("platform_owner" | "platform_admin" | "platform_support")[],
+  options: { allowSandbox?: boolean } = {},
 ): Promise<{ userId: string; email: string; role: "platform_owner" | "platform_admin" | "platform_support" }> {
   const identity = await getCurrentIdentity(headers);
   if (!identity?.platformRole || !allowedRoles.includes(identity.platformRole)) {
     throw Object.assign(new Error("Platform administrator access is required."), { statusCode: 403, code: "PLATFORM_PERMISSION_DENIED" });
+  }
+  if (!options.allowSandbox && (identity.isSandbox || identity.impersonatedBy || isSandboxRequestHeaders(headers))) {
+    throwSandboxForbidden();
   }
   return { userId: identity.user.id, email: identity.user.email, role: identity.platformRole };
 }

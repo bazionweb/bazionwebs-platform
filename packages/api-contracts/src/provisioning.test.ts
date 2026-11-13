@@ -16,27 +16,27 @@ const request = {
   source: "bazionweb",
   customer: {
     externalCustomerId: "customer-1008",
-    displayName: "Grace Community Church",
-  primaryContact: { name: "Grace Admin", email: "admin@example.org" },
+    displayName: "Acacia Studio Ltd",
+    primaryContact: { name: "Grace Wanjiku", email: "admin@acacia.example.org" },
   },
   order: {
     externalOrderId: "order-2026-0042",
-    offerId: "church-ministry-launch",
+    offerId: "website-launch",
     offerVersion: "1.0.0",
   },
   composition: {
-    product: { id: "church-ministry", version: "1.0.0" },
-    solution: { id: "church-ministry", version: "1.0.0" },
-    template: { id: "church-ministry", version: "1.0.0" },
+    product: { id: "bazion-site", version: "1.0.0" },
+    solution: { id: "business-website", version: "1.0.0" },
+    template: { id: "node-nextjs", version: "1.0.0" },
   },
-  requestedDomain: "www.grace.example.org",
+  requestedDomain: "www.acacia.example.org",
 };
 
 describe("Bazion commercial-to-platform provisioning contract v1", () => {
   it("parses a valid request with lowercase contact email and hostname", () => {
     const parsed = provisionProductRequestV1Schema.parse(request);
-    expect(parsed.customer.primaryContact.email).toBe("admin@example.org");
-    expect(parsed.requestedDomain).toBe("www.grace.example.org");
+    expect(parsed.customer.primaryContact.email).toBe("admin@acacia.example.org");
+    expect(parsed.requestedDomain).toBe("www.acacia.example.org");
   });
 
   it("keeps the published JSON Schema artifact synchronized with the runtime validator", () => {
@@ -68,11 +68,11 @@ describe("Bazion commercial-to-platform provisioning contract v1", () => {
   it("keeps catalog identifier casing identical to the published JSON Schema", () => {
     expect(provisionProductRequestV1Schema.safeParse({
       ...request,
-      order: { ...request.order, offerId: "Church-Ministry-Launch" },
+      order: { ...request.order, offerId: "Website-Launch" },
     }).success).toBe(false);
     expect(provisionProductRequestV1Schema.safeParse({
       ...request,
-      composition: { ...request.composition, product: { id: "Church-Ministry", version: "1.0.0" } },
+      composition: { ...request.composition, product: { id: "Bazion-Site", version: "1.0.0" } },
     }).success).toBe(false);
   });
 

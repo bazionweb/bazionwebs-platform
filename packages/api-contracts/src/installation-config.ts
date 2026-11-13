@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { distributionModeSchema, offboardedInstallationStatusSchema } from "./shared-enums.js";
 
 export const installedProductVersionSchema = z.string().max(40).regex(/^\d+\.\d+\.\d+$/);
 export const productIdentifierSchema = z.string().max(80).regex(/^[a-z][a-z0-9-]*$/);
@@ -66,8 +67,8 @@ export const exportedInstallationSchema = z
     templateId: productIdentifierSchema,
     templateVersion: installedProductVersionSchema,
     configurationSchemaVersion: installedProductVersionSchema,
-    distributionMode: z.enum(["shared-managed", "dedicated"]),
-    status: z.enum(["offboarding", "offboarded"]),
+    distributionMode: distributionModeSchema,
+    status: offboardedInstallationStatusSchema,
     currentConfigurationVersion: z.number().int().min(0).max(2_147_483_647),
     createdBy: z.string().min(1).max(128),
     createdAt: z.iso.datetime(),

@@ -24,6 +24,15 @@ vi.mock("../../lib/tenant-modules.js", () => ({
 
 vi.mock("../../lib/tenant-maintenance.js", () => ({
   getTenantMaintenanceStatus: mocks.getTenantMaintenanceStatus,
+  assertTenantNotInMaintenance: async (tenantId: string) => {
+    const maintenance = await mocks.getTenantMaintenanceStatus(tenantId);
+    if (maintenance?.enabled) {
+      throw Object.assign(new Error(maintenance.message), {
+        statusCode: 503,
+        code: "TENANT_MAINTENANCE",
+      });
+    }
+  },
 }));
 
 vi.mock("@bazion/auth", () => ({

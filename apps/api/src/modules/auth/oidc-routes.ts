@@ -9,6 +9,7 @@ import {
   buildBffSessionCookieOptions,
   buildOidcTransactionCookieOptions,
   getCurrentIdentity,
+  isSandboxRequestHeaders,
   parseCookieHeader,
   resolveSafeRedirectTarget,
   serializeClearCookieHeader,
@@ -49,9 +50,12 @@ async function resolveRuntimeOidcSettings(config?: AppConfig) {
     ...(config?.corsOrigins ?? []),
   ];
   const bffClientId = config?.oidc?.bffClientId ?? process.env.OIDC_BFF_CLIENT_ID ?? "bazion-bff-platform";
+  const configuredBffClientSecret = config?.oidc?.bffClientSecret ?? process.env.OIDC_BFF_CLIENT_SECRET;
+  if (nodeEnv === "production" && !configuredBffClientSecret) {
+    throw new Error("OIDC_BFF_CLIENT_SECRET must be configured explicitly in production.");
+  }
   const bffClientSecret =
-    config?.oidc?.bffClientSecret
-    ?? process.env.OIDC_BFF_CLIENT_SECRET
+    configuredBffClientSecret
     ?? createHmac("sha256", vaultSecret).update("bazion:oidc:bff-client").digest("hex");
 
   const authority = authServer.getOidcAuthority({
@@ -66,8 +70,13 @@ async function resolveRuntimeOidcSettings(config?: AppConfig) {
   const redirectUris = Array.from(new Set([
     `${issuer}/v1/bff/callback`,
     `${storefrontOrigin.replace(/\/+$/, "")}/api/auth/callback`,
+    `${storefrontOrigin.replace(/\/+$/, "")}/api/auth/oidc/callback`,
     `${consoleOrigin.replace(/\/+$/, "")}/api/auth/callback`,
-    ...(commercialOrigin ? [`${commercialOrigin.replace(/\/+$/, "")}/api/auth/callback`] : []),
+    `${consoleOrigin.replace(/\/+$/, "")}/api/auth/oidc/callback`,
+    ...(commercialOrigin ? [
+      `${commercialOrigin.replace(/\/+$/, "")}/api/auth/callback`,
+      `${commercialOrigin.replace(/\/+$/, "")}/api/auth/oidc/callback`,
+    ] : []),
   ]));
 
   return {
@@ -159,7 +168,8 @@ export async function oidcRoutes(app: FastifyInstance, options: OidcRoutesOption
     const settings = await resolveRuntimeOidcSettings(options.config);
     const sessionDetails = await settings.authServer.auth.api.getSession({ headers: new Headers(request.headers as Record<string, string>) }).catch(() => null);
     const impersonatedBy = (sessionDetails as { session?: { impersonatedBy?: unknown } } | null)?.session?.impersonatedBy;
-    const isSandboxHeader = request.headers["x-bazion-sandbox"] === "true";
+    const isSandboxHeader = isSandboxRequestHeaders(request.headers);
+    const isSandboxSession = Boolean(impersonatedBy || isSandboxHeader);
 
     try {
       settings.authServer.assertNoSandboxImpersonation({
@@ -204,6 +214,7 @@ export async function oidcRoutes(app: FastifyInstance, options: OidcRoutesOption
         codeChallengeMethod: parsed.data.code_challenge_method,
         userId: identity.user.id,
         tenantId: parsed.data.tenant_id ?? identity.tenant?.id ?? null,
+        isSandboxSession,
       });
 
       await auditWriter.append({

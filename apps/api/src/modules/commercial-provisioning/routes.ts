@@ -5,9 +5,9 @@ import { requirePlatformRole } from "@bazion/auth";
 import { pool } from "../../lib/database.js";
 import {
   CommercialMachineAuthError,
-  DEFAULT_COMMAND_AUDIENCE,
-  DEFAULT_COMMAND_ISSUER,
-  verifyMachineBearerToken,
+  InMemoryJtiReplayCache,
+  verifyRuntimeMachineBearer,
+  type MachineTokenReplayStore,
 } from "./auth.js";
 import {
   CommercialProvisioningError,
@@ -28,8 +28,10 @@ const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}
 export interface CommercialProvisioningRuntime {
   commandAuth: {
     secret: string;
+    previousSecrets?: readonly string[] | undefined;
     issuer: string;
     audience: string;
+    replayStore?: MachineTokenReplayStore | undefined;
   };
   service: Pick<CommercialProvisioningService, "acceptCommand" | "getOperation" | "reconcile">;
   dispatcher: Pick<PlatformStatusOutboxDispatcher, "replayOutboxEntry">;
@@ -64,6 +66,21 @@ export async function commercialProvisioningRoutes(
   app: FastifyInstance,
   options: { runtime: CommercialProvisioningRuntime | null },
 ): Promise<void> {
+  const fallbackReplayCache = new InMemoryJtiReplayCache();
+  const verifyAuth = (
+    runtime: CommercialProvisioningRuntime,
+    headers: Record<string, unknown>,
+    requiredScopes: readonly string[],
+  ) =>
+    verifyRuntimeMachineBearer(
+      headers,
+      {
+        ...runtime.commandAuth,
+        replayStore: runtime.commandAuth.replayStore ?? fallbackReplayCache,
+      },
+      requiredScopes,
+    );
+
   app.get("/internal/commercial/provisioning-catalog", async (request, reply) => {
     const runtime = options.runtime;
     if (!runtime) {
@@ -74,12 +91,7 @@ export async function commercialProvisioningRoutes(
     }
 
     try {
-      verifyMachineBearerToken(request.headers as Record<string, unknown>, {
-        secret: runtime.commandAuth.secret,
-        expectedIssuer: runtime.commandAuth.issuer || DEFAULT_COMMAND_ISSUER,
-        expectedAudience: runtime.commandAuth.audience || DEFAULT_COMMAND_AUDIENCE,
-        requiredScopes: ["commercial:provisioning:read"],
-      });
+      verifyAuth(runtime, request.headers as Record<string, unknown>, ["commercial:provisioning:read"]);
       const catalog = runtime.pilotPolicy
         ? getProvisioningCatalogForPolicy(runtime.pilotPolicy)
         : getProvisioningOfferCatalogV1();
@@ -106,12 +118,7 @@ export async function commercialProvisioningRoutes(
     reply.header("x-correlation-id", correlationId);
     const startedAtMs = Date.now();
     try {
-      verifyMachineBearerToken(request.headers as Record<string, unknown>, {
-        secret: runtime.commandAuth.secret,
-        expectedIssuer: runtime.commandAuth.issuer || DEFAULT_COMMAND_ISSUER,
-        expectedAudience: runtime.commandAuth.audience || DEFAULT_COMMAND_AUDIENCE,
-        requiredScopes: ["commercial:provisioning:write"],
-      });
+      verifyAuth(runtime, request.headers as Record<string, unknown>, ["commercial:provisioning:write"]);
 
       const result = await runtime.service.acceptCommand(request.body);
       runtime.telemetry?.recordCommandAcceptance({
@@ -146,12 +153,7 @@ export async function commercialProvisioningRoutes(
       }
 
       try {
-        verifyMachineBearerToken(request.headers as Record<string, unknown>, {
-          secret: runtime.commandAuth.secret,
-          expectedIssuer: runtime.commandAuth.issuer || DEFAULT_COMMAND_ISSUER,
-          expectedAudience: runtime.commandAuth.audience || DEFAULT_COMMAND_AUDIENCE,
-          requiredScopes: ["commercial:provisioning:read"],
-        });
+        verifyAuth(runtime, request.headers as Record<string, unknown>, ["commercial:provisioning:read"]);
 
         const operation = await runtime.service.getOperation(request.params.operationId.trim());
         return reply.send({ operation });
@@ -252,12 +254,9 @@ export async function commercialProvisioningRoutes(
     }
 
     try {
-      const claims = verifyMachineBearerToken(request.headers as Record<string, unknown>, {
-        secret: runtime.commandAuth.secret,
-        expectedIssuer: runtime.commandAuth.issuer || DEFAULT_COMMAND_ISSUER,
-        expectedAudience: runtime.commandAuth.audience || DEFAULT_COMMAND_AUDIENCE,
-        requiredScopes: ["commercial:order-claims:write"],
-      });
+      const claims = verifyAuth(runtime, request.headers as Record<string, unknown>, [
+        "commercial:order-claims:write",
+      ]);
 
       const parsed = issueOrderClaimProofInputSchema.safeParse(request.body);
       if (!parsed.success) {

@@ -10,6 +10,7 @@
     "start": "node dist/server.js",
     "start:hosting-reconciler": "node dist/hosting-worker.js",
     "start:commercial-status-dispatcher": "node dist/commercial-status-worker.js",
+    "db:expire-installation-offboarding": "tsx scripts/expire-installation-offboarding.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run src --fsModuleCachePath .vitest-cache"
   },

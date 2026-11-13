@@ -7,7 +7,7 @@ import {
 import { platformFetch, requirePlatformOwner } from "@/lib/platform";
 
 export default async function ProvisioningOperationsPage() {
-  const identity = await requirePlatformOwner().catch(() => null);
+  const identity = await requirePlatformOwner();
   const opsRes = await platformFetch<{ items: OperationSummaryItem[] }>(
     "commercial-provisioning/operations?limit=50",
   );
@@ -15,16 +15,16 @@ export default async function ProvisioningOperationsPage() {
   return (
     <main className="frame">
       <AdminSidebar
-        userEmail={identity?.user.email}
-        userName={identity?.user.name}
-        platformRole={identity?.platformRole ?? undefined}
+        userEmail={identity.user.email}
+        userName={identity.user.name}
+        platformRole={identity.platformRole ?? undefined}
       />
 
       <section className="content">
         <AdminTopbar
           title="Platform / Provisioning Sagas"
-          userEmail={identity?.user.email}
-          platformRole={identity?.platformRole ?? undefined}
+          userEmail={identity.user.email}
+          platformRole={identity.platformRole ?? undefined}
         />
 
         <div className="page-head">

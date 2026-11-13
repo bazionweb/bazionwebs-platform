@@ -274,6 +274,75 @@ describe("commercial provisioning HTTP routes", () => {
     }
   });
 
+  it("rejects replayed machine bearer tokens with identical jti", async () => {
+    const app = await makeApp(makeRuntime());
+    try {
+      const token = mintToken({ jti: "replay-check-jti-001", scopes: ["commercial:provisioning:read"] });
+      const first = await app.inject({
+        method: "GET",
+        url: "/v1/internal/commercial/provisioning-catalog",
+        headers: { authorization: `Bearer ${token}` },
+      });
+      expect(first.statusCode).toBe(200);
+
+      const second = await app.inject({
+        method: "GET",
+        url: "/v1/internal/commercial/provisioning-catalog",
+        headers: { authorization: `Bearer ${token}` },
+      });
+      expect(second.statusCode).toBe(401);
+      expect(second.json().error).toBe("MACHINE_TOKEN_REPLAYED");
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("accepts rotated previousSecrets and rejects unknown signing secrets", async () => {
+    const previousSecret = "previous-commercial-command-secret-32chars";
+    const runtime = makeRuntime();
+    runtime.commandAuth.previousSecrets = [previousSecret];
+    const app = await makeApp(runtime);
+    try {
+      const rotatedToken = signMachineBearerToken(
+        {
+          subject: "bazionweb-outbox-worker",
+          issuer: DEFAULT_COMMAND_ISSUER,
+          audience: DEFAULT_COMMAND_AUDIENCE,
+          scopes: ["commercial:provisioning:read"],
+          keyId: "cmd-prev-1",
+          ttlSeconds: 120,
+        },
+        previousSecret,
+      );
+      const validResponse = await app.inject({
+        method: "GET",
+        url: "/v1/internal/commercial/provisioning-catalog",
+        headers: { authorization: `Bearer ${rotatedToken}` },
+      });
+      expect(validResponse.statusCode).toBe(200);
+
+      const unknownToken = signMachineBearerToken(
+        {
+          subject: "bazionweb-outbox-worker",
+          issuer: DEFAULT_COMMAND_ISSUER,
+          audience: DEFAULT_COMMAND_AUDIENCE,
+          scopes: ["commercial:provisioning:read"],
+          keyId: "cmd-unknown",
+          ttlSeconds: 120,
+        },
+        "completely-unknown-command-secret-32chars",
+      );
+      const rejectedResponse = await app.inject({
+        method: "GET",
+        url: "/v1/internal/commercial/provisioning-catalog",
+        headers: { authorization: `Bearer ${unknownToken}` },
+      });
+      expect(rejectedResponse.statusCode).toBe(401);
+    } finally {
+      await app.close();
+    }
+  });
+
   it("fails closed with 503 when commercial provisioning runtime is not configured", async () => {
     const app = await makeApp(null);
     try {

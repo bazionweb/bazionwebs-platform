@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { installationStatusSchema } from "./shared-enums.js";
 
 const externalIdSchema = z.string()
   .trim()
@@ -56,15 +57,7 @@ export const subscriptionLifecycleCommandV1Schema = z.object({
 
 export type SubscriptionLifecycleCommandV1 = z.infer<typeof subscriptionLifecycleCommandV1Schema>;
 
-export const subscriptionLifecycleInstallationStatusSchema = z.enum([
-  "requested",
-  "provisioning",
-  "ready",
-  "suspended",
-  "failed",
-  "offboarding",
-  "offboarded",
-]);
+export const subscriptionLifecycleInstallationStatusSchema = installationStatusSchema;
 
 export const subscriptionLifecycleStatusEventV1Schema = z.object({
   schemaVersion: z.literal("1.0.0"),
@@ -90,6 +83,40 @@ export const subscriptionLifecycleStatusEventV1Schema = z.object({
 }).strict();
 
 export type SubscriptionLifecycleStatusEventV1 = z.infer<typeof subscriptionLifecycleStatusEventV1Schema>;
+
+/** Machine-readable subscription lifecycle command schema sent from Bazionweb to Bazion Platform. */
+export function getSubscriptionLifecycleCommandV1JsonSchema() {
+  return {
+    ...z.toJSONSchema(subscriptionLifecycleCommandV1Schema, { target: "draft-2020-12" }),
+    $id: "https://schemas.bazionweb.com/platform/subscription-lifecycle-command/1.0.0",
+    title: "Bazion subscription lifecycle command v1",
+    description: "Signed lifecycle transition command (activate, grace, suspend, reactivate, cancel) emitted from Bazionweb billing/dunning to Bazion Platform.",
+    allOf: [
+      {
+        if: {
+          properties: { action: { const: "grace" } },
+          required: ["action"],
+        },
+        then: {
+          properties: {
+            graceEndsAt: { not: { type: "null" } },
+          },
+          required: ["graceEndsAt"],
+        },
+      },
+    ],
+  };
+}
+
+/** Machine-readable signed lifecycle callback schema emitted from Bazion Platform to Bazionweb. */
+export function getSubscriptionLifecycleStatusEventV1JsonSchema() {
+  return {
+    ...z.toJSONSchema(subscriptionLifecycleStatusEventV1Schema, { target: "draft-2020-12" }),
+    $id: "https://schemas.bazionweb.com/platform/subscription-lifecycle-status-event/1.0.0",
+    title: "Bazion subscription lifecycle status event v1",
+    description: "Signed callback event from Bazion Platform confirming installation status transitions applied for a commercial subscription lifecycle command.",
+  };
+}
 
 export const installationOffboardRequestSchema = z.object({
   reason: z.string().trim().min(8).max(500),

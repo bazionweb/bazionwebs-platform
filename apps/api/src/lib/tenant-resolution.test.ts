@@ -1,15 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AppConfig } from "../config.js";
-import { resolveTenantId } from "./tenant-resolution.js";
+import { resolveTenantId, resolveTenantRouting } from "./tenant-resolution.js";
 
 const mocks = vi.hoisted(() => ({
   resolvePublicTenantByHostname: vi.fn(),
   resolvePublicTenantBySlug: vi.fn(),
+  resolvePublicTenantInstallationByHostname: vi.fn(),
 }));
 
 vi.mock("@bazion/auth/server", () => ({
   resolvePublicTenantByHostname: mocks.resolvePublicTenantByHostname,
   resolvePublicTenantBySlug: mocks.resolvePublicTenantBySlug,
+  resolvePublicTenantInstallationByHostname: mocks.resolvePublicTenantInstallationByHostname,
 }));
 
 const productionConfig = {
@@ -28,6 +30,7 @@ describe("resolveTenantId", () => {
     vi.clearAllMocks();
     mocks.resolvePublicTenantByHostname.mockResolvedValue(null);
     mocks.resolvePublicTenantBySlug.mockResolvedValue(null);
+    mocks.resolvePublicTenantInstallationByHostname.mockResolvedValue(null);
   });
 
   it("uses the verified hostname even when a request supplies another tenant selector", async () => {
@@ -87,5 +90,30 @@ describe("resolveTenantId", () => {
     }, undefined)).resolves.toBe("default-tenant-id");
 
     expect(mocks.resolvePublicTenantByHostname).toHaveBeenCalledWith("::1");
+  });
+
+  it("resolves verified domain-to-installation routing while retaining legacy null installation_id fallback", async () => {
+    mocks.resolvePublicTenantInstallationByHostname.mockResolvedValueOnce({
+      id: "tenant-1",
+      slug: "tenant-one",
+      name: "Tenant One",
+      default_currency: "KES",
+      installation_id: "inst-brand-a",
+    });
+
+    await expect(resolveTenantRouting("brand-a.example.org:443", productionConfig))
+      .resolves.toEqual({ tenantId: "tenant-1", installationId: "inst-brand-a" });
+    expect(mocks.resolvePublicTenantInstallationByHostname).toHaveBeenCalledWith("brand-a.example.org");
+
+    mocks.resolvePublicTenantInstallationByHostname.mockResolvedValueOnce({
+      id: "tenant-1",
+      slug: "tenant-one",
+      name: "Tenant One",
+      default_currency: "KES",
+      installation_id: null,
+    });
+
+    await expect(resolveTenantRouting("legacy.example.org", productionConfig))
+      .resolves.toEqual({ tenantId: "tenant-1", installationId: null });
   });
 });

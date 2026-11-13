@@ -506,6 +506,12 @@ export async function confirmAccountEmailChange(input: {
 
     const newEmail = String(requestRow.new_email).toLowerCase();
     await authClient.query("BEGIN");
+    const existingAuthUser = await authClient.query(
+      `SELECT email FROM "user" WHERE id = $1 LIMIT 1 FOR UPDATE`,
+      [input.actorUserId],
+    );
+    const previousAuthEmail = existingAuthUser.rows[0]?.email ? String(existingAuthUser.rows[0].email) : null;
+
     const conflict = await authClient.query(
       `SELECT id FROM "user" WHERE lower(email) = $1 AND id <> $2 LIMIT 1`,
       [newEmail, input.actorUserId],
@@ -527,16 +533,8 @@ export async function confirmAccountEmailChange(input: {
       );
     }
 
-    await authClient.query(
-      `UPDATE "user" SET email = $1, "emailVerified" = true, "updatedAt" = now() WHERE id = $2`,
-      [newEmail, input.actorUserId],
-    );
-    const sessionRevocation = await authClient.query(
-      `DELETE FROM "session" WHERE "userId" = $1`,
-      [input.actorUserId],
-    );
-    await authClient.query("COMMIT");
-
+    // Stage both database transactions before committing so identity constraint failures
+    // roll back cleanly without stranding an uncommitted auth update.
     await idClient.query(
       `UPDATE public.platform_members SET email = $2, updated_at = now() WHERE user_id = $1`,
       [input.actorUserId, newEmail],
@@ -553,7 +551,37 @@ export async function confirmAccountEmailChange(input: {
       `UPDATE public.account_email_change_requests SET status = 'confirmed', confirmed_at = now(), updated_at = now() WHERE id = $1::uuid`,
       [requestRow.id],
     );
+
+    await authClient.query(
+      `UPDATE "user" SET email = $1, "emailVerified" = true, "updatedAt" = now() WHERE id = $2`,
+      [newEmail, input.actorUserId],
+    );
+    const sessionRevocation = await authClient.query(
+      `DELETE FROM "session" WHERE "userId" = $1`,
+      [input.actorUserId],
+    );
+
     await idClient.query("COMMIT");
+    try {
+      await authClient.query("COMMIT");
+    } catch (authCommitError) {
+      // Compensate identityPool state if authPool COMMIT fails after idClient committed.
+      if (previousAuthEmail) {
+        try {
+          await input.identityPool.query(
+            `UPDATE public.platform_members SET email = $2, updated_at = now() WHERE user_id = $1`,
+            [input.actorUserId, previousAuthEmail],
+          );
+          await input.identityPool.query(
+            `UPDATE public.account_email_change_requests SET status = 'pending', confirmed_at = NULL, updated_at = now() WHERE id = $1::uuid`,
+            [requestRow.id],
+          );
+        } catch {
+          // Best-effort compensation before propagating failure
+        }
+      }
+      throw authCommitError;
+    }
 
     return {
       requestId: String(requestRow.id),

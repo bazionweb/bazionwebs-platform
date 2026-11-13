@@ -1,4 +1,4 @@
-import type { ProvisionProductRequestV1 } from "@bazion/api-contracts";
+import type { DistributionMode, ProvisionProductRequestV1 } from "@bazion/api-contracts";
 import { provisioningOfferCatalogV1Schema, type ProvisioningOfferCatalogV1 } from "@bazion/api-contracts";
 
 export interface ProvisioningOfferReleaseReference {
@@ -15,7 +15,7 @@ export interface ProvisioningOfferBinding {
   };
   requiredModules: readonly ProvisioningOfferReleaseReference[];
   optionalModules: readonly ProvisioningOfferReleaseReference[];
-  distributionMode: "shared-managed" | "dedicated";
+  distributionMode: DistributionMode;
   availability: "active" | "retired";
   releaseState: {
     product: "stable" | "partial" | "experimental" | "planned" | "deprecated";
@@ -25,7 +25,7 @@ export interface ProvisioningOfferBinding {
   };
 }
 
-export type ProvisioningDistributionMode = ProvisioningOfferBinding["distributionMode"];
+export type ProvisioningDistributionMode = DistributionMode;
 export const defaultSupportedProvisioningDistributionModes: readonly ProvisioningDistributionMode[] = ["shared-managed"];
 
 export type ProvisioningOfferResolutionErrorCode =

@@ -8,6 +8,7 @@ import { withTenantTransaction, type TenantTransaction } from "../../lib/databas
 import type { AppConfig } from "../../config.js";
 import { resolveTenantId } from "../../lib/tenant-resolution.js";
 import { isTenantModuleEnabled } from "../../lib/tenant-modules.js";
+import { assertTenantNotInMaintenance } from "../../lib/tenant-maintenance.js";
 import { DarajaClient, DarajaRequestError, normalizeKenyanPhoneNumber } from "@bazion/payments";
 
 interface RouteOptions { config: AppConfig }
@@ -19,6 +20,7 @@ async function assertCommerceEnabled(tenantId: string): Promise<void> {
       code: "TENANT_MODULE_DISABLED",
     });
   }
+  await assertTenantNotInMaintenance(tenantId);
 }
 
 function tokenHash(token: string): string {

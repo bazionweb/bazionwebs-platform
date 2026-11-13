@@ -1,8 +1,9 @@
-import { randomUUID } from "node:crypto";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { randomBytes, randomUUID } from "node:crypto";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
+import { EncryptedPrivateArchiveStorage } from "./encrypted-private-archive.js";
 import { LocalPrivateArchiveStorage } from "./private-archive.js";
 
 describe("private offboarding archive storage", () => {
@@ -41,6 +42,42 @@ describe("private offboarding archive storage", () => {
     await storage.deleteArchive({ tenantId, key: stored.key, checksum: stored.checksum });
     await expect(
       storage.getArchive({ tenantId, key: stored.key, checksum: stored.checksum }),
+    ).resolves.toBeNull();
+  });
+
+  it("encrypts archives at rest with AES-256-GCM bound to tenant and archive identity", async () => {
+    const key = randomBytes(32).toString("base64");
+    const inner = new LocalPrivateArchiveStorage(dir);
+    const encrypted = new EncryptedPrivateArchiveStorage(inner, key);
+    const tenantId = randomUUID();
+    const otherTenantId = randomUUID();
+    const archiveId = randomUUID();
+    const secretPayload = JSON.stringify({ installationId: randomUUID(), sensitiveSetting: "super-secret-value" });
+    const body = Buffer.from(secretPayload, "utf8");
+
+    const stored = await encrypted.putArchive({ tenantId, archiveId, body });
+    const rawOnDisk = readFileSync(join(dir, ...stored.key.split("/")));
+    expect(rawOnDisk.toString("utf8")).not.toContain("super-secret-value");
+    expect(rawOnDisk.subarray(0, 6).toString("ascii")).toBe("BZARC1");
+
+    const loaded = await encrypted.getArchive({ tenantId, key: stored.key, checksum: stored.checksum });
+    expect(loaded).not.toBeNull();
+    expect(Buffer.from(loaded!.body).toString("utf8")).toBe(secretPayload);
+
+    // Wrong encryption key must fail GCM tag authentication even with valid checksum
+    const wrongKeyEncrypted = new EncryptedPrivateArchiveStorage(inner, randomBytes(32).toString("base64"));
+    await expect(
+      wrongKeyEncrypted.getArchive({ tenantId, key: stored.key, checksum: stored.checksum }),
+    ).rejects.toThrow();
+
+    // Cross-tenant key prefix and AAD mismatch must reject
+    await expect(
+      encrypted.getArchive({ tenantId: otherTenantId, key: stored.key, checksum: stored.checksum }),
+    ).rejects.toThrow("outside the active tenant's private archive area");
+
+    await encrypted.deleteArchive({ tenantId, key: stored.key, checksum: stored.checksum });
+    await expect(
+      encrypted.getArchive({ tenantId, key: stored.key, checksum: stored.checksum }),
     ).resolves.toBeNull();
   });
 });

@@ -17,6 +17,7 @@ import { hostingRoutes } from "./modules/hosting/routes.js";
 import { hostingRecoveryRoutes } from "./modules/hosting/recovery-routes.js";
 import { createHostingProvisioningRuntime } from "./modules/hosting/runtime.js";
 import { commercialProvisioningRoutes } from "./modules/commercial-provisioning/routes.js";
+import { fastifySensitiveRedactionPaths } from "./modules/commercial-provisioning/observability.js";
 import { createCommercialProvisioningRuntime } from "./modules/commercial-provisioning/runtime.js";
 
 const MEDIA_UPLOAD_LIMIT_BYTES = 8 * 1024 * 1024;
@@ -25,9 +26,9 @@ export async function buildApp(config: AppConfig) {
   const app = Fastify({
     logger: {
       level: config.LOG_LEVEL,
-      // Daraja carries its unguessable callback capability in the query string.
-      // Redact the URL at the request logger boundary so access logs cannot leak it.
-      redact: ["req.url", "req.headers.authorization", "req.headers.cookie", "req.headers.x-cart-token", "req.headers.x-dev-secret", "req.headers.x-donation-status-token", "req.headers.x-payment-status-token", "req.headers['set-cookie']"],
+      // Daraja carries its unguessable callback capability in the query string and
+      // commercial endpoints carry signed tokens and customer contacts in headers/bodies.
+      redact: [...fastifySensitiveRedactionPaths],
     },
     bodyLimit: 1_048_576,
     // Enable only when the API is reachable exclusively through a trusted
@@ -97,7 +98,10 @@ export async function buildApp(config: AppConfig) {
     const headerValue = (raw: string | string[] | undefined) => (Array.isArray(raw) ? raw[0] : raw);
     const sandboxHeader = headerValue(request.headers["x-bazion-sandbox"])?.trim().toLowerCase();
     const impersonatingHeader = headerValue(request.headers["x-bazion-impersonating"])?.trim().toLowerCase();
-    const allowSandboxLogout = pathname === "/v1/auth/logout" || pathname === "/api/auth/sign-out";
+    const allowSandboxLogout =
+      pathname === "/v1/auth/logout"
+      || pathname === "/v1/bff/logout"
+      || pathname === "/api/auth/sign-out";
 
     if (!allowSandboxLogout && (sandboxHeader === "true" || sandboxHeader === "1" || impersonatingHeader === "true" || impersonatingHeader === "1")) {
       return reply.code(403).send({
@@ -234,6 +238,8 @@ export async function buildApp(config: AppConfig) {
     tenantProvisionerDatabaseUrl: config.TENANT_PROVISIONER_DATABASE_URL,
     auditDatabaseUrl: config.DATABASE_URL,
     privateArchiveDirectory: config.commercialProvisioning.privateArchiveDir,
+    privateArchiveEncryptionKey: config.commercialProvisioning.privateArchiveEncryptionKey,
+    commandPreviousSecrets: config.commercialProvisioning.commandPreviousSecrets,
     hostingRuntime,
   });
   await app.register(commercialProvisioningRoutes, {

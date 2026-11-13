@@ -320,6 +320,31 @@ export async function resolvePublicTenantByHostname(hostname: string) {
   return result.rows[0] ?? null;
 }
 
+/**
+ * Resolves both tenant identity and (when explicitly associated) the pinned
+ * product installation for a verified active custom hostname. Existing
+ * single-site tenant domains have installation_id = null.
+ */
+export async function resolvePublicTenantInstallationByHostname(hostname: string) {
+  const host = normalizeTenantHostname(hostname);
+  if (!host) return null;
+  const result = await tenantResolverPool.query<{
+    id: string;
+    slug: string;
+    name: string;
+    default_currency: string;
+    installation_id: string | null;
+  }>(
+    `SELECT t.id, t.slug, t.name, t.default_currency, d.installation_id::text AS installation_id
+       FROM public.tenant_domain_directory d
+       JOIN public.tenants t ON t.id = d.tenant_id
+      WHERE d.hostname = $1 AND t.status = 'active'
+      LIMIT 1`,
+    [host],
+  );
+  return result.rows[0] ?? null;
+}
+
 export async function resolvePublicTenantBySlug(slug: string) {
   const cleanSlug = slug.trim().toLowerCase();
   const result = await tenantResolverPool.query<{
@@ -341,6 +366,7 @@ export async function resolvePublicTenantBySlug(slug: string) {
 export interface PlatformTenantDomain {
   id: string;
   hostname: string;
+  installation_id: string | null;
   status: "pending" | "active" | "disabled";
   verified_at: string | null;
   created_at: string;
@@ -355,7 +381,8 @@ export interface PlatformTenantDomainChallenge {
 /** Lists tenant domains without exposing stored verification hashes. */
 export async function listPlatformTenantDomains(tenantId: string): Promise<PlatformTenantDomain[]> {
   const result = await tenantProvisionerPool.query<PlatformTenantDomain>(
-    `SELECT id, hostname, status, verified_at::text AS verified_at,
+    `SELECT id, hostname, installation_id::text AS installation_id, status,
+            verified_at::text AS verified_at,
             created_at::text AS created_at, updated_at::text AS updated_at
        FROM public.tenant_domains
       WHERE tenant_id = $1
@@ -369,6 +396,7 @@ export async function listPlatformTenantDomains(tenantId: string): Promise<Platf
 export async function createPlatformTenantDomain(
   tenantId: string,
   hostname: string,
+  installationId: string | null = null,
 ): Promise<
   | { kind: "created"; value: PlatformTenantDomainChallenge }
   | { kind: "tenant_not_active" }
@@ -388,16 +416,23 @@ export async function createPlatformTenantDomain(
       return { kind: "tenant_not_active" };
     }
     const result = await client.query<PlatformTenantDomain>(
-      `INSERT INTO public.tenant_domains (tenant_id, hostname, verification_token_hash, status, verified_at)
-       VALUES ($1, $2, $3, 'pending', NULL)
+      `INSERT INTO public.tenant_domains (tenant_id, hostname, installation_id, verification_token_hash, status, verified_at)
+       VALUES ($1, $2, $4, $3, 'pending', NULL)
        ON CONFLICT (hostname)
        DO UPDATE SET verification_token_hash = EXCLUDED.verification_token_hash,
+                     installation_id = COALESCE(EXCLUDED.installation_id, public.tenant_domains.installation_id),
                      status = 'pending', verified_at = NULL, updated_at = now()
        WHERE public.tenant_domains.tenant_id = EXCLUDED.tenant_id
          AND public.tenant_domains.status IN ('pending', 'disabled')
-       RETURNING id, hostname, status, verified_at::text AS verified_at,
+         AND (
+           public.tenant_domains.installation_id IS NULL
+           OR EXCLUDED.installation_id IS NULL
+           OR public.tenant_domains.installation_id = EXCLUDED.installation_id
+         )
+       RETURNING id, hostname, installation_id::text AS installation_id, status,
+                 verified_at::text AS verified_at,
                  created_at::text AS created_at, updated_at::text AS updated_at`,
-      [tenantId, hostname, tokenHash],
+      [tenantId, hostname, tokenHash, installationId],
     );
     const domain = result.rows[0];
     if (!domain) {
@@ -459,7 +494,8 @@ export async function activatePlatformTenantDomain(
         AND d.verification_token_hash = $3
         AND d.updated_at > now() - interval '7 days'
         AND EXISTS (SELECT 1 FROM public.tenants t WHERE t.id = d.tenant_id AND t.status = 'active')
-      RETURNING d.id, d.hostname, d.status, d.verified_at::text AS verified_at,
+      RETURNING d.id, d.hostname, d.installation_id::text AS installation_id, d.status,
+                d.verified_at::text AS verified_at,
                 d.created_at::text AS created_at, d.updated_at::text AS updated_at`,
     [tenantId, domainId, verificationTokenHash],
   );
@@ -475,7 +511,8 @@ export async function disablePlatformTenantDomain(
     `UPDATE public.tenant_domains
         SET status = 'disabled', verification_token_hash = NULL, updated_at = now()
       WHERE tenant_id = $1 AND id = $2 AND status <> 'disabled'
-      RETURNING id, hostname, status, verified_at::text AS verified_at,
+      RETURNING id, hostname, installation_id::text AS installation_id, status,
+                verified_at::text AS verified_at,
                 created_at::text AS created_at, updated_at::text AS updated_at`,
     [tenantId, domainId],
   );
@@ -1206,7 +1243,7 @@ export async function revokePlatformUserSessions(userId: string): Promise<number
 }
 
 export async function generateEmergencyPasswordResetUrl(userIdOrEmail: string): Promise<{
-  resetUrl: string;
+  emailDelivered: boolean;
   email: string;
 } | null> {
   const userResult = await authPool.query<{ id: string; email: string; name: string }>(
@@ -1231,7 +1268,7 @@ export async function generateEmergencyPasswordResetUrl(userIdOrEmail: string): 
   );
 
   const resetUrl = `${appBaseUrl}/reset-password?token=${encodeURIComponent(token)}`;
-
+  let emailDelivered = false;
   try {
     await enqueueAuthEmail(
       user.email,
@@ -1241,11 +1278,18 @@ export async function generateEmergencyPasswordResetUrl(userIdOrEmail: string): 
       "password-reset",
       resetUrl,
     );
-  } catch {
-    // Platform admin still receives the URL directly
+    emailDelivered = true;
+  } catch (error) {
+    if (nodeEnv === "production") {
+      throw Object.assign(new Error("Emergency password reset notification could not be queued."), {
+        statusCode: 503,
+        code: "NOTIFICATION_DELIVERY_UNAVAILABLE",
+        cause: error,
+      });
+    }
   }
 
-  return { resetUrl, email: user.email };
+  return { emailDelivered, email: user.email };
 }
 
 export { requirePlatformRole, requirePlatformPermission } from "./tenant-context.js";
@@ -1323,7 +1367,23 @@ export async function claimGuestOrder(
 export async function requestEmailChange(
   input: Parameters<typeof requestPlatformEmailChange>[1],
 ) {
-  return requestPlatformEmailChange(phase5Deps, input);
+  const requested = await requestPlatformEmailChange(phase5Deps, input);
+  const verificationUrl = `${appBaseUrl}/settings/email-change?token=${encodeURIComponent(requested.verificationToken)}`;
+  try {
+    await enqueueAuthEmail(
+      requested.newEmail,
+      "Confirm your Bazion Web email address change",
+      verificationUrl,
+      "Confirm this email address change to update your account sign-in email.",
+      "email-verification",
+      `email-change:${requested.requestId}`,
+    );
+  } catch (error) {
+    if (nodeEnv !== "test") {
+      throw error;
+    }
+  }
+  return requested;
 }
 
 export async function confirmEmailChange(

@@ -51,15 +51,35 @@ function isUuid(value: unknown): value is string {
  * fencing tokens so concurrent or stale workers can never advance or corrupt the same saga.
  */
 export class PostgresProvisioningSagaJournal implements ProvisioningSagaJournal {
-  constructor(private readonly db: SqlQueryExecutor) {}
+  constructor(
+    private readonly db: SqlQueryExecutor,
+    private readonly options: { requireLease?: boolean } = {},
+  ) {}
 
   private async assertLease(operationId: string, lease?: ProvisioningSagaLease): Promise<string | null> {
     if (!lease) {
-      const res = await this.db.query<{ correlation_id: string }>(
-        `SELECT correlation_id FROM public.product_provisioning_operations WHERE id = $1`,
+      if (this.options.requireLease || process.env.NODE_ENV === "production") {
+        throw new StaleSagaLeaseError(operationId);
+      }
+      const res = await this.db.query<{
+        correlation_id: string;
+        lease_token: string | null;
+        lease_expires_at: Date | string | null;
+      }>(
+        `SELECT correlation_id, lease_token, lease_expires_at
+         FROM public.product_provisioning_operations
+         WHERE id = $1`,
         [operationId],
       );
-      return res.rows[0]?.correlation_id ?? null;
+      const row = res.rows[0];
+      if (!row) return null;
+      if (
+        row.lease_token
+        && (row.lease_expires_at === null || new Date(row.lease_expires_at).getTime() >= Date.now())
+      ) {
+        throw new StaleSagaLeaseError(operationId);
+      }
+      return row.correlation_id;
     }
 
     const res = await this.db.query<{ correlation_id: string }>(
@@ -72,6 +92,22 @@ export class PostgresProvisioningSagaJournal implements ProvisioningSagaJournal 
       throw new StaleSagaLeaseError(operationId, lease.fencingToken);
     }
     return res.rows[0].correlation_id;
+  }
+
+  private buildOperationFenceExists(
+    operationIdParam: string,
+    params: unknown[],
+    lease?: ProvisioningSagaLease,
+  ): string {
+    if (!lease) return "";
+    const tokenIdx = params.push(lease.leaseToken);
+    const fenceIdx = params.push(lease.fencingToken);
+    return ` AND EXISTS (
+      SELECT 1 FROM public.product_provisioning_operations o
+      WHERE o.id = ${operationIdParam}
+        AND o.lease_token = $${tokenIdx}
+        AND o.fencing_token = $${fenceIdx}
+    )`;
   }
 
   async claimOperation(input: {
@@ -340,6 +376,8 @@ export class PostgresProvisioningSagaJournal implements ProvisioningSagaJournal 
       if (!bindRes.rows[0] && lease) throw new StaleSagaLeaseError(operationId, lease.fencingToken);
     }
 
+    const updateStepParams: unknown[] = [operationId, step, JSON.stringify(effect)];
+    const updateStepFence = this.buildOperationFenceExists("$1::uuid", updateStepParams, lease);
     const updated = await this.db.query(
       `UPDATE public.product_provisioning_step_attempts
        SET status = 'succeeded',
@@ -355,33 +393,36 @@ export class PostgresProvisioningSagaJournal implements ProvisioningSagaJournal 
            AND status IN ('running', 'unknown')
          ORDER BY attempt_number DESC
          LIMIT 1
-       )
+       )${updateStepFence}
        RETURNING id`,
-      [operationId, step, JSON.stringify(effect)],
+      updateStepParams,
     );
 
     if (!updated.rows[0]) {
-      const nextRes = await this.db.query<{ next_attempt: number }>(
-        `SELECT COALESCE(MAX(attempt_number), 0) + 1 AS next_attempt
-         FROM public.product_provisioning_step_attempts
-         WHERE operation_id = $1 AND step_name = $2 AND direction = 'forward'`,
-        [operationId, step],
-      );
-      const nextAttempt = Number(nextRes.rows[0]?.next_attempt ?? 1);
-      await this.db.query(
+      const insertParams: unknown[] = [
+        operationId,
+        step,
+        lease?.fencingToken ?? 0,
+        correlationId,
+        JSON.stringify(effect),
+      ];
+      const insertFence = this.buildOperationFenceExists("$1::uuid", insertParams, lease);
+      const inserted = await this.db.query(
         `INSERT INTO public.product_provisioning_step_attempts (
           operation_id, step_name, direction, attempt_number, status,
           fencing_token, correlation_id, effect_refs, finished_at
-        ) VALUES ($1, $2, 'forward', $3, 'succeeded', $4, $5, $6::jsonb, now())`,
-        [
-          operationId,
-          step,
-          nextAttempt,
-          lease?.fencingToken ?? 0,
-          correlationId,
-          JSON.stringify(effect),
-        ],
+        )
+        SELECT $1::uuid, $2::varchar, 'forward', COALESCE(MAX(attempt_number), 0) + 1, 'succeeded',
+               $3, $4, $5::jsonb, now()
+        FROM public.product_provisioning_step_attempts
+        WHERE operation_id = $1::uuid AND step_name = $2::varchar AND direction = 'forward'${insertFence}
+        HAVING EXISTS (SELECT 1 FROM public.product_provisioning_operations o WHERE o.id = $1::uuid)
+        RETURNING id`,
+        insertParams,
       );
+      if (!inserted.rows[0] && lease) {
+        throw new StaleSagaLeaseError(operationId, lease.fencingToken);
+      }
     }
   }
 
@@ -408,7 +449,9 @@ export class PostgresProvisioningSagaJournal implements ProvisioningSagaJournal 
     lease?: ProvisioningSagaLease,
   ): Promise<void> {
     await this.assertLease(operationId, lease);
-    await this.db.query(
+    const params: unknown[] = [operationId, step];
+    const fence = this.buildOperationFenceExists("$1::uuid", params, lease);
+    const res = await this.db.query(
       `UPDATE public.product_provisioning_step_attempts
        SET status = 'succeeded',
            finished_at = now()
@@ -418,9 +461,14 @@ export class PostgresProvisioningSagaJournal implements ProvisioningSagaJournal 
          WHERE operation_id = $1 AND step_name = $2 AND direction = 'compensate' AND status = 'running'
          ORDER BY attempt_number DESC
          LIMIT 1
-       )`,
-      [operationId, step],
+       )${fence}
+       RETURNING id`,
+      params,
     );
+    if (!res.rows[0] && lease) {
+      // Check lease is still valid when compensation had no running row
+      await this.assertLease(operationId, lease);
+    }
   }
 
   async failCompensation(
@@ -458,6 +506,8 @@ export class PostgresProvisioningSagaJournal implements ProvisioningSagaJournal 
       if (!opUpdate.rows[0] && lease) throw new StaleSagaLeaseError(operationId, lease.fencingToken);
     }
 
+    const attemptParams: unknown[] = [operationId, step, direction, lease?.fencingToken ?? 0, correlationId];
+    const attemptFence = this.buildOperationFenceExists("$1::uuid", attemptParams, lease);
     const res = await this.db.query<{ attempt_number: number }>(
       `INSERT INTO public.product_provisioning_step_attempts (
         operation_id, step_name, direction, attempt_number, status,
@@ -465,10 +515,14 @@ export class PostgresProvisioningSagaJournal implements ProvisioningSagaJournal 
       )
       SELECT $1::uuid, $2::varchar, $3::varchar, COALESCE(MAX(attempt_number), 0) + 1, 'running', $4, $5, '{}'::jsonb
       FROM public.product_provisioning_step_attempts
-      WHERE operation_id = $1::uuid AND step_name = $2::varchar AND direction = $3::varchar
+      WHERE operation_id = $1::uuid AND step_name = $2::varchar AND direction = $3::varchar${attemptFence}
+      HAVING EXISTS (SELECT 1 FROM public.product_provisioning_operations o WHERE o.id = $1::uuid)
       RETURNING attempt_number`,
-      [operationId, step, direction, lease?.fencingToken ?? 0, correlationId],
+      attemptParams,
     );
+    if (!res.rows[0] && lease) {
+      throw new StaleSagaLeaseError(operationId, lease.fencingToken);
+    }
     return Number(res.rows[0]?.attempt_number ?? 1);
   }
 
@@ -481,6 +535,16 @@ export class PostgresProvisioningSagaJournal implements ProvisioningSagaJournal 
   ): Promise<void> {
     const correlationId = await this.assertLease(operationId, lease);
     const attemptStatus = failure.disposition === "unknown" ? "unknown" : "failed";
+    const updateParams: unknown[] = [
+      operationId,
+      step,
+      direction,
+      attemptStatus,
+      failure.code,
+      failure.retryable,
+      failure.disposition,
+    ];
+    const updateFence = this.buildOperationFenceExists("$1::uuid", updateParams, lease);
     const updated = await this.db.query(
       `UPDATE public.product_provisioning_step_attempts
        SET status = $4,
@@ -494,36 +558,39 @@ export class PostgresProvisioningSagaJournal implements ProvisioningSagaJournal 
          WHERE operation_id = $1 AND step_name = $2 AND direction = $3 AND status = 'running'
          ORDER BY attempt_number DESC
          LIMIT 1
-       )
+       )${updateFence}
        RETURNING id`,
-      [operationId, step, direction, attemptStatus, failure.code, failure.retryable, failure.disposition],
+      updateParams,
     );
     if (!updated.rows[0]) {
-      const nextRes = await this.db.query<{ next_attempt: number }>(
-        `SELECT COALESCE(MAX(attempt_number), 0) + 1 AS next_attempt
-         FROM public.product_provisioning_step_attempts
-         WHERE operation_id = $1 AND step_name = $2 AND direction = $3`,
-        [operationId, step, direction],
-      );
-      await this.db.query(
+      const insertParams: unknown[] = [
+        operationId,
+        step,
+        direction,
+        attemptStatus,
+        lease?.fencingToken ?? 0,
+        correlationId,
+        failure.code,
+        failure.retryable,
+        failure.disposition,
+      ];
+      const insertFence = this.buildOperationFenceExists("$1::uuid", insertParams, lease);
+      const inserted = await this.db.query(
         `INSERT INTO public.product_provisioning_step_attempts (
           operation_id, step_name, direction, attempt_number, status,
           fencing_token, correlation_id, effect_refs,
           error_code, retryable, failure_disposition, finished_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, '{}'::jsonb, $8, $9, $10, now())`,
-        [
-          operationId,
-          step,
-          direction,
-          Number(nextRes.rows[0]?.next_attempt ?? 1),
-          attemptStatus,
-          lease?.fencingToken ?? 0,
-          correlationId,
-          failure.code,
-          failure.retryable,
-          failure.disposition,
-        ],
+        )
+        SELECT $1::uuid, $2::varchar, $3::varchar, COALESCE(MAX(attempt_number), 0) + 1, $4, $5, $6, '{}'::jsonb, $7, $8, $9, now()
+        FROM public.product_provisioning_step_attempts
+        WHERE operation_id = $1::uuid AND step_name = $2::varchar AND direction = $3::varchar${insertFence}
+        HAVING EXISTS (SELECT 1 FROM public.product_provisioning_operations o WHERE o.id = $1::uuid)
+        RETURNING id`,
+        insertParams,
       );
+      if (!inserted.rows[0] && lease) {
+        throw new StaleSagaLeaseError(operationId, lease.fencingToken);
+      }
     }
   }
 

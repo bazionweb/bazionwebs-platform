@@ -1,4 +1,5 @@
 import { isIP } from "node:net";
+import { isAbsolute } from "node:path";
 import { Pool } from "pg";
 import { currentDatabaseSchemaVersion, requiredDatabaseMigrations } from "./migration-registry.js";
 
@@ -101,6 +102,11 @@ function requireHttpsOriginList(name: string): void {
   }
 }
 
+function optionalUrl(name: string, expectedUser: string): URL | null {
+  if (!process.env[name]?.trim()) return null;
+  return parseUrl(name, expectedUser);
+}
+
 function checkStaticProductionConfig(): Record<string, URL | null> {
   if (process.env.NODE_ENV !== "production") {
     fail("Run this command with NODE_ENV=production.");
@@ -123,12 +129,36 @@ function checkStaticProductionConfig(): Record<string, URL | null> {
   requireHttpsUrl("BETTER_AUTH_URL");
   requireHttpsUrl("AUTH_APP_URL");
   requireHttpsUrl("PUBLIC_STOREFRONT_URL");
+  if (process.env.PLATFORM_CONSOLE_URL?.trim()) requireHttpsUrl("PLATFORM_CONSOLE_URL");
+  if (process.env.COMMERCIAL_PORTAL_URL?.trim()) requireHttpsUrl("COMMERCIAL_PORTAL_URL");
+  if (process.env.OIDC_ISSUER?.trim()) requireHttpsUrl("OIDC_ISSUER");
   requireHttpsOriginList("CORS_ORIGINS");
   requireHttpsOriginList("BETTER_AUTH_TRUSTED_ORIGINS");
 
   const authSecret = required("BETTER_AUTH_SECRET");
   if (authSecret.length < 32 || /dev-only|ci-only|change-me|replace-with|local-dev/i.test(authSecret)) {
     fail("BETTER_AUTH_SECRET must be a unique production secret, not an example or CI value.");
+  }
+
+  required("OIDC_SIGNING_PRIVATE_KEY_PEM");
+  const oidcBffSecret = required("OIDC_BFF_CLIENT_SECRET");
+  if (oidcBffSecret && /dev-only|ci-only|change-me|replace-with|local-dev/i.test(oidcBffSecret)) {
+    fail("OIDC_BFF_CLIENT_SECRET must not be a development or example value.");
+  }
+
+  const privateArchiveDir = process.env.PRIVATE_ARCHIVE_DIR?.trim();
+  if (privateArchiveDir && !isAbsolute(privateArchiveDir)) {
+    fail("PRIVATE_ARCHIVE_DIR must be an absolute path.");
+  }
+
+  if (process.env.COMMERCIAL_PROVISIONING_ENABLED === "true") {
+    const commandSecret = required("COMMERCIAL_PROVISIONING_COMMAND_SECRET");
+    if (commandSecret && (commandSecret.length < 32 || /dev-only|ci-only|change-me|replace-with|local-dev/i.test(commandSecret))) {
+      fail("COMMERCIAL_PROVISIONING_COMMAND_SECRET must be a unique production secret of at least 32 characters.");
+    }
+    if (process.env.COMMERCIAL_PROVISIONING_PILOT_MODE === "staging_pilot") {
+      fail("COMMERCIAL_PROVISIONING_PILOT_MODE=staging_pilot is forbidden in production.");
+    }
   }
 
   const encryptionKeyValue = required("NOTIFICATION_ENCRYPTION_KEY");
@@ -179,6 +209,9 @@ function checkStaticProductionConfig(): Record<string, URL | null> {
     fail("NOTIFICATION_WORKER_BATCH_SIZE must be an integer from 1 to 5.");
   }
 
+  const requireProvisioner = process.env.COMMERCIAL_PROVISIONING_ENABLED === "true";
+  const requireReconciler = process.env.HOSTING_PROVIDER === "dokploy";
+
   return {
     DATABASE_URL: parseUrl("DATABASE_URL", "bazion_app"),
     AUTH_DATABASE_URL: parseUrl("AUTH_DATABASE_URL", "bazion_auth_runtime"),
@@ -188,12 +221,29 @@ function checkStaticProductionConfig(): Record<string, URL | null> {
     NOTIFICATION_WORKER_DATABASE_URL: parseUrl("NOTIFICATION_WORKER_DATABASE_URL", "bazion_notification_worker"),
     MIGRATION_DATABASE_URL: parseUrl("MIGRATION_DATABASE_URL", "bazion_migrator"),
     AUTH_MIGRATION_DATABASE_URL: parseUrl("AUTH_MIGRATION_DATABASE_URL", "bazion_migrator"),
+    PRODUCT_PROVISIONER_DATABASE_URL: requireProvisioner
+      ? parseUrl("PRODUCT_PROVISIONER_DATABASE_URL", "bazion_product_provisioner")
+      : optionalUrl("PRODUCT_PROVISIONER_DATABASE_URL", "bazion_product_provisioner"),
+    HOSTING_RECONCILER_DATABASE_URL: requireReconciler
+      ? parseUrl("HOSTING_RECONCILER_DATABASE_URL", "bazion_hosting_reconciler")
+      : optionalUrl("HOSTING_RECONCILER_DATABASE_URL", "bazion_hosting_reconciler"),
   };
 }
 
 async function verifyDatabase(urls: Record<string, URL | null>): Promise<void> {
-  const connectionNames = Object.keys(urls);
-  if (connectionNames.some((name) => !urls[name] || !requiredValues[name])) {
+  const requiredConnectionNames = [
+    "DATABASE_URL",
+    "AUTH_DATABASE_URL",
+    "TENANT_RESOLVER_DATABASE_URL",
+    "TENANT_PROVISIONER_DATABASE_URL",
+    "NOTIFICATION_ENQUEUER_DATABASE_URL",
+    "NOTIFICATION_WORKER_DATABASE_URL",
+    "MIGRATION_DATABASE_URL",
+    "AUTH_MIGRATION_DATABASE_URL",
+    ...(process.env.COMMERCIAL_PROVISIONING_ENABLED === "true" ? ["PRODUCT_PROVISIONER_DATABASE_URL"] : []),
+    ...(process.env.HOSTING_PROVIDER === "dokploy" ? ["HOSTING_RECONCILER_DATABASE_URL"] : []),
+  ];
+  if (requiredConnectionNames.some((name) => !urls[name] || !requiredValues[name])) {
     warn("Database checks are skipped until all required PostgreSQL connection URLs are present and valid.");
     return;
   }
@@ -253,6 +303,8 @@ async function verifyDatabase(urls: Record<string, URL | null>): Promise<void> {
         "bazion_notification_enqueuer",
         "bazion_notification_worker",
         "bazion_migrator",
+        "bazion_product_provisioner",
+        "bazion_hosting_reconciler",
       ]],
     );
     const roleMap = new Map(roleResult.rows.map((row) => [row.rolname, row]));
@@ -264,7 +316,16 @@ async function verifyDatabase(urls: Record<string, URL | null>): Promise<void> {
       "bazion_notification_enqueuer",
       "bazion_notification_worker",
     ];
-    for (const roleName of [...runtimeRoles, "bazion_migrator"]) {
+    for (const roleName of [
+      ...runtimeRoles,
+      "bazion_migrator",
+      ...(roleMap.has("bazion_product_provisioner") || process.env.COMMERCIAL_PROVISIONING_ENABLED === "true"
+        ? ["bazion_product_provisioner"]
+        : []),
+      ...(roleMap.has("bazion_hosting_reconciler") || process.env.HOSTING_PROVIDER === "dokploy"
+        ? ["bazion_hosting_reconciler"]
+        : []),
+    ]) {
       const role = roleMap.get(roleName);
       if (!role) {
         fail(`Required PostgreSQL role ${roleName} does not exist.`);
@@ -273,7 +334,7 @@ async function verifyDatabase(urls: Record<string, URL | null>): Promise<void> {
       if (!role.rolcanlogin || role.rolsuper || role.rolbypassrls) {
         fail(`PostgreSQL role ${roleName} must be login-enabled and must not be superuser or bypass RLS.`);
       }
-      if (runtimeRoles.includes(roleName) && (role.rolcreatedb || role.rolcreaterole)) {
+      if (roleName !== "bazion_migrator" && (role.rolcreatedb || role.rolcreaterole)) {
         fail(`Runtime PostgreSQL role ${roleName} must not have CREATEDB or CREATEROLE.`);
       }
     }
@@ -357,8 +418,51 @@ async function verifyDatabase(urls: Record<string, URL | null>): Promise<void> {
         fail("Tenant provisioner still has notification outbox access.");
       }
       if (grants.app_outbox_select || grants.app_outbox_insert || grants.app_outbox_update || grants.app_outbox_delete || grants.auth_outbox_select) fail("The general API and Better Auth runtime roles must not access notification outbox payloads; only the dedicated enqueuer/worker may access their granted columns.");
-      if (!grants.app_audit_insert || grants.app_audit_select || grants.app_audit_update || grants.app_audit_delete) {
-        fail("Audit event grants must permit API INSERT only; SELECT/UPDATE/DELETE must remain denied.");
+      if (!grants.app_audit_insert || !grants.app_audit_select || grants.app_audit_update || grants.app_audit_delete) {
+        fail("Audit event grants must permit API INSERT and SELECT only; UPDATE/DELETE must remain denied.");
+      }
+    }
+
+    if (roleMap.has("bazion_product_provisioner")) {
+      const provPrivRes = await migrationPool.query<{
+        config_update: boolean;
+        products_select: boolean;
+        orders_select: boolean;
+        hosting_state_select: boolean;
+        hosting_provider_resource_select: boolean;
+        resolver_directory_select: boolean;
+        app_installations_select: boolean;
+        app_operations_select: boolean;
+      }>(
+        `SELECT
+           has_table_privilege('bazion_product_provisioner', 'public.installation_configuration_versions', 'UPDATE') AS config_update,
+           has_table_privilege('bazion_product_provisioner', 'public.products', 'SELECT') AS products_select,
+           has_table_privilege('bazion_product_provisioner', 'public.orders', 'SELECT') AS orders_select,
+           has_column_privilege('bazion_product_provisioner', 'public.tenant_hosting_deployments', 'state', 'SELECT') AS hosting_state_select,
+           has_column_privilege('bazion_product_provisioner', 'public.tenant_hosting_deployments', 'provider_resource_id', 'SELECT') AS hosting_provider_resource_select,
+           has_table_privilege('bazion_tenant_resolver', 'public.tenant_domain_directory', 'SELECT') AS resolver_directory_select,
+           has_table_privilege('bazion_app', 'public.product_installations', 'SELECT') AS app_installations_select,
+           has_table_privilege('bazion_app', 'public.product_provisioning_operations', 'SELECT') AS app_operations_select`,
+      );
+      const p = provPrivRes.rows[0];
+      if (!p) {
+        fail("Could not inspect commercial provisioning privileges.");
+      } else {
+        if (p.config_update) {
+          fail("bazion_product_provisioner must not hold UPDATE privilege on immutable installation_configuration_versions.");
+        }
+        if (p.products_select || p.orders_select) {
+          fail("bazion_product_provisioner must not have direct SELECT access to commerce tables.");
+        }
+        if (!p.hosting_state_select || p.hosting_provider_resource_select) {
+          fail("bazion_product_provisioner hosting projection grants must expose narrow projection columns only, never provider_resource_id.");
+        }
+        if (!p.resolver_directory_select) {
+          fail("bazion_tenant_resolver must hold SELECT on public.tenant_domain_directory.");
+        }
+        if (p.app_installations_select || p.app_operations_select) {
+          fail("bazion_app must not have direct table privileges on commercial provisioning or installation tables.");
+        }
       }
     }
 

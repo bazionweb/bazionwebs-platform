@@ -1,7 +1,8 @@
 import { z } from "zod";
+import { TENANT_HOSTING_TEMPLATES } from "@bazion/platform-contracts";
 
 export const hostingProvisionInputSchema = z.object({
-  template: z.enum(["wordpress", "node-nextjs", "ecommerce"]),
+  template: z.enum(TENANT_HOSTING_TEMPLATES),
 }).strict();
 
 export const hostingLifecycleActionSchema = z.object({

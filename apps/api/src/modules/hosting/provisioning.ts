@@ -20,6 +20,7 @@ export type BeginHostingProvisionResult =
   | { kind: "reconciliation_required" }
   | { kind: "tenant_not_found" }
   | { kind: "tenant_inactive" }
+  | { kind: "dedicated_installation_required" }
   | { kind: "idempotency_conflict" };
 
 export interface HostingProvisioningStore {
@@ -61,6 +62,22 @@ export class PostgresHostingProvisioningStore implements HostingProvisioningStor
       const tenant = tenantResult.rows[0];
       if (!tenant) { await client.query("ROLLBACK"); return { kind: "tenant_not_found" }; }
       if (tenant.status !== "active") { await client.query("ROLLBACK"); return { kind: "tenant_inactive" }; }
+
+      await client.query("SELECT set_config('app.tenant_id', $1, true)", [input.tenantId]);
+      const installationsResult = await client.query<{ distribution_mode: string; status: string }>(
+        "SELECT distribution_mode, status FROM public.product_installations " +
+        "WHERE tenant_id = $1 AND status IN ('requested', 'provisioning', 'ready')",
+        [input.tenantId],
+      );
+      if (
+        installationsResult.rows.length > 0
+        && !installationsResult.rows.some(
+          (row) => row.distribution_mode === "dedicated" && ["provisioning", "ready"].includes(row.status),
+        )
+      ) {
+        await client.query("ROLLBACK");
+        return { kind: "dedicated_installation_required" };
+      }
 
       // The tenant row lock serializes provisioning requests for this tenant.
       // A different idempotency key must not create a second resource with the
@@ -287,6 +304,7 @@ export class TenantHostingProvisioningService {
     if (started.kind === "reconciliation_required") throw new Error("HOSTING_RECONCILIATION_REQUIRED");
     if (started.kind === "tenant_not_found") throw new Error("TENANT_NOT_FOUND");
     if (started.kind === "tenant_inactive") throw new Error("TENANT_NOT_ACTIVE");
+    if (started.kind === "dedicated_installation_required") throw new Error("HOSTING_DEDICATED_INSTALLATION_REQUIRED");
     if (started.kind === "idempotency_conflict") throw new Error("HOSTING_IDEMPOTENCY_CONFLICT");
 
     let reference = started.reference;

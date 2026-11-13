@@ -474,11 +474,21 @@ describe.skipIf(!enabled)("Cross-repo live end-to-end commercial-to-platform del
         offerVersion: "9.9.9",
       },
     };
+    const conflictWriteJwt = signMachineBearerToken(
+      {
+        subject: "cross-repo-e2e-verifier",
+        issuer: DEFAULT_COMMAND_ISSUER,
+        audience: DEFAULT_COMMAND_AUDIENCE,
+        scopes: ["commercial:provisioning:write"],
+        ttlSeconds: 120,
+      },
+      commandSecret,
+    );
     const conflictHttp = await fetch(`${platformBaseUrl}/v1/internal/commercial/provisioning-requests`, {
       method: "POST",
       headers: {
         "content-type": "application/json",
-        authorization: `Bearer ${writeJwt}`,
+        authorization: `Bearer ${conflictWriteJwt}`,
       },
       body: JSON.stringify(conflictPayload),
     });
@@ -565,13 +575,23 @@ describe.skipIf(!enabled)("Cross-repo live end-to-end commercial-to-platform del
     expect(replayJson.deduplicated).toBe(true);
 
     // Verify tampered HMAC is rejected with 401 by NestJS over live HTTP
+    const tamperedJwt = signMachineBearerToken(
+      {
+        subject: "cross-repo-replay-test",
+        issuer: DEFAULT_CALLBACK_ISSUER,
+        audience: DEFAULT_CALLBACK_AUDIENCE,
+        scopes: ["provisioning:status:write"],
+        ttlSeconds: 120,
+      },
+      callbackBearerSecret,
+    );
     const badHmac = createHmac("sha256", "wrong-secret-32-chars-minimum-1234").update(`1.${replayRaw}`).digest("hex");
     const tamperedResp = await fetch(callbackEndpoint, {
       method: "POST",
       headers: {
         "content-type": "application/json",
         "x-bazion-signature": `t=${Math.floor(Date.now() / 1000)},v1=${badHmac}`,
-        authorization: `Bearer ${replayJwt}`,
+        authorization: `Bearer ${tamperedJwt}`,
       },
       body: replayRaw,
     });

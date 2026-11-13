@@ -626,20 +626,21 @@ describe("Phase 7 observability, redaction, SLOs, reconciliation & cutover gates
     const app = Fastify();
     await app.register(commercialProvisioningRoutes, { prefix: "/v1", runtime });
     try {
-      const readToken = signMachineBearerToken(
-        {
-          subject: "bazionweb-api",
-          issuer: "bazionweb",
-          audience: "bazion-platform:commercial-provisioning",
-          scopes: ["commercial:provisioning:read", "commercial:provisioning:write"],
-        },
-        secret,
-      );
+      const mintToken = () =>
+        signMachineBearerToken(
+          {
+            subject: "bazionweb-api",
+            issuer: "bazionweb",
+            audience: "bazion-platform:commercial-provisioning",
+            scopes: ["commercial:provisioning:read", "commercial:provisioning:write"],
+          },
+          secret,
+        );
 
       const catalogRes = await app.inject({
         method: "GET",
         url: "/v1/internal/commercial/provisioning-catalog",
-        headers: { authorization: `Bearer ${readToken}` },
+        headers: { authorization: `Bearer ${mintToken()}` },
       });
       expect(catalogRes.statusCode).toBe(200);
       expect(catalogRes.json().bindings[0].offer.id).toBe("website-launch");
@@ -649,7 +650,7 @@ describe("Phase 7 observability, redaction, SLOs, reconciliation & cutover gates
         method: "POST",
         url: "/v1/internal/commercial/provisioning-requests",
         headers: {
-          authorization: `Bearer ${readToken}`,
+          authorization: `Bearer ${mintToken()}`,
           "x-correlation-id": correlationId,
         },
         payload: { correlationId },
@@ -671,7 +672,7 @@ describe("Phase 7 observability, redaction, SLOs, reconciliation & cutover gates
       const invalidRecon = await app.inject({
         method: "POST",
         url: "/v1/internal/commercial/reconciliation/report",
-        headers: { authorization: `Bearer ${readToken}` },
+        headers: { authorization: `Bearer ${mintToken()}` },
         payload: {
           schemaVersion: "1.0.0",
           paidOrders: [
@@ -703,5 +704,126 @@ describe("Phase 7 observability, redaction, SLOs, reconciliation & cutover gates
     } finally {
       await app.close();
     }
+  });
+
+  it("paginates operations with keyset cursors and falls back to provisionerPool for hosting deployments", async () => {
+    const operationQueries: Array<{ sql: string; params: unknown[] | undefined }> = [];
+    const tenantUuid = "11111111-1111-4111-8111-111111111111";
+    const installationUuid = "22222222-2222-4222-8222-222222222222";
+    const deploymentUuid = "33333333-3333-4333-8333-333333333333";
+    const page1 = Array.from({ length: 500 }, (_, index) => ({
+      id: `00000000-0000-4000-8000-${String(index + 1).padStart(12, "0")}`,
+      external_customer_id: "cust-pag",
+      external_order_id: `ord-pag-${index + 1}`,
+      offer_id: "website-launch",
+      offer_version: "1.0.0",
+      product_id: "bazion-site",
+      product_version: "1.0.0",
+      solution_id: "website",
+      solution_version: "1.0.0",
+      template_id: "node-nextjs",
+      template_version: "1.0.0",
+      status: index === 0 ? "ready" : "accepted",
+      failure_code: null,
+      failure_disposition: null,
+      tenant_id: index === 0 ? tenantUuid : null,
+      installation_id: index === 0 ? installationUuid : null,
+      lease_token: null,
+      lease_expires_at: null,
+      accepted_at: `2026-11-12T00:00:${String(Math.floor(index / 10)).padStart(2, "0")}.000Z`,
+      updated_at: "2026-11-12T00:00:00.000Z",
+    }));
+    const page2 = [
+      {
+        ...page1[0]!,
+        id: "00000000-0000-4000-8000-999999999999",
+        external_order_id: "ord-pag-501",
+        status: "accepted",
+        tenant_id: null,
+        installation_id: null,
+        accepted_at: "2026-11-11T23:00:00.000Z",
+      },
+    ];
+    const allOps = [...page1, ...page2];
+
+    const provisionerPool = {
+      query: vi.fn(async (sql: string, params?: unknown[]) => {
+        if (sql.includes("FROM public.product_provisioning_operations")) {
+          operationQueries.push({ sql, params });
+          return { rows: params && params.length === 3 ? page2 : page1, rowCount: params && params.length === 3 ? 1 : 500 };
+        }
+        if (sql.includes("FROM public.product_provisioning_inbox")) {
+          return {
+            rows: allOps.map((op) => ({ operation_id: op.id, external_order_id: op.external_order_id })),
+            rowCount: allOps.length,
+          };
+        }
+        if (
+          sql.includes("FROM public.product_provisioning_status_outbox") ||
+          sql.includes("FROM public.product_subscription_lifecycle_outbox")
+        ) {
+          return { rows: [], rowCount: 0 };
+        }
+        if (sql.includes("FROM public.tenant_hosting_deployments")) {
+          return {
+            rows: [
+              {
+                id: deploymentUuid,
+                tenant_id: tenantUuid,
+                state: "failed",
+                error_code: "IMAGE_PULL_FAILED",
+                updated_at: "2026-11-12T00:00:00.000Z",
+              },
+            ],
+            rowCount: 1,
+          };
+        }
+        return { rows: [], rowCount: 0 };
+      }),
+      connect: vi.fn(async () => ({
+        query: vi.fn(async (sql: string) => {
+          if (sql.includes("FROM public.product_installations")) {
+            return {
+              rows: [
+                {
+                  id: installationUuid,
+                  tenant_id: tenantUuid,
+                  external_order_id: "ord-pag-1",
+                  distribution_mode: "dedicated",
+                  status: "ready",
+                  updated_at: "2026-11-12T00:00:00.000Z",
+                },
+              ],
+              rowCount: 1,
+            };
+          }
+          return { rows: [], rowCount: 0 };
+        }),
+        release: vi.fn(),
+      })),
+    };
+
+    const tenantControlPlanePool = {
+      query: vi.fn(async (sql: string) => {
+        if (sql.includes("FROM public.tenants")) {
+          return { rows: [{ id: tenantUuid, status: "active", updated_at: "2026-11-12T00:00:00.000Z" }], rowCount: 1 };
+        }
+        if (sql.includes("FROM public.tenant_module_entitlements")) {
+          return { rows: [], rowCount: 0 };
+        }
+        if (sql.includes("FROM public.tenant_hosting_deployments")) {
+          throw new Error("permission denied for table tenant_hosting_deployments");
+        }
+        return { rows: [], rowCount: 0 };
+      }),
+    };
+
+    const service = new CrossEntityReconciliationService(provisionerPool as any, tenantControlPlanePool as any, []);
+    const report = await service.reconcile([], "88888888-8888-4888-8888-888888888888");
+    expect(operationQueries).toHaveLength(2);
+    expect(operationQueries[1]!.params).toEqual([page1[499]!.accepted_at, page1[499]!.id, 500]);
+    expect(report.summary.operationsChecked).toBe(501);
+    expect(report.summary.deploymentsChecked).toBe(1);
+    expect(report.exceptions.some((ex) => ex.id === `dedicated_hosting_drift:${installationUuid}:${deploymentUuid}`)).toBe(true);
   });
 });

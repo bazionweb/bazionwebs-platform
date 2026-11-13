@@ -32,6 +32,7 @@ interface DokployResource {
   name?: string;
   appName?: string;
   environmentId?: string;
+  serverId?: string;
 }
 
 function resourceId(payload: unknown): string {
@@ -230,7 +231,10 @@ export class DokployComposeProvider implements TenantHostingProvider {
     await this.request("compose.redeploy", "POST", { composeId: reference.resourceId, freshVolumes: false });
   }
 
-  async inspect(reference: TenantHostingDeploymentReference): Promise<TenantHostingDeployment> {
+  async inspect(
+    reference: TenantHostingDeploymentReference,
+    expected?: { expectedTenantSlug?: string; expectedTemplate?: TenantHostingTemplate },
+  ): Promise<TenantHostingDeployment> {
     this.assertReference(reference);
     let payload: DokployResource | null;
     try {
@@ -248,6 +252,17 @@ export class DokployComposeProvider implements TenantHostingProvider {
     if (typeof payload.environmentId === "string" && payload.environmentId !== this.config.environmentId) {
       throw new Error("DOKPLOY_RESOURCE_ENVIRONMENT_MISMATCH");
     }
+    if (this.config.serverId && typeof payload.serverId === "string" && payload.serverId !== this.config.serverId) {
+      throw new Error("DOKPLOY_RESOURCE_SERVER_MISMATCH");
+    }
+    if (
+      expected?.expectedTenantSlug
+      && expected?.expectedTemplate
+      && typeof payload.name === "string"
+      && payload.name !== `${expected.expectedTenantSlug}-${expected.expectedTemplate}`
+    ) {
+      throw new Error("DOKPLOY_RESOURCE_NAME_MISMATCH");
+    }
     return {
       reference,
       state: deploymentState(payload.composeStatus ?? payload.status),
@@ -259,6 +274,20 @@ export class DokployComposeProvider implements TenantHostingProvider {
         ? { providerEnvironmentId: payload.environmentId }
         : {}),
     };
+  }
+
+  /** Re-applies resolved runtime secrets to an existing compose resource during credential rotation. */
+  async rotateEnvironment(reference: TenantHostingDeploymentReference, environmentSecretRef: string): Promise<void> {
+    this.assertReference(reference);
+    if (!environmentSecretRef.trim()) {
+      throw new Error("DEPLOYMENT_INPUT_INVALID");
+    }
+    const environment = await this.secrets.resolveEnvironment(environmentSecretRef);
+    await this.request("compose.saveEnvironment", "POST", {
+      composeId: reference.resourceId,
+      env: safeEnvironment(environment),
+      createEnvFile: true,
+    });
   }
 
   async stop(reference: TenantHostingDeploymentReference): Promise<void> {

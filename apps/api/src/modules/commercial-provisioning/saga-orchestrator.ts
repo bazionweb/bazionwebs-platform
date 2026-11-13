@@ -85,6 +85,12 @@ export interface ProvisioningStepAdapters {
     context: ProvisioningSagaContext;
     idempotencyKey: string;
   }): Promise<{ configurationVersion: number; checksum: string } | null>;
+  compensateConfiguration?(input: {
+    operation: ProvisioningOperationMetadata;
+    context: ProvisioningSagaContext;
+    effect: ProvisioningStepEffect;
+    idempotencyKey: string;
+  }): Promise<void>;
 
   bindDomain(input: {
     operation: ProvisioningOperationMetadata;
@@ -135,8 +141,14 @@ export interface PostgresPoolLike {
   connect(): Promise<PoolClient>;
 }
 
-const BUILTIN_PRODUCTS = new Set(["bazion-site", "church-ministry", "ecommerce", "managed-web"]);
+const TEST_FIXTURE_PRODUCT_IDS = new Set(["bazion-site", "church-ministry", "ecommerce", "managed-web"]);
 let cachedOfferingIds: Set<string> | null = null;
+
+function hasProductManifest(productId: string): boolean {
+  if (!/^[a-z0-9][a-z0-9._-]*$/.test(productId)) return false;
+  const manifestPath = resolve(dirname(fileURLToPath(import.meta.url)), `../../../../../products/${productId}/manifest.json`);
+  return existsSync(manifestPath);
+}
 
 function getKnownOfferingIds(): Set<string> | null {
   if (cachedOfferingIds) return cachedOfferingIds;
@@ -175,8 +187,8 @@ export function createDefaultProvisioningStepAdapters(input: {
       template: { id: string; version: string };
       idempotencyKey: string;
     }): Promise<{ providerDeploymentId?: string; status: string }>;
-    inspect(ref: { providerId: string; deploymentId: string }): Promise<{ status: string }>;
-    stop?(args: { deploymentId: string; operationId: string; idempotencyKey: string }): Promise<void>;
+    inspect(ref: { providerId: string; deploymentId: string; tenantId?: string }): Promise<{ status: string }>;
+    stop?(args: { tenantId?: string; deploymentId: string; operationId: string; idempotencyKey: string }): Promise<void>;
   } | null;
   domainBinder?: {
     reserveOrVerify(tenantId: string, hostname: string): Promise<{ domainId: string; status: "pending" | "active" }>;
@@ -192,11 +204,16 @@ export function createDefaultProvisioningStepAdapters(input: {
       if (!op.productId || !op.solutionId || !op.templateId || !op.offerId) {
         throw new ProvisioningStepError("INVALID_COMPOSITION_REFERENCE", "compensate");
       }
-      if (!BUILTIN_PRODUCTS.has(op.productId) && process.env.ALLOW_CUSTOM_PRODUCT_IDS !== "true") {
+      const boundProduct = offerBindings?.some((b) => b.composition.product.id === op.productId) ?? false;
+      const validProduct =
+        boundProduct
+        || hasProductManifest(op.productId)
+        || (process.env.NODE_ENV === "test" && TEST_FIXTURE_PRODUCT_IDS.has(op.productId));
+      if (!validProduct) {
         throw new ProvisioningStepError("UNKNOWN_PRODUCT_RELEASE", "compensate");
       }
       const offerings = getKnownOfferingIds();
-      if (offerings && !offerings.has(op.offerId) && process.env.ALLOW_CUSTOM_OFFER_IDS !== "true") {
+      if (!boundProduct && offerings && !offerings.has(op.offerId)) {
         throw new ProvisioningStepError("UNKNOWN_COMMERCIAL_OFFER", "compensate");
       }
     },
@@ -331,7 +348,10 @@ export function createDefaultProvisioningStepAdapters(input: {
           `SELECT request_fingerprint FROM public.product_provisioning_operations WHERE id = $1 LIMIT 1`,
           [operation.operationId],
         );
-        const fingerprint = opRow.rows[0]?.request_fingerprint ?? "a".repeat(64);
+        const fingerprint = opRow.rows[0]?.request_fingerprint;
+        if (!fingerprint) {
+          throw new ProvisioningStepError("OPERATION_FINGERPRINT_MISSING", "compensate");
+        }
         const inserted = await client.query<{ id: string }>(
           `INSERT INTO public.product_installations (
              tenant_id, source, external_customer_id, external_order_id,
@@ -570,6 +590,30 @@ export function createDefaultProvisioningStepAdapters(input: {
       }
     },
 
+    async compensateConfiguration({ context }) {
+      const tenantId = context.tenantId;
+      if (!tenantId || !platformPool) return;
+      const controlClient = await platformPool.connect();
+      try {
+        await controlClient.query("BEGIN");
+        await controlClient.query(
+          `UPDATE public.tenant_module_entitlements
+           SET enabled = false,
+               updated_at = now()
+           WHERE tenant_id = $1
+             AND updated_by = 'commercial-provisioning'
+             AND module_id <> 'platform-identity'`,
+          [tenantId],
+        );
+        await controlClient.query("COMMIT");
+      } catch (error) {
+        await controlClient.query("ROLLBACK").catch(() => undefined);
+        throw error;
+      } finally {
+        controlClient.release();
+      }
+    },
+
     async bindDomain({ operation, context }) {
       if (!operation.requestedDomain) {
         return { domain_mode: "default_platform_subdomain" };
@@ -697,14 +741,71 @@ export function createDefaultProvisioningStepAdapters(input: {
       };
     },
 
-    async inspectHosting({ operation }) {
+    async inspectHosting({ operation, context, idempotencyKey }) {
       if (operation.distributionMode === "shared-managed") {
         return { outcome: "completed", effect: { hosting_mode: "shared_managed", isolation_tier: "shared" } };
+      }
+      if (!context.tenantId) {
+        return { outcome: "absent" };
+      }
+      const existingDeployment = await provisionerPool
+        .query<{ id: string; state: string }>(
+          `SELECT id::text, state
+           FROM public.tenant_hosting_deployments
+           WHERE tenant_id = $1 AND idempotency_key = $2
+           LIMIT 1`,
+          [context.tenantId, idempotencyKey],
+        )
+        .catch(() => ({ rows: [] as Array<{ id: string; state: string }> }));
+      const row = existingDeployment.rows[0];
+      if (!row) {
+        return { outcome: "absent" };
+      }
+      const providerId = hostingRuntime?.providerId ?? "dokploy";
+      if (hostingRuntime?.inspect) {
+        try {
+          const observed = await hostingRuntime.inspect({
+            providerId,
+            deploymentId: row.id,
+            tenantId: context.tenantId,
+          });
+          if (observed.status === "running" || observed.status === "ready" || observed.status === "deploying") {
+            return {
+              outcome: "completed",
+              effect: {
+                hosting_mode: "dedicated",
+                provider_id: providerId,
+                hosting_ownership: "created",
+                deployment_id: row.id,
+              },
+            };
+          }
+          if (observed.status === "removed" || observed.status === "failed") {
+            return { outcome: "absent" };
+          }
+          return { outcome: "pending" };
+        } catch {
+          return { outcome: "pending" };
+        }
+      }
+      if (row.state === "running" || row.state === "ready" || row.state === "deploying") {
+        return {
+          outcome: "completed",
+          effect: {
+            hosting_mode: "dedicated",
+            provider_id: providerId,
+            hosting_ownership: "created",
+            deployment_id: row.id,
+          },
+        };
+      }
+      if (row.state === "unknown") {
+        return { outcome: "pending" };
       }
       return { outcome: "absent" };
     },
 
-    async compensateHosting({ operation, effect, idempotencyKey }) {
+    async compensateHosting({ operation, context, effect, idempotencyKey }) {
       if (
         effect.hosting_mode !== "dedicated"
         || effect.hosting_ownership !== "created"
@@ -714,6 +815,7 @@ export function createDefaultProvisioningStepAdapters(input: {
         return;
       }
       await hostingRuntime.stop({
+        ...(context.tenantId ? { tenantId: context.tenantId } : {}),
         deploymentId: effect.deployment_id,
         operationId: operation.operationId,
         idempotencyKey,
@@ -847,8 +949,8 @@ export function buildProvisioningSagaSteps(
           config_checksum: res.checksum,
         };
       },
-      async compensate() {
-        // Installation archival/cleanup handles configuration retention without silent wipe.
+      async compensate(context, effect, compensateKey) {
+        await adapters.compensateConfiguration?.({ operation, context, effect, idempotencyKey: compensateKey });
       },
     },
     {
@@ -929,7 +1031,13 @@ export class CommercialProvisioningSagaOrchestrator {
 
   async runClaimed(
     claimed: ClaimedProvisioningOperation,
-    options?: { resumeForward?: boolean; resumeCompensation?: boolean; distributionMode?: "shared-managed" | "dedicated" },
+    options?: {
+      resumeForward?: boolean;
+      resumeCompensation?: boolean;
+      forceInspect?: boolean;
+      distributionMode?: "shared-managed" | "dedicated";
+      leaseDurationMs?: number;
+    },
   ): Promise<ProvisioningSagaResult> {
     const metadata: ProvisioningOperationMetadata = {
       operationId: claimed.operationId,
@@ -968,8 +1076,10 @@ export class CommercialProvisioningSagaOrchestrator {
         steps,
         journal: this.journal,
         lease: claimed.lease,
+        leaseDurationMs: options?.leaseDurationMs ?? this.leaseDurationMs,
         ...(options?.resumeForward !== undefined ? { resumeForward: options.resumeForward } : {}),
         ...(options?.resumeCompensation !== undefined ? { resumeCompensation: options.resumeCompensation } : {}),
+        ...(options?.forceInspect !== undefined ? { forceInspect: options.forceInspect } : {}),
       });
 
       if (result.status === "failed" && result.failure?.retryable) {
@@ -1003,7 +1113,7 @@ export class CommercialProvisioningSagaOrchestrator {
 
   async runOperation(
     operationId: string,
-    options?: { resumeForward?: boolean; resumeCompensation?: boolean; leaseDurationMs?: number },
+    options?: { resumeForward?: boolean; resumeCompensation?: boolean; forceInspect?: boolean; leaseDurationMs?: number },
   ): Promise<{ claimed: false } | { claimed: true; result: ProvisioningSagaResult; lease: ProvisioningSagaLease }> {
     const claimed = await this.journal.claimOperation({
       operationId,

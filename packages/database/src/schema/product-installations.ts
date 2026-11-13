@@ -33,6 +33,7 @@ export const productInstallations = pgTable("product_installations", {
 }, (table) => [
   check("product_installations_source_ck", sql`${table.source} = 'bazionweb'`),
   check("product_installations_distribution_ck", sql`${table.distributionMode} in ('shared-managed', 'dedicated')`),
+  check("product_installations_config_schema_ck", sql`${table.configurationSchemaVersion} ~ '^[0-9]+\\.[0-9]+\\.[0-9]+$'`),
   check("product_installations_status_ck", sql`${table.status} in ('requested', 'provisioning', 'ready', 'suspended', 'failed', 'offboarding', 'offboarded')`),
   check("product_installations_fingerprint_ck", sql`${table.requestFingerprint} ~ '^[a-f0-9]{64}$'`),
   check("product_installations_ready_ck", sql`${table.status} not in ('ready', 'suspended') or ${table.readyAt} is not null`),
@@ -55,6 +56,11 @@ export const installationConfigurationVersions = pgTable("installation_configura
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
   foreignKey({ columns: [table.installationId, table.tenantId], foreignColumns: [productInstallations.id, productInstallations.tenantId], name: "installation_configuration_versions_installation_fk" }),
+  check("installation_configuration_versions_version_ck", sql`${table.version} > 0`),
+  check("installation_configuration_versions_object_ck", sql`jsonb_typeof(${table.configuration}) = 'object'`),
+  check("installation_configuration_versions_schema_ck", sql`${table.configurationSchemaVersion} ~ '^[0-9]+\\.[0-9]+\\.[0-9]+$'`),
+  check("installation_configuration_versions_checksum_ck", sql`${table.checksum} ~ '^[a-f0-9]{64}$'`),
+  check("installation_configuration_versions_no_secrets_ck", sql`not public.product_configuration_contains_secret_key(${table.configuration})`),
   unique("installation_configuration_versions_uq").on(table.installationId, table.version),
   index("installation_configuration_versions_tenant_idx").on(table.tenantId, table.installationId, table.version),
 ]);

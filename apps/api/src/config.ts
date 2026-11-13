@@ -80,9 +80,11 @@ const envSchema = z.object({
   COMMERCIAL_PROVISIONING_DUAL_READ_RECONCILIATION_ENABLED: z.enum(["true", "false"]).default("true"),
   PRODUCT_PROVISIONER_DATABASE_URL: optionalEnv,
   COMMERCIAL_PROVISIONING_COMMAND_SECRET: optionalEnv,
+  COMMERCIAL_PROVISIONING_COMMAND_PREVIOUS_SECRETS: optionalEnv,
   COMMERCIAL_PROVISIONING_COMMAND_ISSUER: z.string().trim().min(1).default("bazionweb"),
   COMMERCIAL_PROVISIONING_COMMAND_AUDIENCE: z.string().trim().min(1).default("bazion-platform:commercial-provisioning"),
   PRIVATE_ARCHIVE_DIR: optionalEnv,
+  PRIVATE_ARCHIVE_ENCRYPTION_KEY: optionalEnv,
   PLATFORM_CONSOLE_URL: z.string().url().default("http://localhost:3001"),
   COMMERCIAL_PORTAL_URL: z.string().url().optional(),
   OIDC_ISSUER: z.string().url().optional(),
@@ -188,6 +190,29 @@ export function loadConfig() {
   if (config.PRIVATE_ARCHIVE_DIR && !isAbsolute(config.PRIVATE_ARCHIVE_DIR)) {
     throw new Error("PRIVATE_ARCHIVE_DIR must be an absolute path.");
   }
+  const previousCommandSecrets = (config.COMMERCIAL_PROVISIONING_COMMAND_PREVIOUS_SECRETS?.split(",") ?? [])
+    .map((value) => value.trim())
+    .filter(Boolean);
+  for (const prevSecret of previousCommandSecrets) {
+    if (prevSecret.length < 32) {
+      throw new Error("Each entry in COMMERCIAL_PROVISIONING_COMMAND_PREVIOUS_SECRETS must be at least 32 characters.");
+    }
+  }
+  if (config.PRIVATE_ARCHIVE_ENCRYPTION_KEY) {
+    const trimmedKey = config.PRIVATE_ARCHIVE_ENCRYPTION_KEY.trim();
+    const decodedKey = Buffer.from(trimmedKey, "base64");
+    if (decodedKey.byteLength !== 32 || decodedKey.toString("base64") !== trimmedKey) {
+      throw new Error("PRIVATE_ARCHIVE_ENCRYPTION_KEY must be a canonical Base64-encoded 32-byte key.");
+    }
+  }
+  if (config.NODE_ENV === "production" && commercialProvisioningEnabled) {
+    if (!config.PRIVATE_ARCHIVE_DIR) {
+      throw new Error("Production startup blocked: PRIVATE_ARCHIVE_DIR must be configured when commercial provisioning is enabled.");
+    }
+    if (!config.PRIVATE_ARCHIVE_ENCRYPTION_KEY) {
+      throw new Error("Production startup blocked: PRIVATE_ARCHIVE_ENCRYPTION_KEY must be configured when commercial provisioning is enabled.");
+    }
+  }
 
   const trustedProxyAddresses = config.TRUSTED_PROXY_ADDRESSES.split(",").map((value) => value.trim()).filter(Boolean);
   if (config.NODE_ENV === "production" && trustedProxyAddresses.length === 0) {
@@ -215,6 +240,12 @@ export function loadConfig() {
     }
     if (!config.OIDC_SIGNING_PRIVATE_KEY_PEM) {
       throw new Error("Production startup blocked: configure OIDC_SIGNING_PRIVATE_KEY_PEM for OIDC RS256 signing.");
+    }
+    if (!config.OIDC_BFF_CLIENT_SECRET) {
+      throw new Error("Production startup blocked: configure an explicit OIDC_BFF_CLIENT_SECRET.");
+    }
+    if (/dev-only|ci-only|change-me|replace-with|local-dev/i.test(config.OIDC_BFF_CLIENT_SECRET)) {
+      throw new Error("Production startup blocked: replace the development OIDC_BFF_CLIENT_SECRET.");
     }
   }
   if (config.NODE_ENV === "production") {
@@ -271,9 +302,11 @@ export function loadConfig() {
       workerEnabled: config.COMMERCIAL_PROVISIONING_WORKER_ENABLED === "true",
       databaseUrl: config.PRODUCT_PROVISIONER_DATABASE_URL,
       commandSecret: config.COMMERCIAL_PROVISIONING_COMMAND_SECRET,
+      commandPreviousSecrets: previousCommandSecrets,
       commandIssuer: config.COMMERCIAL_PROVISIONING_COMMAND_ISSUER,
       commandAudience: config.COMMERCIAL_PROVISIONING_COMMAND_AUDIENCE,
       privateArchiveDir: config.PRIVATE_ARCHIVE_DIR ?? defaultPrivateArchiveDirectory,
+      privateArchiveEncryptionKey: config.PRIVATE_ARCHIVE_ENCRYPTION_KEY,
       pilotMode: config.COMMERCIAL_PROVISIONING_PILOT_MODE,
       allowedCustomerIds: [
         ...(config.COMMERCIAL_PROVISIONING_CANARY_CUSTOMERS?.split(",") ?? []),

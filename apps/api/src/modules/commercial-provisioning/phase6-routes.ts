@@ -8,7 +8,7 @@ import { requirePlatformRole } from "@bazion/auth";
 import { StaleSagaLeaseError } from "@bazion/product-installations";
 import {
   CommercialMachineAuthError,
-  verifyMachineBearerToken,
+  verifyRuntimeMachineBearer,
 } from "./auth.js";
 import type { CommercialProvisioningRuntime } from "./routes.js";
 import { CommercialProvisioningError } from "./service.js";
@@ -68,12 +68,11 @@ export async function registerCommercialPhase6Routes(
         });
       }
 
-      const claims = verifyMachineBearerToken(request.headers, {
-        secret: runtime.commandAuth.secret,
-        expectedIssuer: runtime.commandAuth.issuer,
-        expectedAudience: runtime.commandAuth.audience,
-        requiredScopes: ["commercial:lifecycle:write"],
-      });
+      const claims = verifyRuntimeMachineBearer(
+        request.headers as Record<string, unknown>,
+        runtime.commandAuth,
+        ["commercial:lifecycle:write"],
+      );
 
       const result = await runtime.lifecycleService.applySignedCommand(request.body, {
         requestId: request.id,

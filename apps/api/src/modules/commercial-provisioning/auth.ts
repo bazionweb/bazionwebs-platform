@@ -28,14 +28,48 @@ export interface MachineTokenClaims {
   jti: string;
 }
 
+export interface MachineTokenReplayStore {
+  checkAndRemember(jti: string, expSeconds: number, nowSeconds: number): boolean;
+}
+
+/** Bounded in-memory jti replay guard with automatic expired-entry pruning. */
+export class InMemoryJtiReplayCache implements MachineTokenReplayStore {
+  private readonly seen = new Map<string, number>();
+
+  constructor(private readonly maxEntries = 10_000) {}
+
+  checkAndRemember(jti: string, expSeconds: number, nowSeconds: number): boolean {
+    for (const [key, expiry] of this.seen) {
+      if (expiry <= nowSeconds) {
+        this.seen.delete(key);
+      }
+    }
+    const existingExpiry = this.seen.get(jti);
+    if (existingExpiry !== undefined && existingExpiry > nowSeconds) {
+      return false;
+    }
+    if (this.seen.size >= this.maxEntries) {
+      const oldestKey = this.seen.keys().next().value;
+      if (oldestKey !== undefined) {
+        this.seen.delete(oldestKey);
+      }
+    }
+    this.seen.set(jti, expSeconds);
+    return true;
+  }
+}
+
 export interface VerifyMachineBearerOptions {
   secret: string;
+  keyId?: string;
+  previousSecrets?: readonly (string | { kid?: string; secret: string })[];
   expectedIssuer?: string;
   expectedAudience?: string;
   requiredScopes: readonly string[];
   maxTtlSeconds?: number;
   clockSkewSeconds?: number;
   nowSeconds?: number;
+  replayStore?: MachineTokenReplayStore;
 }
 
 function base64UrlEncode(value: Buffer | string): string {
@@ -100,10 +134,8 @@ export function verifyMachineBearerToken(
   if (parsedHeader.alg !== "HS256" || (parsedHeader.typ !== undefined && parsedHeader.typ !== "JWT")) {
     throw new CommercialMachineAuthError(401, "MACHINE_TOKEN_UNSUPPORTED_ALG", "Unsupported machine token algorithm.");
   }
+  const tokenKid = typeof parsedHeader.kid === "string" && parsedHeader.kid.trim() ? parsedHeader.kid.trim() : undefined;
 
-  const expectedSignature = createHmac("sha256", options.secret)
-    .update(`${encodedHeader}.${encodedPayload}`)
-    .digest();
   let suppliedSignature: Buffer;
   try {
     suppliedSignature = Buffer.from(encodedSignature, "base64url");
@@ -111,10 +143,32 @@ export function verifyMachineBearerToken(
     throw new CommercialMachineAuthError(401, "MACHINE_TOKEN_INVALID", "Malformed machine signature.");
   }
 
-  if (
-    suppliedSignature.length !== expectedSignature.length ||
-    !timingSafeEqual(suppliedSignature, expectedSignature)
-  ) {
+  const candidateKeys: Array<{ kid?: string; secret: string }> = [
+    ...(options.keyId ? [{ kid: options.keyId, secret: options.secret }] : [{ secret: options.secret }]),
+    ...(options.previousSecrets ?? []).map((entry) =>
+      typeof entry === "string" ? { secret: entry } : entry,
+    ),
+  ].filter((entry) => entry.secret && entry.secret.length >= 32);
+
+  const orderedCandidates = tokenKid
+    ? [
+        ...candidateKeys.filter((entry) => entry.kid === tokenKid),
+        ...candidateKeys.filter((entry) => entry.kid === undefined),
+      ]
+    : candidateKeys;
+
+  const signingInput = `${encodedHeader}.${encodedPayload}`;
+  const signatureValid = orderedCandidates.some((candidate) => {
+    const expectedSignature = createHmac("sha256", candidate.secret)
+      .update(signingInput)
+      .digest();
+    return (
+      suppliedSignature.length === expectedSignature.length
+      && timingSafeEqual(suppliedSignature, expectedSignature)
+    );
+  });
+
+  if (!signatureValid) {
     throw new CommercialMachineAuthError(401, "MACHINE_TOKEN_SIGNATURE_INVALID", "Invalid machine token signature.");
   }
 
@@ -162,6 +216,10 @@ export function verifyMachineBearerToken(
     }
   }
 
+  if (options.replayStore && !options.replayStore.checkAndRemember(jti, exp, nowSeconds)) {
+    throw new CommercialMachineAuthError(401, "MACHINE_TOKEN_REPLAYED", "Machine token jti has already been used.");
+  }
+
   return {
     iss: expectedIssuer,
     sub,
@@ -171,6 +229,30 @@ export function verifyMachineBearerToken(
     exp,
     jti,
   };
+}
+
+export interface RuntimeCommandAuthConfig {
+  secret: string;
+  previousSecrets?: readonly string[] | undefined;
+  issuer: string;
+  audience: string;
+  replayStore?: MachineTokenReplayStore | undefined;
+}
+
+/** Shared verifier binding runtime key-rotation and replay-protection settings for all machine routes. */
+export function verifyRuntimeMachineBearer(
+  headers: Record<string, unknown>,
+  commandAuth: RuntimeCommandAuthConfig,
+  requiredScopes: readonly string[],
+): MachineTokenClaims {
+  return verifyMachineBearerToken(headers, {
+    secret: commandAuth.secret,
+    ...(commandAuth.previousSecrets?.length ? { previousSecrets: commandAuth.previousSecrets } : {}),
+    expectedIssuer: commandAuth.issuer || DEFAULT_COMMAND_ISSUER,
+    expectedAudience: commandAuth.audience || DEFAULT_COMMAND_AUDIENCE,
+    requiredScopes,
+    ...(commandAuth.replayStore ? { replayStore: commandAuth.replayStore } : {}),
+  });
 }
 
 /** Mint a short-lived audience-scoped HS256 machine JWT for internal service calls. */
@@ -183,6 +265,7 @@ export function signMachineBearerToken(
     ttlSeconds?: number;
     nowSeconds?: number;
     jti?: string;
+    keyId?: string;
   },
   secret: string,
 ): string {
@@ -191,7 +274,13 @@ export function signMachineBearerToken(
   }
   const nowSeconds = input.nowSeconds ?? Math.floor(Date.now() / 1000);
   const ttlSeconds = Math.min(Math.max(input.ttlSeconds ?? 120, 10), DEFAULT_MAX_TOKEN_TTL_SECONDS);
-  const header = base64UrlEncode(JSON.stringify({ alg: "HS256", typ: "JWT" }));
+  const header = base64UrlEncode(
+    JSON.stringify({
+      alg: "HS256",
+      typ: "JWT",
+      ...(input.keyId ? { kid: input.keyId } : {}),
+    }),
+  );
   const payload = base64UrlEncode(JSON.stringify({
     iss: input.issuer ?? DEFAULT_CALLBACK_ISSUER,
     sub: input.subject,

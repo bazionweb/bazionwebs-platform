@@ -1,10 +1,15 @@
+import { existsSync, readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import type { ProvisioningOfferBinding } from "./offer-resolution.js";
 import type { ProvisioningOperationMetadata } from "./saga-orchestrator.js";
 
+const PRODUCTS_DIR = resolve(dirname(fileURLToPath(import.meta.url)), "../../../../../products");
+
 const DEFAULT_REQUIRED_MODULES_BY_PRODUCT: Readonly<Record<string, readonly string[]>> = {
   "church-ministry": ["platform-identity", "church-ministry", "media-storage"],
-  ecommerce: ["platform-identity", "commerce", "payments", "media-storage"],
-  "bazion-commerce": ["platform-identity", "commerce", "payments", "media-storage"],
+  ecommerce: ["platform-identity", "commerce", "media-storage"],
+  "bazion-commerce": ["platform-identity", "commerce", "media-storage"],
   "bazion-site": ["platform-identity", "website-content", "media-storage"],
   "managed-web": ["platform-identity", "website-content", "media-storage"],
 };
@@ -16,6 +21,24 @@ const DEFAULT_OPTIONAL_MODULES_BY_PRODUCT: Readonly<Record<string, readonly stri
   "bazion-site": ["analytics", "notifications"],
   "managed-web": ["analytics", "notifications"],
 };
+
+function readManifestModuleIds(
+  productId: string,
+  field: "requiredModules" | "optionalModules",
+): string[] | null {
+  try {
+    const manifestPath = resolve(PRODUCTS_DIR, `${productId}/manifest.json`);
+    if (!existsSync(manifestPath)) return null;
+    const raw = JSON.parse(readFileSync(manifestPath, "utf8")) as Record<string, unknown>;
+    const entries = raw[field];
+    if (!Array.isArray(entries)) return null;
+    return entries
+      .map((entry) => (entry && typeof entry === "object" ? (entry as { id?: unknown }).id : null))
+      .filter((id): id is string => typeof id === "string" && id.trim().length > 0);
+  } catch {
+    return null;
+  }
+}
 
 export interface ProductInitialConfigurationSpec {
   configuration: Record<string, unknown>;
@@ -144,11 +167,13 @@ export function buildProductInitialConfiguration(
 ): ProductInitialConfigurationSpec {
   const requiredModules = binding
     ? binding.requiredModules.map((mod) => mod.id)
-    : [...(DEFAULT_REQUIRED_MODULES_BY_PRODUCT[operation.productId] ?? ["platform-identity", "media-storage"])];
+    : readManifestModuleIds(operation.productId, "requiredModules")
+      ?? [...(DEFAULT_REQUIRED_MODULES_BY_PRODUCT[operation.productId] ?? ["platform-identity", "media-storage"])];
 
   const optionalModules = binding
     ? binding.optionalModules.map((mod) => mod.id)
-    : [...(DEFAULT_OPTIONAL_MODULES_BY_PRODUCT[operation.productId] ?? [])];
+    : readManifestModuleIds(operation.productId, "optionalModules")
+      ?? [...(DEFAULT_OPTIONAL_MODULES_BY_PRODUCT[operation.productId] ?? [])];
 
   const tenantPlatformSettingsDefaults = {
     locale: "en-KE",

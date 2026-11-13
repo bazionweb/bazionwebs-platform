@@ -5,7 +5,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { signMachineBearerToken, DEFAULT_COMMAND_AUDIENCE, DEFAULT_COMMAND_ISSUER } from "../commercial-provisioning/auth.js";
 
 const runIntegration =
-  process.env.AUTH_INTEGRATION_TESTS === "true"
+  (process.env.AUTH_INTEGRATION_TESTS === "true" || process.env.AUTH_INTEGRATION_TESTS === "1")
   && Boolean(
     process.env.AUTH_DATABASE_URL
     && process.env.MIGRATION_DATABASE_URL

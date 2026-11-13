@@ -246,35 +246,45 @@ export class InstallationOffboardingService {
 
         const body = Buffer.from(serializeInstallationOffboardingExport(envelope), "utf8");
         const stored = await this.storage.putArchive({ tenantId: input.tenantId, archiveId, body });
-        const objectChecksum = createHash("sha256").update(body).digest("hex");
-        if (stored.checksum !== objectChecksum || stored.sizeBytes !== body.byteLength) {
+        if (!/^[0-9a-f]{64}$/i.test(stored.checksum) || stored.sizeBytes < body.byteLength) {
+          await this.storage
+            .deleteArchive({ tenantId: input.tenantId, key: stored.key, checksum: stored.checksum })
+            .catch(() => undefined);
           throw new CommercialProvisioningError(503, "OFFBOARDING_ARCHIVE_INVALID", "Written archive integrity mismatch.");
         }
 
-        const inserted = await client.query<{
-          id: string;
-          created_at: Date | string;
-          retention_expires_at: Date | string;
-        }>(
-          `INSERT INTO public.installation_offboarding_archives (
-             id, tenant_id, installation_id, archive_key, archive_checksum,
-             object_checksum, archive_size_bytes, format_version,
-             configuration_version, configuration_schema_version
-           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-           RETURNING id::text, created_at, retention_expires_at`,
-          [
-            archiveId,
-            input.tenantId,
-            input.installationId,
-            stored.key,
-            envelope.checksum,
-            objectChecksum,
-            stored.sizeBytes,
-            envelope.formatVersion,
-            installation.current_configuration_version,
-            installation.configuration_schema_version,
-          ],
-        );
+        let inserted;
+        try {
+          inserted = await client.query<{
+            id: string;
+            created_at: Date | string;
+            retention_expires_at: Date | string;
+          }>(
+            `INSERT INTO public.installation_offboarding_archives (
+               id, tenant_id, installation_id, archive_key, archive_checksum,
+               object_checksum, archive_size_bytes, format_version,
+               configuration_version, configuration_schema_version
+             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+             RETURNING id::text, created_at, retention_expires_at`,
+            [
+              archiveId,
+              input.tenantId,
+              input.installationId,
+              stored.key,
+              envelope.checksum,
+              stored.checksum,
+              stored.sizeBytes,
+              envelope.formatVersion,
+              installation.current_configuration_version,
+              installation.configuration_schema_version,
+            ],
+          );
+        } catch (dbError) {
+          await this.storage
+            .deleteArchive({ tenantId: input.tenantId, key: stored.key, checksum: stored.checksum })
+            .catch(() => undefined);
+          throw dbError;
+        }
         await client.query("COMMIT");
 
         archiveSummary = {
@@ -498,7 +508,7 @@ export class InstallationOffboardingService {
       if (archivesDeleted > 0) {
         await this.auditWriter
           .append({
-            actorType: "user",
+            actorType: input.actor.role === "system" ? "system" : "user",
             actorId: input.actor.userId,
             actorRole: input.actor.role,
             tenantId: input.tenantId,
@@ -519,5 +529,52 @@ export class InstallationOffboardingService {
     } finally {
       client.release();
     }
+  }
+
+  /**
+   * Scans commercial tenants referenced by durable provisioning operations and purges expired
+   * installation archives using each tenant's RLS-scoped transaction cleanly.
+   */
+  async purgeDueArchivesAcrossTenants(input?: {
+    asOf?: Date;
+    tenantBatchLimit?: number;
+    requestId?: string;
+  }): Promise<{
+    tenantsScanned: number;
+    archivesScanned: number;
+    configurationsDeleted: number;
+    archivesDeleted: number;
+  }> {
+    const limit = Math.max(1, Math.min(1_000, input?.tenantBatchLimit ?? 250));
+    const tenants = await this.provisionerPool.query<{ tenant_id: string }>(
+      `SELECT DISTINCT tenant_id::text AS tenant_id
+       FROM public.product_provisioning_operations
+       WHERE tenant_id IS NOT NULL
+       ORDER BY tenant_id
+       LIMIT $1`,
+      [limit],
+    );
+    let archivesScanned = 0;
+    let configurationsDeleted = 0;
+    let archivesDeleted = 0;
+
+    for (const row of tenants.rows) {
+      const outcome = await this.purgeExpiredArchivesForTenant({
+        tenantId: row.tenant_id,
+        actor: { userId: "system-retention-worker", role: "system" },
+        requestId: input?.requestId ?? `retention-${randomUUID()}`,
+        ...(input?.asOf ? { asOf: input.asOf } : {}),
+      });
+      archivesScanned += outcome.archivesScanned;
+      configurationsDeleted += outcome.configurationsDeleted;
+      archivesDeleted += outcome.archivesDeleted;
+    }
+
+    return {
+      tenantsScanned: tenants.rows.length,
+      archivesScanned,
+      configurationsDeleted,
+      archivesDeleted,
+    };
   }
 }

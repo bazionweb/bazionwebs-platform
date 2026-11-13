@@ -29,11 +29,17 @@ class MemoryJournal implements ProvisioningSagaJournal {
   unknownStep: NonNullable<ProvisioningSagaSnapshot["unknownStep"]> | null = null;
   attempts = new Map<string, number>();
   activeLease: ProvisioningSagaLease | null = null;
+  renewCalls = 0;
 
   private checkLease(lease?: ProvisioningSagaLease) {
     if (lease && this.activeLease && (lease.leaseToken !== this.activeLease.leaseToken || lease.fencingToken !== this.activeLease.fencingToken)) {
       throw new StaleSagaLeaseError(context.operationId, lease.fencingToken);
     }
+  }
+
+  async renewLease(input: { operationId: string; lease: ProvisioningSagaLease; leaseDurationMs?: number }) {
+    this.renewCalls += 1;
+    this.checkLease(input.lease);
   }
 
   async load(): Promise<ProvisioningSagaSnapshot> {
@@ -306,5 +312,36 @@ describe("durable provisioning saga orchestration", () => {
     const resolved = await runProvisioningSaga({ context, steps, journal, resumeCompensation: true });
     expect(resolved.status).toBe("compensated");
     expect(compensated).toEqual(["provision_hosting", "ensure_tenant"]);
+  });
+
+  it("renews leases before each step and halts stale workers before running the next external side effect", async () => {
+    const journal = new MemoryJournal();
+    const lease1: ProvisioningSagaLease = { leaseToken: "lease-1", fencingToken: 1, workerId: "worker-a" };
+    const lease2: ProvisioningSagaLease = { leaseToken: "lease-2", fencingToken: 2, workerId: "worker-b" };
+    journal.activeLease = lease1;
+
+    let step2Executed = false;
+    const originalCompleteStep = journal.completeStep.bind(journal);
+    journal.completeStep = async (operationId, stepName, effect, lease) => {
+      await originalCompleteStep(operationId, stepName, effect, lease);
+      journal.activeLease = lease2;
+    };
+    const steps: ProvisioningSagaStep[] = [
+      step("ensure_tenant", {
+        execute: async () => ({ tenant_id: "00000000-0000-4000-8000-000000000001" }),
+      }),
+      step("create_installation", {
+        execute: async () => {
+          step2Executed = true;
+          return { installation_id: "00000000-0000-4000-8000-000000000002" };
+        },
+      }),
+    ];
+
+    await expect(
+      runProvisioningSaga({ context, steps, journal, lease: lease1, leaseDurationMs: 45_000 }),
+    ).rejects.toBeInstanceOf(StaleSagaLeaseError);
+    expect(step2Executed).toBe(false);
+    expect(journal.renewCalls).toBe(2);
   });
 });

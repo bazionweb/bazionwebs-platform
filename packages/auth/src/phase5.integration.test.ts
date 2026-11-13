@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { Pool } from "pg";
 import { afterAll, describe, expect, it } from "vitest";
 
-const runIntegration = process.env.AUTH_INTEGRATION_TESTS === "true";
+const runIntegration = process.env.AUTH_INTEGRATION_TESTS === "true" || process.env.AUTH_INTEGRATION_TESTS === "1";
 
 describe.skipIf(!runIntegration)("Phase 5 PostgreSQL identity, OIDC BFF, claim proof, and email lifecycle", () => {
   const suffix = randomUUID().slice(0, 8);

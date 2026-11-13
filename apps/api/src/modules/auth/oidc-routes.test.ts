@@ -160,6 +160,7 @@ const ENV_KEYS = [
   "COMMERCIAL_PORTAL_URL",
   "OIDC_ISSUER",
   "OIDC_SIGNING_PRIVATE_KEY_PEM",
+  "OIDC_BFF_CLIENT_SECRET",
   "CORS_ORIGINS",
   "MEDIA_STORAGE_DRIVER",
   "MEDIA_STORAGE_ENDPOINT",
@@ -290,6 +291,10 @@ describe("Phase 5 OIDC, BFF cookies, CSRF, claim-order, email lifecycle, and dee
     expect(() => loadConfig()).toThrow(/OIDC_SIGNING_PRIVATE_KEY_PEM/);
 
     process.env.OIDC_SIGNING_PRIVATE_KEY_PEM = testKeyPair.privateKey;
+    delete process.env.OIDC_BFF_CLIENT_SECRET;
+    expect(() => loadConfig()).toThrow(/OIDC_BFF_CLIENT_SECRET/);
+
+    process.env.OIDC_BFF_CLIENT_SECRET = "production-oidc-bff-client-secret-32c";
     const prod = loadConfig();
     expect(prod.platformConsoleUrl).toBe("https://admin.bazion.co.ke");
     expect(prod.commercialPortalUrl).toBe("https://portal.bazion.co.ke");

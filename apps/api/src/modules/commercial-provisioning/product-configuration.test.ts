@@ -63,7 +63,7 @@ describe("product-specific initial configuration and shared-managed isolation", 
     const ecommerceConfig = buildProductInitialConfiguration(
       makeOperation({ productId: "ecommerce", solutionId: "ecommerce-storefront", templateId: "ecommerce" }),
     );
-    expect(ecommerceConfig.requiredModules).toEqual(["platform-identity", "commerce", "payments", "media-storage"]);
+    expect(ecommerceConfig.requiredModules).toEqual(["platform-identity", "commerce", "media-storage"]);
     expect(ecommerceConfig.configuration.productSettings).toMatchObject({
       profileMode: "commerce-storefront",
       storeDefaults: { defaultCountryCode: "KE", defaultCurrency: "KES" },
@@ -180,6 +180,9 @@ describe("product-specific initial configuration and shared-managed isolation", 
     };
 
     const provisioner = makeMockPool(async (sql) => {
+      if (sql.includes("request_fingerprint") && sql.includes("FROM public.product_provisioning_operations")) {
+        return { rows: [{ request_fingerprint: "a".repeat(64) }], rowCount: 1 };
+      }
       if (sql.includes("FROM public.product_provisioning_operations")) {
         return { rows: [{ tenant_id: null }], rowCount: 0 };
       }

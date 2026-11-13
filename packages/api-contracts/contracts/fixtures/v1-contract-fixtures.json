@@ -1,0 +1,770 @@
+{
+  "schemaVersion": "1.0.0",
+  "description": "Shared cross-repository positive and negative wire fixtures for Bazion Commercial <-> Platform Contract v1 using real catalog offerings.",
+  "provisionProductRequest": {
+    "valid": [
+      {
+        "name": "website-launch order with normalized lowercase email and hostname",
+        "payload": {
+          "schemaVersion": "1.0.0",
+          "eventId": "76d60c98-a6ee-49fa-ae27-49a6b5920b98",
+          "correlationId": "ff46ea3a-a4fb-4f08-8b19-a01a7fbd84a9",
+          "idempotencyKey": "bazionweb:order:order-2026-0042:line:0:v1",
+          "occurredAt": "2026-11-11T08:30:00.000Z",
+          "source": "bazionweb",
+          "customer": {
+            "externalCustomerId": "customer-1008",
+            "displayName": "Acacia Studio Ltd",
+            "primaryContact": {
+              "name": "Grace Wanjiku",
+              "email": "admin@acacia.example.org"
+            }
+          },
+          "order": {
+            "externalOrderId": "order-2026-0042:line:0",
+            "offerId": "website-launch",
+            "offerVersion": "1.0.0"
+          },
+          "composition": {
+            "product": { "id": "bazion-site", "version": "1.0.0" },
+            "solution": { "id": "business-website", "version": "1.0.0" },
+            "template": { "id": "node-nextjs", "version": "1.0.0" }
+          },
+          "requestedDomain": "www.acacia.example.org"
+        }
+      },
+      {
+        "name": "website-business order without optional requestedDomain",
+        "payload": {
+          "schemaVersion": "1.0.0",
+          "eventId": "9a8e1102-3f62-4c22-8f6e-41d2e8b0b001",
+          "correlationId": "b13c4420-8a75-4e92-9f41-6b8b0019c002",
+          "idempotencyKey": "bazionweb:order:order-2026-0043:line:1:v1",
+          "occurredAt": "2026-11-11T09:15:00.000Z",
+          "source": "bazionweb",
+          "customer": {
+            "externalCustomerId": "customer-1009",
+            "displayName": "Kilimani Traders",
+            "primaryContact": {
+              "name": "David Otieno",
+              "email": "david@kilimani.example.org"
+            }
+          },
+          "order": {
+            "externalOrderId": "order-2026-0043:line:1",
+            "offerId": "website-business",
+            "offerVersion": "2026.1.0"
+          },
+          "composition": {
+            "product": { "id": "bazion-site", "version": "1.0.0" },
+            "solution": { "id": "business-website", "version": "1.0.0" },
+            "template": { "id": "node-nextjs", "version": "1.0.0" }
+          }
+        }
+      }
+    ],
+    "invalid": [
+      {
+        "name": "rejects unsupported major contract version 2.0.0",
+        "payload": {
+          "schemaVersion": "2.0.0",
+          "eventId": "76d60c98-a6ee-49fa-ae27-49a6b5920b98",
+          "correlationId": "ff46ea3a-a4fb-4f08-8b19-a01a7fbd84a9",
+          "idempotencyKey": "bazionweb:order:order-2026-0042:line:0:v1",
+          "occurredAt": "2026-11-11T08:30:00.000Z",
+          "source": "bazionweb",
+          "customer": {
+            "externalCustomerId": "customer-1008",
+            "displayName": "Acacia Studio Ltd",
+            "primaryContact": {
+              "name": "Grace Wanjiku",
+              "email": "admin@acacia.example.org"
+            }
+          },
+          "order": {
+            "externalOrderId": "order-2026-0042:line:0",
+            "offerId": "website-launch",
+            "offerVersion": "1.0.0"
+          },
+          "composition": {
+            "product": { "id": "bazion-site", "version": "1.0.0" },
+            "solution": { "id": "business-website", "version": "1.0.0" },
+            "template": { "id": "node-nextjs", "version": "1.0.0" }
+          }
+        }
+      },
+      {
+        "name": "rejects below-minimum contract version 0.9.0",
+        "payload": {
+          "schemaVersion": "0.9.0",
+          "eventId": "76d60c98-a6ee-49fa-ae27-49a6b5920b98",
+          "correlationId": "ff46ea3a-a4fb-4f08-8b19-a01a7fbd84a9",
+          "idempotencyKey": "bazionweb:order:order-2026-0042:line:0:v1",
+          "occurredAt": "2026-11-11T08:30:00.000Z",
+          "source": "bazionweb",
+          "customer": {
+            "externalCustomerId": "customer-1008",
+            "displayName": "Acacia Studio Ltd",
+            "primaryContact": {
+              "name": "Grace Wanjiku",
+              "email": "admin@acacia.example.org"
+            }
+          },
+          "order": {
+            "externalOrderId": "order-2026-0042:line:0",
+            "offerId": "website-launch",
+            "offerVersion": "1.0.0"
+          },
+          "composition": {
+            "product": { "id": "bazion-site", "version": "1.0.0" },
+            "solution": { "id": "business-website", "version": "1.0.0" },
+            "template": { "id": "node-nextjs", "version": "1.0.0" }
+          }
+        }
+      },
+      {
+        "name": "rejects pricing and payment fields in wire payload",
+        "payload": {
+          "schemaVersion": "1.0.0",
+          "eventId": "76d60c98-a6ee-49fa-ae27-49a6b5920b98",
+          "correlationId": "ff46ea3a-a4fb-4f08-8b19-a01a7fbd84a9",
+          "idempotencyKey": "bazionweb:order:order-2026-0042:line:0:v1",
+          "occurredAt": "2026-11-11T08:30:00.000Z",
+          "source": "bazionweb",
+          "paid": true,
+          "amount": 25000,
+          "currency": "KES",
+          "customer": {
+            "externalCustomerId": "customer-1008",
+            "displayName": "Acacia Studio Ltd",
+            "primaryContact": {
+              "name": "Grace Wanjiku",
+              "email": "admin@acacia.example.org"
+            }
+          },
+          "order": {
+            "externalOrderId": "order-2026-0042:line:0",
+            "offerId": "website-launch",
+            "offerVersion": "1.0.0"
+          },
+          "composition": {
+            "product": { "id": "bazion-site", "version": "1.0.0" },
+            "solution": { "id": "business-website", "version": "1.0.0" },
+            "template": { "id": "node-nextjs", "version": "1.0.0" }
+          }
+        }
+      },
+      {
+        "name": "rejects non-normalized uppercase primaryContact email",
+        "payload": {
+          "schemaVersion": "1.0.0",
+          "eventId": "76d60c98-a6ee-49fa-ae27-49a6b5920b98",
+          "correlationId": "ff46ea3a-a4fb-4f08-8b19-a01a7fbd84a9",
+          "idempotencyKey": "bazionweb:order:order-2026-0042:line:0:v1",
+          "occurredAt": "2026-11-11T08:30:00.000Z",
+          "source": "bazionweb",
+          "customer": {
+            "externalCustomerId": "customer-1008",
+            "displayName": "Acacia Studio Ltd",
+            "primaryContact": {
+              "name": "Grace Wanjiku",
+              "email": "ADMIN@acacia.example.org"
+            }
+          },
+          "order": {
+            "externalOrderId": "order-2026-0042:line:0",
+            "offerId": "website-launch",
+            "offerVersion": "1.0.0"
+          },
+          "composition": {
+            "product": { "id": "bazion-site", "version": "1.0.0" },
+            "solution": { "id": "business-website", "version": "1.0.0" },
+            "template": { "id": "node-nextjs", "version": "1.0.0" }
+          }
+        }
+      },
+      {
+        "name": "rejects URL path in requestedDomain instead of bare hostname",
+        "payload": {
+          "schemaVersion": "1.0.0",
+          "eventId": "76d60c98-a6ee-49fa-ae27-49a6b5920b98",
+          "correlationId": "ff46ea3a-a4fb-4f08-8b19-a01a7fbd84a9",
+          "idempotencyKey": "bazionweb:order:order-2026-0042:line:0:v1",
+          "occurredAt": "2026-11-11T08:30:00.000Z",
+          "source": "bazionweb",
+          "customer": {
+            "externalCustomerId": "customer-1008",
+            "displayName": "Acacia Studio Ltd",
+            "primaryContact": {
+              "name": "Grace Wanjiku",
+              "email": "admin@acacia.example.org"
+            }
+          },
+          "order": {
+            "externalOrderId": "order-2026-0042:line:0",
+            "offerId": "website-launch",
+            "offerVersion": "1.0.0"
+          },
+          "composition": {
+            "product": { "id": "bazion-site", "version": "1.0.0" },
+            "solution": { "id": "business-website", "version": "1.0.0" },
+            "template": { "id": "node-nextjs", "version": "1.0.0" }
+          },
+          "requestedDomain": "https://acacia.example.org/admin"
+        }
+      },
+      {
+        "name": "rejects path traversal sequence in externalOrderId",
+        "payload": {
+          "schemaVersion": "1.0.0",
+          "eventId": "76d60c98-a6ee-49fa-ae27-49a6b5920b98",
+          "correlationId": "ff46ea3a-a4fb-4f08-8b19-a01a7fbd84a9",
+          "idempotencyKey": "bazionweb:order:order-2026-0042:line:0:v1",
+          "occurredAt": "2026-11-11T08:30:00.000Z",
+          "source": "bazionweb",
+          "customer": {
+            "externalCustomerId": "customer-1008",
+            "displayName": "Acacia Studio Ltd",
+            "primaryContact": {
+              "name": "Grace Wanjiku",
+              "email": "admin@acacia.example.org"
+            }
+          },
+          "order": {
+            "externalOrderId": "../../tenant",
+            "offerId": "website-launch",
+            "offerVersion": "1.0.0"
+          },
+          "composition": {
+            "product": { "id": "bazion-site", "version": "1.0.0" },
+            "solution": { "id": "business-website", "version": "1.0.0" },
+            "template": { "id": "node-nextjs", "version": "1.0.0" }
+          }
+        }
+      },
+      {
+        "name": "rejects non-lowercase catalog identifier in offerId",
+        "payload": {
+          "schemaVersion": "1.0.0",
+          "eventId": "76d60c98-a6ee-49fa-ae27-49a6b5920b98",
+          "correlationId": "ff46ea3a-a4fb-4f08-8b19-a01a7fbd84a9",
+          "idempotencyKey": "bazionweb:order:order-2026-0042:line:0:v1",
+          "occurredAt": "2026-11-11T08:30:00.000Z",
+          "source": "bazionweb",
+          "customer": {
+            "externalCustomerId": "customer-1008",
+            "displayName": "Acacia Studio Ltd",
+            "primaryContact": {
+              "name": "Grace Wanjiku",
+              "email": "admin@acacia.example.org"
+            }
+          },
+          "order": {
+            "externalOrderId": "order-2026-0042:line:0",
+            "offerId": "Website-Launch",
+            "offerVersion": "1.0.0"
+          },
+          "composition": {
+            "product": { "id": "bazion-site", "version": "1.0.0" },
+            "solution": { "id": "business-website", "version": "1.0.0" },
+            "template": { "id": "node-nextjs", "version": "1.0.0" }
+          }
+        }
+      }
+    ]
+  },
+  "provisioningOfferCatalog": {
+    "valid": [
+      {
+        "name": "price-free website-launch and website-business catalog response",
+        "payload": {
+          "schemaVersion": "1.0.0",
+          "generatedAt": "2026-11-11T08:30:00.000Z",
+          "bindings": [
+            {
+              "offer": { "id": "website-launch", "version": "1.0.0" },
+              "composition": {
+                "product": { "id": "bazion-site", "version": "1.0.0" },
+                "solution": { "id": "business-website", "version": "1.0.0" },
+                "template": { "id": "node-nextjs", "version": "1.0.0" }
+              },
+              "requiredModules": [
+                { "id": "website-content", "version": "1.0.0" }
+              ],
+              "optionalModules": [
+                { "id": "forms-leads", "version": "1.0.0" }
+              ],
+              "distributionMode": "shared-managed"
+            }
+          ]
+        }
+      }
+    ],
+    "invalid": [
+      {
+        "name": "rejects duplicate offerId@offerVersion entries in catalog",
+        "payload": {
+          "schemaVersion": "1.0.0",
+          "generatedAt": "2026-11-11T08:30:00.000Z",
+          "bindings": [
+            {
+              "offer": { "id": "website-launch", "version": "1.0.0" },
+              "composition": {
+                "product": { "id": "bazion-site", "version": "1.0.0" },
+                "solution": { "id": "business-website", "version": "1.0.0" },
+                "template": { "id": "node-nextjs", "version": "1.0.0" }
+              },
+              "requiredModules": [{ "id": "website-content", "version": "1.0.0" }],
+              "optionalModules": [],
+              "distributionMode": "shared-managed"
+            },
+            {
+              "offer": { "id": "website-launch", "version": "1.0.0" },
+              "composition": {
+                "product": { "id": "bazion-site", "version": "1.0.0" },
+                "solution": { "id": "business-website", "version": "1.0.0" },
+                "template": { "id": "node-nextjs", "version": "1.0.0" }
+              },
+              "requiredModules": [{ "id": "website-content", "version": "1.0.0" }],
+              "optionalModules": [],
+              "distributionMode": "shared-managed"
+            }
+          ]
+        }
+      },
+      {
+        "name": "rejects duplicate module identifier across required and optional modules",
+        "payload": {
+          "schemaVersion": "1.0.0",
+          "generatedAt": "2026-11-11T08:30:00.000Z",
+          "bindings": [
+            {
+              "offer": { "id": "website-launch", "version": "1.0.0" },
+              "composition": {
+                "product": { "id": "bazion-site", "version": "1.0.0" },
+                "solution": { "id": "business-website", "version": "1.0.0" },
+                "template": { "id": "node-nextjs", "version": "1.0.0" }
+              },
+              "requiredModules": [{ "id": "website-content", "version": "1.0.0" }],
+              "optionalModules": [{ "id": "website-content", "version": "1.0.0" }],
+              "distributionMode": "shared-managed"
+            }
+          ]
+        }
+      },
+      {
+        "name": "rejects pricing fields leaked into offer binding",
+        "payload": {
+          "schemaVersion": "1.0.0",
+          "generatedAt": "2026-11-11T08:30:00.000Z",
+          "bindings": [
+            {
+              "offer": { "id": "website-launch", "version": "1.0.0" },
+              "price": 15000,
+              "composition": {
+                "product": { "id": "bazion-site", "version": "1.0.0" },
+                "solution": { "id": "business-website", "version": "1.0.0" },
+                "template": { "id": "node-nextjs", "version": "1.0.0" }
+              },
+              "requiredModules": [{ "id": "website-content", "version": "1.0.0" }],
+              "optionalModules": [],
+              "distributionMode": "shared-managed"
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "provisioningOperation": {
+    "valid": [
+      {
+        "name": "accepted operation before tenant/installation assignment",
+        "payload": {
+          "schemaVersion": "1.0.0",
+          "operationId": "1bcf8d5a-fc01-4a6b-b8c3-0345b1e22b12",
+          "correlationId": "ff46ea3a-a4fb-4f08-8b19-a01a7fbd84a9",
+          "externalOrderId": "order-2026-0042:line:0",
+          "status": "accepted",
+          "currentStep": "accept_command",
+          "tenantId": null,
+          "installationId": null,
+          "failure": null,
+          "updatedAt": "2026-11-11T08:30:01.000Z"
+        }
+      },
+      {
+        "name": "ready operation with assigned tenant and installation",
+        "payload": {
+          "schemaVersion": "1.0.0",
+          "operationId": "1bcf8d5a-fc01-4a6b-b8c3-0345b1e22b12",
+          "correlationId": "ff46ea3a-a4fb-4f08-8b19-a01a7fbd84a9",
+          "externalOrderId": "order-2026-0042:line:0",
+          "status": "ready",
+          "currentStep": "verify_readiness",
+          "tenantId": "6b692865-86e6-42b9-934f-94953912a777",
+          "installationId": "4954ba5a-6c50-4881-a3bc-c43076c7abc8",
+          "failure": null,
+          "updatedAt": "2026-11-11T08:32:00.000Z"
+        }
+      },
+      {
+        "name": "failed operation with safe non-sensitive failure code",
+        "payload": {
+          "schemaVersion": "1.0.0",
+          "operationId": "1bcf8d5a-fc01-4a6b-b8c3-0345b1e22b12",
+          "correlationId": "ff46ea3a-a4fb-4f08-8b19-a01a7fbd84a9",
+          "externalOrderId": "order-2026-0042:line:0",
+          "status": "failed",
+          "currentStep": "provision_hosting",
+          "tenantId": "6b692865-86e6-42b9-934f-94953912a777",
+          "installationId": null,
+          "failure": {
+            "code": "PROVISIONING_HOST_UNAVAILABLE",
+            "retryable": true
+          },
+          "updatedAt": "2026-11-11T08:32:00.000Z"
+        }
+      }
+    ],
+    "invalid": [
+      {
+        "name": "rejects ready operation when tenantId or installationId is null",
+        "payload": {
+          "schemaVersion": "1.0.0",
+          "operationId": "1bcf8d5a-fc01-4a6b-b8c3-0345b1e22b12",
+          "correlationId": "ff46ea3a-a4fb-4f08-8b19-a01a7fbd84a9",
+          "externalOrderId": "order-2026-0042:line:0",
+          "status": "ready",
+          "currentStep": null,
+          "tenantId": null,
+          "installationId": null,
+          "failure": null,
+          "updatedAt": "2026-11-11T08:32:00.000Z"
+        }
+      },
+      {
+        "name": "rejects failed operation without failure object",
+        "payload": {
+          "schemaVersion": "1.0.0",
+          "operationId": "1bcf8d5a-fc01-4a6b-b8c3-0345b1e22b12",
+          "correlationId": "ff46ea3a-a4fb-4f08-8b19-a01a7fbd84a9",
+          "externalOrderId": "order-2026-0042:line:0",
+          "status": "failed",
+          "currentStep": "provision_hosting",
+          "tenantId": null,
+          "installationId": null,
+          "failure": null,
+          "updatedAt": "2026-11-11T08:32:00.000Z"
+        }
+      },
+      {
+        "name": "rejects extra internal fields such as raw providerError",
+        "payload": {
+          "schemaVersion": "1.0.0",
+          "operationId": "1bcf8d5a-fc01-4a6b-b8c3-0345b1e22b12",
+          "correlationId": "ff46ea3a-a4fb-4f08-8b19-a01a7fbd84a9",
+          "externalOrderId": "order-2026-0042:line:0",
+          "status": "accepted",
+          "currentStep": null,
+          "tenantId": null,
+          "installationId": null,
+          "failure": null,
+          "providerError": "ECONNREFUSED",
+          "updatedAt": "2026-11-11T08:30:01.000Z"
+        }
+      }
+    ]
+  },
+  "provisioningStatusEvent": {
+    "valid": [
+      {
+        "name": "valid ready webhook callback event with matching correlationId",
+        "payload": {
+          "schemaVersion": "1.0.0",
+          "eventType": "product.provisioning.status.v1",
+          "eventId": "22222222-2222-4222-8222-222222222222",
+          "correlationId": "ff46ea3a-a4fb-4f08-8b19-a01a7fbd84a9",
+          "occurredAt": "2026-11-11T08:32:00.000Z",
+          "source": "bazion-platform",
+          "operation": {
+            "schemaVersion": "1.0.0",
+            "operationId": "1bcf8d5a-fc01-4a6b-b8c3-0345b1e22b12",
+            "correlationId": "ff46ea3a-a4fb-4f08-8b19-a01a7fbd84a9",
+            "externalOrderId": "order-2026-0042:line:0",
+            "status": "ready",
+            "currentStep": "verify_readiness",
+            "tenantId": "6b692865-86e6-42b9-934f-94953912a777",
+            "installationId": "4954ba5a-6c50-4881-a3bc-c43076c7abc8",
+            "failure": null,
+            "updatedAt": "2026-11-11T08:32:00.000Z"
+          }
+        }
+      }
+    ],
+    "invalid": [
+      {
+        "name": "rejects event when operation correlationId differs from event correlationId",
+        "payload": {
+          "schemaVersion": "1.0.0",
+          "eventType": "product.provisioning.status.v1",
+          "eventId": "22222222-2222-4222-8222-222222222222",
+          "correlationId": "ff46ea3a-a4fb-4f08-8b19-a01a7fbd84a9",
+          "occurredAt": "2026-11-11T08:32:00.000Z",
+          "source": "bazion-platform",
+          "operation": {
+            "schemaVersion": "1.0.0",
+            "operationId": "1bcf8d5a-fc01-4a6b-b8c3-0345b1e22b12",
+            "correlationId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+            "externalOrderId": "order-2026-0042:line:0",
+            "status": "ready",
+            "currentStep": "verify_readiness",
+            "tenantId": "6b692865-86e6-42b9-934f-94953912a777",
+            "installationId": "4954ba5a-6c50-4881-a3bc-c43076c7abc8",
+            "failure": null,
+            "updatedAt": "2026-11-11T08:32:00.000Z"
+          }
+        }
+      },
+      {
+        "name": "rejects wrong event source",
+        "payload": {
+          "schemaVersion": "1.0.0",
+          "eventType": "product.provisioning.status.v1",
+          "eventId": "22222222-2222-4222-8222-222222222222",
+          "correlationId": "ff46ea3a-a4fb-4f08-8b19-a01a7fbd84a9",
+          "occurredAt": "2026-11-11T08:32:00.000Z",
+          "source": "bazionweb",
+          "operation": {
+            "schemaVersion": "1.0.0",
+            "operationId": "1bcf8d5a-fc01-4a6b-b8c3-0345b1e22b12",
+            "correlationId": "ff46ea3a-a4fb-4f08-8b19-a01a7fbd84a9",
+            "externalOrderId": "order-2026-0042:line:0",
+            "status": "accepted",
+            "currentStep": null,
+            "tenantId": null,
+            "installationId": null,
+            "failure": null,
+            "updatedAt": "2026-11-11T08:30:01.000Z"
+          }
+        }
+      }
+    ]
+  },
+  "subscriptionLifecycleCommand": {
+    "valid": [
+      {
+        "name": "grace command with required graceEndsAt timestamp",
+        "payload": {
+          "schemaVersion": "1.0.0",
+          "eventId": "33333333-3333-4333-8333-333333333333",
+          "correlationId": "44444444-4444-4444-8444-444444444444",
+          "idempotencyKey": "bazionweb:sub:sub-100:grace:v1",
+          "occurredAt": "2026-11-11T10:00:00.000Z",
+          "effectiveAt": "2026-11-11T10:00:00.000Z",
+          "source": "bazionweb",
+          "action": "grace",
+          "subscriptionId": "sub-100",
+          "externalCustomerId": "customer-1008",
+          "externalOrderId": "order-2026-0042:line:0",
+          "reasonCode": "RENEWAL_PAST_DUE",
+          "graceEndsAt": "2026-11-18T10:00:00.000Z"
+        }
+      },
+      {
+        "name": "reactivate command targeting pinned installationId",
+        "payload": {
+          "schemaVersion": "1.0.0",
+          "eventId": "55555555-5555-4555-8555-555555555555",
+          "correlationId": "44444444-4444-4444-8444-444444444444",
+          "idempotencyKey": "bazionweb:sub:sub-100:reactivate:v1",
+          "occurredAt": "2026-11-12T10:00:00.000Z",
+          "effectiveAt": "2026-11-12T10:00:00.000Z",
+          "source": "bazionweb",
+          "action": "reactivate",
+          "subscriptionId": "sub-100",
+          "externalCustomerId": "customer-1008",
+          "externalOrderId": "order-2026-0042:line:0",
+          "installationId": "4954ba5a-6c50-4881-a3bc-c43076c7abc8",
+          "reasonCode": "INVOICE_SETTLED"
+        }
+      }
+    ],
+    "invalid": [
+      {
+        "name": "rejects grace command without graceEndsAt",
+        "payload": {
+          "schemaVersion": "1.0.0",
+          "eventId": "33333333-3333-4333-8333-333333333333",
+          "correlationId": "44444444-4444-4444-8444-444444444444",
+          "idempotencyKey": "bazionweb:sub:sub-100:grace:v1",
+          "occurredAt": "2026-11-11T10:00:00.000Z",
+          "effectiveAt": "2026-11-11T10:00:00.000Z",
+          "source": "bazionweb",
+          "action": "grace",
+          "subscriptionId": "sub-100",
+          "externalCustomerId": "customer-1008",
+          "externalOrderId": "order-2026-0042:line:0",
+          "reasonCode": "RENEWAL_PAST_DUE"
+        }
+      },
+      {
+        "name": "rejects grace command with null graceEndsAt",
+        "payload": {
+          "schemaVersion": "1.0.0",
+          "eventId": "33333333-3333-4333-8333-333333333333",
+          "correlationId": "44444444-4444-4444-8444-444444444444",
+          "idempotencyKey": "bazionweb:sub:sub-100:grace:v1",
+          "occurredAt": "2026-11-11T10:00:00.000Z",
+          "effectiveAt": "2026-11-11T10:00:00.000Z",
+          "source": "bazionweb",
+          "action": "grace",
+          "subscriptionId": "sub-100",
+          "externalCustomerId": "customer-1008",
+          "externalOrderId": "order-2026-0042:line:0",
+          "reasonCode": "RENEWAL_PAST_DUE",
+          "graceEndsAt": null
+        }
+      },
+      {
+        "name": "rejects lowercase reasonCode",
+        "payload": {
+          "schemaVersion": "1.0.0",
+          "eventId": "55555555-5555-4555-8555-555555555555",
+          "correlationId": "44444444-4444-4444-8444-444444444444",
+          "idempotencyKey": "bazionweb:sub:sub-100:suspend:v1",
+          "occurredAt": "2026-11-12T10:00:00.000Z",
+          "effectiveAt": "2026-11-12T10:00:00.000Z",
+          "source": "bazionweb",
+          "action": "suspend",
+          "subscriptionId": "sub-100",
+          "externalCustomerId": "customer-1008",
+          "externalOrderId": "order-2026-0042:line:0",
+          "reasonCode": "nonpayment"
+        }
+      },
+      {
+        "name": "rejects unsupported schemaVersion 2.0.0",
+        "payload": {
+          "schemaVersion": "2.0.0",
+          "eventId": "55555555-5555-4555-8555-555555555555",
+          "correlationId": "44444444-4444-4444-8444-444444444444",
+          "idempotencyKey": "bazionweb:sub:sub-100:suspend:v1",
+          "occurredAt": "2026-11-12T10:00:00.000Z",
+          "effectiveAt": "2026-11-12T10:00:00.000Z",
+          "source": "bazionweb",
+          "action": "suspend",
+          "subscriptionId": "sub-100",
+          "externalCustomerId": "customer-1008",
+          "externalOrderId": "order-2026-0042:line:0",
+          "reasonCode": "GRACE_EXPIRED"
+        }
+      }
+    ]
+  },
+  "subscriptionLifecycleStatusEvent": {
+    "valid": [
+      {
+        "name": "suspended lifecycle callback with UUID tenant and installation",
+        "payload": {
+          "schemaVersion": "1.0.0",
+          "eventType": "product.subscription.lifecycle.status.v1",
+          "eventId": "66666666-6666-4666-8666-666666666666",
+          "correlationId": "44444444-4444-4444-8444-444444444444",
+          "occurredAt": "2026-11-19T00:00:00.000Z",
+          "source": "bazion-platform",
+          "lifecycle": {
+            "schemaVersion": "1.0.0",
+            "commandId": "77777777-7777-4777-8777-777777777777",
+            "action": "suspend",
+            "subscriptionId": "sub-100",
+            "externalOrderId": "order-2026-0042:line:0",
+            "tenantId": "6b692865-86e6-42b9-934f-94953912a777",
+            "installationId": "4954ba5a-6c50-4881-a3bc-c43076c7abc8",
+            "installationStatus": "suspended",
+            "applied": true,
+            "reasonCode": "GRACE_EXPIRED_DUNNING_EXHAUSTED",
+            "effectiveAt": "2026-11-19T00:00:00.000Z",
+            "updatedAt": "2026-11-19T00:00:01.000Z"
+          }
+        }
+      },
+      {
+        "name": "provisioning in-progress lifecycle callback with full installation status enum",
+        "payload": {
+          "schemaVersion": "1.0.0",
+          "eventType": "product.subscription.lifecycle.status.v1",
+          "eventId": "88888888-8888-4888-8888-888888888888",
+          "correlationId": "44444444-4444-4444-8444-444444444444",
+          "occurredAt": "2026-11-19T00:00:05.000Z",
+          "source": "bazion-platform",
+          "lifecycle": {
+            "schemaVersion": "1.0.0",
+            "commandId": "77777777-7777-4777-8777-777777777777",
+            "action": "activate",
+            "subscriptionId": "sub-100",
+            "externalOrderId": "order-2026-0042:line:0",
+            "tenantId": "6b692865-86e6-42b9-934f-94953912a777",
+            "installationId": null,
+            "installationStatus": "provisioning",
+            "applied": true,
+            "reasonCode": "INVOICE_SETTLED",
+            "effectiveAt": "2026-11-19T00:00:05.000Z",
+            "updatedAt": "2026-11-19T00:00:05.000Z"
+          }
+        }
+      }
+    ],
+    "invalid": [
+      {
+        "name": "rejects non-UUID tenantId in lifecycle callback",
+        "payload": {
+          "schemaVersion": "1.0.0",
+          "eventType": "product.subscription.lifecycle.status.v1",
+          "eventId": "66666666-6666-4666-8666-666666666666",
+          "correlationId": "44444444-4444-4444-8444-444444444444",
+          "occurredAt": "2026-11-19T00:00:00.000Z",
+          "source": "bazion-platform",
+          "lifecycle": {
+            "schemaVersion": "1.0.0",
+            "commandId": "77777777-7777-4777-8777-777777777777",
+            "action": "suspend",
+            "subscriptionId": "sub-100",
+            "externalOrderId": "order-2026-0042:line:0",
+            "tenantId": "tenant-not-a-uuid",
+            "installationId": "4954ba5a-6c50-4881-a3bc-c43076c7abc8",
+            "installationStatus": "suspended",
+            "applied": true,
+            "reasonCode": "GRACE_EXPIRED",
+            "effectiveAt": "2026-11-19T00:00:00.000Z",
+            "updatedAt": "2026-11-19T00:00:01.000Z"
+          }
+        }
+      },
+      {
+        "name": "rejects unknown installationStatus value",
+        "payload": {
+          "schemaVersion": "1.0.0",
+          "eventType": "product.subscription.lifecycle.status.v1",
+          "eventId": "66666666-6666-4666-8666-666666666666",
+          "correlationId": "44444444-4444-4444-8444-444444444444",
+          "occurredAt": "2026-11-19T00:00:00.000Z",
+          "source": "bazion-platform",
+          "lifecycle": {
+            "schemaVersion": "1.0.0",
+            "commandId": "77777777-7777-4777-8777-777777777777",
+            "action": "suspend",
+            "subscriptionId": "sub-100",
+            "externalOrderId": "order-2026-0042:line:0",
+            "tenantId": "6b692865-86e6-42b9-934f-94953912a777",
+            "installationId": "4954ba5a-6c50-4881-a3bc-c43076c7abc8",
+            "installationStatus": "archived",
+            "applied": true,
+            "reasonCode": "GRACE_EXPIRED",
+            "effectiveAt": "2026-11-19T00:00:00.000Z",
+            "updatedAt": "2026-11-19T00:00:01.000Z"
+          }
+        }
+      }
+    ]
+  }
+}

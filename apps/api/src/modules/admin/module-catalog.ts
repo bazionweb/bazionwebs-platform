@@ -122,6 +122,20 @@ export const platformModuleCatalog: readonly PlatformModuleCatalogItem[] = [
     "defaultEnabled": false,
     "required": false,
     "tenantAssignable": true
+  },
+  {
+    "id": "media-storage",
+    "name": "Tenant media storage",
+    "version": "1.0.0",
+    "status": "partial",
+    "tenantModel": "tenant-owned",
+    "dependencies": [
+      "platform-identity"
+    ],
+    "description": "Tenant-scoped media uploads, assets library, and object storage adapters.",
+    "defaultEnabled": false,
+    "required": false,
+    "tenantAssignable": true
   }
 ];
 

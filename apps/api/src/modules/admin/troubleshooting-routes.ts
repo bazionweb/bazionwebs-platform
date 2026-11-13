@@ -18,6 +18,20 @@ import { currentDatabaseSchemaVersion, requiredDatabaseMigrations } from "@bazio
 import { diagnoseTenantDomainDns } from "./domain-verification.js";
 import { platformModuleCatalog } from "./module-catalog.js";
 
+function maskEmail(email: string): string {
+  const [local = "", domain = ""] = email.split("@", 2);
+  if (!domain) return "***";
+  const prefix = local.slice(0, 1) || "*";
+  return `${prefix}***@${domain}`;
+}
+
+function sanitizeExportSetting(settingKey: string, settingValue: string): string {
+  if (/(secret|token|password|credential|private|api[-_]?key|webhook|dsn|passkey|signature)/i.test(settingKey)) {
+    return "[REDACTED]";
+  }
+  return settingValue;
+}
+
 const auditWriter = new PostgresAuditEventWriter(pool);
 
 async function safeQuery<T extends QueryResultRow = any>(queryString: string, params: unknown[] = []): Promise<{ rows: T[]; rowCount?: number | null }> {
@@ -928,7 +942,18 @@ export async function troubleshootingRoutes(app: FastifyInstance): Promise<void>
         async () => {
           const res = await generateEmergencyPasswordResetUrl(userId);
           if (!res) return reply.code(404).send({ error: "USER_NOT_FOUND" });
-          return reply.send({ success: true, resetUrl: res.resetUrl });
+          if (!res.emailDelivered) {
+            return reply.code(503).send({
+              error: "NOTIFICATION_DELIVERY_UNAVAILABLE",
+              message: "Emergency reset link was created but email delivery could not be queued.",
+            });
+          }
+          return reply.send({
+            success: true,
+            emailDelivered: true,
+            maskedEmail: maskEmail(res.email),
+            expiresInSeconds: 3600,
+          });
         },
       );
     },
@@ -1150,7 +1175,12 @@ export async function troubleshootingRoutes(app: FastifyInstance): Promise<void>
         },
         async () => {
           const [tenant, domains, settings, modules, bindings] = await Promise.all([
-            pool.query(`SELECT * FROM public.tenants WHERE id = $1`, [tenantId]),
+            pool.query(
+              `SELECT id, slug, name, default_currency, status, created_at, suspended_at, closed_at
+                 FROM public.tenants
+                WHERE id = $1`,
+              [tenantId],
+            ),
             pool.query(`SELECT id, hostname, status, verified_at FROM public.tenant_domains WHERE tenant_id = $1`, [tenantId]),
             pool.query(`SELECT setting_key, setting_value FROM public.ministry_settings WHERE tenant_id = $1`, [tenantId]),
             pool.query(`SELECT module_id, enabled, updated_at FROM public.tenant_module_entitlements WHERE tenant_id = $1`, [tenantId]),
@@ -1163,7 +1193,10 @@ export async function troubleshootingRoutes(app: FastifyInstance): Promise<void>
             exportedAt: new Date().toISOString(),
             tenant: tenant.rows[0],
             domains: domains.rows,
-            settings: settings.rows,
+            settings: settings.rows.map((row: { setting_key: string; setting_value: string }) => ({
+              setting_key: row.setting_key,
+              setting_value: sanitizeExportSetting(row.setting_key, row.setting_value),
+            })),
             modules: modules.rows,
             bindings: bindings.rows[0] ?? null,
           });

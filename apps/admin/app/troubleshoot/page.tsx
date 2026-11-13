@@ -10,7 +10,7 @@ export default async function TroubleshootingPage({
 }: {
   searchParams?: Promise<{ tenantId?: string }>;
 }) {
-  const identity = await requirePlatformOwner().catch(() => null);
+  const identity = await requirePlatformOwner();
   const result = await platformFetch<TenantList>("tenants?limit=100");
   const tenants = result.data?.items ?? [];
   const params = await searchParams;

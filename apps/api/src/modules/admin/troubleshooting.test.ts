@@ -305,9 +305,9 @@ describe("Superadmin Troubleshooting Routes", () => {
       expect(response.json()).toEqual({ success: true, userId: "user-1" });
     });
 
-    it("generates emergency password reset link", async () => {
+    it("queues emergency password reset notification without returning raw reset tokens", async () => {
       mocks.generateEmergencyPasswordResetUrl.mockResolvedValueOnce({
-        resetUrl: "http://localhost:3000/reset-password?token=secret123",
+        emailDelivered: true,
         email: "pastor@church.org",
       });
 
@@ -319,7 +319,9 @@ describe("Superadmin Troubleshooting Routes", () => {
       expect(response.statusCode).toBe(200);
       expect(response.json()).toEqual({
         success: true,
-        resetUrl: "http://localhost:3000/reset-password?token=secret123",
+        emailDelivered: true,
+        maskedEmail: "p***@church.org",
+        expiresInSeconds: 3600,
       });
     });
 

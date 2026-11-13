@@ -2,7 +2,12 @@ import type { FastifyInstance } from "fastify";
 import { PostgresAuditEventWriter } from "@bazion/audit";
 import { requirePlatformRole } from "@bazion/auth";
 import { getPlatformTenant } from "@bazion/auth/server";
-import type { TenantHostingDeploymentReference, TenantHostingDeploymentState, TenantHostingTemplate } from "@bazion/platform-contracts";
+import {
+  TENANT_HOSTING_TEMPLATES,
+  type TenantHostingDeploymentReference,
+  type TenantHostingDeploymentState,
+  type TenantHostingTemplate,
+} from "@bazion/platform-contracts";
 import { pool } from "../../lib/database.js";
 import type { HostingProvisioningRuntime } from "./runtime.js";
 
@@ -10,7 +15,7 @@ const auditWriter = new PostgresAuditEventWriter(pool);
 const tenantIdPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const deploymentIdPattern = tenantIdPattern;
 const resourceIdPattern = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,254}$/;
-const templates = new Set<TenantHostingTemplate>(["wordpress", "node-nextjs", "ecommerce"]);
+const templates = new Set<TenantHostingTemplate>(TENANT_HOSTING_TEMPLATES);
 const recoverableStates = new Set<TenantHostingDeploymentState>(["provisioning", "ready", "deploying", "running", "stopped", "failed"]);
 
 interface RecoveryRow {

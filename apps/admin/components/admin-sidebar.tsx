@@ -63,7 +63,13 @@ export function AdminSidebar({
       href: "/operations",
       label: "Provisioning Sagas",
       icon: "🔄",
-      isActive: pathname.startsWith("/operations"),
+      isActive: pathname === "/operations",
+    },
+    {
+      href: "/operations/cutover",
+      label: "SLOs & Cutover",
+      icon: "📈",
+      isActive: pathname.startsWith("/operations/cutover"),
     },
   ];
 

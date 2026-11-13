@@ -1,8 +1,10 @@
 import {
   provisioningManualReviewRequestSchema,
   provisioningOperationDetailV1Schema,
+  provisioningOperationSummaryV1Schema,
   provisioningOperatorActionRequestSchema,
   type ProvisioningOperationDetailV1,
+  type ProvisioningOperationSummaryV1,
 } from "@bazion/api-contracts";
 import { PostgresAuditEventWriter } from "@bazion/audit";
 import type { CommercialProvisioningSagaOrchestrator } from "./saga-orchestrator.js";
@@ -21,23 +23,7 @@ function iso(value: Date | string): string {
   return date.toISOString();
 }
 
-export interface ProvisioningOperationListItem {
-  operationId: string;
-  externalOrderId: string;
-  externalCustomerId: string;
-  offerId: string;
-  status: string;
-  currentStep: string | null;
-  tenantId: string | null;
-  installationId: string | null;
-  failureCode: string | null;
-  failureDisposition: string | null;
-  fencingToken: number;
-  holderWorkerId: string | null;
-  leaseExpiresAt: string | null;
-  attemptCount: number;
-  updatedAt: string;
-}
+export type ProvisioningOperationListItem = ProvisioningOperationSummaryV1;
 
 /**
  * Operator inspection and audited manual intervention service for provisioning sagas.
@@ -81,25 +67,31 @@ export class CommercialProvisioningOperatorService {
     const whereClause = clauses.length > 0 ? `WHERE ${clauses.join(" AND ")}` : "";
     const res = await this.provisionerPool.query<{
       id: string;
+      schema_version: string;
+      correlation_id: string;
       external_order_id: string;
-      external_customer_id: string;
       offer_id: string;
+      offer_version: string;
       status: string;
       current_step: string | null;
       tenant_id: string | null;
       installation_id: string | null;
       failure_code: string | null;
+      failure_retryable: boolean | null;
       failure_disposition: string | null;
       fencing_token: string | number;
       worker_id: string | null;
       lease_expires_at: Date | string | null;
       attempt_count: number;
+      retry_after_at: Date | string | null;
+      accepted_at: Date | string;
       updated_at: Date | string;
+      finished_at: Date | string | null;
     }>(
-      `SELECT id::text, external_order_id, external_customer_id, offer_id, status,
-              current_step, tenant_id::text, installation_id::text,
-              failure_code, failure_disposition, fencing_token, worker_id,
-              lease_expires_at, attempt_count, updated_at
+      `SELECT id::text, schema_version, correlation_id::text, external_order_id,
+              offer_id, offer_version, status, current_step, tenant_id::text, installation_id::text,
+              failure_code, failure_retryable, failure_disposition, fencing_token, worker_id,
+              lease_expires_at, attempt_count, retry_after_at, accepted_at, updated_at, finished_at
        FROM public.product_provisioning_operations
        ${whereClause}
        ORDER BY updated_at DESC, accepted_at DESC
@@ -107,22 +99,29 @@ export class CommercialProvisioningOperatorService {
       params,
     );
 
-    return res.rows.map((row) => ({
-      operationId: row.id,
-      externalOrderId: row.external_order_id,
-      externalCustomerId: row.external_customer_id,
+    return res.rows.map((row) => provisioningOperationSummaryV1Schema.parse({
+      operation: {
+        schemaVersion: row.schema_version,
+        operationId: row.id,
+        correlationId: row.correlation_id,
+        externalOrderId: row.external_order_id,
+        status: row.status,
+        currentStep: row.current_step,
+        tenantId: row.tenant_id,
+        installationId: row.installation_id,
+        failure: row.failure_code ? { code: row.failure_code, retryable: Boolean(row.failure_retryable) } : null,
+        updatedAt: iso(row.updated_at),
+      },
       offerId: row.offer_id,
-      status: row.status,
-      currentStep: row.current_step,
-      tenantId: row.tenant_id,
-      installationId: row.installation_id,
-      failureCode: row.failure_code,
+      offerVersion: row.offer_version,
       failureDisposition: row.failure_disposition,
-      fencingToken: Number(row.fencing_token ?? 0),
       holderWorkerId: row.worker_id,
+      fencingToken: Number(row.fencing_token ?? 0),
       leaseExpiresAt: row.lease_expires_at ? iso(row.lease_expires_at) : null,
       attemptCount: Number(row.attempt_count ?? 0),
-      updatedAt: iso(row.updated_at),
+      retryAfterAt: row.retry_after_at ? iso(row.retry_after_at) : null,
+      acceptedAt: iso(row.accepted_at),
+      finishedAt: row.finished_at ? iso(row.finished_at) : null,
     }));
   }
 
@@ -345,7 +344,8 @@ export class CommercialProvisioningOperatorService {
           }
         } else {
           const outcome = await this.orchestrator.runOperation(input.operationId, {
-            resumeForward: input.action === "resume" || input.action === "reconcile" || input.action === "retry",
+            resumeForward: true,
+            forceInspect: input.action === "reconcile",
           });
           if (!outcome.claimed) {
             throw new CommercialProvisioningError(409, "OPERATION_LEASE_ACTIVE", "Operation is currently locked by another worker.");
@@ -461,21 +461,36 @@ export class CommercialProvisioningOperatorService {
     );
 
     if (parsed.data.resolution === "mark_failed") {
-      await this.provisionerPool.query(
+      const updated = await this.provisionerPool.query(
         `UPDATE public.product_provisioning_operations
          SET status = 'failed',
              failure_code = COALESCE(failure_code, 'MANUAL_REVIEW_FAILED'),
              failure_retryable = false,
              failure_disposition = 'compensate',
              last_operator_actor_id = $2
-         WHERE id = $1`,
+         WHERE id = $1
+           AND status = 'compensation_required'`,
         [input.operationId, input.actor.userId],
       );
+      if ((updated.rowCount ?? 0) === 0) {
+        throw new CommercialProvisioningError(
+          409,
+          "MANUAL_REVIEW_CONFLICT",
+          "Operation status changed concurrently before manual review could be finalized.",
+        );
+      }
     } else if (this.orchestrator) {
-      await this.orchestrator.runOperation(input.operationId, {
+      const outcome = await this.orchestrator.runOperation(input.operationId, {
         resumeForward: parsed.data.resolution === "resume_forward",
         resumeCompensation: parsed.data.resolution === "trigger_compensate",
       });
+      if (!outcome.claimed) {
+        throw new CommercialProvisioningError(
+          409,
+          "OPERATION_LEASE_ACTIVE",
+          "Operation is currently locked by another worker.",
+        );
+      }
     }
 
     const after = await this.getOperationDetail(input.operationId);
@@ -551,8 +566,14 @@ export class CommercialProvisioningOperatorService {
                 i.created_at, i.ready_at, i.offboarded_at,
                 a.id::text AS archive_id, a.retention_expires_at, a.recovered_at, a.archive_purged_at
          FROM public.product_installations i
-         LEFT JOIN public.installation_offboarding_archives a
-           ON a.id = i.offboarding_archive_id AND a.tenant_id = i.tenant_id
+         LEFT JOIN LATERAL (
+           SELECT id, retention_expires_at, recovered_at, archive_purged_at
+           FROM public.installation_offboarding_archives
+           WHERE tenant_id = i.tenant_id
+             AND installation_id = i.id
+           ORDER BY created_at DESC
+           LIMIT 1
+         ) a ON true
          WHERE i.tenant_id = $1
          ORDER BY i.created_at DESC
          LIMIT 50`,

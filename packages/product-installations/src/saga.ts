@@ -83,6 +83,11 @@ export class StaleSagaLeaseError extends Error {
 /** The implementation must persist every method and serialize writes per operation ID. */
 export interface ProvisioningSagaJournal {
   load(operationId: string): Promise<ProvisioningSagaSnapshot>;
+  renewLease?(input: {
+    operationId: string;
+    lease: ProvisioningSagaLease;
+    leaseDurationMs?: number;
+  }): Promise<void>;
   setStatus(
     operationId: string,
     status: ProvisioningOperationStatus,
@@ -215,6 +220,7 @@ async function compensateCompletedSteps(
   steps: readonly ProvisioningSagaStep[],
   journal: ProvisioningSagaJournal,
   lease?: ProvisioningSagaLease,
+  leaseDurationMs?: number,
 ): Promise<ProvisioningSagaResult> {
   await journal.setStatus(context.operationId, "compensating", null, lease);
   const snapshot = await journal.load(context.operationId);
@@ -234,6 +240,13 @@ async function compensateCompletedSteps(
       return { status: "compensation_required", failure };
     }
 
+    if (lease && journal.renewLease) {
+      await journal.renewLease({
+        operationId: workingContext.operationId,
+        lease,
+        ...(leaseDurationMs !== undefined ? { leaseDurationMs } : {}),
+      });
+    }
     await journal.startCompensation(context.operationId, completed.name, lease);
     try {
       await step.compensate(
@@ -270,10 +283,12 @@ export async function runProvisioningSaga(input: {
   steps: readonly ProvisioningSagaStep[];
   journal: ProvisioningSagaJournal;
   lease?: ProvisioningSagaLease;
+  leaseDurationMs?: number;
   resumeCompensation?: boolean;
   resumeForward?: boolean;
+  forceInspect?: boolean;
 }): Promise<ProvisioningSagaResult> {
-  const { context, steps, journal, lease } = input;
+  const { context, steps, journal, lease, leaseDurationMs } = input;
   if (!context.operationId || !context.correlationId || !context.externalOrderId) {
     throw new Error("INVALID_PROVISIONING_SAGA_CONTEXT");
   }
@@ -294,14 +309,24 @@ export async function runProvisioningSaga(input: {
   }
 
   if (snapshot.status === "compensation_required") {
-    if (input.resumeCompensation && snapshot.failure?.disposition === "compensation_failed") {
-      return compensateCompletedSteps(workingContext, steps, journal, lease);
+    if (
+      input.resumeCompensation
+      && (snapshot.failure?.disposition === "compensation_failed" || snapshot.failure?.disposition === "compensate")
+    ) {
+      return compensateCompletedSteps(workingContext, steps, journal, lease, leaseDurationMs);
     }
     if (input.resumeCompensation && snapshot.failure?.disposition === "unknown") {
       const unknownStepName = snapshot.unknownStep?.name ?? snapshot.runningStep?.name;
       const unknownStep = steps.find((candidate) => candidate.name === unknownStepName);
       if (unknownStep?.inspect) {
         try {
+          if (lease && journal.renewLease) {
+            await journal.renewLease({
+              operationId: workingContext.operationId,
+              lease,
+              ...(leaseDurationMs !== undefined ? { leaseDurationMs } : {}),
+            });
+          }
           const inspected = await unknownStep.inspect(
             workingContext,
             stepIdempotencyKey(workingContext.operationId, unknownStep.name, "forward"),
@@ -310,10 +335,10 @@ export async function runProvisioningSaga(input: {
             assertSafeEffect(inspected.effect);
             propagateEffectToContext(workingContext, inspected.effect);
             await journal.completeStep(workingContext.operationId, unknownStep.name, inspected.effect, lease);
-            return compensateCompletedSteps(workingContext, steps, journal, lease);
+            return compensateCompletedSteps(workingContext, steps, journal, lease, leaseDurationMs);
           }
           if (inspected.outcome === "absent") {
-            return compensateCompletedSteps(workingContext, steps, journal, lease);
+            return compensateCompletedSteps(workingContext, steps, journal, lease, leaseDurationMs);
           }
         } catch (error) {
           if (error instanceof StaleSagaLeaseError) throw error;
@@ -328,25 +353,42 @@ export async function runProvisioningSaga(input: {
   }
 
   if (snapshot.status === "compensating") {
-    return compensateCompletedSteps(workingContext, steps, journal, lease);
+    return compensateCompletedSteps(workingContext, steps, journal, lease, leaseDurationMs);
   }
   if (snapshot.status === "failed" && !input.resumeForward && snapshot.failure?.retryable !== true) {
     if (input.resumeCompensation) {
-      return compensateCompletedSteps(workingContext, steps, journal, lease);
+      return compensateCompletedSteps(workingContext, steps, journal, lease, leaseDurationMs);
     }
     return resultFromSnapshot(snapshot);
   }
 
-  await journal.setStatus(workingContext.operationId, "validating", null, lease);
+  const firstIncompleteStep = steps.find(
+    (candidate) => !snapshot.completedSteps.some((completed) => completed.name === candidate.name),
+  );
+  await journal.setStatus(
+    workingContext.operationId,
+    firstIncompleteStep?.status ?? "validating",
+    null,
+    lease,
+  );
 
   for (const step of steps) {
     snapshot = await journal.load(workingContext.operationId);
     workingContext = hydrateContextFromSnapshot(workingContext, snapshot);
     if (snapshot.completedSteps.some((completed) => completed.name === step.name)) continue;
 
+    if (lease && journal.renewLease) {
+      await journal.renewLease({
+        operationId: workingContext.operationId,
+        lease,
+        ...(leaseDurationMs !== undefined ? { leaseDurationMs } : {}),
+      });
+    }
+
     const forwardKey = stepIdempotencyKey(workingContext.operationId, step.name, "forward");
     const needsInspection =
-      (snapshot.runningStep?.name === step.name && snapshot.runningStep.direction === "forward")
+      Boolean(input.forceInspect)
+      || (snapshot.runningStep?.name === step.name && snapshot.runningStep.direction === "forward")
       || (snapshot.unknownStep?.name === step.name && snapshot.unknownStep.direction === "forward");
 
     if (needsInspection && step.inspect) {
@@ -412,7 +454,7 @@ export async function runProvisioningSaga(input: {
         return { status: "compensation_required", failure };
       }
       await journal.setStatus(workingContext.operationId, "failed", failure, lease);
-      return compensateCompletedSteps(workingContext, steps, journal, lease);
+      return compensateCompletedSteps(workingContext, steps, journal, lease, leaseDurationMs);
     }
   }
 

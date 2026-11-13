@@ -10,7 +10,7 @@ import {
 import { platformFetch, requirePlatformOwner } from "@/lib/platform";
 
 export default async function CutoverAndSloPage() {
-  const identity = await requirePlatformOwner().catch(() => null);
+  const identity = await requirePlatformOwner();
   const [sloRes, reconRes, cutoverRes] = await Promise.all([
     platformFetch<ProvisioningSloSnapshot>("commercial-provisioning/slo-alerts"),
     platformFetch<CrossEntityReconciliationReport>("commercial-provisioning/reconciliation-exceptions"),

@@ -35,7 +35,7 @@ import type { AppConfig } from "../../config.js";
 import { withTenantTransaction, type TenantTransaction } from "../../lib/database.js";
 import { resolveTenantId } from "../../lib/tenant-resolution.js";
 import { isTenantModuleEnabled } from "../../lib/tenant-modules.js";
-import { getTenantMaintenanceStatus } from "../../lib/tenant-maintenance.js";
+import { assertTenantNotInMaintenance, getTenantMaintenanceStatus } from "../../lib/tenant-maintenance.js";
 import { DarajaClient, normalizeKenyanPhoneNumber } from "@bazion/payments";
 import {
   buildTenantObjectKey,
@@ -95,12 +95,7 @@ async function assertChurchEnabled(tenantId: string): Promise<void> {
 
 async function assertChurchPublicAvailable(tenantId: string): Promise<void> {
   await assertChurchEnabled(tenantId);
-  const maintenance = await getTenantMaintenanceStatus(tenantId);
-  if (!maintenance.enabled) return;
-  throw Object.assign(new Error(maintenance.message), {
-    statusCode: 503,
-    code: "TENANT_MAINTENANCE",
-  });
+  await assertTenantNotInMaintenance(tenantId);
 }
 
 export async function churchRoutes(app: FastifyInstance, options: RouteOptions) {

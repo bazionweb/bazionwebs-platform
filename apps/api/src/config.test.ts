@@ -133,5 +133,31 @@ describe("API runtime configuration", () => {
     vi.stubEnv("BETTER_AUTH_TRUSTED_ORIGINS", "https://app.bazion-demo.org");
     vi.stubEnv("COMMERCIAL_PROVISIONING_COMMAND_SECRET", "dev-only-secret-that-must-not-run-in-production");
     expect(() => loadConfig()).toThrow(/replace the development commercial provisioning secret/);
+
+    vi.stubEnv("COMMERCIAL_PROVISIONING_COMMAND_SECRET", "production-grade-commercial-secret-32chars");
+    vi.stubEnv("COMMERCIAL_PROVISIONING_COMMAND_PREVIOUS_SECRETS", "too-short");
+    expect(() => loadConfig()).toThrow(/COMMERCIAL_PROVISIONING_COMMAND_PREVIOUS_SECRETS must be at least 32 characters/);
+
+    vi.stubEnv("COMMERCIAL_PROVISIONING_COMMAND_PREVIOUS_SECRETS", "previous-commercial-secret-at-least-32chars");
+    vi.stubEnv("PRIVATE_ARCHIVE_ENCRYPTION_KEY", "not-valid-base64-key");
+    expect(() => loadConfig()).toThrow(/PRIVATE_ARCHIVE_ENCRYPTION_KEY must be a canonical Base64-encoded 32-byte key/);
+
+    vi.stubEnv("PRIVATE_ARCHIVE_ENCRYPTION_KEY", "");
+    expect(() => loadConfig()).toThrow(/PRIVATE_ARCHIVE_DIR must be configured when commercial provisioning is enabled/);
+
+    vi.stubEnv("PRIVATE_ARCHIVE_DIR", process.platform === "win32" ? "D:\\bazion\\archives" : "/var/lib/bazion/archives");
+    expect(() => loadConfig()).toThrow(/PRIVATE_ARCHIVE_ENCRYPTION_KEY must be configured when commercial provisioning is enabled/);
+
+    const archiveKey = Buffer.from("0123456789abcdef0123456789abcdef", "utf8").toString("base64");
+    vi.stubEnv("PRIVATE_ARCHIVE_ENCRYPTION_KEY", archiveKey);
+    vi.stubEnv("PLATFORM_CONSOLE_URL", "https://console.bazion-demo.org");
+    vi.stubEnv(
+      "OIDC_SIGNING_PRIVATE_KEY_PEM",
+      `-----BEGIN PRIVATE KEY-----\n${"A".repeat(80)}\n-----END PRIVATE KEY-----`,
+    );
+    vi.stubEnv("OIDC_BFF_CLIENT_SECRET", "production-grade-oidc-bff-secret-32chars");
+    const prodConfig = loadConfig();
+    expect(prodConfig.commercialProvisioning.commandPreviousSecrets).toEqual(["previous-commercial-secret-at-least-32chars"]);
+    expect(prodConfig.commercialProvisioning.privateArchiveEncryptionKey).toBe(archiveKey);
   });
 });

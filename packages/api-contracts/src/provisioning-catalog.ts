@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { sharedManagedDistributionModeSchema } from "./shared-enums.js";
 
 const releaseReferenceSchema = z.object({
   id: z.string().trim().min(1).max(120).regex(/^[a-z0-9][a-z0-9._-]*$/),
@@ -14,7 +15,7 @@ export const provisioningOfferBindingV1Schema = z.object({
   }).strict(),
   requiredModules: z.array(releaseReferenceSchema).min(1).max(100),
   optionalModules: z.array(releaseReferenceSchema).max(100),
-  distributionMode: z.literal("shared-managed"),
+  distributionMode: sharedManagedDistributionModeSchema,
 }).strict().superRefine((binding, context) => {
   const moduleIds = new Set<string>();
   for (const [index, module] of [...binding.requiredModules, ...binding.optionalModules].entries()) {

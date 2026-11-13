@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { PostgresAuditEventWriter } from "@bazion/audit";
 import { requirePlatformRole } from "@bazion/auth";
 import { getPlatformTenant } from "@bazion/auth/server";
+import type { TenantHostingTemplate } from "@bazion/platform-contracts";
 import { pool } from "../../lib/database.js";
 import { tenantHostingDockerSecretReference } from "./secrets.js";
 import { hostingLifecycleActionSchema, hostingProvisionInputSchema } from "./policy.js";
@@ -10,6 +11,45 @@ import type { HostingProvisioningRuntime } from "./runtime.js";
 const auditWriter = new PostgresAuditEventWriter(pool);
 const tenantIdPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const idempotencyKeyPattern = /^[A-Za-z0-9][A-Za-z0-9._:-]{7,199}$/;
+
+async function hasActiveDedicatedInstallation(tenantId: string): Promise<boolean> {
+  const maybeConnect = (pool as { connect?: unknown }).connect;
+  if (typeof maybeConnect === "function") {
+    const client = await (pool as { connect(): Promise<{ query<T>(sql: string, values?: unknown[]): Promise<{ rows: T[] }>; release(): void }> }).connect();
+    try {
+      await client.query("BEGIN");
+      await client.query("SELECT set_config('app.tenant_id', $1, true)", [tenantId]);
+      const result = await client.query<{ distribution_mode: string; status: string }>(
+        `SELECT distribution_mode, status
+         FROM public.product_installations
+         WHERE tenant_id = $1
+           AND distribution_mode = 'dedicated'
+           AND status IN ('provisioning', 'ready')
+         LIMIT 1`,
+        [tenantId],
+      );
+      await client.query("COMMIT");
+      return result.rows.length > 0;
+    } catch (error) {
+      await client.query("ROLLBACK").catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+  const result = await pool.query<{ distribution_mode: string; status: string }>(
+    `SELECT distribution_mode, status
+     FROM public.product_installations
+     WHERE tenant_id = $1
+       AND distribution_mode = 'dedicated'
+       AND status IN ('provisioning', 'ready')
+     LIMIT 1`,
+    [tenantId],
+  );
+  return (result?.rows ?? []).some(
+    (row) => row.distribution_mode === "dedicated" && ["provisioning", "ready"].includes(row.status),
+  );
+}
 
 function errorCode(error: unknown): string {
   return error instanceof Error && /^[A-Z][A-Z0-9_]{1,63}$/.test(error.message)
@@ -25,6 +65,7 @@ function errorStatus(code: string): number {
     case "HOSTING_PROVISIONING_IN_PROGRESS":
     case "HOSTING_RECONCILIATION_REQUIRED":
     case "HOSTING_IDEMPOTENCY_CONFLICT":
+    case "HOSTING_DEDICATED_INSTALLATION_REQUIRED":
     case "TENANT_NOT_CLOSED":
     case "HOSTING_LIFECYCLE_IN_PROGRESS":
     case "HOSTING_LIFECYCLE_STATE_INVALID":
@@ -235,7 +276,7 @@ export async function hostingRoutes(
     },
   );
 
-  app.post<{ Params: { tenantId: string }; Body: { template: "wordpress" | "node-nextjs" | "ecommerce" } }>(
+  app.post<{ Params: { tenantId: string }; Body: { template: TenantHostingTemplate } }>(
     "/admin/platform/tenants/:tenantId/hosting/provision",
     async (request, reply) => {
       const tenantId = request.params.tenantId.trim();
@@ -269,6 +310,20 @@ export async function hostingRoutes(
           metadata: { template: parsed.data.template, reason: "tenant_not_active" },
         });
         return reply.code(409).send({ error: "TENANT_NOT_ACTIVE" });
+      }
+      if (!(await hasActiveDedicatedInstallation(tenantId))) {
+        await auditWriter.append({
+          actorType: "user",
+          actorId: operator.userId,
+          actorRole: operator.role,
+          tenantId,
+          action: "tenant.hosting.provision.denied",
+          resourceType: "tenant_hosting_deployment",
+          outcome: "denied",
+          requestId: request.id,
+          metadata: { template: parsed.data.template, reason: "dedicated_installation_required" },
+        });
+        return reply.code(409).send({ error: "HOSTING_DEDICATED_INSTALLATION_REQUIRED" });
       }
       const runtime = options.runtime;
       if (!runtime) return reply.code(503).send({ error: "HOSTING_NOT_CONFIGURED" });

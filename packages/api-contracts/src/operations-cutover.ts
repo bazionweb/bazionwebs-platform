@@ -1,4 +1,8 @@
 import { z } from "zod";
+import {
+  commercialOrderProvisioningStatusSchema,
+  sharedManagedDistributionModeSchema,
+} from "./shared-enums.js";
 
 const nonEmptyId = (max = 128) => z.string().trim().min(1).max(max);
 const uuidSchema = z.string().uuid();
@@ -14,7 +18,7 @@ export type PilotMode = z.infer<typeof pilotModeSchema>;
 export const pilotCohortOfferRuleV1Schema = z.object({
   offerId: nonEmptyId(120),
   offerVersion: nonEmptyId(64),
-  distributionMode: z.literal("shared-managed"),
+  distributionMode: sharedManagedDistributionModeSchema,
 }).strict();
 
 export const pilotCohortPolicyV1Schema = z.object({
@@ -41,19 +45,7 @@ export const commercialPaidOrderSnapshotV1Schema = z.object({
   operationId: uuidSchema.nullable().optional(),
   tenantId: uuidSchema.nullable().optional(),
   installationId: uuidSchema.nullable().optional(),
-  provisioningStatus: z.enum([
-    "pending",
-    "accepted",
-    "validating",
-    "provisioning_tenant",
-    "configuring_installation",
-    "provisioning_hosting",
-    "ready",
-    "compensating",
-    "compensation_required",
-    "compensated",
-    "failed",
-  ]),
+  provisioningStatus: commercialOrderProvisioningStatusSchema,
   legacyFallbackUsed: z.boolean().default(false),
   legacyTenantId: uuidSchema.nullable().optional(),
 }).strict();

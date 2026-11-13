@@ -3,7 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { Pool } from "pg";
 import { createOutboxPayloadCodec } from "@bazion/notifications";
 
-const enabled = process.env.AUTH_INTEGRATION_TESTS === "1";
+const enabled = process.env.AUTH_INTEGRATION_TESTS === "1" || process.env.AUTH_INTEGRATION_TESTS === "true";
 
 describe.skipIf(!enabled)("Better Auth HTTP integration", () => {
   let auth: (typeof import("./server.js"))["auth"];
@@ -60,10 +60,19 @@ describe.skipIf(!enabled)("Better Auth HTTP integration", () => {
       );
       const codec = createOutboxPayloadCodec(Buffer.from(process.env.NOTIFICATION_ENCRYPTION_KEY ?? "", "base64"));
       const verificationEmail = queued.rows
-        .map(({ payload_ciphertext }) => JSON.parse(codec.decrypt(payload_ciphertext)) as {
-          to?: string;
-          template?: string;
-          variables?: { url?: string };
+        .flatMap(({ payload_ciphertext }) => {
+          // Concurrent notification tests write outbox rows with per-suite random keys.
+          try {
+            return [
+              JSON.parse(codec.decrypt(payload_ciphertext)) as {
+                to?: string;
+                template?: string;
+                variables?: { url?: string };
+              },
+            ];
+          } catch {
+            return [];
+          }
         })
         .find((payload) => payload.to === email && payload.template === "auth.email-verification");
       const verificationUrl = verificationEmail?.variables?.url;

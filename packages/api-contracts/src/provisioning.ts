@@ -1,4 +1,10 @@
 import { z } from "zod";
+import {
+  provisioningOperationStatusSchema,
+  type ProvisioningOperationStatus,
+} from "./shared-enums.js";
+
+export { provisioningOperationStatusSchema, type ProvisioningOperationStatus };
 
 const externalIdSchema = z.string()
   .trim()
@@ -75,21 +81,6 @@ export function getProvisionProductRequestV1JsonSchema() {
     description: "A paid Bazion commercial order requesting a version-pinned product installation. Do not include prices, payment credentials, secrets or database credentials.",
   };
 }
-
-export const provisioningOperationStatusSchema = z.enum([
-  "accepted",
-  "validating",
-  "provisioning_tenant",
-  "configuring_installation",
-  "provisioning_hosting",
-  "ready",
-  "compensating",
-  "compensation_required",
-  "compensated",
-  "failed",
-]);
-
-export type ProvisioningOperationStatus = z.infer<typeof provisioningOperationStatusSchema>;
 
 /** Publicly safe operation snapshot; provider errors and credentials stay internal. */
 export const provisioningOperationV1Schema = z.object({
@@ -272,6 +263,22 @@ export const provisioningOperationDetailV1Schema = z.object({
 }).strict();
 
 export type ProvisioningOperationDetailV1 = z.infer<typeof provisioningOperationDetailV1Schema>;
+
+export const provisioningOperationSummaryV1Schema = z.object({
+  operation: provisioningOperationV1Schema,
+  offerId: catalogIdSchema,
+  offerVersion: versionSchema,
+  failureDisposition: z.enum(["retry", "compensate", "unknown", "compensation_failed"]).nullable(),
+  holderWorkerId: z.string().trim().max(128).nullable(),
+  fencingToken: z.number().int().min(0),
+  leaseExpiresAt: z.iso.datetime().nullable(),
+  attemptCount: z.number().int().min(0),
+  retryAfterAt: z.iso.datetime().nullable(),
+  acceptedAt: z.iso.datetime(),
+  finishedAt: z.iso.datetime().nullable(),
+}).strict();
+
+export type ProvisioningOperationSummaryV1 = z.infer<typeof provisioningOperationSummaryV1Schema>;
 
 export const provisioningOperatorActionRequestSchema = z.object({
   reason: z.string().trim().min(8).max(500),

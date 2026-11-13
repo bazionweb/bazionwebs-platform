@@ -64,6 +64,7 @@ beforeEach(() => {
   mocks.getPlatformTenant.mockReset();
   mocks.appendAuditEvent.mockReset();
   mocks.poolQuery.mockReset();
+  mocks.poolQuery.mockResolvedValue({ rows: [{ distribution_mode: "dedicated", status: "ready" }] });
   mocks.requirePlatformRole.mockResolvedValue({
     userId: "platform-owner",
     email: "owner@bazion.test",
@@ -323,6 +324,30 @@ describe("platform tenant hosting route", () => {
       expect(response.statusCode).toBe(409);
       expect(response.json()).toEqual({ error: "TENANT_NOT_CLOSED" });
       expect(runtime.lifecycle).not.toHaveBeenCalled();
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("denies dedicated hosting provisioning when the tenant lacks an active dedicated installation", async () => {
+    const runtime = makeRuntime();
+    mocks.poolQuery.mockResolvedValueOnce({ rows: [] });
+    const app = await makeApp(runtime);
+    try {
+      const response = await app.inject({
+        method: "POST",
+        url: `/v1/admin/platform/tenants/${tenantId}/hosting/provision`,
+        headers: { "idempotency-key": "host-alpha-node-0001" },
+        payload: { template: "node-nextjs" },
+      });
+      expect(response.statusCode).toBe(409);
+      expect(response.json()).toEqual({ error: "HOSTING_DEDICATED_INSTALLATION_REQUIRED" });
+      expect(runtime.provision).not.toHaveBeenCalled();
+      expect(mocks.appendAuditEvent).toHaveBeenCalledWith(expect.objectContaining({
+        action: "tenant.hosting.provision.denied",
+        outcome: "denied",
+        metadata: expect.objectContaining({ reason: "dedicated_installation_required" }),
+      }));
     } finally {
       await app.close();
     }

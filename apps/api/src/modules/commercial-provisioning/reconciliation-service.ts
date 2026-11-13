@@ -121,6 +121,85 @@ export class CrossEntityReconciliationService {
     private readonly offerBindings: readonly ProvisioningOfferBinding[] = [],
   ) {}
 
+  private async fetchAllOperations(): Promise<OperationReconRow[]> {
+    const pageSize = 500;
+    const maxPages = 20;
+    const rows: OperationReconRow[] = [];
+    let cursorAcceptedAt: Date | string | null = null;
+    let cursorId: string | null = null;
+
+    for (let page = 0; page < maxPages; page += 1) {
+      const res: { rows: OperationReconRow[] } = cursorAcceptedAt && cursorId
+        ? await this.provisionerPool.query<OperationReconRow>(
+            `SELECT id::text, external_customer_id, external_order_id, offer_id, offer_version,
+                    product_id, product_version, solution_id, solution_version, template_id, template_version,
+                    status, failure_code, failure_disposition, tenant_id::text, installation_id::text,
+                    lease_token::text, lease_expires_at, accepted_at, updated_at
+               FROM public.product_provisioning_operations
+              WHERE (accepted_at, id) < ($1::timestamptz, $2::uuid)
+              ORDER BY accepted_at DESC, id DESC
+              LIMIT $3`,
+            [cursorAcceptedAt, cursorId, pageSize],
+          )
+        : await this.provisionerPool.query<OperationReconRow>(
+            `SELECT id::text, external_customer_id, external_order_id, offer_id, offer_version,
+                    product_id, product_version, solution_id, solution_version, template_id, template_version,
+                    status, failure_code, failure_disposition, tenant_id::text, installation_id::text,
+                    lease_token::text, lease_expires_at, accepted_at, updated_at
+               FROM public.product_provisioning_operations
+              ORDER BY accepted_at DESC, id DESC
+              LIMIT $1`,
+            [pageSize],
+          );
+
+      rows.push(...res.rows);
+      if (res.rows.length < pageSize) break;
+      const last: OperationReconRow = res.rows[res.rows.length - 1]!;
+      cursorAcceptedAt = last.accepted_at;
+      cursorId = last.id;
+    }
+    return rows;
+  }
+
+  private async fetchDeadOutbox(
+    table: "public.product_provisioning_status_outbox" | "public.product_subscription_lifecycle_outbox",
+    selectOperationId: boolean,
+  ): Promise<DeadOutboxRow[]> {
+    const pageSize = 200;
+    const maxPages = 10;
+    const rows: DeadOutboxRow[] = [];
+    let cursorUpdatedAt: Date | string | null = null;
+    let cursorId: string | null = null;
+    const opColumn = selectOperationId ? "operation_id::text" : "NULL::text AS operation_id";
+
+    for (let page = 0; page < maxPages; page += 1) {
+      const res: { rows: DeadOutboxRow[] } = cursorUpdatedAt && cursorId
+        ? await this.provisionerPool.query<DeadOutboxRow>(
+            `SELECT id::text, ${opColumn}, dead_lettered_at, updated_at
+               FROM ${table}
+              WHERE status = 'dead'
+                AND (updated_at, id) < ($1::timestamptz, $2::uuid)
+              ORDER BY updated_at DESC, id DESC
+              LIMIT $3`,
+            [cursorUpdatedAt, cursorId, pageSize],
+          )
+        : await this.provisionerPool.query<DeadOutboxRow>(
+            `SELECT id::text, ${opColumn}, dead_lettered_at, updated_at
+               FROM ${table}
+              WHERE status = 'dead'
+              ORDER BY updated_at DESC, id DESC
+              LIMIT $1`,
+            [pageSize],
+          );
+      rows.push(...res.rows);
+      if (res.rows.length < pageSize) break;
+      const last: DeadOutboxRow = res.rows[res.rows.length - 1]!;
+      cursorUpdatedAt = last.updated_at;
+      cursorId = last.id;
+    }
+    return rows;
+  }
+
   async reconcile(
     paidOrders: readonly CommercialPaidOrderSnapshotV1[] = [],
     correlationId?: string,
@@ -130,37 +209,18 @@ export class CrossEntityReconciliationService {
     const nowIso = now.toISOString();
     const resolvedCorrelationId = resolveCorrelationId(correlationId);
 
-    const [opsRes, inboxRes, statusDeadRes, lifecycleDeadRes] = await Promise.all([
-      this.provisionerPool.query<OperationReconRow>(
-        `SELECT id::text, external_customer_id, external_order_id, offer_id, offer_version,
-                product_id, product_version, solution_id, solution_version, template_id, template_version,
-                status, failure_code, failure_disposition, tenant_id::text, installation_id::text,
-                lease_token::text, lease_expires_at, accepted_at, updated_at
-           FROM public.product_provisioning_operations
-          ORDER BY accepted_at DESC
-          LIMIT 500`,
-      ),
+    const [operations, inboxRes, statusDeadRows, lifecycleDeadRows] = await Promise.all([
+      this.fetchAllOperations(),
       this.provisionerPool.query<InboxReconRow>(
         `SELECT operation_id::text, external_order_id
            FROM public.product_provisioning_inbox`,
       ),
-      this.provisionerPool.query<DeadOutboxRow>(
-        `SELECT id::text, operation_id::text, dead_lettered_at, updated_at
-           FROM public.product_provisioning_status_outbox
-          WHERE status = 'dead'
-          ORDER BY updated_at DESC
-          LIMIT 200`,
-      ),
-      this.provisionerPool.query<DeadOutboxRow>(
-        `SELECT id::text, NULL::text AS operation_id, dead_lettered_at, updated_at
-           FROM public.product_subscription_lifecycle_outbox
-          WHERE status = 'dead'
-          ORDER BY updated_at DESC
-          LIMIT 200`,
-      ),
+      this.fetchDeadOutbox("public.product_provisioning_status_outbox", true),
+      this.fetchDeadOutbox("public.product_subscription_lifecycle_outbox", false),
     ]);
 
-    const operations = opsRes.rows;
+    const statusDeadRes = { rows: statusDeadRows };
+    const lifecycleDeadRes = { rows: lifecycleDeadRows };
     const inboxByOperationId = new Set(inboxRes.rows.map((r) => r.operation_id));
 
     // Collect tenant IDs and installations respecting FORCE ROW LEVEL SECURITY on product_installations.
@@ -185,6 +245,15 @@ export class CrossEntityReconciliationService {
       entitlements = entRes.rows;
       if (hostRes.rows !== null) {
         hostingDeployments = hostRes.rows;
+        hostingAvailable = true;
+      }
+    }
+    if (!hostingAvailable) {
+      const provisionerHostRes = await this.provisionerPool.query<HostingDeploymentReconRow>(
+        `SELECT id::text, tenant_id::text, state, error_code, updated_at FROM public.tenant_hosting_deployments`,
+      ).catch(() => ({ rows: null as HostingDeploymentReconRow[] | null, rowCount: 0 }));
+      if (provisionerHostRes.rows !== null) {
+        hostingDeployments = provisionerHostRes.rows;
         hostingAvailable = true;
       }
     }
