@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { ResponsiveImage } from "./responsive-image.js";
 
 export interface EventCardProps {
   id: string;
@@ -38,7 +39,7 @@ export function EventCard({
   return (
     <article className="ch-card">
       <div className="ch-card-media">
-        {posterUrl ? <img src={posterUrl} alt={title} loading="lazy" /> : <div className="ch-event-placeholder" aria-hidden="true"><span>{title}</span></div>}
+        {posterUrl ? <ResponsiveImage src={posterUrl} alt={title} sizes="(max-width: 760px) 100vw, (max-width: 1100px) 50vw, 33vw" /> : <div className="ch-event-placeholder" aria-hidden="true"><span>{title}</span></div>}
         {(dayBadge || monthBadge) && (
           <div className="ch-event-date-badge">
             {dayBadge && <div className="ch-event-date-day">{dayBadge}</div>}

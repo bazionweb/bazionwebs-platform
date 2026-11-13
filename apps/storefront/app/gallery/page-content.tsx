@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ChurchFooter, ChurchNav, Modal, PageHero } from "@bazion/ui";
+import { ChurchFooter, ChurchNav, Modal, PageHero, ResponsiveImage } from "@bazion/ui";
 import { useMinistrySite } from "../../lib/use-ministry-site";
 
 export default function GalleryPage() {
@@ -29,7 +29,7 @@ export default function GalleryPage() {
                 aria-label={"View photo " + (index + 1) + (item.caption ? ": " + item.caption : "")}
                 onClick={() => setActiveImageIndex(index)}
               >
-                <img src={item.imageUrl} alt={item.alt} loading="lazy" />
+                <ResponsiveImage src={item.imageUrl} alt={item.alt} sizes="(max-width: 600px) 100vw, (max-width: 1000px) 50vw, 33vw" />
                 <span className="ch-gallery-view-label" aria-hidden="true">View photo</span>
               </button>
               {item.caption && <figcaption>{item.caption}</figcaption>}
@@ -60,7 +60,7 @@ export default function GalleryPage() {
       }}
     >
       {activeImage && activeImageIndex !== null && <div className="ch-gallery-viewer">
-        <img src={activeImage.imageUrl} alt={activeImage.alt} />
+        <ResponsiveImage src={activeImage.imageUrl} alt={activeImage.alt} sizes="90vw" loading="eager" />
         {activeImage.caption && <p>{activeImage.caption}</p>}
         {site.galleryImages.length > 1 && <div className="ch-gallery-controls">
           <button type="button" className="ch-btn ch-btn-outline" onClick={() => moveImage(-1)} aria-label="Previous photo">← Previous</button>

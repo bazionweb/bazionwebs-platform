@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ChurchFooter, ChurchNav, CategoryFilter, PageHero, SermonCard, Modal } from "@bazion/ui";
+import { ChurchFooter, ChurchNav, CategoryFilter, PageHero, SermonCard, Modal, ResponsiveImage } from "@bazion/ui";
 import { useMinistrySite } from "../../lib/use-ministry-site";
 
 interface PublicSermon {
@@ -67,11 +67,10 @@ export default function SermonsPage() {
             aria-label={"Play latest message: " + featuredSermon.title}
             onClick={() => setActiveVideo({ title: featuredSermon.title, youtubeVideoId: featuredSermon.youtubeVideoId ?? undefined })}
           >
-            <img
+            <ResponsiveImage
               src={featuredSermon.thumbnailUrl || "https://img.youtube.com/vi/" + encodeURIComponent(featuredSermon.youtubeVideoId) + "/hqdefault.jpg"}
               alt=""
-              loading="lazy"
-              decoding="async"
+              sizes="(max-width: 800px) 100vw, 800px"
             />
             <span className="ch-sermon-featured-play" aria-hidden="true">▶</span>
             <span className="ch-sermon-featured-label" aria-hidden="true">Watch the latest message</span>

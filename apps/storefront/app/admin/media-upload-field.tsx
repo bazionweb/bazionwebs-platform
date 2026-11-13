@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { ResponsiveImage } from "@bazion/ui";
 
 export type MinistryMediaAsset = {
   key: string;
@@ -126,7 +127,7 @@ export function MediaUploadField({
       </button>
     </div>
     <small className="ministry-media-help">JPEG, PNG, WebP, or AVIF · up to 8 MB. URLs must use HTTPS or a site-relative path.</small>
-    {value && safePreviewUrl(value) && <div className="ministry-media-preview"><img src={value} alt={`${label} preview`} loading="lazy" /><span>Current image preview</span></div>}
+    {value && safePreviewUrl(value) && <div className="ministry-media-preview"><ResponsiveImage src={value} alt={`${label} preview`} sizes="180px" /><span>Current image preview</span></div>}
     {error && <p className="ministry-media-error" role="alert">{error}</p>}
     {libraryOpen && <section className="ministry-media-library" aria-label={`${label} media library`}>
       <div className="ministry-media-library-heading"><div><strong>Tenant media library</strong><small>Uploaded assets are available only in this workspace.</small></div><button type="button" onClick={() => setLibraryOpen(false)} aria-label="Close media library">Close</button></div>
@@ -134,7 +135,7 @@ export function MediaUploadField({
       {!loadingLibrary && assets.length === 0 && <p className="ministry-media-help">No images have been uploaded to this workspace yet.</p>}
       {!loadingLibrary && assets.length > 0 && <div className="ministry-media-grid">
         {assets.map((asset) => <button type="button" key={asset.key} className="ministry-media-asset" onClick={() => { onChange(asset.url); setLibraryOpen(false); }}>
-          <img src={asset.url} alt={`Select ${fileName(asset.key)}`} loading="lazy" />
+          <ResponsiveImage src={asset.url} alt={`Select ${fileName(asset.key)}`} sizes="(max-width: 760px) 40vw, 180px" />
           <span>{fileName(asset.key)}</span><small>{formatBytes(asset.sizeBytes)}</small>
         </button>)}
       </div>}

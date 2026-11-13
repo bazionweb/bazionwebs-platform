@@ -1,4 +1,5 @@
 import type { CSSProperties, ReactNode } from "react";
+import { ResponsiveImage } from "./responsive-image.js";
 
 const PARTICLE_SHAPES = ["circle", "diamond", "triangle", "sparkle", "ring", "square"] as const;
 const PARTICLE_SIZES = [5, 7, 4, 9, 6, 8, 5, 7, 4, 8, 6, 9];
@@ -49,16 +50,19 @@ export function PageHero({
   return (
     <section
       className="ch-hero-wrap"
-      style={
-        bgImageUrl
-          ? {
-              backgroundImage: `linear-gradient(rgba(10, 25, 47, 0.85), rgba(10, 25, 47, 0.95)), url(${bgImageUrl})`,
-              backgroundSize: "cover",
-              backgroundPosition: "center",
-            }
-          : undefined
-      }
     >
+      {bgImageUrl && <>
+        <ResponsiveImage
+          src={bgImageUrl}
+          alt=""
+          aria-hidden="true"
+          className="ch-hero-image"
+          sizes="100vw"
+          loading="eager"
+          fetchPriority="high"
+        />
+        <div className="ch-hero-image-overlay" aria-hidden="true" />
+      </>}
       <div className="ch-hero-particles" aria-hidden="true">
         {HERO_PARTICLES.map((particle, index) => (
           <span

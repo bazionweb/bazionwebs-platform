@@ -8,6 +8,7 @@ import {
   EventCard,
   CategoryFilter,
   Modal,
+  ResponsiveImage,
 } from "@bazion/ui";
 import { EventCalendarButton } from "./event-calendar-button";
 import { useMinistrySite } from "../../lib/use-ministry-site";
@@ -155,10 +156,11 @@ export default function EventsPage() {
                 }}
               >
                 <div style={{ height: "340px", backgroundColor: "var(--church-primary)" }}>
-                  {featuredEvent.posterUrl ? <img
+                  {featuredEvent.posterUrl ? <ResponsiveImage
                       src={featuredEvent.posterUrl}
                       alt={featuredEvent.title}
                       style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                      sizes="(max-width: 760px) 100vw, 45vw"
                     /> : <div className="ch-event-placeholder" aria-hidden="true"><span>Event details</span></div>}
                 </div>
                 <div style={{ padding: "32px", display: "flex", flexDirection: "column", justifyContent: "center" }}>

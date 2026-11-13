@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
+import { ResponsiveImage } from "@bazion/ui";
 
 type Currency = "KES" | "USD" | "EUR" | "GBP" | "CAD" | "AUD" | "NZD" | "CHF" | "SGD" | "ZAR" | "NGN" | "GHS" | "INR" | "AED" | "BRL" | "MXN" | "SAR" | "CNY" | "HKD" | "SEK" | "NOK" | "DKK" | "PLN" | "THB" | "PHP";
 type Product = {
@@ -274,7 +275,7 @@ export function ShopStorefront({ initialProducts, categories, store, homeHref = 
           {products.length === 0 ? <div className="store-empty"><span aria-hidden="true">✳</span><h3>No pieces found</h3><p>Try another search or choose a different category.</p></div> : products.map((product, index) => (
             <article className="store-product" key={product.id} style={{ "--product-index": index } as React.CSSProperties}>
               <div className="store-product-image">
-                {product.imageUrl ? <img src={product.imageUrl} alt={product.imageAlt || product.name} loading="lazy" decoding="async" /> : <div className={`product-placeholder placeholder-${index % 4}`} aria-hidden="true"><span>{String(index + 1).padStart(2, "0")}</span><b>{product.name.slice(0, 1).toUpperCase()}</b></div>}
+                {product.imageUrl ? <ResponsiveImage src={product.imageUrl} alt={product.imageAlt || product.name} sizes="(max-width: 600px) 50vw, (max-width: 900px) 50vw, 33vw" /> : <div className={`product-placeholder placeholder-${index % 4}`} aria-hidden="true"><span>{String(index + 1).padStart(2, "0")}</span><b>{product.name.slice(0, 1).toUpperCase()}</b></div>}
                 {product.featured && <span className="product-badge">A favourite</span>}
                 {product.stockAvailable === 0 && <span className="product-badge sold-out">Sold out</span>}
                 <button type="button" className="quick-add" aria-label={`Add ${product.name} to basket`} disabled={busy || product.stockAvailable === 0} onClick={() => void addProduct(product)}><span aria-hidden="true">+</span><span>Add to basket</span></button>

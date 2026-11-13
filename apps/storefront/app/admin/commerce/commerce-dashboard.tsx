@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import { ResponsiveImage } from "@bazion/ui";
 
 type Currency = "KES" | "USD" | "EUR" | "GBP" | "CAD" | "AUD" | "NZD" | "CHF" | "SGD" | "ZAR" | "NGN" | "GHS" | "INR" | "AED" | "BRL" | "MXN" | "SAR" | "CNY" | "HKD" | "SEK" | "NOK" | "DKK" | "PLN" | "THB" | "PHP";
 type Product = {
@@ -314,7 +315,7 @@ export function CommerceDashboard({ initialTab = "products" }: { initialTab?: "p
             )}
           </div>
         ) : products.map((product) => <article className="commerce-product-row" key={product.id}>
-          {product.imageUrl ? <img src={product.imageUrl} alt="" loading="lazy" /> : <div className="commerce-product-monogram" aria-hidden="true">{product.name.slice(0, 1).toUpperCase()}</div>}
+          {product.imageUrl ? <ResponsiveImage src={product.imageUrl} alt="" sizes="76px" /> : <div className="commerce-product-monogram" aria-hidden="true">{product.name.slice(0, 1).toUpperCase()}</div>}
           <div className="commerce-product-row-main"><span className="commerce-product-category">{product.category} · {product.sku}</span><h3>{product.name}</h3><p>{amount(product.priceMinor, product.currency, store.locale)}{product.compareAtPriceMinor ? ` · Compare ${amount(product.compareAtPriceMinor, product.currency, store.locale)}` : ""}</p></div>
           <div className="commerce-product-stock"><span className={product.active ? "status-active" : "status-muted"}>{product.active ? "Published" : "Draft"}</span><small>{product.stockTracked ? `${Math.max(product.stockOnHand - product.stockReserved, 0)} available` : "Inventory not tracked"}</small></div>
           {canEditProduct && <button type="button" className="commerce-secondary" onClick={() => editProduct(product)}>Edit</button>}

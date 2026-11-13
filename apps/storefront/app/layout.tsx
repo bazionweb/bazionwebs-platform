@@ -1,16 +1,14 @@
 import type { Metadata } from "next";
-import { Inter, Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 import "./recovery.css";
+import "./font-fallbacks.css";
 import "@bazion/ui/tokens.css";
 import "@bazion/ui/primitives.css";
 import "@bazion/ui/navigation.css";
 import "@bazion/ui/church.css";
 import { SiteThemeProvider } from "../lib/site-theme-provider";
+import { ResponsiveImageProvider } from "@bazion/ui";
 import { fetchTenantPublicData, getTenantRequestContext } from "../lib/server-tenant-api";
-
-const plusJakarta = Plus_Jakarta_Sans({ subsets: ["latin"], variable: "--font-plus-jakarta", display: "swap" });
-const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
 
 interface PublicSiteMetadataResponse {
   tenant?: { name?: string | null } | null;
@@ -56,8 +54,15 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${plusJakarta.variable} ${inter.variable}`}>
-      <body><SiteThemeProvider>{children}</SiteThemeProvider></body>
+    <html lang="en">
+      <body>
+        <ResponsiveImageProvider
+          publicMediaBaseUrl={process.env.MEDIA_STORAGE_PUBLIC_BASE_URL ?? ""}
+          imageTransformsEnabled={process.env.MEDIA_IMAGE_TRANSFORMS_ENABLED === "true"}
+        >
+          <SiteThemeProvider>{children}</SiteThemeProvider>
+        </ResponsiveImageProvider>
+      </body>
     </html>
   );
 }

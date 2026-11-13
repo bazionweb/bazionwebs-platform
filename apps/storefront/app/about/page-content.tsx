@@ -6,6 +6,7 @@ import {
   PageHero,
   LeadershipCard,
   ScriptureQuote,
+  ResponsiveImage,
 } from "@bazion/ui";
 import { useMinistrySite } from "../../lib/use-ministry-site";
 
@@ -38,7 +39,7 @@ export default function AboutPage() {
             <div className="ch-grid-2" style={{ alignItems: "center" }}>
               <div>
                 {lead?.photoUrl && <div className="ch-lead-portrait">
-                  <img src={lead.photoUrl} alt={lead.name} />
+                  <ResponsiveImage src={lead.photoUrl} alt={lead.name} sizes="(max-width: 760px) 100vw, 50vw" />
                 </div>}
               </div>
               <div>

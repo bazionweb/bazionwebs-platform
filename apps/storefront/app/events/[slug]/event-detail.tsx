@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ChurchFooter, ChurchNav, PageHero } from "@bazion/ui";
+import { ChurchFooter, ChurchNav, PageHero, ResponsiveImage } from "@bazion/ui";
 import { EventCalendarButton } from "../event-calendar-button";
 import { useMinistrySite } from "../../../lib/use-ministry-site";
 
@@ -103,7 +103,9 @@ export function EventDetail({ slug }: { slug: string }) {
           <PageHero eyebrow="EVENT DETAILS" title={event.title} subtitle={`${dateLabel}${event.venue ? ` • ${event.venue}` : ""}${event.address ? ` • ${event.address}` : ""}`} bgImageUrl={event.posterUrl ?? site.branding.heroBgUrl} />
           <section className="ch-section"><div className="ch-container ch-grid-2" style={{ alignItems: "start" }}>
             <article>
-              {event.posterUrl && <img src={event.posterUrl} alt={event.title} style={{ width: "100%", maxHeight: 460, objectFit: "cover", borderRadius: "var(--church-radius-lg)", marginBottom: 24 }} />}
+              {event.posterUrl && <div style={{ width: "100%", maxHeight: 460, aspectRatio: "16 / 9", overflow: "hidden", borderRadius: "var(--church-radius-lg)", marginBottom: 24 }}>
+                <ResponsiveImage src={event.posterUrl} alt={event.title} sizes="(max-width: 760px) 100vw, 50vw" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+              </div>}
               <h2>About this event</h2>
               <p style={{ lineHeight: 1.8, whiteSpace: "pre-wrap" }}>{event.description || "More details will be shared by the ministry."}</p>
               <p><strong>Venue:</strong> {event.venue || "To be announced"}{event.address ? `, ${event.address}` : ""}</p>

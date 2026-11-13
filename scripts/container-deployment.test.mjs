@@ -8,6 +8,8 @@ const adminConfig = await readFile(new URL("../apps/admin/next.config.ts", impor
 const storefrontConfig = await readFile(new URL("../apps/storefront/next.config.ts", import.meta.url), "utf8");
 const adminLayout = await readFile(new URL("../apps/admin/app/layout.tsx", import.meta.url), "utf8");
 const storefrontLayout = await readFile(new URL("../apps/storefront/app/layout.tsx", import.meta.url), "utf8");
+const adminFontFallbacks = await readFile(new URL("../apps/admin/app/font-fallbacks.css", import.meta.url), "utf8");
+const storefrontFontFallbacks = await readFile(new URL("../apps/storefront/app/font-fallbacks.css", import.meta.url), "utf8");
 const ciWorkflow = await readFile(new URL("../.github/workflows/ci.yml", import.meta.url), "utf8");
 
 test("Dockerfile provides a production target for each platform app and a one-shot migration target", () => {
@@ -47,11 +49,13 @@ test("Next.js apps emit standalone output with the workspace root traced", () =>
   }
 });
 
-test("Next.js builds bundle self-hosted fonts and disable build telemetry", () => {
+test("Next.js builds need no external font fetch and disable build telemetry", () => {
   assert.match(dockerfile, /ENV NEXT_TELEMETRY_DISABLED=1/);
-  for (const [name, layout] of [["admin", adminLayout], ["storefront", storefrontLayout]]) {
-    assert.match(layout, /from "next\/font\/google"/, `${name} must self-host its font assets`);
-    assert.doesNotMatch(layout, /fonts\.googleapis\.com|fonts\.gstatic\.com/, `${name} must not add browser font network requests`);
+  for (const [name, layout, fontFallbacks] of [["admin", adminLayout, adminFontFallbacks], ["storefront", storefrontLayout, storefrontFontFallbacks]]) {
+    assert.doesNotMatch(layout, /next\/font\/(google|local)/, `${name} build must not fetch fonts from external services`);
+    assert.match(layout, /font-fallbacks\.css/, `${name} must load its local system font stack`);
+    assert.match(fontFallbacks, /--font-plus-jakarta:\s*["']Segoe UI["']/);
+    assert.match(fontFallbacks, /--font-inter:\s*Arial/);
   }
 });
 
