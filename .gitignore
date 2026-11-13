@@ -12,3 +12,4 @@ out
 coverage
 **/.vitest-cache/
 /data/migrations/*.json
+.agents/

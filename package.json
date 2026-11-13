@@ -26,6 +26,7 @@
     "modules:generate": "node scripts/generate-runtime-module-catalog.mjs",
     "modules:check": "node scripts/generate-runtime-module-catalog.mjs --check",
     "production:preflight": "node scripts/production-preflight.mjs",
+    "contracts:verify-cross-repo": "node scripts/verify-cross-repo-contracts.mjs",
     "platform:create-admin": "dotenv -e .env -- pnpm --filter @bazion/auth run platform:create-admin"
   },
   "devDependencies": {

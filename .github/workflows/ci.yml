@@ -58,12 +58,26 @@ jobs:
       PRIVATE_ARCHIVE_ENCRYPTION_KEY: MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=
       TRUST_PROXY: "false"
       TRUSTED_PROXY_ADDRESSES: ""
+      BAZIONWEB_TEST_DATABASE_URL: ${{ secrets.BAZIONWEB_TEST_DATABASE_URL || 'postgresql://bazionweb:testpassword@127.0.0.1:5433/bazionweb_test' }}
+      BAZIONWEB_API_DIR: ${{ vars.BAZIONWEB_API_DIR || '../bazionweb/apps/api' }}
+      BAZIONWEB_REPO: ${{ vars.BAZIONWEB_REPO || 'bazionwebs/bazionweb' }}
+      BAZIONWEB_REPO_REF: ${{ vars.BAZIONWEB_REPO_REF || 'main' }}
+      BAZIONWEB_REPO_TOKEN: ${{ secrets.BAZIONWEB_REPO_TOKEN }}
 
     steps:
       - name: Check out pull request head
         uses: actions/checkout@v6
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Check out sibling Bazionweb repository for contract parity and joint E2E
+        uses: actions/checkout@v6
+        with:
+          repository: ${{ env.BAZIONWEB_REPO }}
+          ref: ${{ env.BAZIONWEB_REPO_REF }}
+          path: ../bazionweb
+          token: ${{ env.BAZIONWEB_REPO_TOKEN || github.token }}
           persist-credentials: false
 
       - name: Set up Node.js
@@ -82,6 +96,9 @@ jobs:
 
       - name: Validate catalogue, module, solution, template and product manifests
         run: pnpm catalog:validate
+
+      - name: Verify cross-repository contract schema and fixture parity
+        run: pnpm contracts:verify-cross-repo
 
       - name: Start PostgreSQL with least-privilege roles
         run: |
@@ -103,19 +120,30 @@ jobs:
       - name: Apply matching Better Auth schema
         run: pnpm --filter @bazion/auth migrate
 
+      - name: Start isolated Bazionweb test PostgreSQL and apply Prisma migrations
+        run: |
+          docker run -d --name bazionweb-db-test -p 127.0.0.1:5433:5432 \
+            -e POSTGRES_USER=bazionweb \
+            -e POSTGRES_PASSWORD=testpassword \
+            -e POSTGRES_DB=bazionweb_test \
+            postgres:16-alpine
+          for attempt in {1..30}; do
+            if docker exec bazionweb-db-test pg_isready -U bazionweb -d bazionweb_test; then
+              break
+            fi
+            sleep 2
+          done
+          npm --prefix ../bazionweb ci --ignore-scripts
+          DATABASE_URL="$BAZIONWEB_TEST_DATABASE_URL" DATABASE_URL_UNPOOLED="$BAZIONWEB_TEST_DATABASE_URL" npm --prefix ../bazionweb --workspace=@bazionweb/api run prisma:migrate
+          DATABASE_URL="$BAZIONWEB_TEST_DATABASE_URL" npm --prefix ../bazionweb --workspace=@bazionweb/api run prisma:generate
+
       - name: Typecheck all workspaces
         run: pnpm typecheck
 
       - name: Run unit, authentication and tenant-isolation tests
         run: pnpm test
 
-      - name: Run gated cross-repo commercial-platform E2E suite (when sibling bazionweb test DB is configured)
-        if: env.BAZIONWEB_TEST_DATABASE_URL != '' && env.BAZIONWEB_API_DIR != ''
-        env:
-          MIGRATION_DATABASE_URL: ${{ vars.MIGRATION_DATABASE_URL || 'postgresql://bazion_admin:bazion_dev_only@127.0.0.1:5432/bazion_platform' }}
-          PRODUCT_PROVISIONER_DATABASE_URL: ${{ vars.PRODUCT_PROVISIONER_DATABASE_URL || 'postgresql://bazion_product_provisioner:bazion_product_provisioner_dev_only@127.0.0.1:5432/bazion_platform' }}
-          BAZIONWEB_TEST_DATABASE_URL: ${{ secrets.BAZIONWEB_TEST_DATABASE_URL }}
-          BAZIONWEB_API_DIR: ${{ vars.BAZIONWEB_API_DIR }}
+      - name: Run joint cross-repo commercial-platform PostgreSQL E2E suite
         run: pnpm --filter @bazion/api exec vitest run src/modules/commercial-provisioning/cross-repo-e2e.integration.test.ts
 
       - name: Build all applications and packages
