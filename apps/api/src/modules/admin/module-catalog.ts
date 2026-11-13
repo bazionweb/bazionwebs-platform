@@ -110,6 +110,20 @@ export const platformModuleCatalog: readonly PlatformModuleCatalogItem[] = [
     "tenantAssignable": false
   },
   {
+    "id": "forms-leads",
+    "name": "Forms and lead capture",
+    "version": "0.1.0",
+    "status": "partial",
+    "tenantModel": "tenant-owned",
+    "dependencies": [
+      "platform-identity"
+    ],
+    "description": "Public tenant website enquiry forms, protected lead access and retention.",
+    "defaultEnabled": false,
+    "required": false,
+    "tenantAssignable": true
+  },
+  {
     "id": "church-ministry",
     "name": "Church & Ministry Platform",
     "version": "1.0.0",

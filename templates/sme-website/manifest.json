@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "sme-website",
+  "name": "Small business website",
+  "version": "1.0.0",
+  "status": "partial",
+  "implementation": {
+    "packageName": "@bazion/sme-website-template",
+    "entrypoint": "packages/sme-website-template/src/index.ts"
+  },
+  "configuration": {
+    "schemaVersion": "1.0.0",
+    "sourcePath": "packages/sme-website-template/src/config.ts",
+    "schemaNames": ["smeWebsiteTemplateConfigSchema", "smeBusinessContentSchema"]
+  }
+}

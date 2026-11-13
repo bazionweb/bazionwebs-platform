@@ -94,8 +94,8 @@ for (const directory of directories("templates")) {
   const implementationPackage = packagesByName.get(template.implementation.packageName);
   if (!implementationPackage) {
     fail(`${path} references unknown workspace package ${template.implementation.packageName}.`);
-  } else if (!implementationPackage.path.startsWith("apps/")) {
-    fail(`${path} implementation package ${template.implementation.packageName} must be an application package.`);
+  } else if (!implementationPackage.path.startsWith("apps/") && !implementationPackage.path.startsWith("packages/")) {
+    fail(`${path} implementation package ${template.implementation.packageName} must be an application or reusable workspace package.`);
   }
   for (const sourcePath of [template.implementation.entrypoint, template.configuration.sourcePath]) {
     if (!safeRepoPath(sourcePath) || !existsSync(join(root, sourcePath))) {
@@ -206,8 +206,21 @@ for (const directory of directories("products")) {
       if (template.configuration.sourcePath !== product.configuration.sourcePath) {
         fail(`${path} configuration source does not match template ${reference.id}.`);
       }
-      if (!applicationPackages.has(template.implementation.packageName)) {
-        fail(`${path} must declare template application ${template.implementation.packageName} in its applications.`);
+      const templateImplementation = packagesByName.get(template.implementation.packageName);
+      if (templateImplementation?.path.startsWith("apps/")) {
+        if (!applicationPackages.has(template.implementation.packageName)) {
+          fail(`${path} must declare template application ${template.implementation.packageName} in its applications.`);
+        }
+      } else if (templateImplementation?.path.startsWith("packages/")) {
+        const consumedByApplication = product.applications.some(({ packageName }) => {
+          const application = packagesByName.get(packageName)?.manifest;
+          const dependencySpec = application?.dependencies?.[template.implementation.packageName]
+            ?? application?.devDependencies?.[template.implementation.packageName];
+          return typeof dependencySpec === "string" && dependencySpec.startsWith("workspace:");
+        });
+        if (!consumedByApplication) {
+          fail(`${path} template package ${template.implementation.packageName} must be a workspace dependency of a declared application.`);
+        }
       }
       if (product.status === "stable" && template.status !== "stable") fail(`${path} cannot be stable while template ${reference.id} is ${template.status}.`);
     }

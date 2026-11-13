@@ -98,6 +98,32 @@ describe("tenant database routing", () => {
     expect(mockState.pools.some(({ connectionString }) => connectionString === "postgres://gmfc:secret@db.example/gmfc")).toBe(false);
   });
 
+  it("keeps inactive tenants blocked from app traffic while allowing tenant-scoped retention maintenance", async () => {
+    activeTenant({ tenant_status: "suspended" });
+    const database = await loadDatabaseModule();
+
+    await expect(database.withTenantTransaction(tenantId, async () => "public traffic"))
+      .rejects.toMatchObject({ code: "TENANT_DATABASE_TENANT_INACTIVE", statusCode: 503 });
+    await expect(database.withTenantMaintenanceTransaction(tenantId, async () => "retention"))
+      .resolves.toBe("retention");
+
+    expect(mockState.transactionConnections).toEqual(["shared-business-db"]);
+  });
+
+  it("enumerates all tenants for cleanup while business access remains tenant scoped", async () => {
+    mockState.directoryRows = [
+      { tenant_id: tenantId, tenant_status: "active" },
+      { tenant_id: "22222222-2222-4222-8222-222222222222", tenant_status: "suspended" },
+    ];
+    const database = await loadDatabaseModule();
+
+    await expect(database.listTenantIdsForMaintenance()).resolves.toEqual([
+      tenantId,
+      "22222222-2222-4222-8222-222222222222",
+    ]);
+    expect(mockState.queries.at(-1)?.query).toContain("FROM public.tenants ORDER BY id");
+  });
+
   it("routes a ready tenant to its verified dedicated database and reuses its bounded pool", async () => {
     activeTenant({
       tier: "dedicated",

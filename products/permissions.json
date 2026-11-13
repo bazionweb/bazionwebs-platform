@@ -1,5 +1,5 @@
 {
-  "version": "1.0.0",
+  "version": "1.2.0",
   "roles": [
     "owner",
     "admin",
@@ -255,6 +255,51 @@
       "action": "update",
       "roles": ["owner", "admin"],
       "description": "update private enquiries and prayer-request records."
+    },
+    {
+      "id": "tenant.enquiry.read",
+      "moduleId": "forms-leads",
+      "scope": "tenant",
+      "resource": "enquiry",
+      "action": "read",
+      "roles": ["owner", "admin"],
+      "description": "read website enquiry contact details within the active tenant."
+    },
+    {
+      "id": "tenant.enquiry.export",
+      "moduleId": "forms-leads",
+      "scope": "tenant",
+      "resource": "enquiry",
+      "action": "export",
+      "roles": ["owner", "admin"],
+      "description": "export tenant website enquiries for data portability and offboarding."
+    },
+    {
+      "id": "tenant.enquiry.delete",
+      "moduleId": "forms-leads",
+      "scope": "tenant",
+      "resource": "enquiry",
+      "action": "delete",
+      "roles": ["owner", "admin"],
+      "description": "delete tenant website enquiries to fulfill removal requests."
+    },
+    {
+      "id": "tenant.enquiry-policy.read",
+      "moduleId": "forms-leads",
+      "scope": "tenant",
+      "resource": "enquiryPolicy",
+      "action": "read",
+      "roles": ["owner", "admin"],
+      "description": "read the current tenant website privacy notice and enquiry collection policy."
+    },
+    {
+      "id": "tenant.enquiry-policy.update",
+      "moduleId": "forms-leads",
+      "scope": "tenant",
+      "resource": "enquiryPolicy",
+      "action": "update",
+      "roles": ["owner", "admin"],
+      "description": "publish or disable the tenant website privacy notice and configure enquiry retention."
     }
   ]
 }

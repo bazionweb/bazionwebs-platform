@@ -77,8 +77,5 @@
       "basic-seo"
     ]
   },
-  "templateIds": [
-    "corporate-modern",
-    "professional-services"
-  ]
+  "templateIds": ["sme-website"]
 }

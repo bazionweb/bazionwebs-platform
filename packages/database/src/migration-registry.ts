@@ -18,6 +18,7 @@ export const requiredDatabaseMigrations = [
   "0013_tenant_database_routing.sql",
   "0014_global_mission_commerce_entitlement.sql",
   "0015_commerce_inventory_reservation_guard.sql",
+  "0016_forms_leads_site_enquiries.sql",
   "0016_tenant_hosting_deployments.sql",
   "0017_hosting_reconciliation_schedule.sql",
   "0018_hosting_provider_lifecycle.sql",

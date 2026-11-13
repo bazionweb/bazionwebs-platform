@@ -146,6 +146,40 @@ test("accepts a product whose pinned dependencies match the current solution", (
   assert.match(result.stdout, /Product manifests valid: 1 products, 1 templates/);
 });
 
+test("accepts a reusable package as a template implementation when an application consumes it", () => {
+  const root = fixture();
+  const template = readJson(root, "templates/church-ministry/manifest.json");
+  template.implementation.packageName = "@bazion/site-template";
+  template.implementation.entrypoint = "packages/site-template/src/index.ts";
+  writeJson(root, "templates/church-ministry/manifest.json", template);
+  writeJson(root, "packages/site-template/package.json", { name: "@bazion/site-template", version: "1.0.0" });
+  writeText(root, "packages/site-template/src/index.ts", "export {}\n");
+  writeJson(root, "apps/storefront/package.json", {
+    name: "@bazion/storefront",
+    version: "0.1.0",
+    dependencies: { "@bazion/site-template": "workspace:*" },
+  });
+
+  const result = runValidator(root);
+
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+});
+
+test("requires product applications to consume package-backed templates as workspace dependencies", () => {
+  const root = fixture();
+  const template = readJson(root, "templates/church-ministry/manifest.json");
+  template.implementation.packageName = "@bazion/site-template";
+  template.implementation.entrypoint = "packages/site-template/src/index.ts";
+  writeJson(root, "templates/church-ministry/manifest.json", template);
+  writeJson(root, "packages/site-template/package.json", { name: "@bazion/site-template", version: "1.0.0" });
+  writeText(root, "packages/site-template/src/index.ts", "export {}\n");
+
+  const result = runValidator(root);
+
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /template package @bazion\/site-template must be a workspace dependency/);
+});
+
 test("rejects a product that pins a different module version", () => {
   const root = fixture();
   const product = readJson(root, "products/church-ministry/manifest.json");

@@ -13,7 +13,7 @@ This is the execution checklist for turning the modular platform into a repeatab
 - [x] Finish Phase 0 PostgreSQL integration evidence: full `pnpm test` passed (24 Turborepo tasks); focused runs passed with no skips for database 15/15, notifications 6/6, audit 4/4, auth 35/35 (email verification enabled), checkout 3/3 and church onboarding 2/2.
 - [x] Finish Phase 1 product contract decisions and readiness checks (`pnpm catalog:validate`; stable release readiness remains blocked for partial dependencies).
 - [x] Phase 2 contract slice: add versioned website branding, navigation, SEO and page-section schemas; adopt them in tenant-owned Church/Ministry settings.
-- [ ] Phase 2 remaining: add server-side 404 behavior for unpublished pages; extract shared page/UI primitives; complete the SME contact/enquiry vertical slice and two-tenant proof.
+- [ ] Phase 2 remaining: migrate remaining church-only layout/form styles; finish the SME enquiry API, tenant-scoped persistence and two-tenant proof.
 
 Foundational completed slices: `cbe1851` product manifests, `e2271ac` runtime catalogue generation, `00743e3` tenant/installation boundary, `35117b2` stable readiness enforcement. The current CI integration-test reliability slice is recorded in the Phase 0 evidence below.
 
@@ -54,16 +54,26 @@ Foundational completed slices: `cbe1851` product manifests, `e2271ac` runtime ca
 **Owner lane:** storefront/UI + API/contracts. **Prerequisite:** Phase 1 schemas and readiness rules.
 
 - [x] Preserve GMFC as tenant-owned content/configuration on the reusable Church/Ministry template; keep customer content out of shared defaults. The tenant template is a dedicated `@bazion/church-ministry-template` workspace package with explicit contract dependencies and a conformance test.
-- [ ] Extract generic design tokens, navigation, forms and responsive layout primitives from the church-specific storefront.
+- [x] Extract role-based design tokens, responsive container/section/grid and accessible form primitives into `@bazion/ui`; use them on the ministry contact page.
+- [x] Move primary website navigation to a template-neutral shared primitive while preserving the Church/Ministry configuration adapter.
+- [ ] Continue replacing church-only layout and form styles as product slices adopt the shared primitives.
+- [x] Create a reusable SME website package foundation with tenant-owned page content, privacy-gated enquiry UI, same-origin endpoint validation, and shared SEO/navigation/UI contracts. Its server endpoint and persistence remain open below.
+- [x] Add tenant-scoped enquiry persistence, privacy-consent metadata, rate limiting and honeypot controls, owner/admin authorization, bounded export and deletion, and scheduled retention cleanup. The collection endpoint requires a published tenant privacy policy; PostgreSQL integration coverage proves isolation for both enquiry records and policies.
 - [x] Define a constrained, versioned website configuration contract for branding, navigation, SEO and allowed page sections in `@bazion/website-contracts`; Church/Ministry settings reuse the schemas, apply a backwards-compatible `1.0.0` default, and preserve tenant-specific navigation in the domain port.
 - [x] Bind public navigation to tenant site settings; disabled or unconfigured internal pages and unsafe destinations are filtered, while valid HTTPS partner links remain available.
 - [x] Expose tenant page visibility and navigation editing in the admin UI; validate the saved site contract and keep the home page enabled.
-- [x] Hide disabled routes, including event and sermon detail routes, after tenant settings resolve; set `noindex, nofollow` and show an accessible unavailable state. A server-side 404 is still required for correct HTTP and crawler behavior.
-- [ ] Implement a small reusable SME website vertical slice: home, service/about page, contact/enquiry form, SEO and accessible responsive states.
+- [x] Hide disabled routes, including event and sermon detail routes, after tenant settings resolve; set `noindex, nofollow` and show an accessible unavailable state.
+- [x] Return a server-side 404 for disabled public routes, including event and sermon detail routes, so crawlers and direct requests receive correct HTTP behavior.
+- [x] Implement a reusable SME website vertical slice: home, about, services, contact/enquiry and privacy pages, SEO metadata, responsive theme and accessible rendered states.
 - [ ] Add tenant-scoped enquiry persistence, consent/spam controls, authorization and retention/export behavior.
-- [ ] Configure two tenants with different brands/content/navigation using the same runtime and template.
-- [ ] Verify feature entitlement changes protect API operations as well as UI links.
-- [ ] Add visual/accessibility checks and PostgreSQL cross-tenant denial coverage for the SME slice.
+- [x] Configure two tenants with different brands/content/navigation using the same template components.
+- [x] Verify the forms-leads entitlement protects both the rendered form state and public API operation.
+- [x] Add rendered accessibility-state checks and PostgreSQL cross-tenant denial coverage for the SME slice.
+- [ ] Add browser-based visual regression checks for responsive SME page layouts.
+
+**Forms/lead capture evidence (2026-11-11):** `@bazion/forms` and `forms-leads` are registered as a reusable domain/API module. The public endpoint validates submissions, requires an enabled published tenant notice and matching notice version, assigns consent/retention metadata server-side, and applies per-IP rate limits plus a honeypot. Owner/admin routes manage policy, list/export and delete records; a bounded cleanup job includes inactive tenants. PostgreSQL tenant isolation passed for enquiries and policy rows with cross-tenant spoof writes denied. `pnpm typecheck`, `pnpm catalog:validate`, full `pnpm test` (32 Turborepo tasks, including database 15/15 and API 120/120), and `pnpm build` passed against the disposable PostgreSQL cluster.
+
+**SME template UI evidence (2026-11-11):** the same rendered page components now produce distinct tenant branding, content and navigation from independent validated configurations. The contact page requires an explicit forms entitlement and an enabled privacy page with a sufficiently detailed notice. Server-rendered tests check skip navigation, labelled consent fields and the unavailable state. Workspace typecheck, catalogue validation, full PostgreSQL-backed tests and production builds passed. Browser screenshot regression is still open.
 
 **Exit gate:** a second site can be configured without copying application code or adding a customer branch; both tenants pass route, accessibility and RLS checks.
 

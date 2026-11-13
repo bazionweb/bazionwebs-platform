@@ -13,6 +13,7 @@ import { oidcDiscoveryRoutes, oidcRoutes } from "./modules/auth/oidc-routes.js";
 import { adminRoutes } from "./modules/admin/routes.js";
 import { adminIdentityRoutes } from "./modules/admin/identity-routes.js";
 import { churchRoutes } from "./modules/church/routes.js";
+import { formsLeadsRoutes } from "./modules/forms-leads/routes.js";
 import { hostingRoutes } from "./modules/hosting/routes.js";
 import { hostingRecoveryRoutes } from "./modules/hosting/recovery-routes.js";
 import { createHostingProvisioningRuntime } from "./modules/hosting/runtime.js";
@@ -64,7 +65,7 @@ export async function buildApp(config: AppConfig) {
         .catch((error: Error) => callback(error, false));
     },
     credentials: true,
-    methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization", "Idempotency-Key", "X-Donation-Status-Token", "X-Payment-Status-Token", "X-Requested-With"],
   });
   await app.register(rateLimit, { max: 120, timeWindow: "1 minute" });
@@ -223,6 +224,7 @@ export async function buildApp(config: AppConfig) {
   await app.register(commerceRoutes, { prefix: "/v1", config });
   await app.register(commerceAdminRoutes, { prefix: "/v1" });
   await app.register(churchRoutes, { prefix: "/v1", config });
+  await app.register(formsLeadsRoutes, { prefix: "/v1", config });
   const hostingRuntime = createHostingProvisioningRuntime(config.hosting);
   await app.register(hostingRoutes, {
     prefix: "/v1",

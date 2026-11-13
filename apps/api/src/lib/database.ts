@@ -323,6 +323,19 @@ export async function withTenantTransaction<T>(
   }
 }
 
+/** Maintenance is allowed to expire records after a tenant is suspended or disabled. */
+export async function withTenantMaintenanceTransaction<T>(tenantId: string, callback: (tx: TenantTransaction) => Promise<T>): Promise<T> {
+  return withTenantTransaction(tenantId, callback, { allowInactive: true });
+}
+
+/** Enumerate tenant IDs for supervised all-tenant jobs; business work remains tenant-scoped. */
+export async function listTenantIdsForMaintenance(): Promise<string[]> {
+  const result = await tenantDirectoryPool.query<{ tenant_id: string }>(
+    "SELECT id::text AS tenant_id FROM public.tenants ORDER BY id",
+  );
+  return result.rows.map(({ tenant_id }) => tenant_id);
+}
+
 export interface TenantBackupTransactionOptions {
   allowInactive?: boolean;
   repeatableReadOnly?: boolean;
