@@ -39,6 +39,8 @@ jobs:
       PRODUCT_PROVISIONER_DATABASE_URL: postgres://bazion_product_provisioner:bazion_product_provisioner_local_only@localhost:5432/bazion_platform
       BAZION_HOSTING_RECONCILER_PASSWORD: bazion_hosting_reconciler_local_only
       BAZION_PRODUCT_PROVISIONER_PASSWORD: bazion_product_provisioner_local_only
+      TENANT_BACKUP_DATABASE_URL: postgres://bazion_tenant_backup:bazion_tenant_backup_local_only@localhost:5432/bazion_platform
+      BAZION_TENANT_BACKUP_PASSWORD: bazion_tenant_backup_local_only
       NOTIFICATION_ENCRYPTION_KEY: MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=
       BETTER_AUTH_URL: http://localhost:4000
       BETTER_AUTH_SECRET: ci-only-bazion-auth-secret-that-is-long-enough-2026

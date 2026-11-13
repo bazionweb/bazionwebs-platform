@@ -23,6 +23,7 @@ export const requiredDatabaseMigrations = [
   "0018_hosting_provider_lifecycle.sql",
   "0018_product_installations_provisioning_sagas.sql",
   "0019_commercial_provisioning_delivery.sql",
+  "0019_tenant_backup_restore_access.sql",
   "0020_phase5_identity_oidc_bff.sql",
   "0021_phase6_saga_leases_lifecycle_archive.sql",
   "0022_phase4_hosting_deployment_projection.sql",

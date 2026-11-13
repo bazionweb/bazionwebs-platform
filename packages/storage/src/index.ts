@@ -39,6 +39,8 @@ export interface StoredFile {
 export interface ObjectStorage {
   putObject(input: { tenantId: string; key: string; body: Uint8Array; contentType: string }): Promise<void>;
   listObjects(input: { tenantId: string; limit?: number }): Promise<StoredObject[]>;
+  /** Complete tenant-prefix listing in bounded pages. The cursor is opaque to callers. */
+  listObjectsPage(input: { tenantId: string; limit?: number; cursor?: string }): Promise<{ objects: StoredObject[]; nextCursor: string | null }>;
   getObject(input: { tenantId: string; key: string }): Promise<StoredFile | null>;
   deleteObject(input: { tenantId: string; key: string }): Promise<void>;
   publicUrl(key: string): string;
@@ -144,6 +146,31 @@ export class S3ObjectStorage implements ObjectStorage {
     return objects.sort((a, b) => b.lastModified.localeCompare(a.lastModified)).slice(0, limit);
   }
 
+  async listObjectsPage(input: { tenantId: string; limit?: number; cursor?: string }): Promise<{ objects: StoredObject[]; nextCursor: string | null }> {
+    const limit = Math.max(1, Math.min(input.limit ?? 500, 1000));
+    const prefix = `${input.tenantId}/`;
+    const result = await this.client.send(new ListObjectsV2Command({
+      Bucket: this.config.bucket,
+      Prefix: prefix,
+      ContinuationToken: input.cursor,
+      MaxKeys: limit,
+    }));
+    const objects = (result.Contents ?? []).flatMap((object) => {
+      if (!object.Key || !object.Key.startsWith(prefix)) return [];
+      return [{
+        key: object.Key,
+        url: this.publicUrl(object.Key),
+        contentType: contentTypeFromKey(object.Key),
+        sizeBytes: object.Size ?? 0,
+        lastModified: object.LastModified?.toISOString() ?? "",
+      }];
+    });
+    return {
+      objects,
+      nextCursor: result.IsTruncated ? result.NextContinuationToken ?? null : null,
+    };
+  }
+
   async getObject(input: { tenantId: string; key: string }): Promise<StoredFile | null> {
     assertTenantKey(input.tenantId, input.key);
     try {
@@ -218,6 +245,38 @@ export class LocalObjectStorage implements ObjectStorage {
     };
     await walk(tenantPath);
     return files.sort((a, b) => b.lastModified.localeCompare(a.lastModified)).slice(0, limit);
+  }
+
+  async listObjectsPage(input: { tenantId: string; limit?: number; cursor?: string }): Promise<{ objects: StoredObject[]; nextCursor: string | null }> {
+    const tenantPath = resolve(this.directory, input.tenantId);
+    const limit = Math.max(1, Math.min(input.limit ?? 500, 1000));
+    const files: StoredObject[] = [];
+    const walk = async (directory: string): Promise<void> => {
+      let entries;
+      try { entries = await readdir(directory, { withFileTypes: true }); }
+      catch (error) {
+        if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") return;
+        throw error;
+      }
+      for (const entry of entries) {
+        const fullPath = join(directory, entry.name);
+        if (entry.isDirectory()) { await walk(fullPath); continue; }
+        if (!entry.isFile() || entry.name.endsWith(".content-type")) continue;
+        const key = relative(this.directory, fullPath).split(sep).join("/");
+        if (!key.startsWith(`${input.tenantId}/`)) continue;
+        const metadata = await stat(fullPath);
+        let contentType = contentTypeFromKey(key);
+        try { contentType = await readFile(`${fullPath}.content-type`, "utf8"); } catch { /* Extension fallback. */ }
+        files.push({ key, url: this.publicUrl(key), contentType, sizeBytes: metadata.size, lastModified: metadata.mtime.toISOString() });
+      }
+    };
+    await walk(tenantPath);
+    files.sort((left, right) => left.key.localeCompare(right.key));
+    const startIndex = input.cursor ? files.findIndex((file) => file.key > input.cursor!) : 0;
+    const pageStart = startIndex < 0 ? files.length : startIndex;
+    const objects = files.slice(pageStart, pageStart + limit);
+    const hasMore = pageStart + objects.length < files.length;
+    return { objects, nextCursor: hasMore ? objects.at(-1)?.key ?? null : null };
   }
 
   async getObject(input: { tenantId: string; key: string }): Promise<StoredFile | null> {

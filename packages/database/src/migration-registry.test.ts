@@ -24,6 +24,7 @@ describe("database migration registry", () => {
     expect(requiredDatabaseMigrations).toContain("0018_hosting_provider_lifecycle.sql");
     expect(requiredDatabaseMigrations).toContain("0018_product_installations_provisioning_sagas.sql");
     expect(requiredDatabaseMigrations).toContain("0019_commercial_provisioning_delivery.sql");
+    expect(requiredDatabaseMigrations).toContain("0019_tenant_backup_restore_access.sql");
     expect(requiredDatabaseMigrations).toContain("0020_phase5_identity_oidc_bff.sql");
     expect(requiredDatabaseMigrations).toContain("0021_phase6_saga_leases_lifecycle_archive.sql");
     expect(requiredDatabaseMigrations).toContain("0022_phase4_hosting_deployment_projection.sql");
