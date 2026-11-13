@@ -47,10 +47,25 @@ test("Lockfile preserves packageManagerDependencies matching package.json and CI
   );
 });
 
-test("CI configures job-level cross-repo env, sibling checkout, contract parity, and unconditional joint E2E step", () => {
+test("CI requires isolated joint E2E execution and a scoped sibling-repository read credential", () => {
   const workflow = readFileSync(join(repoRoot, ".github/workflows/ci.yml"), "utf8");
   const apiPackage = JSON.parse(readFileSync(join(repoRoot, "apps/api/package.json"), "utf8"));
   assert.match(workflow, /path:\s*\.bazionweb\b/, "CI must check out sibling bazionweb repo into .bazionweb.");
+  assert.match(
+    workflow,
+    /name: Require read access to sibling Bazionweb repository\r?\n\s+env:\r?\n\s+BAZIONWEB_REPO_TOKEN:\s*\$\{\{\s*secrets\.BAZIONWEB_REPO_TOKEN\s*\}\}[\s\S]*?if \[ -z "\$BAZIONWEB_REPO_TOKEN" \]/,
+    "CI must fail early with a clear error when the least-privilege Bazionweb checkout secret is missing.",
+  );
+  assert.match(
+    workflow,
+    /repository: \$\{\{ env\.BAZIONWEB_REPO \}\}[\s\S]*?token: \$\{\{ secrets\.BAZIONWEB_REPO_TOKEN \}\}/,
+    "The sibling checkout must use the dedicated read credential, not the Platform repository token.",
+  );
+  assert.doesNotMatch(
+    workflow,
+    /token:\s*\$\{\{\s*env\.BAZIONWEB_REPO_TOKEN\s*\|\|\s*github\.token/,
+    "A current-repository token must not silently fall back for the sibling checkout.",
+  );
   assert.match(workflow, /pnpm contracts:verify-cross-repo/, "CI must run cross-repo contract parity verification.");
   assert.match(
     workflow,
