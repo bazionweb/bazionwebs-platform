@@ -59,7 +59,7 @@ jobs:
       TRUST_PROXY: "false"
       TRUSTED_PROXY_ADDRESSES: ""
       BAZIONWEB_TEST_DATABASE_URL: ${{ secrets.BAZIONWEB_TEST_DATABASE_URL || 'postgresql://bazionweb:testpassword@127.0.0.1:5433/bazionweb_test' }}
-      BAZIONWEB_API_DIR: ${{ vars.BAZIONWEB_API_DIR || '../bazionweb/apps/api' }}
+      BAZIONWEB_API_DIR: ${{ vars.BAZIONWEB_API_DIR || '.bazionweb/apps/api' }}
       BAZIONWEB_REPO: ${{ vars.BAZIONWEB_REPO || 'bazionwebs/bazionweb' }}
       BAZIONWEB_REPO_REF: ${{ vars.BAZIONWEB_REPO_REF || 'main' }}
       BAZIONWEB_REPO_TOKEN: ${{ secrets.BAZIONWEB_REPO_TOKEN }}
@@ -76,7 +76,7 @@ jobs:
         with:
           repository: ${{ env.BAZIONWEB_REPO }}
           ref: ${{ env.BAZIONWEB_REPO_REF }}
-          path: ../bazionweb
+          path: .bazionweb
           token: ${{ env.BAZIONWEB_REPO_TOKEN || github.token }}
           persist-credentials: false
 
@@ -133,9 +133,9 @@ jobs:
             fi
             sleep 2
           done
-          npm --prefix ../bazionweb ci --ignore-scripts
-          DATABASE_URL="$BAZIONWEB_TEST_DATABASE_URL" DATABASE_URL_UNPOOLED="$BAZIONWEB_TEST_DATABASE_URL" npm --prefix ../bazionweb --workspace=@bazionweb/api run prisma:migrate
-          DATABASE_URL="$BAZIONWEB_TEST_DATABASE_URL" npm --prefix ../bazionweb --workspace=@bazionweb/api run prisma:generate
+          npm --prefix .bazionweb ci --ignore-scripts
+          DATABASE_URL="$BAZIONWEB_TEST_DATABASE_URL" DATABASE_URL_UNPOOLED="$BAZIONWEB_TEST_DATABASE_URL" npm --prefix .bazionweb --workspace=@bazionweb/api run prisma:migrate
+          DATABASE_URL="$BAZIONWEB_TEST_DATABASE_URL" npm --prefix .bazionweb --workspace=@bazionweb/api run prisma:generate
 
       - name: Typecheck all workspaces
         run: pnpm typecheck

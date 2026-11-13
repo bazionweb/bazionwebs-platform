@@ -49,7 +49,7 @@ test("Lockfile preserves packageManagerDependencies matching package.json and CI
 
 test("CI configures job-level cross-repo env, sibling checkout, contract parity, and unconditional joint E2E step", () => {
   const workflow = readFileSync(join(repoRoot, ".github/workflows/ci.yml"), "utf8");
-  assert.match(workflow, /path:\s*\.\.\/bazionweb/, "CI must check out sibling bazionweb repo into ../bazionweb.");
+  assert.match(workflow, /path:\s*\.bazionweb\b/, "CI must check out sibling bazionweb repo into .bazionweb.");
   assert.match(workflow, /pnpm contracts:verify-cross-repo/, "CI must run cross-repo contract parity verification.");
   assert.match(
     workflow,

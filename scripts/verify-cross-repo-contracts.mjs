@@ -10,6 +10,7 @@ function resolveBazionwebApiDir() {
   const candidates = [
     explicit ? resolve(repoRoot, explicit) : null,
     explicit ? resolve(explicit) : null,
+    resolve(repoRoot, ".bazionweb/apps/api"),
     resolve(repoRoot, "../bazionweb/apps/api"),
     resolve(repoRoot, "../../bazionweb/apps/api"),
     "D:/bazionweb/apps/api",
@@ -80,3 +81,4 @@ if (mismatches.length > 0) {
 console.log(
   `Verified ${contractRelativeFiles.length} shared contract schemas and fixtures match between ${platformContractsDir} and ${bazionwebContractsDir}.`,
 );
+

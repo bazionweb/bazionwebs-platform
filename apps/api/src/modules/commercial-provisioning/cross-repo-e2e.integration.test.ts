@@ -57,8 +57,27 @@ async function readTenantAndInstallationStatus(
 const crossRepoE2eOfferBindings: ProvisioningOfferBinding[] = [integrationOfferBinding];
 
 const currentDir = dirname(fileURLToPath(import.meta.url));
-const defaultBazionwebApiDir = resolve(currentDir, "../../../../../../../bazionweb/apps/api");
-const bazionwebApiDir = process.env.BAZIONWEB_API_DIR?.trim() || defaultBazionwebApiDir;
+const repoRootDir = resolve(currentDir, "../../../../..");
+
+function resolveBazionwebApiDir(): string {
+  const explicit = process.env.BAZIONWEB_API_DIR?.trim();
+  const candidates = [
+    explicit ? resolve(repoRootDir, explicit) : null,
+    explicit ? resolve(explicit) : null,
+    resolve(repoRootDir, ".bazionweb/apps/api"),
+    resolve(repoRootDir, "../bazionweb/apps/api"),
+    resolve(currentDir, "../../../../../../../bazionweb/apps/api"),
+  ].filter((candidate): candidate is string => Boolean(candidate));
+
+  for (const candidate of candidates) {
+    if (existsSync(resolve(candidate, "scripts/phase3-e2e-bridge.ts"))) {
+      return candidate;
+    }
+  }
+  return candidates[0] ?? resolve(repoRootDir, ".bazionweb/apps/api");
+}
+
+const bazionwebApiDir = resolveBazionwebApiDir();
 const bridgeScriptPath = resolve(bazionwebApiDir, "scripts/phase3-e2e-bridge.ts");
 
 function isSafeLocalBazionwebTestDb(urlString: string | undefined): boolean {
