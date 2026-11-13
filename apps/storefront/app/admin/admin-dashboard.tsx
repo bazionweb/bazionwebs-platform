@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { pulse } from "@bazion/ui";
 import { authClient } from "@bazion/auth/client";
 
 type Overview = {
@@ -114,10 +115,18 @@ export function AdminDashboard() {
     setBusyKey("invite");
     setFeedback("");
     try {
-      await apiRequest("/v1/admin/invitations", {
-        method: "POST",
-        body: JSON.stringify({ email: inviteEmail, role: inviteRole }),
-      });
+      await pulse.track(
+        () =>
+          apiRequest("/v1/admin/invitations", {
+            method: "POST",
+            body: JSON.stringify({ email: inviteEmail, role: inviteRole }),
+          }),
+        {
+          pending: `Sending invitation to ${inviteEmail}…`,
+          success: `Invitation created for ${inviteEmail}`,
+          group: "team:invite",
+        },
+      );
       setInviteEmail("");
       setFeedback("Invitation created. Delivery depends on the configured authentication email transport.");
       setReloadKey((value) => value + 1);
@@ -132,10 +141,18 @@ export function AdminDashboard() {
     setBusyKey(`role:${member.id}`);
     setFeedback("");
     try {
-      await apiRequest(`/v1/admin/members/${encodeURIComponent(member.id)}/role`, {
-        method: "PATCH",
-        body: JSON.stringify({ role }),
-      });
+      await pulse.track(
+        () =>
+          apiRequest(`/v1/admin/members/${encodeURIComponent(member.id)}/role`, {
+            method: "PATCH",
+            body: JSON.stringify({ role }),
+          }),
+        {
+          pending: `Updating role for ${member.user.email}…`,
+          success: `Role updated for ${member.user.email}`,
+          group: `team:role:${member.id}`,
+        },
+      );
       setFeedback(`Updated the role for ${member.user.email}.`);
       setReloadKey((value) => value + 1);
     } catch (error) {
@@ -146,11 +163,24 @@ export function AdminDashboard() {
   }
 
   async function removeMember(member: Member) {
-    if (!window.confirm(`Remove ${member.user.email} from this client workspace?`)) return;
+    const confirmed = await pulse.confirm({
+      title: `Remove ${member.user.email}?`,
+      message: "The user will lose access to this client workspace.",
+      tone: "danger",
+      confirmLabel: "Remove member",
+    });
+    if (!confirmed) return;
     setBusyKey(`remove:${member.id}`);
     setFeedback("");
     try {
-      await apiRequest(`/v1/admin/members/${encodeURIComponent(member.user.id)}`, { method: "DELETE" });
+      await pulse.track(
+        () => apiRequest(`/v1/admin/members/${encodeURIComponent(member.user.id)}`, { method: "DELETE" }),
+        {
+          pending: `Removing ${member.user.email}…`,
+          success: `Removed ${member.user.email}`,
+          group: `team:remove:${member.id}`,
+        },
+      );
       setFeedback(`Removed ${member.user.email} from this workspace.`);
       setReloadKey((value) => value + 1);
     } catch (error) {
@@ -164,7 +194,14 @@ export function AdminDashboard() {
     setBusyKey(`cancel:${invitation.id}`);
     setFeedback("");
     try {
-      await apiRequest(`/v1/admin/invitations/${encodeURIComponent(invitation.id)}`, { method: "DELETE" });
+      await pulse.track(
+        () => apiRequest(`/v1/admin/invitations/${encodeURIComponent(invitation.id)}`, { method: "DELETE" }),
+        {
+          pending: `Cancelling invitation for ${invitation.email}…`,
+          success: `Cancelled invitation for ${invitation.email}`,
+          group: `team:cancel:${invitation.id}`,
+        },
+      );
       setFeedback(`Cancelled the invitation for ${invitation.email}.`);
       setReloadKey((value) => value + 1);
     } catch (error) {
@@ -175,8 +212,17 @@ export function AdminDashboard() {
   }
 
   async function signOut() {
-    await authClient.signOut();
-    window.location.assign("/login");
+    await pulse.track(
+      async () => {
+        await authClient.signOut();
+        window.location.assign("/login");
+      },
+      {
+        pending: "Signing out…",
+        success: "Signed out",
+        group: "auth:signout",
+      },
+    );
   }
 
   if (session.isPending || activeOrganization.isPending) {

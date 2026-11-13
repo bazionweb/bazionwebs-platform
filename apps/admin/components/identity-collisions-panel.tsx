@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { assertOk, pulse } from "@bazion/ui";
 
 interface IdentityCollisionRow {
   id: string;
@@ -62,11 +63,15 @@ export function IdentityCollisionsPanel() {
     const note = (notesById[item.id] ?? "").trim();
     const targetUserId = (targetsById[item.id] ?? item.existingUserId ?? "").trim();
     if (note.length < 3) {
-      setError("Enter a short audit resolution note (at least 3 characters) before resolving.");
+      const msg = "Enter a short audit resolution note (at least 3 characters) before resolving.";
+      setError(msg);
+      pulse.warning(msg);
       return;
     }
     if (action === "resolve_link" && !targetUserId) {
-      setError("Enter a verified target user ID before linking a federated subject.");
+      const msg = "Enter a verified target user ID before linking a federated subject.";
+      setError(msg);
+      pulse.warning(msg);
       return;
     }
 
@@ -74,21 +79,28 @@ export function IdentityCollisionsPanel() {
     setError("");
     setNotice("");
     try {
-      const res = await fetch(`/v1/admin/platform/identity/collisions/${encodeURIComponent(item.id)}/resolve`, {
-        method: "POST",
-        credentials: "include",
-        cache: "no-store",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          action,
-          ...(action === "resolve_link" ? { targetUserId } : {}),
-          note,
-        }),
-      });
-      const body = await res.json().catch(() => ({})) as { message?: string };
-      if (!res.ok) {
-        throw new Error(body.message ?? `Resolution failed (HTTP ${res.status}).`);
-      }
+      await pulse.track(
+        async () => {
+          const res = await fetch(`/v1/admin/platform/identity/collisions/${encodeURIComponent(item.id)}/resolve`, {
+            method: "POST",
+            credentials: "include",
+            cache: "no-store",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({
+              action,
+              ...(action === "resolve_link" ? { targetUserId } : {}),
+              note,
+            }),
+          });
+          await assertOk(res);
+        },
+        {
+          title: action === "resolve_link" ? "Linking identity subject" : "Rejecting identity collision",
+          pendingDetail: `Collision ${item.id}…`,
+          successTitle: action === "resolve_link" ? "Identity subject linked" : "Collision rejected",
+          group: `id:collision:${item.id}`,
+        },
+      );
       setNotice(`Collision ${item.id} marked as ${action === "resolve_link" ? "resolved_linked" : "resolved_rejected"}.`);
       await loadCollisions(statusFilter);
     } catch (err) {

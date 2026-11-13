@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { pulse } from "@bazion/ui";
 import { authClient, resolveSafeRedirectTarget } from "@bazion/auth/client";
 import { AccountIdentityPanels } from "./account-identity-panels";
 
@@ -58,23 +59,32 @@ export function WorkspacePicker() {
     setMessage("");
     setIdentity(null);
     try {
-      const result = await authClient.organization.setActive({ organizationId });
-      if (result.error) throw new Error(result.error.message ?? "Could not switch workspace.");
-      const response = await fetch("/v1/auth/me", { credentials: "include", cache: "no-store" });
-      if (!response.ok) throw new Error("Workspace selected, but the tenant context could not be loaded.");
-      const currentIdentity = await response.json() as CurrentIdentity;
-      if (currentIdentity.organization?.id !== organizationId || currentIdentity.tenant?.status !== "active") {
-        throw new Error("This organization is not linked to an active tenant. Contact Bazion support.");
-      }
-      if (currentIdentity.tenant?.slug) {
-        document.cookie = `bazion_tenant=${encodeURIComponent(currentIdentity.tenant.slug)}; path=/; samesite=lax`;
-      }
-      setIdentity(currentIdentity);
-      const redirectTarget = resolveSafeRedirectTarget(
-        new URLSearchParams(window.location.search).get("redirect"),
-        { allowedOrigins: [window.location.origin], fallback: "/admin" },
+      await pulse.track(
+        async () => {
+          const result = await authClient.organization.setActive({ organizationId });
+          if (result.error) throw new Error(result.error.message ?? "Could not switch workspace.");
+          const response = await fetch("/v1/auth/me", { credentials: "include", cache: "no-store" });
+          if (!response.ok) throw new Error("Workspace selected, but the tenant context could not be loaded.");
+          const currentIdentity = await response.json() as CurrentIdentity;
+          if (currentIdentity.organization?.id !== organizationId || currentIdentity.tenant?.status !== "active") {
+            throw new Error("This organization is not linked to an active tenant. Contact Bazion support.");
+          }
+          if (currentIdentity.tenant?.slug) {
+            document.cookie = `bazion_tenant=${encodeURIComponent(currentIdentity.tenant.slug)}; path=/; samesite=lax`;
+          }
+          setIdentity(currentIdentity);
+          const redirectTarget = resolveSafeRedirectTarget(
+            new URLSearchParams(window.location.search).get("redirect"),
+            { allowedOrigins: [window.location.origin], fallback: "/admin" },
+          );
+          window.location.assign(redirectTarget);
+        },
+        {
+          pending: "Switching workspace…",
+          success: "Workspace activated",
+          scope: "workspace",
+        },
       );
-      window.location.assign(redirectTarget);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Workspace selection failed.");
     } finally {
@@ -123,7 +133,10 @@ export function WorkspacePicker() {
   }, [session.data?.user.id, identity, organizations.isPending, organizationList.length, activeOrganization.data?.id, selectWorkspace]);
 
   async function signOut() {
-    await authClient.signOut();
+    await pulse.track(
+      () => authClient.signOut(),
+      { pending: "Signing out…", success: "Signed out", scope: "auth" },
+    );
     window.location.assign("/login");
   }
 

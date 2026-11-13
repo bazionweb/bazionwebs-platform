@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
+import { pulse } from "@bazion/ui";
 
 type Product = { id: string; sku: string; name: string; description: string | null; currency: string; priceMinor: number; stockAvailable: number | null };
 type Cart = { id: string; currency: string; status: string; items: Array<{ id: string; productId: string; quantity: number; unitPriceMinor: number; name: string; sku: string }>; totals: { subtotalMinor: number; totalMinor: number; currency: string } };
@@ -109,9 +110,19 @@ export function Storefront({ products, apiBase }: { products: Product[]; apiBase
   async function addProduct(productId: string) {
     setBusy(true); setNotice("");
     try {
-      const id = await ensureCart();
-      const updated = await api<Cart>(`/v1/carts/${id}/items`, { method: "POST", body: JSON.stringify({ productId, quantity: 1 }) });
-      setCart(updated); setCheckout(null); setNotice("Added to your cart.");
+      await pulse.track(
+        async () => {
+          const id = await ensureCart();
+          const updated = await api<Cart>(`/v1/carts/${id}/items`, { method: "POST", body: JSON.stringify({ productId, quantity: 1 }) });
+          setCart(updated); setCheckout(null); setNotice("Added to your cart.");
+          return updated;
+        },
+        {
+          pending: "Adding item to basket…",
+          success: "Item added to cart",
+          scope: "cart",
+        },
+      );
     } catch (error) { setNotice(error instanceof Error ? error.message : "Could not add the item."); }
     finally { setBusy(false); }
   }
@@ -120,18 +131,45 @@ export function Storefront({ products, apiBase }: { products: Product[]; apiBase
     if (!cartId) return;
     setBusy(true);
     try {
-      const updated = await api<Cart>(`/v1/carts/${cartId}/items/${itemId}`, { method: "PATCH", body: JSON.stringify({ quantity }) });
-      setCart(updated);
+      await pulse.track(
+        async () => {
+          const updated = await api<Cart>(`/v1/carts/${cartId}/items/${itemId}`, { method: "PATCH", body: JSON.stringify({ quantity }) });
+          setCart(updated);
+          return updated;
+        },
+        {
+          pending: "Updating quantity…",
+          success: "Cart updated",
+          scope: "cart",
+        },
+      );
     } catch (error) { setNotice(error instanceof Error ? error.message : "Could not update the cart."); }
     finally { setBusy(false); }
   }
 
   async function removeItem(itemId: string) {
     if (!cartId) return;
+    const confirmed = await pulse.confirm({
+      title: "Remove item from cart?",
+      detail: "This item will be removed from your current order.",
+      confirmLabel: "Remove item",
+      danger: true,
+    });
+    if (!confirmed) return;
     setBusy(true);
     try {
-      const updated = await api<Cart>(`/v1/carts/${cartId}/items/${itemId}`, { method: "DELETE" });
-      setCart(updated);
+      await pulse.track(
+        async () => {
+          const updated = await api<Cart>(`/v1/carts/${cartId}/items/${itemId}`, { method: "DELETE" });
+          setCart(updated);
+          return updated;
+        },
+        {
+          pending: "Removing item…",
+          success: "Item removed from cart",
+          scope: "cart",
+        },
+      );
     } catch (error) { setNotice(error instanceof Error ? error.message : "Could not remove the item."); }
     finally { setBusy(false); }
   }
@@ -141,28 +179,38 @@ export function Storefront({ products, apiBase }: { products: Product[]; apiBase
     if (!cartId) return;
     setBusy(true); setNotice("");
     try {
-      const idempotencyStorageKey = `bazion-checkout-key:${cartId}`;
-      const statusStorageKey = `bazion-checkout-status:${cartId}`;
-      const idempotencyKey = window.sessionStorage.getItem(idempotencyStorageKey) ?? crypto.randomUUID();
-      const statusToken = window.sessionStorage.getItem(statusStorageKey) ?? `${crypto.randomUUID().replaceAll("-", "")}${crypto.randomUUID().replaceAll("-", "")}`;
-      window.sessionStorage.setItem(idempotencyStorageKey, idempotencyKey);
-      window.sessionStorage.setItem(statusStorageKey, statusToken);
-      const result = await api<CheckoutResult>("/v1/checkout", {
-        method: "POST",
-        headers: { "Idempotency-Key": idempotencyKey, "X-Payment-Status-Token": statusToken },
-        body: JSON.stringify({ cartId, customer, shippingAddress: address }),
-      });
-      window.sessionStorage.removeItem(idempotencyStorageKey);
-      window.sessionStorage.setItem(`bazion-checkout-result:${cartId}`, JSON.stringify(result));
-      setCheckout(result);
-      const isPendingMpesa = result.payment.provider === "mpesa" && !["succeeded", "failed", "cancelled"].includes(result.payment.status);
-      setPaymentStatusToken(isPendingMpesa ? statusToken : null);
-      if (!isPendingMpesa) window.sessionStorage.removeItem(statusStorageKey);
-      setNotice(result.payment.provider === "mpesa"
-        ? result.payment.status === "succeeded" ? "Safaricom confirmed your payment."
-          : result.payment.status === "failed" ? "M-Pesa did not accept the request. This order was cancelled."
-            : "Approve the M-Pesa prompt. Your order stays unpaid until Safaricom confirms it."
-        : "Order created. Complete the local mock payment to test the order flow.");
+      await pulse.track(
+        async () => {
+          const idempotencyStorageKey = `bazion-checkout-key:${cartId}`;
+          const statusStorageKey = `bazion-checkout-status:${cartId}`;
+          const idempotencyKey = window.sessionStorage.getItem(idempotencyStorageKey) ?? crypto.randomUUID();
+          const statusToken = window.sessionStorage.getItem(statusStorageKey) ?? `${crypto.randomUUID().replaceAll("-", "")}${crypto.randomUUID().replaceAll("-", "")}`;
+          window.sessionStorage.setItem(idempotencyStorageKey, idempotencyKey);
+          window.sessionStorage.setItem(statusStorageKey, statusToken);
+          const result = await api<CheckoutResult>("/v1/checkout", {
+            method: "POST",
+            headers: { "Idempotency-Key": idempotencyKey, "X-Payment-Status-Token": statusToken },
+            body: JSON.stringify({ cartId, customer, shippingAddress: address }),
+          });
+          window.sessionStorage.removeItem(idempotencyStorageKey);
+          window.sessionStorage.setItem(`bazion-checkout-result:${cartId}`, JSON.stringify(result));
+          setCheckout(result);
+          const isPendingMpesa = result.payment.provider === "mpesa" && !["succeeded", "failed", "cancelled"].includes(result.payment.status);
+          setPaymentStatusToken(isPendingMpesa ? statusToken : null);
+          if (!isPendingMpesa) window.sessionStorage.removeItem(statusStorageKey);
+          setNotice(result.payment.provider === "mpesa"
+            ? result.payment.status === "succeeded" ? "Safaricom confirmed your payment."
+              : result.payment.status === "failed" ? "M-Pesa did not accept the request. This order was cancelled."
+                : "Approve the M-Pesa prompt. Your order stays unpaid until Safaricom confirms it."
+            : "Order created. Complete the local mock payment to test the order flow.");
+          return result;
+        },
+        {
+          pending: "Submitting order & initializing payment…",
+          success: "Order registered successfully",
+          scope: "checkout",
+        },
+      );
     } catch (error) {
       if (error instanceof ApiError && error.status >= 400 && error.status < 500) {
         window.sessionStorage.removeItem(`bazion-checkout-key:${cartId}`);
@@ -175,21 +223,37 @@ export function Storefront({ products, apiBase }: { products: Product[]; apiBase
 
   async function startNewOrder() {
     if (!cartId || !cart?.items.length) return;
+    const confirmed = await pulse.confirm({
+      title: "Start a new order?",
+      detail: "Your previous order status will be cleared and a new checkout session initialized.",
+      confirmLabel: "Start new order",
+    });
+    if (!confirmed) return;
     setBusy(true); setNotice("");
     try {
-      const priorCartId = cartId;
-      const priorItems = cart.items.map(({ productId, quantity }) => ({ productId, quantity }));
-      const created = await api<{ id: string }>("/v1/carts", { method: "POST", body: JSON.stringify({ currency: cart.currency }) });
-      let nextCart = await api<Cart>(`/v1/carts/${created.id}`);
-      for (const item of priorItems) {
-        nextCart = await api<Cart>(`/v1/carts/${created.id}/items`, { method: "POST", body: JSON.stringify(item) });
-      }
-      window.localStorage.setItem("bazion-demo-cart-id", created.id);
-      window.sessionStorage.removeItem(`bazion-checkout-status:${priorCartId}`);
-      window.sessionStorage.removeItem(`bazion-checkout-result:${priorCartId}`);
-      window.sessionStorage.removeItem(`bazion-checkout-key:${priorCartId}`);
-      setCartId(created.id); setCart(nextCart); setCheckout(null); setPaymentStatusToken(null);
-      setNotice("A new order is ready. Review your details before submitting again.");
+      await pulse.track(
+        async () => {
+          const priorCartId = cartId;
+          const priorItems = cart.items.map(({ productId, quantity }) => ({ productId, quantity }));
+          const created = await api<{ id: string }>("/v1/carts", { method: "POST", body: JSON.stringify({ currency: cart.currency }) });
+          let nextCart = await api<Cart>(`/v1/carts/${created.id}`);
+          for (const item of priorItems) {
+            nextCart = await api<Cart>(`/v1/carts/${created.id}/items`, { method: "POST", body: JSON.stringify(item) });
+          }
+          window.localStorage.setItem("bazion-demo-cart-id", created.id);
+          window.sessionStorage.removeItem(`bazion-checkout-status:${priorCartId}`);
+          window.sessionStorage.removeItem(`bazion-checkout-result:${priorCartId}`);
+          window.sessionStorage.removeItem(`bazion-checkout-key:${priorCartId}`);
+          setCartId(created.id); setCart(nextCart); setCheckout(null); setPaymentStatusToken(null);
+          setNotice("A new order is ready. Review your details before submitting again.");
+          return nextCart;
+        },
+        {
+          pending: "Preparing new checkout session…",
+          success: "New order session ready",
+          scope: "checkout",
+        },
+      );
     } catch (error) { setNotice(error instanceof Error ? error.message : "Could not start a new order."); }
     finally { setBusy(false); }
   }

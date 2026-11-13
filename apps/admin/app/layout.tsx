@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { PulseHost } from "@bazion/ui";
+import "@bazion/ui/pulse.css";
 import "./globals.css";
 import "./recovery.css";
 
@@ -18,7 +20,10 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           rel="stylesheet"
         />
       </head>
-      <body>{children}</body>
+      <body>
+        {children}
+        <PulseHost position="bottom-right" />
+      </body>
     </html>
   );
 }

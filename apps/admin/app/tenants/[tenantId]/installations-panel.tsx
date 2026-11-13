@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { assertOk, pulse } from "@bazion/ui";
 
 export interface TenantInstallationItem {
   id: string;
@@ -58,30 +59,50 @@ export function TenantInstallationsPanel(props: {
 
   async function offboard(installationId: string) {
     if (reason.trim().length < 8) {
-      setFeedback({ kind: "error", text: "Provide an offboarding reason of at least 8 characters." });
+      const msg = "Provide an offboarding reason of at least 8 characters.";
+      setFeedback({ kind: "error", text: msg });
+      pulse.warning(msg);
       return;
     }
     if (!confirmDestructive) {
-      setFeedback({ kind: "error", text: "Confirm destructive offboarding archive export before proceeding." });
+      const msg = "Confirm destructive offboarding archive export before proceeding.";
+      setFeedback({ kind: "error", text: msg });
+      pulse.warning(msg);
       return;
     }
+    const ok = await pulse.confirm({
+      title: `Offboard installation ${installationId}?`,
+      message: "Exports a 30-day recovery archive and suspends the active installation.",
+      tone: "danger",
+      confirmLabel: "Offboard & archive",
+    });
+    if (!ok) return;
     setBusy(`offboard:${installationId}`);
     setFeedback(null);
     try {
-      const res = await fetch(
-        `/v1/admin/platform/tenants/${encodeURIComponent(props.tenantId)}/installations/${encodeURIComponent(installationId)}/offboard`,
+      const body = await pulse.track(
+        async () => {
+          const res = await fetch(
+            `/v1/admin/platform/tenants/${encodeURIComponent(props.tenantId)}/installations/${encodeURIComponent(installationId)}/offboard`,
+            {
+              method: "POST",
+              credentials: "include",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify({ reason: reason.trim(), confirmDestructive: true }),
+            },
+          );
+          await assertOk(res);
+          return (await res.json()) as { archive: { retentionExpiresAt: string } };
+        },
         {
-          method: "POST",
-          credentials: "include",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ reason: reason.trim(), confirmDestructive: true }),
+          title: "Offboarding installation",
+          pendingDetail: "Creating 30-day recovery archive…",
+          successTitle: "Installation archived",
+          successDetail: (b) =>
+            `30-day retention until ${new Date(b.archive.retentionExpiresAt).toLocaleDateString("en-KE")}`,
+          group: `install:offboard:${installationId}`,
         },
       );
-      const body = await res.json().catch(() => null);
-      if (!res.ok) {
-        setFeedback({ kind: "error", text: body?.message ?? `Offboard failed (HTTP ${res.status}).` });
-        return;
-      }
       setReason("");
       setConfirmDestructive(false);
       setFeedback({
@@ -89,6 +110,8 @@ export function TenantInstallationsPanel(props: {
         text: `Installation ${installationId} archived (30-day retention until ${new Date(body.archive.retentionExpiresAt).toLocaleDateString("en-KE")}).`,
       });
       await reload();
+    } catch (err) {
+      setFeedback({ kind: "error", text: err instanceof Error ? err.message : "Offboard failed." });
     } finally {
       setBusy(null);
     }
@@ -96,55 +119,89 @@ export function TenantInstallationsPanel(props: {
 
   async function restore(installationId: string) {
     if (reason.trim().length < 8) {
-      setFeedback({ kind: "error", text: "Provide a restore reason of at least 8 characters." });
+      const msg = "Provide a restore reason of at least 8 characters.";
+      setFeedback({ kind: "error", text: msg });
+      pulse.warning(msg);
       return;
     }
     setBusy(`restore:${installationId}`);
     setFeedback(null);
     try {
-      const res = await fetch(
-        `/v1/admin/platform/tenants/${encodeURIComponent(props.tenantId)}/installations/${encodeURIComponent(installationId)}/restore`,
+      const body = await pulse.track(
+        async () => {
+          const res = await fetch(
+            `/v1/admin/platform/tenants/${encodeURIComponent(props.tenantId)}/installations/${encodeURIComponent(installationId)}/restore`,
+            {
+              method: "POST",
+              credentials: "include",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify({ reason: reason.trim() }),
+            },
+          );
+          await assertOk(res);
+          return (await res.json()) as { status: string };
+        },
         {
-          method: "POST",
-          credentials: "include",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ reason: reason.trim() }),
+          title: "Restoring installation",
+          pendingDetail: "Recovering configuration from archive…",
+          successTitle: "Installation restored",
+          successDetail: (b) => `Status: ${b.status}`,
+          group: `install:restore:${installationId}`,
         },
       );
-      const body = await res.json().catch(() => null);
-      if (!res.ok) {
-        setFeedback({ kind: "error", text: body?.message ?? `Restore failed (HTTP ${res.status}).` });
-        return;
-      }
       setReason("");
       setFeedback({ kind: "success", text: `Installation ${installationId} restored cleanly (${body.status}).` });
       await reload();
+    } catch (err) {
+      setFeedback({ kind: "error", text: err instanceof Error ? err.message : "Restore failed." });
     } finally {
       setBusy(null);
     }
   }
 
   async function purgeExpired() {
+    const ok = await pulse.confirm({
+      title: "Purge expired offboarding archives?",
+      message: "Permanently deletes archives past their 30-day retention window.",
+      tone: "danger",
+      confirmLabel: "Purge expired",
+    });
+    if (!ok) return;
     setBusy("purge");
     setFeedback(null);
     try {
-      const res = await fetch(
-        `/v1/admin/platform/tenants/${encodeURIComponent(props.tenantId)}/offboarding-archives/purge-expired`,
+      const body = await pulse.track(
+        async () => {
+          const res = await fetch(
+            `/v1/admin/platform/tenants/${encodeURIComponent(props.tenantId)}/offboarding-archives/purge-expired`,
+            {
+              method: "POST",
+              credentials: "include",
+            },
+          );
+          await assertOk(res);
+          return (await res.json()) as {
+            archivesScanned: number;
+            archivesDeleted: number;
+            configurationsDeleted: number;
+          };
+        },
         {
-          method: "POST",
-          credentials: "include",
+          title: "Purging expired archives",
+          pendingDetail: "Scanning retention windows…",
+          successTitle: "Archive purge complete",
+          successDetail: (b) =>
+            `Deleted ${b.archivesDeleted} expired archives (${b.configurationsDeleted} config rows)`,
+          group: `install:purge:${props.tenantId}`,
         },
       );
-      const body = await res.json().catch(() => null);
-      if (!res.ok) {
-        setFeedback({ kind: "error", text: body?.message ?? `Purge failed (HTTP ${res.status}).` });
-        return;
-      }
       setFeedback({
         kind: "success",
         text: `Purge complete: scanned ${body.archivesScanned}, deleted ${body.archivesDeleted} expired archives and ${body.configurationsDeleted} configuration rows.`,
       });
       await reload();
+    } catch (err) {
+      setFeedback({ kind: "error", text: err instanceof Error ? err.message : "Purge failed." });
     } finally {
       setBusy(null);
     }

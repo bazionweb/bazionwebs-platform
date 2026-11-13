@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { pulse } from "@bazion/ui";
 
 interface CopyGivingDetailProps {
   label: string;
@@ -17,8 +18,11 @@ export function CopyGivingDetail({ label, value, variant }: CopyGivingDetailProp
       if (!navigator.clipboard?.writeText) throw new Error("Clipboard access is unavailable.");
       await navigator.clipboard.writeText(value);
       setStatus(label + " copied.");
+      pulse.success(label + " copied", { detail: value, duration: 2500 });
     } catch {
-      setStatus("Copy is unavailable here. Press and hold the value to copy it.");
+      const fallback = "Copy is unavailable here. Press and hold the value to copy it.";
+      setStatus(fallback);
+      pulse.warning(fallback);
     }
   }
 

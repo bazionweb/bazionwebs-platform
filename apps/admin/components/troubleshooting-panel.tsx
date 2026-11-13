@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { pulse } from "@bazion/ui";
 import type { Tenant } from "@/lib/platform";
 
 interface OutboxItem {
@@ -250,6 +251,11 @@ export function TroubleshootingPanel({
 
   function notify(type: "success" | "error", text: string) {
     setNotification({ type, text });
+    if (type === "success") {
+      pulse.success(text);
+    } else {
+      pulse.error(text);
+    }
     setTimeout(() => setNotification(null), 6000);
   }
 
@@ -704,7 +710,13 @@ export function TroubleshootingPanel({
 
   // Sync Tenant Schema Versions Action
   async function handleSyncTenantBindings() {
-    if (!confirm("Align all lagging tenant database bindings to current platform schema version?")) return;
+    const ok = await pulse.confirm({
+      title: "Align tenant database bindings?",
+      message: "Align all lagging tenant database bindings to the current platform schema version?",
+      tone: "warning",
+      confirmLabel: "Sync bindings",
+    });
+    if (!ok) return;
     setSyncingBindings(true);
     try {
       const res = await fetch(`/v1/admin/platform/troubleshoot/database/sync-tenant-bindings`, { method: "POST" });

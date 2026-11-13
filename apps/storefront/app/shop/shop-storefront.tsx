@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
+import { pulse } from "@bazion/ui";
 
 type Currency = "KES" | "USD" | "EUR" | "GBP" | "CAD" | "AUD" | "NZD" | "CHF" | "SGD" | "ZAR" | "NGN" | "GHS" | "INR" | "AED" | "BRL" | "MXN" | "SAR" | "CNY" | "HKD" | "SEK" | "NOK" | "DKK" | "PLN" | "THB" | "PHP";
 type Product = {
@@ -162,13 +163,24 @@ export function ShopStorefront({ initialProducts, categories, store, homeHref = 
 
   async function addProduct(product: Product) {
     if (product.currency !== currency) {
-      setNotice(`Choose ${product.currency} to add this item to your basket.`);
+      const msg = `Choose ${product.currency} to add this item to your basket.`;
+      setNotice(msg);
+      pulse.warning(msg);
       return;
     }
     setBusy(true); setNotice("");
     try {
-      const id = await ensureCart();
-      const updated = await api<Cart>(`/carts/${id}/items`, { method: "POST", body: JSON.stringify({ productId: product.id, quantity: 1 }) });
+      const updated = await pulse.track(
+        async () => {
+          const id = await ensureCart();
+          return await api<Cart>(`/carts/${id}/items`, { method: "POST", body: JSON.stringify({ productId: product.id, quantity: 1 }) });
+        },
+        {
+          pending: `Adding ${product.name} to basket…`,
+          success: `${product.name} added to your basket`,
+          group: `basket:add:${product.id}`,
+        },
+      );
       setCart(updated); setCheckout(null); setNotice(`${product.name} added to your basket.`);
     } catch (error) { setNotice(error instanceof Error ? error.message : "Could not add this item."); }
     finally { setBusy(false); }
@@ -177,16 +189,40 @@ export function ShopStorefront({ initialProducts, categories, store, homeHref = 
   async function changeQuantity(itemId: string, quantity: number) {
     if (!cartId) return;
     setBusy(true);
-    try { setCart(await api<Cart>(`/carts/${cartId}/items/${itemId}`, { method: "PATCH", body: JSON.stringify({ quantity }) })); }
-    catch (error) { setNotice(error instanceof Error ? error.message : "Could not update the basket."); }
+    try {
+      const updated = await pulse.track(
+        () => api<Cart>(`/carts/${cartId}/items/${itemId}`, { method: "PATCH", body: JSON.stringify({ quantity }) }),
+        {
+          pending: "Updating basket…",
+          success: "Basket updated",
+          group: `basket:qty:${itemId}`,
+        },
+      );
+      setCart(updated);
+    } catch (error) { setNotice(error instanceof Error ? error.message : "Could not update the basket."); }
     finally { setBusy(false); }
   }
 
   async function removeItem(itemId: string) {
     if (!cartId) return;
+    const ok = await pulse.confirm({
+      title: "Remove item from basket?",
+      tone: "neutral",
+      confirmLabel: "Remove item",
+    });
+    if (!ok) return;
     setBusy(true);
-    try { setCart(await api<Cart>(`/carts/${cartId}/items/${itemId}`, { method: "DELETE" })); setCheckout(null); }
-    catch (error) { setNotice(error instanceof Error ? error.message : "Could not remove the item."); }
+    try {
+      const updated = await pulse.track(
+        () => api<Cart>(`/carts/${cartId}/items/${itemId}`, { method: "DELETE" }),
+        {
+          pending: "Removing item from basket…",
+          success: "Item removed",
+          group: `basket:remove:${itemId}`,
+        },
+      );
+      setCart(updated); setCheckout(null);
+    } catch (error) { setNotice(error instanceof Error ? error.message : "Could not remove the item."); }
     finally { setBusy(false); }
   }
 
@@ -201,10 +237,21 @@ export function ShopStorefront({ initialProducts, categories, store, homeHref = 
       const statusToken = window.sessionStorage.getItem(statusKey) ?? `${crypto.randomUUID().replaceAll("-", "")}${crypto.randomUUID().replaceAll("-", "")}`;
       window.sessionStorage.setItem(keyKey, idempotencyKey);
       window.sessionStorage.setItem(statusKey, statusToken);
-      const result = await api<CheckoutResult>("/checkout", {
-        method: "POST", headers: { "Idempotency-Key": idempotencyKey, "X-Payment-Status-Token": statusToken },
-        body: JSON.stringify({ cartId, customer, shippingAddress: address }),
-      });
+      const result = await pulse.track(
+        () =>
+          api<CheckoutResult>("/checkout", {
+            method: "POST", headers: { "Idempotency-Key": idempotencyKey, "X-Payment-Status-Token": statusToken },
+            body: JSON.stringify({ cartId, customer, shippingAddress: address }),
+          }),
+        {
+          pending: "Preparing your order…",
+          success: (res) =>
+            res.payment.provider === "mpesa"
+              ? "Approve the M-Pesa prompt on your phone"
+              : "Order created successfully",
+          group: `checkout:${cartId}`,
+        },
+      );
       window.sessionStorage.removeItem(keyKey);
       window.sessionStorage.setItem(`bazion-checkout-result:${cartId}`, JSON.stringify(result));
       setCheckout(result);
@@ -223,7 +270,9 @@ export function ShopStorefront({ initialProducts, categories, store, homeHref = 
 
   function changeCurrency(value: Currency) {
     if (cart?.status === "open" && cart.items.length && cart.currency !== value) {
-      setNotice("Finish or empty your current basket before changing its currency.");
+      const msg = "Finish or empty your current basket before changing its currency.";
+      setNotice(msg);
+      pulse.warning(msg);
       return;
     }
     setCurrency(value); setNotice("");
@@ -263,6 +312,7 @@ export function ShopStorefront({ initialProducts, categories, store, homeHref = 
           <div><p className="store-eyebrow">THE COLLECTION</p><h2 id="catalog-title">Find your next favourite.</h2></div>
           <p>{totalProducts} {totalProducts === 1 ? "piece" : "pieces"} to explore</p>
         </div>
+        {notice && (!cart || cart.items.length === 0) && <p className="store-notice" role="status" style={{ margin: "16px 0" }}>{notice}</p>}
         {store.paymentProvider === "mpesa" && shopperCurrencies.length === 0 && <p className="store-payment-limit" role="status">This store needs a KES price list for M-Pesa checkout. Connect a global payment provider before selling in other currencies.</p>}
         <div className="store-filters">
           <label className="store-search"><span className="sr-only">Search products</span><span aria-hidden="true">⌕</span><input type="search" placeholder="Search the collection" value={search} onChange={(event) => setSearch(event.target.value)} /></label>

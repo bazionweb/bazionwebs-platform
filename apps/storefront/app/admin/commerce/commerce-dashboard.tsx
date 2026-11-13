@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import { pulse } from "@bazion/ui";
 
 type Currency = "KES" | "USD" | "EUR" | "GBP" | "CAD" | "AUD" | "NZD" | "CHF" | "SGD" | "ZAR" | "NGN" | "GHS" | "INR" | "AED" | "BRL" | "MXN" | "SAR" | "CNY" | "HKD" | "SEK" | "NOK" | "DKK" | "PLN" | "THB" | "PHP";
 type Product = {
@@ -130,7 +131,11 @@ export function CommerceDashboard({ initialTab = "products" }: { initialTab?: "p
     const priceMinor = parseAmount(form.price);
     const compareAtPriceMinor = parseAmount(form.compareAtPrice);
     if (priceMinor === null || Number.isNaN(priceMinor) || (Number.isNaN(compareAtPriceMinor))) {
-      setProductError("Enter valid product prices, using the selected currency."); setSaving(false); return;
+      const msg = "Enter valid product prices, using the selected currency.";
+      setProductError(msg);
+      pulse.warning(msg);
+      setSaving(false);
+      return;
     }
     const payload = {
       sku: form.sku, slug: form.slug.trim() || undefined, name: form.name,
@@ -142,7 +147,14 @@ export function CommerceDashboard({ initialTab = "products" }: { initialTab?: "p
     };
     try {
       const path = editingProductId ? `/admin/commerce/products/${editingProductId}` : "/admin/commerce/products";
-      await api(path, { method: editingProductId ? "PATCH" : "POST", body: JSON.stringify(payload) });
+      await pulse.track(
+        () => api(path, { method: editingProductId ? "PATCH" : "POST", body: JSON.stringify(payload) }),
+        {
+          pending: editingProductId ? `Saving ${form.name}…` : `Adding ${form.name} to catalog…`,
+          success: editingProductId ? "Product changes saved" : "Product added to catalog",
+          group: "commerce:product",
+        },
+      );
       setForm(emptyProduct); setEditingProductId(null); setProductError("");
       setNotice(editingProductId ? "Product changes saved." : "Product added to your catalog.");
       await loadProducts();
@@ -155,7 +167,11 @@ export function CommerceDashboard({ initialTab = "products" }: { initialTab?: "p
     const enabled = store.supportedCurrencies.length ? store.supportedCurrencies : [store.defaultCurrency];
     const parsedCountries = countriesInput.split(",").map((country) => country.trim().toUpperCase()).filter(Boolean);
     if (parsedCountries.some((country) => !/^[A-Z]{2}$/.test(country))) {
-      setStoreError("Use two-letter ISO country codes separated by commas, such as KE, UG, GB."); setSaving(false); return;
+      const msg = "Use two-letter ISO country codes separated by commas, such as KE, UG, GB.";
+      setStoreError(msg);
+      pulse.warning(msg);
+      setSaving(false);
+      return;
     }
     const shippingRates = Object.fromEntries(enabled.map((currency) => {
       const entered = decimal(store.shippingRates[currency]);
@@ -164,7 +180,14 @@ export function CommerceDashboard({ initialTab = "products" }: { initialTab?: "p
     }));
     const payload = { ...store, supportedCurrencies: enabled, shippingRates, shippingCountries: parsedCountries };
     try {
-      const result = await api<{ store: Store }>("/admin/commerce/store", { method: "PUT", body: JSON.stringify(payload) });
+      const result = await pulse.track(
+        () => api<{ store: Store }>("/admin/commerce/store", { method: "PUT", body: JSON.stringify(payload) }),
+        {
+          pending: "Saving store settings…",
+          success: "Store settings saved",
+          group: "commerce:store",
+        },
+      );
       setStore({ ...emptyStore, ...result.store }); setCountriesInput(result.store.shippingCountries.join(", "));
       setNotice("Store settings saved.");
     } catch (error) { setStoreError(message(error)); }
@@ -172,9 +195,26 @@ export function CommerceDashboard({ initialTab = "products" }: { initialTab?: "p
   }
 
   async function fulfillOrder(orderId: string) {
+    const ok = await pulse.confirm({
+      title: "Mark order as fulfilled?",
+      message: "This records the order as fulfilled and updates its fulfillment status.",
+      tone: "neutral",
+      confirmLabel: "Mark fulfilled",
+    });
+    if (!ok) return;
     setSaving(true); setNotice(""); setOrderError("");
-    try { await api(`/admin/commerce/orders/${orderId}`, { method: "PATCH", body: JSON.stringify({ status: "fulfilled" }) }); setNotice("Order marked fulfilled."); await loadOrders(); }
-    catch (error) { setOrderError(message(error)); }
+    try {
+      await pulse.track(
+        () => api(`/admin/commerce/orders/${orderId}`, { method: "PATCH", body: JSON.stringify({ status: "fulfilled" }) }),
+        {
+          pending: "Fulfilling order…",
+          success: "Order marked fulfilled",
+          group: `order:fulfill:${orderId}`,
+        },
+      );
+      setNotice("Order marked fulfilled.");
+      await loadOrders();
+    } catch (error) { setOrderError(message(error)); }
     finally { setSaving(false); }
   }
 

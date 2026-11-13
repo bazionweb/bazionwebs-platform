@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
+import { pulse } from "@bazion/ui";
 
 type Props = {
   currentEmail: string;
@@ -48,28 +49,38 @@ export function AccountIdentityPanels({ currentEmail, emailVerified, onOrderClai
     setClaimNotice("");
     setClaimError("");
     try {
-      const response = await fetch("/v1/auth/claim-order", {
-        method: "POST",
-        credentials: "include",
-        cache: "no-store",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ proofToken: proofToken.trim() }),
-      });
-      const body = await response.json().catch(() => ({})) as ApiErrorBody & {
-        claimed?: boolean;
-        externalOrderId?: string;
-        tenantId?: string;
-        membershipRole?: string;
-      };
-      if (!response.ok) {
-        const collisionNote = body.collisionId ? ` (Collision reference: ${body.collisionId})` : "";
-        throw new Error(`${body.message ?? "Order claim failed."}${collisionNote}`);
-      }
-      setProofToken("");
-      setClaimNotice(
-        `Order ${body.externalOrderId ?? ""} claimed (${body.membershipRole ?? "member"}). Refreshing your workspace list…`,
+      await pulse.track(
+        async () => {
+          const response = await fetch("/v1/auth/claim-order", {
+            method: "POST",
+            credentials: "include",
+            cache: "no-store",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ proofToken: proofToken.trim() }),
+          });
+          const body = await response.json().catch(() => ({})) as ApiErrorBody & {
+            claimed?: boolean;
+            externalOrderId?: string;
+            tenantId?: string;
+            membershipRole?: string;
+          };
+          if (!response.ok) {
+            const collisionNote = body.collisionId ? ` (Collision reference: ${body.collisionId})` : "";
+            throw new Error(`${body.message ?? "Order claim failed."}${collisionNote}`);
+          }
+          setProofToken("");
+          setClaimNotice(
+            `Order ${body.externalOrderId ?? ""} claimed (${body.membershipRole ?? "member"}). Refreshing your workspace list…`,
+          );
+          onOrderClaimed();
+          return body;
+        },
+        {
+          pending: "Claiming order…",
+          success: "Order claimed successfully",
+          scope: "order-claim",
+        },
       );
-      onOrderClaimed();
     } catch (error) {
       setClaimError(error instanceof Error ? error.message : "Could not claim order.");
     } finally {
@@ -83,26 +94,36 @@ export function AccountIdentityPanels({ currentEmail, emailVerified, onOrderClai
     setEmailNotice("");
     setEmailError("");
     try {
-      const response = await fetch("/v1/auth/email-change/request", {
-        method: "POST",
-        credentials: "include",
-        cache: "no-store",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ newEmail: newEmail.trim() }),
-      });
-      const body = await response.json().catch(() => ({})) as ApiErrorBody & {
-        accepted?: boolean;
-        newEmail?: string;
-        expiresAt?: string;
-      };
-      if (!response.ok) {
-        const collisionNote = body.collisionId ? ` (Conflict reference: ${body.collisionId})` : "";
-        throw new Error(`${body.message ?? "Email change request failed."}${collisionNote}`);
-      }
-      setEmailChangeRequested(true);
-      setEmailExpiresAt(body.expiresAt ?? null);
-      setEmailNotice(
-        `Verification token issued for ${body.newEmail ?? newEmail.trim()}. Enter the verification token below to finalize the change and re-authenticate.`,
+      await pulse.track(
+        async () => {
+          const response = await fetch("/v1/auth/email-change/request", {
+            method: "POST",
+            credentials: "include",
+            cache: "no-store",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ newEmail: newEmail.trim() }),
+          });
+          const body = await response.json().catch(() => ({})) as ApiErrorBody & {
+            accepted?: boolean;
+            newEmail?: string;
+            expiresAt?: string;
+          };
+          if (!response.ok) {
+            const collisionNote = body.collisionId ? ` (Conflict reference: ${body.collisionId})` : "";
+            throw new Error(`${body.message ?? "Email change request failed."}${collisionNote}`);
+          }
+          setEmailChangeRequested(true);
+          setEmailExpiresAt(body.expiresAt ?? null);
+          setEmailNotice(
+            `Verification token issued for ${body.newEmail ?? newEmail.trim()}. Enter the verification token below to finalize the change and re-authenticate.`,
+          );
+          return body;
+        },
+        {
+          pending: "Requesting email change…",
+          success: "Verification token issued",
+          scope: "email-change",
+        },
       );
     } catch (error) {
       setEmailError(error instanceof Error ? error.message : "Could not request email change.");
@@ -117,27 +138,37 @@ export function AccountIdentityPanels({ currentEmail, emailVerified, onOrderClai
     setEmailNotice("");
     setEmailError("");
     try {
-      const response = await fetch("/v1/auth/email-change/confirm", {
-        method: "POST",
-        credentials: "include",
-        cache: "no-store",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ token: confirmToken.trim() }),
-      });
-      const body = await response.json().catch(() => ({})) as ApiErrorBody & {
-        updated?: boolean;
-        newEmail?: string;
-        reauthenticationRequired?: boolean;
-      };
-      if (!response.ok) {
-        const collisionNote = body.collisionId ? ` (Conflict reference: ${body.collisionId})` : "";
-        throw new Error(`${body.message ?? "Email change confirmation failed."}${collisionNote}`);
-      }
-      setConfirmToken("");
-      setEmailNotice(
-        `Email updated to ${body.newEmail ?? "your new address"}. Active sessions were revoked; redirecting to sign in…`,
+      await pulse.track(
+        async () => {
+          const response = await fetch("/v1/auth/email-change/confirm", {
+            method: "POST",
+            credentials: "include",
+            cache: "no-store",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ token: confirmToken.trim() }),
+          });
+          const body = await response.json().catch(() => ({})) as ApiErrorBody & {
+            updated?: boolean;
+            newEmail?: string;
+            reauthenticationRequired?: boolean;
+          };
+          if (!response.ok) {
+            const collisionNote = body.collisionId ? ` (Conflict reference: ${body.collisionId})` : "";
+            throw new Error(`${body.message ?? "Email change confirmation failed."}${collisionNote}`);
+          }
+          setConfirmToken("");
+          setEmailNotice(
+            `Email updated to ${body.newEmail ?? "your new address"}. Active sessions were revoked; redirecting to sign in…`,
+          );
+          window.location.assign("/login?callbackURL=%2Fworkspace");
+          return body;
+        },
+        {
+          pending: "Confirming email change…",
+          success: "Email changed successfully",
+          scope: "email-change",
+        },
       );
-      window.location.assign("/login?callbackURL=%2Fworkspace");
     } catch (error) {
       setEmailError(error instanceof Error ? error.message : "Could not confirm email change.");
     } finally {

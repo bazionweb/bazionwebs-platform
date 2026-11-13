@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { pulse } from "@bazion/ui";
 import { getDefaultTenantAdminUrl, getPublicStorefrontBaseUrl } from "@/lib/public-urls";
 
 export function AdminSidebar({
@@ -17,12 +18,21 @@ export function AdminSidebar({
 
   async function handleSignOut() {
     try {
-      await fetch("/api/auth/sign-out", {
-        method: "POST",
-        credentials: "include",
-        headers: { "content-type": "application/json" },
-        body: "{}",
-      });
+      await pulse.track(
+        () =>
+          fetch("/api/auth/sign-out", {
+            method: "POST",
+            credentials: "include",
+            headers: { "content-type": "application/json" },
+            body: "{}",
+          }),
+        {
+          title: "Signing out",
+          pendingDetail: "Closing platform operator session…",
+          successTitle: "Signed out",
+          group: "admin:signout",
+        },
+      );
     } finally {
       window.location.assign("/login");
     }

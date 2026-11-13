@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { PulseActivityButton, pulse } from "@bazion/ui";
 
 export function AdminTopbar({
   title,
@@ -17,12 +18,21 @@ export function AdminTopbar({
   async function handleSignOut() {
     setSigningOut(true);
     try {
-      await fetch("/api/auth/sign-out", {
-        method: "POST",
-        credentials: "include",
-        headers: { "content-type": "application/json" },
-        body: "{}",
-      });
+      await pulse.track(
+        () =>
+          fetch("/api/auth/sign-out", {
+            method: "POST",
+            credentials: "include",
+            headers: { "content-type": "application/json" },
+            body: "{}",
+          }),
+        {
+          title: "Signing out",
+          pendingDetail: "Closing platform operator session…",
+          successTitle: "Signed out",
+          group: "admin:signout",
+        },
+      );
     } finally {
       window.location.assign("/login");
     }
@@ -35,6 +45,7 @@ export function AdminTopbar({
       </div>
 
       <div className="topbar-right">
+        <PulseActivityButton label="Activity" />
         {userEmail ? (
           <div className="topbar-user">
             <span className="topbar-status-dot" title="Authenticated session active"></span>

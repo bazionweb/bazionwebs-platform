@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { pulse } from "@bazion/ui";
 import { authClient } from "@bazion/auth/client";
 
 export function AcceptInvitationForm({ invitationId }: { invitationId: string }) {
@@ -12,9 +13,19 @@ export function AcceptInvitationForm({ invitationId }: { invitationId: string })
     setBusy(true);
     setMessage("");
     try {
-      const result = await authClient.organization.acceptInvitation({ invitationId });
-      if (result.error) throw new Error(result.error.message ?? "Invitation could not be accepted.");
-      setMessage("Invitation accepted. Your client organization membership is now active.");
+      await pulse.track(
+        async () => {
+          const result = await authClient.organization.acceptInvitation({ invitationId });
+          if (result.error) throw new Error(result.error.message ?? "Invitation could not be accepted.");
+          setMessage("Invitation accepted. Your client organization membership is now active.");
+          return result;
+        },
+        {
+          pending: "Accepting invitation…",
+          success: "Invitation accepted! Organization membership active.",
+          scope: "invitation",
+        },
+      );
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Invitation could not be accepted.");
     } finally {
