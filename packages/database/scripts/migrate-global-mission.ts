@@ -121,6 +121,12 @@ try {
   if (entitlement.rows[0]?.enabled === false) {
     throw new Error("Church Ministry is explicitly disabled for this tenant. Enable it in the platform tenant settings before import.");
   }
+  await client.query(
+    `INSERT INTO public.tenant_module_entitlements (tenant_id, module_id, enabled, updated_by)
+     VALUES ($1, 'church-ministry', true, 'system:gmfc-baseline')
+     ON CONFLICT (tenant_id, module_id) DO NOTHING`,
+    [tenantId],
+  );
 
   await client.query("SELECT set_config('app.tenant_id', $1, true)", [tenantId]);
   await client.query(
