@@ -6,6 +6,10 @@ import {
   type TenantHostingSecretResolver,
   type TenantHostingTemplate,
 } from "@bazion/platform-contracts";
+import { HttpSecretManagerClient, type SecretManagerClient } from "../../lib/secret-manager-client.js";
+
+export { HttpSecretManagerClient } from "../../lib/secret-manager-client.js";
+export type { HttpSecretManagerClientOptions, SecretManagerClient } from "../../lib/secret-manager-client.js";
 
 const tenantUuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const templateNames = new Set<TenantHostingTemplate>(TENANT_HOSTING_TEMPLATES);
@@ -20,6 +24,7 @@ const requiredKeys: Record<TenantHostingTemplate, readonly string[]> = {
 };
 const forbiddenKeys = new Set(["PATH", "HOME", "HOSTNAME", "PORT", "NODE_ENV", "PWD", "SHELL", "SHLVL"]);
 const maxSecretBytes = 64 * 1024;
+const maxCachedHostingSecrets = 256;
 
 function invalidSecret(): Error {
   return new Error("HOSTING_SECRET_INVALID");
@@ -129,10 +134,6 @@ function validateHostingSecretMap(parsed: unknown, template: TenantHostingTempla
   return Object.freeze(values);
 }
 
-export interface SecretManagerClient {
-  getSecretValue(secretPath: string, version?: string): Promise<string | null>;
-}
-
 export interface SecretManagerResolverOptions {
   client: SecretManagerClient;
   pathPrefix?: string;
@@ -155,6 +156,9 @@ export function tenantHostingSecretManagerPath(
     throw new Error("HOSTING_SECRET_REFERENCE_INVALID");
   }
   const cleanPrefix = prefix.replace(/^\/+|\/+$/g, "") || "tenants";
+  if (!cleanPrefix.split("/").every((segment) => /^[A-Za-z0-9_-]{1,64}$/.test(segment))) {
+    throw new Error("HOSTING_SECRET_PATH_PREFIX_INVALID");
+  }
   return `${cleanPrefix}/${tenantId.toLowerCase()}/hosting/${template}`;
 }
 
@@ -174,7 +178,9 @@ export class SecretManagerTenantHostingSecretResolver implements TenantHostingSe
     this.client = options.client;
     this.pathPrefix = (options.pathPrefix ?? "tenants").replace(/^\/+|\/+$/g, "") || "tenants";
     this.secretVersion = options.secretVersion?.trim() || undefined;
-    this.cacheTtlMs = Math.max(0, options.cacheTtlMs ?? 60_000);
+    tenantHostingSecretManagerPath("11111111-1111-4111-8111-111111111111", "node-nextjs", this.pathPrefix);
+    const ttl = Math.trunc(options.cacheTtlMs ?? 60_000);
+    this.cacheTtlMs = Number.isFinite(ttl) ? Math.max(0, Math.min(300_000, ttl)) : 60_000;
   }
 
   async resolveEnvironment(reference: string): Promise<Readonly<Record<string, string>>> {
@@ -194,7 +200,12 @@ export class SecretManagerTenantHostingSecretResolver implements TenantHostingSe
       return cached.values;
     }
 
-    const raw = await this.client.getSecretValue(secretPath, this.secretVersion);
+    let raw: string | null;
+    try {
+      raw = await this.client.getSecretValue(secretPath, this.secretVersion);
+    } catch {
+      throw new Error("HOSTING_SECRET_UNAVAILABLE");
+    }
     if (!raw || raw.trim().length < 2 || Buffer.byteLength(raw, "utf8") > maxSecretBytes) {
       throw new Error("HOSTING_SECRET_UNAVAILABLE");
     }
@@ -208,90 +219,22 @@ export class SecretManagerTenantHostingSecretResolver implements TenantHostingSe
 
     const values = validateHostingSecretMap(parsed, template);
     if (this.cacheTtlMs > 0) {
+      if (this.cache.size >= maxCachedHostingSecrets) {
+        const now = Date.now();
+        for (const [key, entry] of this.cache) {
+          if (entry.expiresAt <= now) this.cache.delete(key);
+        }
+        if (this.cache.size >= maxCachedHostingSecrets) {
+          const oldestKey = this.cache.keys().next().value as string | undefined;
+          if (oldestKey) this.cache.delete(oldestKey);
+        }
+      }
       this.cache.set(cacheKey, {
         values,
         expiresAt: Date.now() + this.cacheTtlMs,
       });
     }
     return values;
-  }
-}
-
-export interface HttpSecretManagerClientOptions {
-  baseUrl: string;
-  authToken: string;
-  timeoutMs?: number;
-  allowInsecureLocalhost?: boolean;
-  fetchImpl?: typeof fetch;
-}
-
-/**
- * HTTP Secret Manager client (Vault / external secret broker compatible) that fetches
- * tenant-scoped JSON secret maps over TLS (or loopback in non-production) with Bearer auth.
- */
-export class HttpSecretManagerClient implements SecretManagerClient {
-  private readonly baseUrl: string;
-  private readonly authToken: string;
-  private readonly timeoutMs: number;
-  private readonly fetchImpl: typeof fetch;
-
-  constructor(options: HttpSecretManagerClientOptions) {
-    const parsed = new URL(options.baseUrl);
-    const isLoopback = parsed.hostname === "127.0.0.1" || parsed.hostname === "localhost";
-    const httpsOk = parsed.protocol === "https:";
-    const devHttpOk = options.allowInsecureLocalhost === true && isLoopback && parsed.protocol === "http:";
-    if ((!httpsOk && !devHttpOk) || parsed.username || parsed.password || parsed.search || parsed.hash) {
-      throw new Error("HOSTING_SECRET_MANAGER_URL_INVALID");
-    }
-    const token = options.authToken.trim();
-    if (!token) {
-      throw new Error("HOSTING_SECRET_MANAGER_TOKEN_REQUIRED");
-    }
-    this.baseUrl = parsed.toString().replace(/\/+$/, "");
-    this.authToken = token;
-    this.timeoutMs = Math.max(500, Math.min(30_000, Math.trunc(options.timeoutMs ?? 5_000)));
-    this.fetchImpl = options.fetchImpl ?? fetch;
-  }
-
-  async getSecretValue(secretPath: string, version?: string): Promise<string | null> {
-    const cleanPath = secretPath.replace(/^\/+/, "");
-    const query = version ? `?version=${encodeURIComponent(version)}` : "";
-    const response = await this.fetchImpl(`${this.baseUrl}/${cleanPath}${query}`, {
-      method: "GET",
-      redirect: "error",
-      headers: {
-        Accept: "application/json",
-        Authorization: `Bearer ${this.authToken}`,
-      },
-      signal: AbortSignal.timeout(this.timeoutMs),
-    });
-
-    if (response.status === 404) {
-      return null;
-    }
-    if (!response.ok) {
-      throw new Error("HOSTING_SECRET_UNAVAILABLE");
-    }
-
-    const payload = (await response.json()) as unknown;
-    if (typeof payload === "string") {
-      return payload;
-    }
-    if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
-      throw invalidSecret();
-    }
-    const record = payload as Record<string, unknown>;
-    if (typeof record.secretString === "string") {
-      return record.secretString;
-    }
-    if (record.data && typeof record.data === "object" && !Array.isArray(record.data)) {
-      const innerData = record.data as Record<string, unknown>;
-      if (innerData.data && typeof innerData.data === "object" && !Array.isArray(innerData.data)) {
-        return JSON.stringify(innerData.data);
-      }
-      return JSON.stringify(innerData);
-    }
-    return JSON.stringify(record);
   }
 }
 

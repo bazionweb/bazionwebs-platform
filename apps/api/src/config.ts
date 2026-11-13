@@ -30,6 +30,15 @@ const envSchema = z.object({
     (value) => value === "" ? undefined : value,
     z.string().trim().regex(/^\d+_[a-z0-9_-]+\.sql$/i).optional(),
   ),
+  TENANT_DATABASE_SECRET_BACKEND: z.enum(["docker", "secret-manager"]).default("docker"),
+  TENANT_DATABASE_SECRET_MANAGER_URL: optionalEnv,
+  TENANT_DATABASE_SECRET_MANAGER_TOKEN: optionalEnv,
+  TENANT_DATABASE_SECRET_MANAGER_PREFIX: optionalEnv,
+  TENANT_DATABASE_SECRET_MANAGER_VERSION: optionalEnv,
+  TENANT_DATABASE_SECRET_MANAGER_CACHE_TTL_MS: z.preprocess(
+    (value) => value === "" || value === undefined ? undefined : value,
+    z.coerce.number().int().min(0).max(300_000).default(30_000),
+  ),
   DEFAULT_TENANT_ID: z.string().uuid().optional(),
   TENANT_RESOLUTION_MODE: z.enum(["static", "verified_domain"]).default("static"),
   CORS_ORIGINS: z.string().default("http://localhost:3000,http://localhost:4000"),
@@ -103,8 +112,35 @@ const envSchema = z.object({
 
 export function loadConfig() {
   const config = envSchema.parse(process.env);
-  if (config.NODE_ENV === "production" && config.HOSTING_SECRET_BACKEND === "docker" && !isAbsolute(config.HOSTING_SECRET_DIRECTORY)) {
-    throw new Error("HOSTING_SECRET_DIRECTORY must be an absolute path in production.");
+  const tenantDatabaseSecretManagerValues = [
+    config.TENANT_DATABASE_SECRET_MANAGER_URL,
+    config.TENANT_DATABASE_SECRET_MANAGER_TOKEN,
+    config.TENANT_DATABASE_SECRET_MANAGER_PREFIX,
+    config.TENANT_DATABASE_SECRET_MANAGER_VERSION,
+  ];
+  if (config.TENANT_DATABASE_SECRET_BACKEND === "secret-manager") {
+    if (!config.TENANT_DATABASE_SECRET_MANAGER_URL || !config.TENANT_DATABASE_SECRET_MANAGER_TOKEN) {
+      throw new Error("TENANT_DATABASE_SECRET_BACKEND=secret-manager requires TENANT_DATABASE_SECRET_MANAGER_URL and TENANT_DATABASE_SECRET_MANAGER_TOKEN.");
+    }
+    let secretManagerUrl: URL;
+    try { secretManagerUrl = new URL(config.TENANT_DATABASE_SECRET_MANAGER_URL); } catch {
+      throw new Error("TENANT_DATABASE_SECRET_MANAGER_URL must be a valid HTTPS URL.");
+    }
+    const isLoopback = secretManagerUrl.hostname === "127.0.0.1" || secretManagerUrl.hostname === "localhost";
+    const isSecure = secretManagerUrl.protocol === "https:"
+      || (config.NODE_ENV !== "production" && isLoopback && secretManagerUrl.protocol === "http:");
+    if (!isSecure || secretManagerUrl.username || secretManagerUrl.password || secretManagerUrl.search || secretManagerUrl.hash) {
+      throw new Error("TENANT_DATABASE_SECRET_MANAGER_URL must use HTTPS, or loopback HTTP outside production, without URL credentials, query parameters or a fragment.");
+    }
+  } else if (tenantDatabaseSecretManagerValues.some(Boolean)) {
+    throw new Error("TENANT_DATABASE_SECRET_MANAGER_* settings require TENANT_DATABASE_SECRET_BACKEND=secret-manager.");
+  }
+  if (
+    config.NODE_ENV === "production"
+    && (config.HOSTING_SECRET_BACKEND === "docker" || config.TENANT_DATABASE_SECRET_BACKEND === "docker")
+    && !isAbsolute(config.HOSTING_SECRET_DIRECTORY)
+  ) {
+    throw new Error("HOSTING_SECRET_DIRECTORY must be an absolute path when Docker secrets are enabled in production.");
   }
   const mediaStorageValues = [
     config.MEDIA_STORAGE_ENDPOINT,

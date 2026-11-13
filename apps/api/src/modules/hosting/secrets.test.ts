@@ -127,6 +127,8 @@ describe("SecretManagerTenantHostingSecretResolver", () => {
       tenantHostingSecretManagerPath(tenantId, "node-nextjs", "prod-tenants"),
       "v3",
     );
+    expect(() => tenantHostingSecretManagerPath(tenantId, "node-nextjs", "prod/../other"))
+      .toThrow("HOSTING_SECRET_PATH_PREFIX_INVALID");
   });
 
   it("rejects missing secret-manager client when backend is enabled and invalidates malformed secrets", async () => {
@@ -140,6 +142,14 @@ describe("SecretManagerTenantHostingSecretResolver", () => {
     await expect(
       resolver.resolveEnvironment(tenantHostingDockerSecretReference(tenantId, "node-nextjs")),
     ).rejects.toThrow("HOSTING_SECRET_UNAVAILABLE");
+  });
+
+  it("normalizes broker failures without leaking upstream response details", async () => {
+    const resolver = new SecretManagerTenantHostingSecretResolver({
+      client: { getSecretValue: async () => { throw new Error("private broker response detail"); } },
+    });
+    await expect(resolver.resolveEnvironment(tenantHostingDockerSecretReference(tenantId, "node-nextjs")))
+      .rejects.toMatchObject({ message: "HOSTING_SECRET_UNAVAILABLE" });
   });
 
   it("builds references by backend and creates HttpSecretManagerClient from env", async () => {
@@ -207,6 +217,6 @@ describe("SecretManagerTenantHostingSecretResolver", () => {
           baseUrl: "http://secrets.internal:8200",
           authToken: "prod-token",
         }),
-    ).toThrow("HOSTING_SECRET_MANAGER_URL_INVALID");
+    ).toThrow("SECRET_MANAGER_URL_INVALID");
   });
 });

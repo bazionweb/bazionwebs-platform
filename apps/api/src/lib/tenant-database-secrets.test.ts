@@ -1,10 +1,14 @@
 import { chmod, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   DockerSecretTenantDatabaseSecretResolver,
+  createTenantDatabaseSecretResolver,
   tenantDatabaseDockerSecretReference,
+  tenantDatabaseSecretManagerPath,
+  tenantDatabaseSecretManagerReference,
+  SecretManagerTenantDatabaseSecretResolver,
 } from "./tenant-database-secrets.js";
 
 const tenantId = "11111111-1111-4111-8111-111111111111";
@@ -58,6 +62,8 @@ describe("DockerSecretTenantDatabaseSecretResolver", () => {
   it.each([
     { DATABASE_URL: "mysql://tenant:secret@db.example/tenant" },
     { DATABASE_URL: "postgres:///tenant" },
+    { DATABASE_URL: "postgres://tenant:secret@db.example" },
+    { DATABASE_URL: "postgres://tenant:secret@db.example/tenant#fragment" },
     { DATABASE_URL: " postgres://tenant:secret@db.example/tenant" },
     { DATABASE_URL: "postgres://tenant:secret@db.example/tenant\n" },
     { DATABASE_URL: databaseUrl, EXTRA: "unexpected" },
@@ -98,6 +104,87 @@ describe("DockerSecretTenantDatabaseSecretResolver", () => {
     const resolver = new DockerSecretTenantDatabaseSecretResolver(directory);
 
     await expect(resolver.resolveDatabaseUrl(tenantDatabaseDockerSecretReference(tenantId), tenantId))
+      .rejects.toThrow("TENANT_DATABASE_SECRET_UNAVAILABLE");
+  });
+});
+
+describe("SecretManagerTenantDatabaseSecretResolver", () => {
+  it("builds the configured Docker or production Secret Manager adapter", () => {
+    expect(createTenantDatabaseSecretResolver({
+      backend: "docker",
+      secretDirectory: "C:/secrets",
+    })).toBeInstanceOf(DockerSecretTenantDatabaseSecretResolver);
+    expect(createTenantDatabaseSecretResolver({
+      backend: "secret-manager",
+      secretDirectory: "C:/secrets",
+      secretManagerUrl: "https://secrets.example.test",
+      secretManagerToken: "read-only-token",
+    })).toBeInstanceOf(SecretManagerTenantDatabaseSecretResolver);
+    expect(() => createTenantDatabaseSecretResolver({
+      backend: "secret-manager",
+      secretDirectory: "C:/secrets",
+    })).toThrow("TENANT_DATABASE_SECRET_MANAGER_CLIENT_REQUIRED");
+    expect(() => createTenantDatabaseSecretResolver({
+      backend: "secret-manager",
+      secretDirectory: "C:/secrets",
+      secretManagerUrl: "http://secrets.example.test",
+      secretManagerToken: "read-only-token",
+    })).toThrow("SECRET_MANAGER_URL_INVALID");
+  });
+
+  it("resolves and caches a versioned secret at the tenant-scoped database path", async () => {
+    const getSecretValue = vi.fn(async () => JSON.stringify({ DATABASE_URL: databaseUrl }));
+    const resolver = new SecretManagerTenantDatabaseSecretResolver({
+      client: { getSecretValue },
+      pathPrefix: "/prod/tenant-secrets/",
+      secretVersion: "v2",
+      cacheTtlMs: 5_000,
+    });
+    const reference = tenantDatabaseSecretManagerReference(tenantId);
+
+    await expect(resolver.resolveDatabaseUrl(reference, tenantId)).resolves.toBe(databaseUrl);
+    await expect(resolver.resolveDatabaseUrl(reference, tenantId)).resolves.toBe(databaseUrl);
+    expect(getSecretValue).toHaveBeenCalledTimes(1);
+    expect(getSecretValue).toHaveBeenCalledWith(
+      tenantDatabaseSecretManagerPath(tenantId, "prod/tenant-secrets"),
+      "v2",
+    );
+  });
+
+  it("requires the reference tenant and requested tenant to match", async () => {
+    const getSecretValue = vi.fn(async () => JSON.stringify({ DATABASE_URL: databaseUrl }));
+    const resolver = new SecretManagerTenantDatabaseSecretResolver({ client: { getSecretValue } });
+
+    await expect(resolver.resolveDatabaseUrl(
+      "secret-manager://bazion-tenant-db-22222222-2222-4222-8222-222222222222",
+      tenantId,
+    )).rejects.toThrow("TENANT_DATABASE_SECRET_REFERENCE_INVALID");
+    expect(getSecretValue).not.toHaveBeenCalled();
+  });
+
+  it("rejects unsafe path prefixes and invalid database URLs without exposing secret data", async () => {
+    expect(() => tenantDatabaseSecretManagerPath(tenantId, "tenants/../other"))
+      .toThrow("TENANT_DATABASE_SECRET_PREFIX_INVALID");
+
+    const resolver = new SecretManagerTenantDatabaseSecretResolver({
+      client: { getSecretValue: async () => JSON.stringify({ DATABASE_URL: "mysql://private:value@db/tenant" }) },
+    });
+    await expect(resolver.resolveDatabaseUrl(tenantDatabaseSecretManagerReference(tenantId), tenantId))
+      .rejects.toMatchObject({ message: "TENANT_DATABASE_SECRET_INVALID" });
+  });
+
+  it("normalizes broker failures and missing values without returning provider details", async () => {
+    const failedResolver = new SecretManagerTenantDatabaseSecretResolver({
+      client: { getSecretValue: async () => { throw new Error("sensitive broker response"); } },
+    });
+    const missingResolver = new SecretManagerTenantDatabaseSecretResolver({
+      client: { getSecretValue: async () => null },
+    });
+    const reference = tenantDatabaseSecretManagerReference(tenantId);
+
+    await expect(failedResolver.resolveDatabaseUrl(reference, tenantId))
+      .rejects.toThrow("TENANT_DATABASE_SECRET_UNAVAILABLE");
+    await expect(missingResolver.resolveDatabaseUrl(reference, tenantId))
       .rejects.toThrow("TENANT_DATABASE_SECRET_UNAVAILABLE");
   });
 });

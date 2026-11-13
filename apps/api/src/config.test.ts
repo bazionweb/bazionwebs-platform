@@ -63,7 +63,28 @@ describe("API runtime configuration", () => {
   it("requires an absolute mounted secret directory in production even when hosting is disabled", () => {
     vi.stubEnv("NODE_ENV", "production");
     vi.stubEnv("HOSTING_SECRET_DIRECTORY", "secrets");
-    expect(() => loadConfig()).toThrow(/HOSTING_SECRET_DIRECTORY must be an absolute path in production/);
+    expect(() => loadConfig()).toThrow(/HOSTING_SECRET_DIRECTORY must be an absolute path when Docker secrets are enabled/);
+  });
+
+  it("requires tenant-scoped Secret Manager configuration and secure URLs when selected", () => {
+    vi.stubEnv("TENANT_DATABASE_SECRET_BACKEND", "secret-manager");
+    expect(() => loadConfig()).toThrow(/requires TENANT_DATABASE_SECRET_MANAGER_URL and TENANT_DATABASE_SECRET_MANAGER_TOKEN/);
+
+    vi.stubEnv("TENANT_DATABASE_SECRET_MANAGER_URL", "http://secrets.example.test");
+    vi.stubEnv("TENANT_DATABASE_SECRET_MANAGER_TOKEN", "test-reader-token");
+    expect(() => loadConfig()).toThrow(/must use HTTPS/);
+
+    vi.stubEnv("TENANT_DATABASE_SECRET_MANAGER_URL", "https://secrets.example.test");
+    expect(loadConfig()).toMatchObject({
+      TENANT_DATABASE_SECRET_BACKEND: "secret-manager",
+      TENANT_DATABASE_SECRET_MANAGER_URL: "https://secrets.example.test",
+      TENANT_DATABASE_SECRET_MANAGER_CACHE_TTL_MS: 30_000,
+    });
+  });
+
+  it("rejects tenant Secret Manager credentials when the Docker backend is selected", () => {
+    vi.stubEnv("TENANT_DATABASE_SECRET_MANAGER_TOKEN", "stale-token");
+    expect(() => loadConfig()).toThrow(/settings require TENANT_DATABASE_SECRET_BACKEND=secret-manager/);
   });
 
   it("accepts a canonical Base64 32-byte notification key", () => {
