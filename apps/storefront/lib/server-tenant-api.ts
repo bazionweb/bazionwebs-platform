@@ -2,6 +2,7 @@ import { cookies, headers } from "next/headers";
 import { cache } from "react";
 
 const apiBaseUrl = (process.env.API_BASE_URL ?? "http://localhost:4000").replace(/\/$/, "");
+const publicSiteDataRevalidateSeconds = 30;
 
 export async function getTenantRequestContext(): Promise<{ origin: string; headers: HeadersInit } | null> {
   try {
@@ -34,7 +35,9 @@ export const fetchTenantPublicData = cache(async function fetchTenantPublicData<
     if (!tenantContext) return null;
     const response = await fetch(`${apiBaseUrl}${path}`, {
       headers: tenantContext.headers,
-      cache: "no-store",
+      // Public content is host-resolved. The forwarded host and explicit tenant
+      // selector are part of the fetch cache key, keeping tenants isolated.
+      next: { revalidate: publicSiteDataRevalidateSeconds },
       signal: AbortSignal.timeout(3_000),
     });
     if (!response.ok) return null;

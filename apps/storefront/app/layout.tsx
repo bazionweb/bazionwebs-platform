@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Inter, Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 import "./recovery.css";
 import "@bazion/ui/tokens.css";
@@ -7,6 +8,9 @@ import "@bazion/ui/navigation.css";
 import "@bazion/ui/church.css";
 import { SiteThemeProvider } from "../lib/site-theme-provider";
 import { fetchTenantPublicData, getTenantRequestContext } from "../lib/server-tenant-api";
+
+const plusJakarta = Plus_Jakarta_Sans({ subsets: ["latin"], variable: "--font-plus-jakarta", display: "swap" });
+const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
 
 interface PublicSiteMetadataResponse {
   tenant?: { name?: string | null } | null;
@@ -52,15 +56,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Inter:wght@400;500;600;700;800;900&display=swap"
-          rel="stylesheet"
-        />
-      </head>
+    <html lang="en" className={`${plusJakarta.variable} ${inter.variable}`}>
       <body><SiteThemeProvider>{children}</SiteThemeProvider></body>
     </html>
   );

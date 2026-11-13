@@ -1,8 +1,11 @@
 import type { NextConfig } from "next";
+import path from "node:path";
 
 const apiBaseUrl = (process.env.API_BASE_URL ?? "http://localhost:4000").replace(/\/$/, "");
 
 const nextConfig: NextConfig = {
+  output: "standalone",
+  outputFileTracingRoot: path.resolve(process.cwd(), "../.."),
   transpilePackages: ["@bazion/ui", "@bazion/auth"],
   // Allow an isolated tenant preview to run beside the generic storefront.
   distDir: process.env.NEXT_DIST_DIR ?? ".next",
