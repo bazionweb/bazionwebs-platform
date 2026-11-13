@@ -39,6 +39,7 @@ export interface CommercialProvisioningRuntime {
   operatorService?: import("./operator-service.js").CommercialProvisioningOperatorService | undefined;
   lifecycleService?: import("./lifecycle-service.js").SubscriptionLifecycleService | undefined;
   lifecycleDispatcher?: Pick<import("./status-outbox-worker.js").PlatformLifecycleOutboxDispatcher, "processDueBatch" | "replayOutboxEntry"> | undefined;
+  installationChangeService?: import("./installation-change-service.js").InstallationChangeService | undefined;
   offboardingService?: import("./offboarding-service.js").InstallationOffboardingService | undefined;
   pilotPolicy?: import("@bazion/api-contracts").PilotCohortPolicyV1 | undefined;
   telemetry?: import("./observability.js").CommercialProvisioningTelemetry | undefined;

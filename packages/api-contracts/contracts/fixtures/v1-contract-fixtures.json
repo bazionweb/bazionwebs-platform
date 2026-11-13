@@ -61,6 +61,31 @@
             "template": { "id": "node-nextjs", "version": "1.0.0" }
           }
         }
+      },
+      {
+        "name": "website-launch PII-free order omitting displayName and primaryContact",
+        "payload": {
+          "schemaVersion": "1.0.0",
+          "eventId": "c1a8e112-3f62-4c22-8f6e-41d2e8b0b010",
+          "correlationId": "d23c4420-8a75-4e92-9f41-6b8b0019c020",
+          "idempotencyKey": "bazionweb:order:order-2026-0044:line:0:v1",
+          "occurredAt": "2026-11-12T10:00:00.000Z",
+          "source": "bazionweb",
+          "customer": {
+            "externalCustomerId": "customer-1010"
+          },
+          "order": {
+            "externalOrderId": "order-2026-0044:line:0",
+            "offerId": "website-launch",
+            "offerVersion": "1.0.0"
+          },
+          "composition": {
+            "product": { "id": "bazion-site", "version": "1.0.0" },
+            "solution": { "id": "business-website", "version": "1.0.0" },
+            "template": { "id": "node-nextjs", "version": "1.0.0" }
+          },
+          "requestedDomain": "minimal.example.org"
+        }
       }
     ],
     "invalid": [
@@ -762,6 +787,81 @@
             "reasonCode": "GRACE_EXPIRED",
             "effectiveAt": "2026-11-19T00:00:00.000Z",
             "updatedAt": "2026-11-19T00:00:01.000Z"
+          }
+        }
+      }
+    ]
+  },
+  "installationChangeCommand": {
+    "valid": [
+      {
+        "name": "valid addon_grant command preserving pinned base composition",
+        "payload": {
+          "schemaVersion": "1.0.0",
+          "eventId": "aaaa1111-1111-4111-8111-111111111111",
+          "correlationId": "bbbb2222-2222-4222-8222-222222222222",
+          "idempotencyKey": "bazionweb:install-change:order-2026-0050:line:0:v1",
+          "occurredAt": "2026-11-12T12:00:00.000Z",
+          "source": "bazionweb",
+          "target": {
+            "externalCustomerId": "customer-1008",
+            "installationId": "4954ba5a-6c50-4881-a3bc-c43076c7abc8",
+            "tenantId": "6b692865-86e6-42b9-934f-94953912a777",
+            "expectedBaseComposition": {
+              "product": { "id": "bazion-site", "version": "1.0.0" },
+              "solution": { "id": "business-website", "version": "1.0.0" },
+              "template": { "id": "node-nextjs", "version": "1.0.0" }
+            }
+          },
+          "commercial": {
+            "externalOrderId": "order-2026-0050:line:0",
+            "orderLineId": "line-0",
+            "invoiceId": "inv-2026-0050",
+            "subscriptionId": "sub-100"
+          },
+          "change": {
+            "changeType": "addon_grant",
+            "preservePinnedBaseComposition": true,
+            "enableModules": ["forms-leads"],
+            "disableModules": [],
+            "entitlementOverrides": { "forms-leads": true },
+            "rollbackOfEventId": null
+          }
+        }
+      }
+    ],
+    "invalid": [
+      {
+        "name": "rejects overlapping enableModules and disableModules",
+        "payload": {
+          "schemaVersion": "1.0.0",
+          "eventId": "aaaa1111-1111-4111-8111-111111111112",
+          "correlationId": "bbbb2222-2222-4222-8222-222222222222",
+          "idempotencyKey": "bazionweb:install-change:order-2026-0051:line:0:v1",
+          "occurredAt": "2026-11-12T12:00:00.000Z",
+          "source": "bazionweb",
+          "target": {
+            "externalCustomerId": "customer-1008",
+            "installationId": "4954ba5a-6c50-4881-a3bc-c43076c7abc8",
+            "expectedBaseComposition": {
+              "product": { "id": "bazion-site", "version": "1.0.0" },
+              "solution": { "id": "business-website", "version": "1.0.0" },
+              "template": { "id": "node-nextjs", "version": "1.0.0" }
+            }
+          },
+          "commercial": {
+            "externalOrderId": "order-2026-0051:line:0",
+            "orderLineId": "line-0",
+            "invoiceId": "inv-2026-0051",
+            "subscriptionId": null
+          },
+          "change": {
+            "changeType": "addon_grant",
+            "preservePinnedBaseComposition": true,
+            "enableModules": ["forms-leads"],
+            "disableModules": ["forms-leads"],
+            "entitlementOverrides": {},
+            "rollbackOfEventId": null
           }
         }
       }

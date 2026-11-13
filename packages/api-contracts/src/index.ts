@@ -6,6 +6,7 @@ export * from "./shared-enums.js";
 export * from "./commerce-admin.js";
 export * from "./contract-compatibility.js";
 export * from "./provisioning.js";
+export * from "./installation-change.js";
 export * from "./provisioning-catalog.js";
 export * from "./lifecycle.js";
 export * from "./operations-cutover.js";

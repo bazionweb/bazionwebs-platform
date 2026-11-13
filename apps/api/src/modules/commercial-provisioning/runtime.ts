@@ -1,23 +1,27 @@
-import { tmpdir } from "node:os";
-import { resolve } from "node:path";
 import { Pool } from "pg";
 import type { PilotMode } from "@bazion/api-contracts";
 import { PostgresAuditEventWriter } from "@bazion/audit";
 import { TENANT_HOSTING_TEMPLATES, type TenantHostingTemplate, type TenantId } from "@bazion/platform-contracts";
-import { EncryptedPrivateArchiveStorage, LocalPrivateArchiveStorage, type PrivateArchiveStorage } from "@bazion/storage";
+import {
+  createPrivateArchiveStorageFromEnv,
+  EncryptedPrivateArchiveStorage,
+  type PrivateArchiveStorage,
+} from "@bazion/storage";
 import type { HostingProvisioningRuntime } from "../hosting/runtime.js";
-import { tenantHostingDockerSecretReference } from "../hosting/secrets.js";
+import { tenantHostingSecretReference } from "../hosting/secrets.js";
 import {
   DEFAULT_COMMAND_AUDIENCE,
   DEFAULT_COMMAND_ISSUER,
   InMemoryJtiReplayCache,
 } from "./auth.js";
+import { InstallationChangeService } from "./installation-change-service.js";
 import { createDefaultTenantLifecycleAdapter, SubscriptionLifecycleService } from "./lifecycle-service.js";
 import { CommercialProvisioningTelemetry, ProvisioningSloService } from "./observability.js";
 import { InstallationOffboardingService } from "./offboarding-service.js";
 import {
   defaultSupportedProvisioningDistributionModes,
   platformProvisioningOfferBindings,
+  promoteApprovedProductionOfferBindings,
   type ProvisioningDistributionMode,
 } from "./offer-resolution.js";
 import { CommercialProvisioningOperatorService } from "./operator-service.js";
@@ -60,6 +64,7 @@ export interface CommercialProvisioningConfig {
   legacyFallbackEnabled?: boolean | undefined;
   dualReadReconciliationEnabled?: boolean | undefined;
   supportedDistributionModes?: readonly ProvisioningDistributionMode[] | undefined;
+  promoteApprovedOffers?: boolean | undefined;
 }
 
 const SUPPORTED_HOSTING_TEMPLATES = new Set<TenantHostingTemplate>(TENANT_HOSTING_TEMPLATES);
@@ -110,7 +115,11 @@ export function adaptHostingRuntime(
         templateVersion: loaded.templateVersion,
         idempotencyKey: args.idempotencyKey,
         composeFile: loaded.composeFile,
-        environmentSecretRef: tenantHostingDockerSecretReference(args.tenantId, templateId),
+        environmentSecretRef: tenantHostingSecretReference(
+          args.tenantId,
+          templateId,
+          hostingRuntime.secretBackend ?? "docker",
+        ),
         actorType: "service",
         actorId: "commercial-provisioning-saga",
       });
@@ -215,13 +224,16 @@ export function createCommercialProvisioningRuntime(
     ...(config.allowedCustomerIds ? { allowedCustomerIds: config.allowedCustomerIds } : {}),
     ...(config.allowedOffers ? { allowedOffers: config.allowedOffers } : {}),
   });
+  const baseOfferBindings = config.promoteApprovedOffers === true
+    ? promoteApprovedProductionOfferBindings()
+    : platformProvisioningOfferBindings;
   const effectiveOfferBindings =
     pilotPolicy.pilotMode === "disabled"
-      ? platformProvisioningOfferBindings
+      ? baseOfferBindings
       : getEffectiveOfferBindingsForMode(
           pilotPolicy.pilotMode,
           pilotPolicy.allowedOffers,
-          platformProvisioningOfferBindings,
+          baseOfferBindings,
         );
   const supportedDistributionModes =
     config.supportedDistributionModes ?? defaultSupportedProvisioningDistributionModes;
@@ -230,11 +242,9 @@ export function createCommercialProvisioningRuntime(
   const auditWriter = new PostgresAuditEventWriter(auditExecutor);
   const nodeEnv = config.nodeEnv ?? process.env.NODE_ENV ?? "development";
   const isProduction = nodeEnv === "production";
-  if (isProduction && !config.privateArchiveDirectory) {
-    throw new Error("PRIVATE_ARCHIVE_DIR must be explicitly configured in production.");
-  }
-  const baseStorage: PrivateArchiveStorage = new LocalPrivateArchiveStorage(
-    config.privateArchiveDirectory ?? resolve(tmpdir(), "bazion-private-archives"),
+  const baseStorage: PrivateArchiveStorage = createPrivateArchiveStorageFromEnv(
+    { ...process.env, NODE_ENV: nodeEnv },
+    config.privateArchiveDirectory ? { privateArchiveDirectory: config.privateArchiveDirectory } : undefined,
   );
   if (isProduction && !config.privateArchiveEncryptionKey) {
     throw new Error("PRIVATE_ARCHIVE_ENCRYPTION_KEY must be configured in production.");
@@ -282,6 +292,10 @@ export function createCommercialProvisioningRuntime(
     auditWriter,
     tenantAdapter,
   );
+  const installationChangeService = new InstallationChangeService(
+    provisionerPool,
+    auditWriter,
+  );
   const offboardingService = new InstallationOffboardingService(
     provisionerPool,
     storage,
@@ -322,6 +336,7 @@ export function createCommercialProvisioningRuntime(
     operatorService,
     lifecycleService,
     lifecycleDispatcher: new PlatformLifecycleOutboxDispatcher(provisionerPool),
+    installationChangeService,
     offboardingService,
     pilotPolicy,
     telemetry,

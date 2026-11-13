@@ -14,8 +14,11 @@ export {
   EncryptedPrivateArchiveStorage,
 } from "./encrypted-private-archive.js";
 export {
+  createPrivateArchiveStorageFromEnv,
   LocalPrivateArchiveStorage,
   S3PrivateArchiveStorage,
+  verifyPrivateArchiveRoundTrip,
+  type ArchiveStorageEnvOptions,
   type PrivateArchiveResult,
   type PrivateArchiveStorage,
   type S3PrivateArchiveStorageConfig,

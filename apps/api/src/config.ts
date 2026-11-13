@@ -67,7 +67,12 @@ const envSchema = z.object({
   DOKPLOY_API_KEY: optionalEnv,
   DOKPLOY_ENVIRONMENT_ID: optionalEnv,
   DOKPLOY_SERVER_ID: optionalEnv,
+  HOSTING_SECRET_BACKEND: z.enum(["docker", "secret-manager"]).default("docker"),
   HOSTING_SECRET_DIRECTORY: z.string().trim().min(1).default("/run/secrets"),
+  HOSTING_SECRET_MANAGER_URL: optionalEnv,
+  HOSTING_SECRET_MANAGER_TOKEN: optionalEnv,
+  HOSTING_SECRET_MANAGER_PREFIX: optionalEnv,
+  HOSTING_SECRET_MANAGER_VERSION: optionalEnv,
   HOSTING_TEMPLATE_DIRECTORY: z.string().trim().min(1).default(defaultHostingTemplateDirectory),
   COMMERCIAL_PROVISIONING_ENABLED: z.enum(["true", "false"]).default("false"),
   COMMERCIAL_PROVISIONING_WORKER_ENABLED: z.enum(["true", "false"]).default("false"),
@@ -78,6 +83,8 @@ const envSchema = z.object({
   COMMERCIAL_PROVISIONING_HOSTING_MUTATIONS_ENABLED: z.enum(["true", "false"]).optional(),
   COMMERCIAL_PROVISIONING_LEGACY_FALLBACK_ENABLED: z.enum(["true", "false"]).default("true"),
   COMMERCIAL_PROVISIONING_DUAL_READ_RECONCILIATION_ENABLED: z.enum(["true", "false"]).default("true"),
+  COMMERCIAL_PROVISIONING_SUPPORTED_DISTRIBUTION_MODES: optionalEnv,
+  COMMERCIAL_PROVISIONING_PROMOTE_APPROVED_OFFERS: z.enum(["true", "false"]).default("false"),
   PRODUCT_PROVISIONER_DATABASE_URL: optionalEnv,
   COMMERCIAL_PROVISIONING_COMMAND_SECRET: optionalEnv,
   COMMERCIAL_PROVISIONING_COMMAND_PREVIOUS_SECRETS: optionalEnv,
@@ -96,7 +103,7 @@ const envSchema = z.object({
 
 export function loadConfig() {
   const config = envSchema.parse(process.env);
-  if (config.NODE_ENV === "production" && !isAbsolute(config.HOSTING_SECRET_DIRECTORY)) {
+  if (config.NODE_ENV === "production" && config.HOSTING_SECRET_BACKEND === "docker" && !isAbsolute(config.HOSTING_SECRET_DIRECTORY)) {
     throw new Error("HOSTING_SECRET_DIRECTORY must be an absolute path in production.");
   }
   const mediaStorageValues = [
@@ -165,8 +172,14 @@ export function loadConfig() {
     if (dokployUrl.protocol !== "https:" || dokployUrl.username || dokployUrl.password || dokployUrl.search || dokployUrl.hash) {
       throw new Error("DOKPLOY_BASE_URL must be an HTTPS URL without credentials, query parameters or a fragment.");
     }
-    if (!isAbsolute(config.HOSTING_SECRET_DIRECTORY)) {
+    if (config.HOSTING_SECRET_BACKEND === "docker" && !isAbsolute(config.HOSTING_SECRET_DIRECTORY)) {
       throw new Error("HOSTING_SECRET_DIRECTORY must be an absolute path when hosting is enabled.");
+    }
+    if (
+      config.HOSTING_SECRET_BACKEND === "secret-manager"
+      && (!config.HOSTING_SECRET_MANAGER_URL || !config.HOSTING_SECRET_MANAGER_TOKEN)
+    ) {
+      throw new Error("HOSTING_SECRET_BACKEND=secret-manager requires HOSTING_SECRET_MANAGER_URL and HOSTING_SECRET_MANAGER_TOKEN.");
     }
   }
   const hasProvisionerUrl = Boolean(config.PRODUCT_PROVISIONER_DATABASE_URL);
@@ -278,7 +291,12 @@ export function loadConfig() {
     },
     hosting: {
       provider: config.HOSTING_PROVIDER,
+      secretBackend: config.HOSTING_SECRET_BACKEND,
       secretDirectory: config.HOSTING_SECRET_DIRECTORY,
+      ...(config.HOSTING_SECRET_MANAGER_URL ? { secretManagerUrl: config.HOSTING_SECRET_MANAGER_URL } : {}),
+      ...(config.HOSTING_SECRET_MANAGER_TOKEN ? { secretManagerToken: config.HOSTING_SECRET_MANAGER_TOKEN } : {}),
+      ...(config.HOSTING_SECRET_MANAGER_PREFIX ? { secretManagerPrefix: config.HOSTING_SECRET_MANAGER_PREFIX } : {}),
+      ...(config.HOSTING_SECRET_MANAGER_VERSION ? { secretManagerVersion: config.HOSTING_SECRET_MANAGER_VERSION } : {}),
       templateDirectory: config.HOSTING_TEMPLATE_DIRECTORY,
       dokploy: config.HOSTING_PROVIDER === "dokploy" ? {
         baseUrl: config.DOKPLOY_BASE_URL!,
@@ -323,6 +341,15 @@ export function loadConfig() {
           : config.HOSTING_PROVIDER === "dokploy",
       legacyFallbackEnabled: config.COMMERCIAL_PROVISIONING_LEGACY_FALLBACK_ENABLED === "true",
       dualReadReconciliationEnabled: config.COMMERCIAL_PROVISIONING_DUAL_READ_RECONCILIATION_ENABLED === "true",
+      ...(config.COMMERCIAL_PROVISIONING_SUPPORTED_DISTRIBUTION_MODES
+        ? {
+            supportedDistributionModes: config.COMMERCIAL_PROVISIONING_SUPPORTED_DISTRIBUTION_MODES
+              .split(",")
+              .map((value) => value.trim())
+              .filter(Boolean) as ("shared-managed" | "dedicated")[],
+          }
+        : {}),
+      promoteApprovedOffers: config.COMMERCIAL_PROVISIONING_PROMOTE_APPROVED_OFFERS === "true",
     },
     trustProxy: trustedProxyAddresses.length ? trustedProxyAddresses : false,
     mpesa: darajaConfiguredCount === darajaValues.length

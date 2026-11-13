@@ -4,12 +4,14 @@ import { z } from "zod";
 import {
   CONTRACT_COMPATIBILITY_V1,
   evaluateContractVersionCompatibility,
+  getInstallationChangeCommandV1JsonSchema,
   getProvisionProductRequestV1JsonSchema,
   getProvisioningOfferCatalogV1JsonSchema,
   getProvisioningOperationV1JsonSchema,
   getProvisioningStatusEventV1JsonSchema,
   getSubscriptionLifecycleCommandV1JsonSchema,
   getSubscriptionLifecycleStatusEventV1JsonSchema,
+  installationChangeCommandV1Schema,
   provisionProductRequestV1Schema,
   provisioningOfferCatalogV1Schema,
   provisioningOperationV1Schema,
@@ -31,6 +33,7 @@ interface ContractFixtureCorpus {
   provisioningStatusEvent: FixtureSection;
   subscriptionLifecycleCommand: FixtureSection;
   subscriptionLifecycleStatusEvent: FixtureSection;
+  installationChangeCommand: FixtureSection;
 }
 
 const fixtures = JSON.parse(
@@ -44,7 +47,7 @@ function readSchemaArtifact(fileName: string) {
 }
 
 describe("Commercial <-> Platform Contract v1 parity & compatibility", () => {
-  it("keeps all 6 published JSON Schema artifacts synchronized with runtime schema builders", () => {
+  it("keeps all 7 published JSON Schema artifacts synchronized with runtime schema builders", () => {
     const schemaPairs: ReadonlyArray<[string, unknown]> = [
       ["provision-product-request-v1.schema.json", getProvisionProductRequestV1JsonSchema()],
       ["provisioning-offer-catalog-v1.schema.json", getProvisioningOfferCatalogV1JsonSchema()],
@@ -52,6 +55,7 @@ describe("Commercial <-> Platform Contract v1 parity & compatibility", () => {
       ["provisioning-status-event-v1.schema.json", getProvisioningStatusEventV1JsonSchema()],
       ["subscription-lifecycle-command-v1.schema.json", getSubscriptionLifecycleCommandV1JsonSchema()],
       ["subscription-lifecycle-status-event-v1.schema.json", getSubscriptionLifecycleStatusEventV1JsonSchema()],
+      ["installation-change-command-v1.schema.json", getInstallationChangeCommandV1JsonSchema()],
     ];
 
     expect(CONTRACT_COMPATIBILITY_V1.contracts.map((item) => item.fileName)).toEqual(
@@ -113,6 +117,7 @@ describe("Commercial <-> Platform Contract v1 parity & compatibility", () => {
     { key: "provisioningStatusEvent", schema: provisioningStatusEventV1Schema },
     { key: "subscriptionLifecycleCommand", schema: subscriptionLifecycleCommandV1Schema },
     { key: "subscriptionLifecycleStatusEvent", schema: subscriptionLifecycleStatusEventV1Schema },
+    { key: "installationChangeCommand", schema: installationChangeCommandV1Schema },
   ];
 
   for (const section of sections) {

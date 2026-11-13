@@ -88,6 +88,38 @@ export async function registerCommercialPhase6Routes(
     }
   });
 
+  // ── Internal signed target-installation add-on / entitlement change command (Bazionweb -> Platform) ──
+  app.post("/internal/commercial/installation-changes", async (request, reply) => {
+    try {
+      const runtime = options.runtime;
+      if (!requireRuntime(runtime, reply)) return reply;
+      if (!runtime.installationChangeService) {
+        return reply.code(503).send({
+          error: "COMMERCIAL_INSTALLATION_CHANGES_UNAVAILABLE",
+          message: "Installation change service is not configured.",
+        });
+      }
+
+      const claims = verifyRuntimeMachineBearer(
+        request.headers as Record<string, unknown>,
+        runtime.commandAuth,
+        ["commercial:lifecycle:write"],
+      );
+
+      const result = await runtime.installationChangeService.applySignedCommand(request.body, {
+        requestId: request.id,
+        actorClientId: claims.sub,
+      });
+
+      return reply.code(200).send({
+        accepted: true,
+        ...result,
+      });
+    } catch (error) {
+      return sendPhase6Error(reply, error);
+    }
+  });
+
   // ── Super-admin & operator provisioning saga inspection & control routes ──
   app.get<{
     Querystring: { status?: string; externalOrderId?: string; tenantId?: string; limit?: string };

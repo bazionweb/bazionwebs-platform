@@ -1,10 +1,14 @@
 import { describe, expect, it } from "vitest";
 import type { ProvisionProductRequestV1 } from "@bazion/api-contracts";
 import {
+  approvedProductionOfferCandidateBindings,
   createProvisioningOfferCatalogV1,
+  OfferBindingPromotionError,
   platformProvisioningOfferBindings,
+  promoteApprovedProductionOfferBindings,
   ProvisioningOfferResolutionError,
   resolveProvisioningOfferBinding,
+  verifyOfferBindingReleaseTrio,
   type ProvisioningOfferBinding,
 } from "./offer-resolution.js";
 
@@ -101,5 +105,46 @@ describe("platform provisioning offer bindings", () => {
       bindings: [{ offer: binding.offer, composition: binding.composition }],
     });
     expect(JSON.stringify(catalog)).not.toMatch(/price|amount|currency/i);
+  });
+
+  it("blocks production candidate promotion while church-ministry manifests remain partial on disk", () => {
+    const verification = verifyOfferBindingReleaseTrio(approvedProductionOfferCandidateBindings[0]!);
+    expect(verification.approved).toBe(false);
+    expect(verification.blockers).toEqual(
+      expect.arrayContaining([
+        "PRODUCT_MANIFEST_NOT_STABLE:partial",
+        "SOLUTION_MANIFEST_NOT_STABLE:partial",
+        "TEMPLATE_MANIFEST_NOT_STABLE:partial",
+      ]),
+    );
+    expect(() => promoteApprovedProductionOfferBindings()).toThrowError(OfferBindingPromotionError);
+  });
+
+  it("promotes and pins an audited production binding once all release trio manifests are stable", () => {
+    const audits: unknown[] = [];
+    const promoted = promoteApprovedProductionOfferBindings(approvedProductionOfferCandidateBindings, {
+      snapshot: {
+        product: { id: "church-ministry", version: "1.0.0", status: "stable" },
+        solution: { id: "church-ministry", version: "1.0.0", status: "stable", readiness: "buildable" },
+        template: { id: "church-ministry", version: "1.0.0", status: "stable" },
+      },
+      auditRecorder: (event) => audits.push(event),
+    });
+
+    expect(promoted).toHaveLength(1);
+    expect(audits).toHaveLength(1);
+
+    const launchRequest: ProvisionProductRequestV1 = {
+      ...request,
+      order: { externalOrderId: "order-prod-1", offerId: "website-launch", offerVersion: "1.0.0" },
+      composition: {
+        product: { id: "church-ministry", version: "1.0.0" },
+        solution: { id: "church-ministry", version: "1.0.0" },
+        template: { id: "church-ministry", version: "1.0.0" },
+      },
+    };
+    const resolved = resolveProvisioningOfferBinding(launchRequest, promoted);
+    expect(resolved.offer).toEqual({ id: "website-launch", version: "1.0.0" });
+    expect(resolved.composition.product).toEqual({ id: "church-ministry", version: "1.0.0" });
   });
 });

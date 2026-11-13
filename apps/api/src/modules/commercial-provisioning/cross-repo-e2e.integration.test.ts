@@ -18,6 +18,7 @@ import {
   signMachineBearerToken,
 } from "./auth.js";
 import { commercialProvisioningRoutes, type CommercialProvisioningRuntime } from "./routes.js";
+import { InstallationChangeService } from "./installation-change-service.js";
 import { createDefaultTenantLifecycleAdapter, SubscriptionLifecycleService } from "./lifecycle-service.js";
 import type { ProvisioningOfferBinding } from "./offer-resolution.js";
 import { CommercialProvisioningService } from "./service.js";
@@ -281,6 +282,7 @@ describe.skipIf(!enabled)("Cross-repo live end-to-end commercial-to-platform del
   let dispatcher: PlatformStatusOutboxDispatcher;
   let lifecycleService: SubscriptionLifecycleService;
   let lifecycleDispatcher: PlatformLifecycleOutboxDispatcher;
+  let installationChangeService: InstallationChangeService;
   let bridge: BazionwebBridgeClient;
 
   const createdOperationIds: string[] = [];
@@ -300,6 +302,10 @@ describe.skipIf(!enabled)("Cross-repo live end-to-end commercial-to-platform del
       createDefaultTenantLifecycleAdapter(migrationPool),
     );
     lifecycleDispatcher = new PlatformLifecycleOutboxDispatcher(provisionerPool);
+    installationChangeService = new InstallationChangeService(
+      provisionerPool,
+      new PostgresAuditEventWriter(databaseModule.pool),
+    );
 
     runtime = {
       commandAuth: {
@@ -311,6 +317,7 @@ describe.skipIf(!enabled)("Cross-repo live end-to-end commercial-to-platform del
       dispatcher,
       lifecycleService,
       lifecycleDispatcher,
+      installationChangeService,
       close: async () => undefined,
     };
 
@@ -836,5 +843,124 @@ describe.skipIf(!enabled)("Cross-repo live end-to-end commercial-to-platform del
     ]);
     expect(stateRestored.projection?.subscriptionStatus).toBe("ACTIVE");
     expect(stateRestored.projection?.status).toBe("ready");
+
+    // 5. Target-installation add-on grant, idempotent replay, base composition check, and rollback
+    const changeToken = signMachineBearerToken(
+      {
+        subject: "bazionweb-change-dispatcher",
+        issuer: DEFAULT_COMMAND_ISSUER,
+        audience: DEFAULT_COMMAND_AUDIENCE,
+        scopes: ["commercial:lifecycle:write"],
+        ttlSeconds: 120,
+      },
+      commandSecret,
+    );
+    const expectedBaseComposition = {
+      product: integrationOfferBinding.composition.product,
+      solution: integrationOfferBinding.composition.solution,
+      template: integrationOfferBinding.composition.template,
+    };
+    const grantEventId = randomUUID();
+    const grantCommand = {
+      schemaVersion: "1.0.0",
+      eventId: grantEventId,
+      correlationId: randomUUID(),
+      idempotencyKey: `bazionweb:e2e-change:grant:${suffix}`,
+      occurredAt: "2026-11-11T10:00:00.000Z",
+      source: "bazionweb",
+      target: {
+        externalCustomerId: settled.clientId,
+        installationId,
+        tenantId,
+        expectedBaseComposition,
+      },
+      commercial: {
+        externalOrderId: settled.outbox.externalOrderId,
+        orderLineId: `${settled.outbox.externalOrderId}:addon:analytics`,
+        invoiceId: renewal.invoiceId,
+        subscriptionId: settled.subscriptionId,
+      },
+      change: {
+        changeType: "addon_grant",
+        preservePinnedBaseComposition: true,
+        enableModules: ["analytics"],
+        disableModules: [],
+        entitlementOverrides: {},
+        rollbackOfEventId: null,
+      },
+    };
+
+    const grantRes = await fetch(`${platformBaseUrl}/v1/internal/commercial/installation-changes`, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${changeToken}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify(grantCommand),
+    });
+    expect(grantRes.status).toBe(200);
+    const grantBody = await grantRes.json() as {
+      idempotentReplay: boolean;
+      resultingModules: string[];
+      preservedBaseComposition: unknown;
+    };
+    expect(grantBody.idempotentReplay).toBe(false);
+    expect(grantBody.resultingModules).toContain("analytics");
+    expect(grantBody.preservedBaseComposition).toEqual(expectedBaseComposition);
+
+    const replayChangeRes = await fetch(`${platformBaseUrl}/v1/internal/commercial/installation-changes`, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${changeToken}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify(grantCommand),
+    });
+    expect(replayChangeRes.status).toBe(200);
+    expect(((await replayChangeRes.json()) as { idempotentReplay: boolean }).idempotentReplay).toBe(true);
+
+    const mismatchRes = await fetch(`${platformBaseUrl}/v1/internal/commercial/installation-changes`, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${changeToken}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        ...grantCommand,
+        eventId: randomUUID(),
+        idempotencyKey: `bazionweb:e2e-change:mismatch:${suffix}`,
+        target: {
+          ...grantCommand.target,
+          expectedBaseComposition: {
+            ...expectedBaseComposition,
+            product: { id: expectedBaseComposition.product.id, version: "9.9.9" },
+          },
+        },
+      }),
+    });
+    expect(mismatchRes.status).toBe(409);
+
+    const rollbackRes = await fetch(`${platformBaseUrl}/v1/internal/commercial/installation-changes`, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${changeToken}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        ...grantCommand,
+        eventId: randomUUID(),
+        idempotencyKey: `bazionweb:e2e-change:rollback:${suffix}`,
+        change: {
+          changeType: "rollback",
+          preservePinnedBaseComposition: true,
+          enableModules: [],
+          disableModules: [],
+          entitlementOverrides: {},
+          rollbackOfEventId: grantEventId,
+        },
+      }),
+    });
+    expect(rollbackRes.status).toBe(200);
+    expect(((await rollbackRes.json()) as { resultingModules: string[] }).resultingModules).not.toContain("analytics");
   }, 45_000);
 });

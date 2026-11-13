@@ -30,6 +30,7 @@ export const requiredDatabaseMigrations = [
   "0022_phase4_hosting_deployment_projection.sql",
   "0023_product_provisioner_hosting_identity_read.sql",
   "0024_commercial_platform_hardening.sql",
+  "0025_installation_changes.sql",
 ] as const;
 
 /** Current tenant database release marker; updates automatically with the registry. */

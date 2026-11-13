@@ -10,6 +10,7 @@ import {
   verifyMachineBearerToken,
 } from "./auth.js";
 import { commercialProvisioningRoutes, type CommercialProvisioningRuntime } from "./routes.js";
+import { InstallationChangeService } from "./installation-change-service.js";
 import { CommercialProvisioningError } from "./service.js";
 import { PlatformLifecycleOutboxDispatcher } from "./status-outbox-worker.js";
 
@@ -371,5 +372,208 @@ describe("Phase 6 commercial lifecycle, operator saga, and archive routes", () =
     );
     expect(claims.sub).toBe("bazion-platform-lifecycle-dispatcher");
     expect(updates.some((u) => u.sql.includes("product_subscription_lifecycle_outbox") && u.sql.includes("'delivered'"))).toBe(true);
+  });
+
+  it("applies signed target-installation addon grants, enforces base composition immutability, replays idempotently, and rolls back", async () => {
+    const changes: Array<any> = [];
+    const entitlements = new Map<string, boolean>([
+      ["platform-identity", true],
+      ["church-ministry", true],
+      ["media-storage", true],
+    ]);
+
+    const fakeClient = {
+      query: vi.fn(async (sql: string, params: any[] = []) => {
+        if (sql === "BEGIN" || sql === "COMMIT" || sql === "ROLLBACK" || sql.startsWith("SELECT set_config")) {
+          return { rows: [], rowCount: 0 };
+        }
+        if (sql.includes("FROM public.product_installation_changes") && sql.includes("idempotency_key = $1")) {
+          const hit = changes.find((c) => c.idempotency_key === params[0] || c.event_id === params[1]);
+          return { rows: hit ? [hit] : [], rowCount: hit ? 1 : 0 };
+        }
+        if (sql.includes("FROM public.product_installations")) {
+          return {
+            rows: [
+              {
+                id: installationId,
+                tenant_id: tenantId,
+                external_customer_id: "cust-p6-100",
+                product_id: "church-ministry",
+                product_version: "1.0.0",
+                solution_id: "church-ministry",
+                solution_version: "1.0.0",
+                template_id: "church-ministry",
+                template_version: "1.0.0",
+                status: "ready",
+              },
+            ],
+            rowCount: 1,
+          };
+        }
+        if (sql.includes("FROM public.tenant_module_entitlements")) {
+          const rows = [...entitlements.entries()]
+            .filter(([, enabled]) => enabled)
+            .sort(([a], [b]) => a.localeCompare(b))
+            .map(([module_id]) => ({ module_id }));
+          return { rows, rowCount: rows.length };
+        }
+        if (sql.includes("FROM public.product_installation_changes") && sql.includes("rollback_of_event_id = $2::uuid")) {
+          const existingRb = changes.find((c) => c.installation_id === params[0] && c.rollback_of_event_id === params[1]);
+          return { rows: existingRb ? [{ id: existingRb.id }] : [], rowCount: existingRb ? 1 : 0 };
+        }
+        if (sql.includes("FROM public.product_installation_changes") && sql.includes("AND event_id = $2::uuid")) {
+          const target = changes.find((c) => c.installation_id === params[0] && c.event_id === params[1]);
+          return { rows: target ? [{ previous_modules: target.previous_modules }] : [], rowCount: target ? 1 : 0 };
+        }
+        if (sql.includes("INSERT INTO public.tenant_module_entitlements")) {
+          entitlements.set(params[1], sql.includes("true"));
+          return { rows: [], rowCount: 1 };
+        }
+        if (sql.includes("INSERT INTO public.product_installation_changes")) {
+          const row = {
+            id: randomUUID(),
+            event_id: params[0],
+            installation_id: params[3],
+            external_order_id: params[6],
+            change_type: params[10],
+            expected_base_composition: JSON.parse(params[11]),
+            enable_modules: params[12],
+            disable_modules: params[13],
+            previous_modules: params[15],
+            resulting_modules: params[16],
+            rollback_of_event_id: params[17],
+            idempotency_key: params[2],
+            applied_at: new Date("2026-11-13T05:15:00.000Z").toISOString(),
+          };
+          changes.push(row);
+          return { rows: [{ id: row.id, applied_at: row.applied_at }], rowCount: 1 };
+        }
+        return { rows: [], rowCount: 0 };
+      }),
+      release: vi.fn(),
+    };
+
+    const installationChangeService = new InstallationChangeService(
+      { connect: async () => fakeClient as any, query: vi.fn() } as any,
+      { append: mocks.appendAuditEvent },
+    );
+
+    const runtime = makePhase6Runtime();
+    runtime.installationChangeService = installationChangeService;
+    const app = Fastify();
+    await app.register(commercialProvisioningRoutes, { prefix: "/v1", runtime });
+    await app.ready();
+
+    try {
+      const grantEventId = randomUUID();
+      const expectedBaseComposition = {
+        product: { id: "church-ministry", version: "1.0.0" },
+        solution: { id: "church-ministry", version: "1.0.0" },
+        template: { id: "church-ministry", version: "1.0.0" },
+      };
+      const grantPayload = {
+        schemaVersion: "1.0.0",
+        eventId: grantEventId,
+        correlationId,
+        idempotencyKey: "bazionweb:change:grant-notifications:v1",
+        occurredAt: "2026-11-13T05:15:00.000Z",
+        source: "bazionweb",
+        target: {
+          externalCustomerId: "cust-p6-100",
+          installationId,
+          tenantId,
+          expectedBaseComposition,
+        },
+        commercial: {
+          externalOrderId: "INV-P6-100:line:1",
+          orderLineId: "INV-P6-100:line:1",
+          invoiceId: "INV-P6-100",
+          subscriptionId: "sub-p6-100",
+        },
+        change: {
+          changeType: "addon_grant",
+          preservePinnedBaseComposition: true,
+          enableModules: ["notifications"],
+          disableModules: [],
+          entitlementOverrides: { "max-recipients": 5000 },
+          rollbackOfEventId: null,
+        },
+      };
+
+      const wrongScopeRes = await app.inject({
+        method: "POST",
+        url: "/v1/internal/commercial/installation-changes",
+        headers: { authorization: `Bearer ${mintToken(["commercial:commands:write"])}` },
+        payload: grantPayload,
+      });
+      expect(wrongScopeRes.statusCode).toBe(403);
+
+      const grantRes = await app.inject({
+        method: "POST",
+        url: "/v1/internal/commercial/installation-changes",
+        headers: { authorization: `Bearer ${mintToken(["commercial:lifecycle:write"])}` },
+        payload: grantPayload,
+      });
+      expect(grantRes.statusCode).toBe(200);
+      const granted = grantRes.json();
+      expect(granted.idempotentReplay).toBe(false);
+      expect(granted.preservedBaseComposition).toEqual(expectedBaseComposition);
+      expect(granted.resultingModules).toContain("notifications");
+
+      // Idempotent replay with same key & payload returns deduplicated result
+      const replayRes = await app.inject({
+        method: "POST",
+        url: "/v1/internal/commercial/installation-changes",
+        headers: { authorization: `Bearer ${mintToken(["commercial:lifecycle:write"])}` },
+        payload: grantPayload,
+      });
+      expect(replayRes.statusCode).toBe(200);
+      expect(replayRes.json().idempotentReplay).toBe(true);
+
+      // Mismatched expectedBaseComposition is rejected (409 BASE_COMPOSITION_MISMATCH)
+      const mismatchRes = await app.inject({
+        method: "POST",
+        url: "/v1/internal/commercial/installation-changes",
+        headers: { authorization: `Bearer ${mintToken(["commercial:lifecycle:write"])}` },
+        payload: {
+          ...grantPayload,
+          eventId: randomUUID(),
+          idempotencyKey: "bazionweb:change:mismatch-test:v1",
+          target: {
+            ...grantPayload.target,
+            expectedBaseComposition: {
+              ...expectedBaseComposition,
+              product: { id: "church-ministry", version: "2.0.0" },
+            },
+          },
+        },
+      });
+      expect(mismatchRes.statusCode).toBe(409);
+      expect(mismatchRes.json().error).toBe("BASE_COMPOSITION_MISMATCH");
+
+      // Rollback reverses the prior grant and restores previousModules
+      const rollbackRes = await app.inject({
+        method: "POST",
+        url: "/v1/internal/commercial/installation-changes",
+        headers: { authorization: `Bearer ${mintToken(["commercial:lifecycle:write"])}` },
+        payload: {
+          ...grantPayload,
+          eventId: randomUUID(),
+          idempotencyKey: "bazionweb:change:rollback-notifications:v1",
+          change: {
+            changeType: "rollback",
+            preservePinnedBaseComposition: true,
+            enableModules: [],
+            disableModules: [],
+            entitlementOverrides: {},
+            rollbackOfEventId: grantEventId,
+          },
+        },
+      });
+      expect(rollbackRes.statusCode).toBe(200);
+      expect(rollbackRes.json().resultingModules).not.toContain("notifications");
+    } finally {
+      await app.close();
+    }
   });
 });

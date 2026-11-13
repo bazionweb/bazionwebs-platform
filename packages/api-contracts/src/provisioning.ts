@@ -51,11 +51,11 @@ export const provisionProductRequestV1Schema = z.object({
   source: z.literal("bazionweb"),
   customer: z.object({
     externalCustomerId: externalIdSchema,
-    displayName: z.string().trim().min(1).max(180),
+    displayName: z.string().trim().min(1).max(180).optional(),
     primaryContact: z.object({
       name: z.string().trim().min(1).max(120),
       email: z.email().max(254).regex(/^[^A-Z]*$/, "Send contact email in lowercase."),
-    }).strict(),
+    }).strict().optional(),
   }).strict(),
   order: z.object({
     externalOrderId: externalIdSchema,

@@ -31,8 +31,16 @@ describe("database migration registry", () => {
     expect(requiredDatabaseMigrations).toContain("0022_phase4_hosting_deployment_projection.sql");
     expect(requiredDatabaseMigrations).toContain("0023_product_provisioner_hosting_identity_read.sql");
     expect(requiredDatabaseMigrations).toContain("0024_commercial_platform_hardening.sql");
+    expect(requiredDatabaseMigrations).toContain("0025_installation_changes.sql");
     expect(currentDatabaseSchemaVersion).toBe(requiredDatabaseMigrations.at(-1));
-    expect(currentDatabaseSchemaVersion).toBe("0024_commercial_platform_hardening.sql");
+    expect(currentDatabaseSchemaVersion).toBe("0025_installation_changes.sql");
+  });
+
+  it("enforces immutable installation changes ledger in 0025", () => {
+    const migration = readFileSync(join(migrationsDirectory, "0025_installation_changes.sql"), "utf8");
+    expect(migration).toContain("product_installation_changes");
+    expect(migration).toContain("preserve_pinned_base_composition = true");
+    expect(migration).toContain("GRANT SELECT, INSERT ON public.product_installation_changes TO bazion_product_provisioner");
   });
 
   it("enforces database hardening for config immutability, domain routing, saga transitions, and role grants in 0024", () => {

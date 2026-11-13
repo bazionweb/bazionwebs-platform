@@ -109,5 +109,14 @@ jobs:
       - name: Run unit, authentication and tenant-isolation tests
         run: pnpm test
 
+      - name: Run gated cross-repo commercial-platform E2E suite (when sibling bazionweb test DB is configured)
+        if: env.BAZIONWEB_TEST_DATABASE_URL != '' && env.BAZIONWEB_API_DIR != ''
+        env:
+          MIGRATION_DATABASE_URL: ${{ vars.MIGRATION_DATABASE_URL || 'postgresql://bazion_admin:bazion_dev_only@127.0.0.1:5432/bazion_platform' }}
+          PRODUCT_PROVISIONER_DATABASE_URL: ${{ vars.PRODUCT_PROVISIONER_DATABASE_URL || 'postgresql://bazion_product_provisioner:bazion_product_provisioner_dev_only@127.0.0.1:5432/bazion_platform' }}
+          BAZIONWEB_TEST_DATABASE_URL: ${{ secrets.BAZIONWEB_TEST_DATABASE_URL }}
+          BAZIONWEB_API_DIR: ${{ vars.BAZIONWEB_API_DIR }}
+        run: pnpm --filter @bazion/api exec vitest run src/modules/commercial-provisioning/cross-repo-e2e.integration.test.ts
+
       - name: Build all applications and packages
         run: pnpm build

@@ -4,7 +4,12 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 import { EncryptedPrivateArchiveStorage } from "./encrypted-private-archive.js";
-import { LocalPrivateArchiveStorage } from "./private-archive.js";
+import {
+  createPrivateArchiveStorageFromEnv,
+  LocalPrivateArchiveStorage,
+  S3PrivateArchiveStorage,
+  verifyPrivateArchiveRoundTrip,
+} from "./private-archive.js";
 
 describe("private offboarding archive storage", () => {
   const dir = mkdtempSync(join(tmpdir(), "bazion-archive-test-"));
@@ -79,6 +84,31 @@ describe("private offboarding archive storage", () => {
     await expect(
       encrypted.getArchive({ tenantId, key: stored.key, checksum: stored.checksum }),
     ).resolves.toBeNull();
+  });
+
+  it("enforces durable archive backend selection from env and verifies encrypted round-trip integrity", async () => {
+    expect(() =>
+      createPrivateArchiveStorageFromEnv({ NODE_ENV: "production" } as NodeJS.ProcessEnv),
+    ).toThrow("Production offboarding archives require S3 storage");
+
+    const s3Backed = createPrivateArchiveStorageFromEnv({
+      NODE_ENV: "production",
+      PRIVATE_ARCHIVE_S3_ENDPOINT: "https://s3.eu-central-1.amazonaws.com",
+      PRIVATE_ARCHIVE_S3_BUCKET: "bazion-archives-prod",
+      PRIVATE_ARCHIVE_S3_REGION: "eu-central-1",
+      PRIVATE_ARCHIVE_S3_ACCESS_KEY_ID: "AKIAEXAMPLE",
+      PRIVATE_ARCHIVE_S3_SECRET_ACCESS_KEY: "super-secret-key",
+    } as NodeJS.ProcessEnv);
+    expect(s3Backed).toBeInstanceOf(S3PrivateArchiveStorage);
+
+    const devStorage = createPrivateArchiveStorageFromEnv(
+      { NODE_ENV: "test" } as NodeJS.ProcessEnv,
+      { privateArchiveDirectory: dir },
+    );
+    const encrypted = new EncryptedPrivateArchiveStorage(devStorage, randomBytes(32).toString("base64"));
+    const probe = await verifyPrivateArchiveRoundTrip(encrypted, randomUUID());
+    expect(probe.verified).toBe(true);
+    expect(probe.checksum).toMatch(/^[a-f0-9]{64}$/);
   });
 });
 

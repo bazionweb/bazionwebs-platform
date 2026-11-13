@@ -35,8 +35,15 @@ const request = {
 describe("Bazion commercial-to-platform provisioning contract v1", () => {
   it("parses a valid request with lowercase contact email and hostname", () => {
     const parsed = provisionProductRequestV1Schema.parse(request);
-    expect(parsed.customer.primaryContact.email).toBe("admin@acacia.example.org");
+    expect(parsed.customer.primaryContact?.email).toBe("admin@acacia.example.org");
     expect(parsed.requestedDomain).toBe("www.acacia.example.org");
+
+    const piiFree = provisionProductRequestV1Schema.parse({
+      ...request,
+      customer: { externalCustomerId: "customer-1008" },
+    });
+    expect(piiFree.customer.displayName).toBeUndefined();
+    expect(piiFree.customer.primaryContact).toBeUndefined();
   });
 
   it("keeps the published JSON Schema artifact synchronized with the runtime validator", () => {

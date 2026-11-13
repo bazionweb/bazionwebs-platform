@@ -1,3 +1,6 @@
+import { existsSync, readFileSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import type { DistributionMode, ProvisionProductRequestV1 } from "@bazion/api-contracts";
 import { provisioningOfferCatalogV1Schema, type ProvisioningOfferCatalogV1 } from "@bazion/api-contracts";
 
@@ -143,4 +146,199 @@ export function createProvisioningOfferCatalogV1(
 
 export function getProvisioningOfferCatalogV1(generatedAt = new Date()): ProvisioningOfferCatalogV1 {
   return createProvisioningOfferCatalogV1(platformProvisioningOfferBindings, generatedAt);
+}
+
+/**
+ * Audited candidate production offer binding pinned to the church-ministry release trio.
+ * Remains non-authoritative until all three manifests pass release-trio verification (`status: "stable"`).
+ */
+export const approvedProductionOfferCandidateBindings: readonly ProvisioningOfferBinding[] = [
+  {
+    offer: { id: "website-launch", version: "1.0.0" },
+    composition: {
+      product: { id: "church-ministry", version: "1.0.0" },
+      solution: { id: "church-ministry", version: "1.0.0" },
+      template: { id: "church-ministry", version: "1.0.0" },
+    },
+    requiredModules: [
+      { id: "platform-identity", version: "1.0.0" },
+      { id: "church-ministry", version: "1.0.0" },
+      { id: "media-storage", version: "1.0.0" },
+    ],
+    optionalModules: [
+      { id: "notifications", version: "0.1.0" },
+      { id: "analytics", version: "1.0.0" },
+      { id: "commerce", version: "1.0.0" },
+    ],
+    distributionMode: "shared-managed",
+    availability: "active",
+    releaseState: {
+      product: "stable",
+      solution: "stable",
+      solutionReadiness: "buildable",
+      template: "stable",
+    },
+  },
+];
+
+export interface ReleaseTrioManifestSnapshot {
+  product: { id: string; version: string; status: string };
+  solution: { id: string; version: string; status: string; readiness: string };
+  template: { id: string; version: string; status: string };
+}
+
+export interface OfferBindingReleaseVerificationResult {
+  approved: boolean;
+  offer: ProvisioningOfferReleaseReference;
+  composition: ProvisioningOfferBinding["composition"];
+  blockers: string[];
+  snapshot: ReleaseTrioManifestSnapshot | null;
+}
+
+export class OfferBindingPromotionError extends ProvisioningOfferResolutionError {
+  constructor(public readonly blockers: readonly string[]) {
+    super("PROVISIONING_OFFER_RELEASE_UNSTABLE");
+    this.name = "OfferBindingPromotionError";
+  }
+}
+
+function defaultRepoRoot(): string {
+  const thisDir = dirname(fileURLToPath(import.meta.url));
+  return resolve(thisDir, "../../../../..");
+}
+
+function readJsonManifest(filePath: string): Record<string, unknown> | null {
+  if (!existsSync(filePath)) return null;
+  return JSON.parse(readFileSync(filePath, "utf8")) as Record<string, unknown>;
+}
+
+/**
+ * Verifies a candidate production offer binding against actual product, solution, and template
+ * manifests on disk (or an explicit test snapshot), blocking promotion whenever any manifest is partial.
+ */
+export function verifyOfferBindingReleaseTrio(
+  binding: ProvisioningOfferBinding,
+  options?: { repoRoot?: string; snapshot?: ReleaseTrioManifestSnapshot },
+): OfferBindingReleaseVerificationResult {
+  const blockers: string[] = [];
+  let snapshot: ReleaseTrioManifestSnapshot | null = options?.snapshot ?? null;
+
+  if (!snapshot) {
+    const repoRoot = options?.repoRoot ?? defaultRepoRoot();
+    const productManifest = readJsonManifest(join(repoRoot, "products", binding.composition.product.id, "manifest.json"));
+    const solutionManifest = readJsonManifest(join(repoRoot, "solutions", binding.composition.solution.id, "manifest.json"));
+    const templateManifest = readJsonManifest(join(repoRoot, "templates", binding.composition.template.id, "manifest.json"));
+
+    if (!productManifest || !solutionManifest || !templateManifest) {
+      if (!productManifest) blockers.push(`PRODUCT_MANIFEST_MISSING:${binding.composition.product.id}`);
+      if (!solutionManifest) blockers.push(`SOLUTION_MANIFEST_MISSING:${binding.composition.solution.id}`);
+      if (!templateManifest) blockers.push(`TEMPLATE_MANIFEST_MISSING:${binding.composition.template.id}`);
+    } else {
+      snapshot = {
+        product: {
+          id: String(productManifest.id ?? ""),
+          version: String(productManifest.version ?? ""),
+          status: String(productManifest.status ?? "unknown"),
+        },
+        solution: {
+          id: String(solutionManifest.id ?? ""),
+          version: String(solutionManifest.version ?? ""),
+          status: String(solutionManifest.status ?? "unknown"),
+          readiness: String(solutionManifest.readiness ?? "unknown"),
+        },
+        template: {
+          id: String(templateManifest.id ?? ""),
+          version: String(templateManifest.version ?? ""),
+          status: String(templateManifest.status ?? "unknown"),
+        },
+      };
+    }
+  }
+
+  if (snapshot) {
+    if (snapshot.product.version !== binding.composition.product.version) {
+      blockers.push(`PRODUCT_VERSION_MISMATCH:${snapshot.product.version}!=${binding.composition.product.version}`);
+    }
+    if (snapshot.product.status !== "stable") {
+      blockers.push(`PRODUCT_MANIFEST_NOT_STABLE:${snapshot.product.status}`);
+    }
+    if (snapshot.solution.version !== binding.composition.solution.version) {
+      blockers.push(`SOLUTION_VERSION_MISMATCH:${snapshot.solution.version}!=${binding.composition.solution.version}`);
+    }
+    if (snapshot.solution.status !== "stable") {
+      blockers.push(`SOLUTION_MANIFEST_NOT_STABLE:${snapshot.solution.status}`);
+    }
+    if (snapshot.solution.readiness !== "buildable") {
+      blockers.push(`SOLUTION_NOT_BUILDABLE:${snapshot.solution.readiness}`);
+    }
+    if (snapshot.template.version !== binding.composition.template.version) {
+      blockers.push(`TEMPLATE_VERSION_MISMATCH:${snapshot.template.version}!=${binding.composition.template.version}`);
+    }
+    if (snapshot.template.status !== "stable") {
+      blockers.push(`TEMPLATE_MANIFEST_NOT_STABLE:${snapshot.template.status}`);
+    }
+  }
+
+  if (binding.availability !== "active") {
+    blockers.push(`OFFER_NOT_ACTIVE:${binding.availability}`);
+  }
+  if (binding.distributionMode !== "shared-managed") {
+    blockers.push(`DISTRIBUTION_NOT_SHARED_MANAGED:${binding.distributionMode}`);
+  }
+
+  return {
+    approved: blockers.length === 0,
+    offer: binding.offer,
+    composition: binding.composition,
+    blockers,
+    snapshot,
+  };
+}
+
+/**
+ * Promotes candidate offer bindings only after every release trio passes manifest readiness checks
+ * and records an audit event when promotion succeeds.
+ */
+export function promoteApprovedProductionOfferBindings(
+  candidates: readonly ProvisioningOfferBinding[] = approvedProductionOfferCandidateBindings,
+  options?: {
+    repoRoot?: string;
+    snapshot?: ReleaseTrioManifestSnapshot;
+    auditRecorder?: (event: {
+      offerId: string;
+      offerVersion: string;
+      composition: ProvisioningOfferBinding["composition"];
+      promotedAt: string;
+    }) => void;
+  },
+): readonly ProvisioningOfferBinding[] {
+  const promoted: ProvisioningOfferBinding[] = [];
+  const allBlockers: string[] = [];
+
+  for (const candidate of candidates) {
+    const verification = verifyOfferBindingReleaseTrio(candidate, options);
+    if (!verification.approved) {
+      allBlockers.push(...verification.blockers);
+      continue;
+    }
+    promoted.push(candidate);
+  }
+
+  if (allBlockers.length > 0 || promoted.length === 0) {
+    throw new OfferBindingPromotionError(
+      allBlockers.length > 0 ? allBlockers : ["NO_PRODUCTION_OFFER_CANDIDATES"],
+    );
+  }
+
+  const promotedAt = new Date().toISOString();
+  for (const binding of promoted) {
+    options?.auditRecorder?.({
+      offerId: binding.offer.id,
+      offerVersion: binding.offer.version,
+      composition: binding.composition,
+      promotedAt,
+    });
+  }
+
+  return promoted;
 }

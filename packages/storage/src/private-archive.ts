@@ -1,7 +1,8 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
-import { isAbsolute, relative, resolve, sep } from "node:path";
+import { tmpdir } from "node:os";
+import { isAbsolute, join, relative, resolve, sep } from "node:path";
 
 const MAX_PRIVATE_ARCHIVE_BYTES = 50 * 1024 * 1024;
 
@@ -205,6 +206,109 @@ export class S3PrivateArchiveStorage implements PrivateArchiveStorage {
   async deleteArchive(input: { tenantId: string; key: string; checksum: string }): Promise<void> {
     assertArchiveKey(input.tenantId, input.key, input.checksum);
     await this.client.send(new DeleteObjectCommand({ Bucket: this.config.bucket, Key: input.key }));
+  }
+}
+
+export interface ArchiveStorageEnvOptions {
+  privateArchiveDirectory?: string;
+}
+
+/**
+ * Selects a durable archive backend from environment variables.
+ * Uses S3PrivateArchiveStorage whenever durable S3 archive coordinates are configured,
+ * rejects unverified local-disk storage in production unless ALLOW_LOCAL_ARCHIVE_IN_PRODUCTION=true,
+ * and falls back to LocalPrivateArchiveStorage in dev/test.
+ */
+export function createPrivateArchiveStorageFromEnv(
+  env: NodeJS.ProcessEnv = process.env,
+  options?: ArchiveStorageEnvOptions,
+): PrivateArchiveStorage {
+  const s3Endpoint = env.PRIVATE_ARCHIVE_S3_ENDPOINT?.trim();
+  const s3Bucket = env.PRIVATE_ARCHIVE_S3_BUCKET?.trim();
+  const s3AccessKey = env.PRIVATE_ARCHIVE_S3_ACCESS_KEY_ID?.trim();
+  const s3SecretKey = env.PRIVATE_ARCHIVE_S3_SECRET_ACCESS_KEY?.trim();
+
+  if (s3Endpoint || s3Bucket || s3AccessKey || s3SecretKey) {
+    if (!s3Endpoint || !s3Bucket || !s3AccessKey || !s3SecretKey) {
+      throw new Error(
+        "Incomplete PRIVATE_ARCHIVE_S3_* configuration: endpoint, bucket, access key, and secret key are all required.",
+      );
+    }
+    return new S3PrivateArchiveStorage({
+      endpoint: s3Endpoint,
+      region: env.PRIVATE_ARCHIVE_S3_REGION?.trim() || "us-east-1",
+      bucket: s3Bucket,
+      accessKeyId: s3AccessKey,
+      secretAccessKey: s3SecretKey,
+    });
+  }
+
+  const isProduction = env.NODE_ENV === "production";
+  const allowLocalInProd = env.ALLOW_LOCAL_ARCHIVE_IN_PRODUCTION === "true";
+  const localDir = options?.privateArchiveDirectory ?? env.PRIVATE_ARCHIVE_DIR?.trim();
+
+  if (isProduction && !allowLocalInProd) {
+    throw new Error(
+      "Production offboarding archives require S3 storage (PRIVATE_ARCHIVE_S3_*) unless ALLOW_LOCAL_ARCHIVE_IN_PRODUCTION=true is explicitly set with durable shared storage.",
+    );
+  }
+  if (isProduction && !localDir) {
+    throw new Error("PRIVATE_ARCHIVE_DIR must be explicitly configured in production.");
+  }
+
+  return new LocalPrivateArchiveStorage(localDir ?? join(tmpdir(), "bazion-private-archives"));
+}
+
+/**
+ * Executes a non-destructive put -> get -> SHA-256 verification -> delete round-trip probe
+ * to confirm archive durability and restore integrity across the active backend.
+ */
+export async function verifyPrivateArchiveRoundTrip(
+  storage: PrivateArchiveStorage,
+  tenantId: string,
+): Promise<{ verified: true; checksum: string; key: string; sizeBytes: number }> {
+  const cleanTenantId = validateUuid(tenantId, "Tenant ID");
+  const archiveId = randomUUID();
+  const probePayload = Buffer.from(
+    JSON.stringify({
+      probe: "archive_durability_roundtrip",
+      tenantId: cleanTenantId,
+      archiveId,
+      checkedAt: new Date().toISOString(),
+    }),
+    "utf8",
+  );
+
+  const stored = await storage.putArchive({
+    tenantId: cleanTenantId,
+    archiveId,
+    body: probePayload,
+  });
+
+  try {
+    const loaded = await storage.getArchive({
+      tenantId: cleanTenantId,
+      key: stored.key,
+      checksum: stored.checksum,
+    });
+    if (!loaded) {
+      throw new Error("ARCHIVE_ROUNDTRIP_MISSING_ON_READ");
+    }
+    if (!Buffer.from(loaded.body).equals(probePayload)) {
+      throw new Error("ARCHIVE_ROUNDTRIP_PAYLOAD_MISMATCH");
+    }
+    return {
+      verified: true,
+      checksum: stored.checksum,
+      key: stored.key,
+      sizeBytes: stored.sizeBytes,
+    };
+  } finally {
+    await storage.deleteArchive({
+      tenantId: cleanTenantId,
+      key: stored.key,
+      checksum: stored.checksum,
+    }).catch(() => undefined);
   }
 }
 

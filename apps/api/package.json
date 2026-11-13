@@ -13,7 +13,7 @@
     "start:commercial-status-dispatcher": "node dist/commercial-status-worker.js",
     "db:expire-installation-offboarding": "tsx scripts/expire-installation-offboarding.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run src --fsModuleCachePath .vitest-cache"
+    "test": "node --env-file-if-exists=../../.env ./node_modules/vitest/vitest.mjs run src --fsModuleCachePath .vitest-cache"
   },
   "dependencies": {
     "@bazion/api-contracts": "workspace:*",

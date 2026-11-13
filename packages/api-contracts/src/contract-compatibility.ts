@@ -89,6 +89,14 @@ export const CONTRACT_COMPATIBILITY_V1 = {
       currentVersion: "1.0.0",
       minimumSupportedVersion: "1.0.0",
     },
+    {
+      schemaName: "installationChangeCommandV1",
+      schemaId: "https://schemas.bazionweb.com/platform/installation-change-command/1.0.0",
+      fileName: "installation-change-command-v1.schema.json",
+      direction: "commercial_to_platform",
+      currentVersion: "1.0.0",
+      minimumSupportedVersion: "1.0.0",
+    },
   ] satisfies readonly PublishedContractDescriptor[],
 } as const;
 

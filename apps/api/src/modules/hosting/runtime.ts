@@ -7,7 +7,10 @@ import {
   type ProvisionTenantHostingInput,
   type ProvisionTenantHostingResult,
 } from "./provisioning.js";
-import { DockerSecretTenantHostingSecretResolver } from "./secrets.js";
+import {
+  createTenantHostingSecretResolverFromEnv,
+  type HostingSecretBackend,
+} from "./secrets.js";
 import { loadTenantHostingTemplate } from "./templates.js";
 import {
   PostgresHostingLifecycleStore,
@@ -15,13 +18,19 @@ import {
   type TenantHostingLifecycleInput,
   type TenantHostingLifecycleResult,
 } from "./lifecycle.js";
-import type { TenantHostingTemplate } from "@bazion/platform-contracts";
+import type { TenantHostingSecretResolver, TenantHostingTemplate } from "@bazion/platform-contracts";
 
 export interface HostingRuntimeConfig {
   provider: "disabled" | "dokploy";
   secretDirectory: string;
   templateDirectory: string;
   dokploy: DokployConfig | null;
+  secretBackend?: HostingSecretBackend | undefined;
+  secretManagerUrl?: string | undefined;
+  secretManagerToken?: string | undefined;
+  secretManagerPrefix?: string | undefined;
+  secretManagerVersion?: string | undefined;
+  secretResolver?: TenantHostingSecretResolver | undefined;
 }
 
 export type HostingRecoveryInspection =
@@ -34,6 +43,7 @@ export type HostingRecoveryInspection =
 export interface HostingProvisioningRuntime {
   providerId: string;
   environmentId: string;
+  secretBackend?: HostingSecretBackend | undefined;
   provision(input: ProvisionTenantHostingInput): Promise<ProvisionTenantHostingResult>;
   lifecycle(input: TenantHostingLifecycleInput): Promise<TenantHostingLifecycleResult>;
   loadTemplate(template: TenantHostingTemplate): ReturnType<typeof loadTenantHostingTemplate>;
@@ -44,7 +54,16 @@ export function createHostingProvisioningRuntime(config: HostingRuntimeConfig): 
   if (config.provider === "disabled") return null;
   if (!config.dokploy) throw new Error("DOKPLOY_CONFIGURATION_REQUIRED");
 
-  const secrets = new DockerSecretTenantHostingSecretResolver(config.secretDirectory);
+  const secretBackend: HostingSecretBackend = config.secretBackend ?? "docker";
+  const secrets = config.secretResolver ?? createTenantHostingSecretResolverFromEnv({
+    ...process.env,
+    HOSTING_SECRET_BACKEND: secretBackend,
+    HOSTING_DOCKER_SECRETS_DIR: config.secretDirectory,
+    ...(config.secretManagerUrl ? { HOSTING_SECRET_MANAGER_URL: config.secretManagerUrl } : {}),
+    ...(config.secretManagerToken ? { HOSTING_SECRET_MANAGER_TOKEN: config.secretManagerToken } : {}),
+    ...(config.secretManagerPrefix ? { HOSTING_SECRET_MANAGER_PREFIX: config.secretManagerPrefix } : {}),
+    ...(config.secretManagerVersion ? { HOSTING_SECRET_MANAGER_VERSION: config.secretManagerVersion } : {}),
+  });
   const provider = new DokployComposeProvider(config.dokploy, secrets);
   const store = new PostgresHostingProvisioningStore(pool);
   const service = new TenantHostingProvisioningService(store, provider, "dokploy");
@@ -54,6 +73,7 @@ export function createHostingProvisioningRuntime(config: HostingRuntimeConfig): 
   return {
     providerId: "dokploy",
     environmentId: config.dokploy.environmentId,
+    secretBackend,
     provision: (input) => service.provision(input),
     lifecycle: (input) => lifecycleService.execute(input),
     loadTemplate: (template) => loadTenantHostingTemplate(template, templateDirectory),

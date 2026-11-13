@@ -73,9 +73,7 @@
         }
       },
       "required": [
-        "externalCustomerId",
-        "displayName",
-        "primaryContact"
+        "externalCustomerId"
       ],
       "additionalProperties": false
     },
