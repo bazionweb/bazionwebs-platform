@@ -49,11 +49,32 @@ test("Lockfile preserves packageManagerDependencies matching package.json and CI
 
 test("CI configures job-level cross-repo env, sibling checkout, contract parity, and unconditional joint E2E step", () => {
   const workflow = readFileSync(join(repoRoot, ".github/workflows/ci.yml"), "utf8");
+  const apiPackage = JSON.parse(readFileSync(join(repoRoot, "apps/api/package.json"), "utf8"));
   assert.match(workflow, /path:\s*\.bazionweb\b/, "CI must check out sibling bazionweb repo into .bazionweb.");
   assert.match(workflow, /pnpm contracts:verify-cross-repo/, "CI must run cross-repo contract parity verification.");
   assert.match(
     workflow,
-    /Run joint cross-repo commercial-platform PostgreSQL E2E suite\r?\n\s+run: pnpm --filter @bazion\/api exec vitest run src\/modules\/commercial-provisioning\/cross-repo-e2e\.integration\.test\.ts/,
-    "Joint cross-repo E2E step must run unconditionally with job-level env vars (no self-referential step if).",
+    /BAZIONWEB_TEST_DATABASE_URL:\s*postgresql:\/\/bazionweb:testpassword@127\.0\.0\.1:5433\/bazionweb_test/,
+    "CI must use the isolated local Bazionweb test database, never a supplied external URL.",
+  );
+  assert.doesNotMatch(
+    workflow,
+    /BAZIONWEB_TEST_DATABASE_URL:\s*\$\{\{\s*secrets\./,
+    "CI must not run Prisma migrations against a secret-supplied database URL.",
+  );
+  assert.match(
+    apiPackage.scripts.test,
+    /--exclude\s+src\/modules\/commercial-provisioning\/cross-repo-e2e\.integration\.test\.ts/,
+    "The joint E2E suite must not run as part of the broad API test suite.",
+  );
+  assert.match(
+    apiPackage.scripts["test:cross-repo"],
+    /vitest\.mjs run src\/modules\/commercial-provisioning\/cross-repo-e2e\.integration\.test\.ts/,
+    "The joint E2E suite must have one dedicated command.",
+  );
+  assert.match(
+    workflow,
+    /Run joint cross-repo commercial-platform PostgreSQL E2E suite\r?\n\s+env:\r?\n\s+REQUIRE_CROSS_REPO_E2E:\s*["']true["']\r?\n\s+run: pnpm --filter @bazion\/api test:cross-repo/,
+    "Joint cross-repo E2E must run once as a required, dedicated step.",
   );
 });

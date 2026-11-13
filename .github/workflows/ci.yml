@@ -58,7 +58,7 @@ jobs:
       PRIVATE_ARCHIVE_ENCRYPTION_KEY: MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=
       TRUST_PROXY: "false"
       TRUSTED_PROXY_ADDRESSES: ""
-      BAZIONWEB_TEST_DATABASE_URL: ${{ secrets.BAZIONWEB_TEST_DATABASE_URL || 'postgresql://bazionweb:testpassword@127.0.0.1:5433/bazionweb_test' }}
+      BAZIONWEB_TEST_DATABASE_URL: postgresql://bazionweb:testpassword@127.0.0.1:5433/bazionweb_test
       BAZIONWEB_API_DIR: ${{ vars.BAZIONWEB_API_DIR || '.bazionweb/apps/api' }}
       BAZIONWEB_REPO: ${{ vars.BAZIONWEB_REPO || 'bazionwebs/bazionweb' }}
       BAZIONWEB_REPO_REF: ${{ vars.BAZIONWEB_REPO_REF || 'main' }}
@@ -122,6 +122,13 @@ jobs:
 
       - name: Start isolated Bazionweb test PostgreSQL and apply Prisma migrations
         run: |
+          node --input-type=module -e '
+            const databaseUrl = new URL(process.env.BAZIONWEB_TEST_DATABASE_URL);
+            if (databaseUrl.hostname !== "127.0.0.1" || databaseUrl.port !== "5433" || databaseUrl.pathname !== "/bazionweb_test") {
+              console.error("CI must use the isolated local bazionweb_test database on 127.0.0.1:5433.");
+              process.exit(1);
+            }
+          '
           docker run -d --name bazionweb-db-test -p 127.0.0.1:5433:5432 \
             -e POSTGRES_USER=bazionweb \
             -e POSTGRES_PASSWORD=testpassword \
@@ -144,7 +151,9 @@ jobs:
         run: pnpm test
 
       - name: Run joint cross-repo commercial-platform PostgreSQL E2E suite
-        run: pnpm --filter @bazion/api exec vitest run src/modules/commercial-provisioning/cross-repo-e2e.integration.test.ts
+        env:
+          REQUIRE_CROSS_REPO_E2E: "true"
+        run: pnpm --filter @bazion/api test:cross-repo
 
       - name: Build all applications and packages
         run: pnpm build

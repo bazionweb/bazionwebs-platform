@@ -24,6 +24,10 @@ import type { ProvisioningOfferBinding } from "./offer-resolution.js";
 import { CommercialProvisioningService } from "./service.js";
 import { integrationOfferBinding } from "./offer-resolution.test-fixtures.js";
 import {
+  getCrossRepoE2ePrerequisiteFailures,
+  isSafeBazionwebTestDatabaseUrl,
+} from "./cross-repo-e2e-config.js";
+import {
   PlatformLifecycleOutboxDispatcher,
   PlatformStatusOutboxDispatcher,
 } from "./status-outbox-worker.js";
@@ -80,25 +84,23 @@ function resolveBazionwebApiDir(): string {
 const bazionwebApiDir = resolveBazionwebApiDir();
 const bridgeScriptPath = resolve(bazionwebApiDir, "scripts/phase3-e2e-bridge.ts");
 
-function isSafeLocalBazionwebTestDb(urlString: string | undefined): boolean {
-  if (!urlString?.trim()) return false;
-  try {
-    const parsed = new URL(urlString.trim());
-    if (process.env.ALLOW_REMOTE_TEST_DB === "true") return true;
-    const isLocalHost = parsed.hostname === "127.0.0.1" || parsed.hostname === "localhost";
-    const isTestDbName = parsed.pathname.toLowerCase().includes("test");
-    return isLocalHost && isTestDbName;
-  } catch {
-    return false;
-  }
-}
-
-const enabled = Boolean(
-  process.env.MIGRATION_DATABASE_URL
-  && process.env.PRODUCT_PROVISIONER_DATABASE_URL
-  && isSafeLocalBazionwebTestDb(process.env.BAZIONWEB_TEST_DATABASE_URL)
-  && existsSync(bridgeScriptPath),
+const requireCrossRepoE2e = process.env.REQUIRE_CROSS_REPO_E2E === "true";
+const e2eEnvironment = {
+  migrationDatabaseUrl: process.env.MIGRATION_DATABASE_URL,
+  productProvisionerDatabaseUrl: process.env.PRODUCT_PROVISIONER_DATABASE_URL,
+  bazionwebTestDatabaseUrl: process.env.BAZIONWEB_TEST_DATABASE_URL,
+  allowRemoteTestDb: process.env.ALLOW_REMOTE_TEST_DB === "true" && !requireCrossRepoE2e,
+  requireIsolatedTestDatabase: requireCrossRepoE2e,
+};
+const prerequisiteFailures = getCrossRepoE2ePrerequisiteFailures(
+  e2eEnvironment,
+  existsSync(bridgeScriptPath),
 );
+const enabled = prerequisiteFailures.length === 0;
+
+if (requireCrossRepoE2e && !enabled) {
+  throw new Error(`REQUIRED_CROSS_REPO_E2E_DISABLED: ${prerequisiteFailures.join(", ")}`);
+}
 
 interface PendingRpc {
   resolve: (value: any) => void;

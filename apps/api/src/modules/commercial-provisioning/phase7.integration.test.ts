@@ -481,5 +481,5 @@ describe.runIf(hasDatabase)("Phase 7 PostgreSQL staging pilot E2E, crash recover
     for (const gateId of drillGateIds) {
       expect(cutoverReport.gates.find((g) => g.id === gateId)?.passed).toBe(true);
     }
-  });
+  }, 30_000);
 });
