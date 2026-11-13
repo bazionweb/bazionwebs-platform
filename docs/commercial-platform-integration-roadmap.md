@@ -66,7 +66,7 @@ This checklist coordinates the Bazion commercial website (`D:\bazionweb`) and th
 - [x] Store platform status events in an outbox in the same transaction as operation state transitions. (`AFTER INSERT` trigger on `product_provisioning_operation_events` writes `product_provisioning_status_outbox` atomically.)
 - [x] Deliver status callbacks to Bazionweb with signatures, event IDs, replay protection and retry/replay tools. (Signed `X-Bazion-Signature` callbacks with timestamps, `eventId` inbox deduplication, replay window enforcement, monotonic `PlatformProvisioningProjection`, and operator replay.)
 - [x] Add reconciliation for accepted-without-status, duplicate, stale and permanently-failed messages. (Platform and Bazionweb admin reconciliation reports plus lagging-operation polling.)
-- [x] Pass required dual-repo CI for transaction atomicity, duplicate delivery and service downtime across both services. *(Run `43443896254`, job `131990355076`, passed with read-only GitHub App checkout, contract parity, isolated PostgreSQL migrations for both repos, unit/auth/tenant tests, the joint commercial-platform E2E suite and full build.)*
+- [x] Pass required dual-repo CI for transaction atomicity, duplicate delivery and service downtime across both services. *(Run `43470680396`, job `132041433181`, passed with read-only GitHub App checkout, contract parity, isolated PostgreSQL migrations for both repos, unit/auth/tenant tests, the joint commercial-platform E2E suite and full build.)*
 - [ ] Execute the same verification in staging with both PostgreSQL instances and confirm zero unresolved drift.
 
 **Exit gate:** neither a lost message nor duplicate delivery can lose or multiply a paid provisioning request.
@@ -127,7 +127,7 @@ This checklist coordinates the Bazion commercial website (`D:\bazionweb`) and th
 **Goal:** migrate incrementally and prove operational recovery before general availability.
 
 - [ ] Run contract tests and a staging pilot for one offer and one product release. *(Shared v1 contract/fixture tests pass across both repos; live remote staging pilot execution awaits `stable` release promotion & staging deployment.)*
-- [x] Exercise payment success, duplicate payment delivery, provisioning, retry, compensation, suspension and reactivation end-to-end in required CI. *(The isolated dual-repo suite passed in run `43443896254`, job `131990355076`; both repositories' migrations and the full cross-repo PostgreSQL flow completed.)*
+- [x] Exercise payment success, duplicate payment delivery, provisioning, retry, compensation, suspension and reactivation end-to-end in required CI. *(The isolated dual-repo suite passed in run `43470680396`, job `132041433181`; both repositories' migrations and the full cross-repo PostgreSQL flow completed.)*
 - [ ] Repeat the end-to-end exercise in live staging before closing this gate.
 - [x] Reconcile commercial orders ↔ platform operations ↔ installations ↔ deployments with exception reports.
 - [x] Set SLOs for command acceptance, ready time, callback lag and stuck-operation age.
@@ -217,7 +217,7 @@ The following findings describe earlier snapshots. Their completion state is tra
 - [x] In the platform, append status events to an outbox in the same transaction as operation changes; send signed callbacks with replay protection.
 - [x] In Bazionweb, verify signatures/timestamps/event IDs and upsert a commercial status projection idempotently.
 - [x] Add reconciliation for accepted-without-status, callback lag, repeated events, dead letters and order/platform mismatches, plus scheduled cross-entity snapshot push (`PlatformProvisioningReconciliationService.pushCrossEntityReconciliationSnapshot` & `@Cron('0 */15 * * * *')`).
-- [x] Execute transaction atomicity, duplicate delivery and service-downtime tests together across both isolated databases in required CI. *(Run `43443896254`, job `131990355076`, passed.)*
+- [x] Execute transaction atomicity, duplicate delivery and service-downtime tests together across both isolated databases in required CI. *(Run `43470680396`, job `132041433181`, passed.)*
 - [ ] Repeat transaction atomicity, duplicate delivery and service-downtime tests against both live staging databases.
 
 ### Phase 4 — Offer resolution and hosting authority
@@ -261,7 +261,7 @@ The following findings describe earlier snapshots. Their completion state is tra
 ### Phase 7 — Pilot, cutover and operations
 
 - [ ] Pilot one real offer, one stable release and one shared-managed tenant in staging before enabling hosting mutations. *(Staging-only pilot binding `website-launch@1.0.0` -> `church-ministry@1.0.0` / `shared-managed` with hosting mutations disabled is implemented in `pilot-cutover.ts` and verified locally against PostgreSQL; release manifests remain `partial` and live remote staging execution remains open)*
-- [x] Exercise paid order, duplicate payment callback, command retry, provisioning success, worker restart, compensation, manual review, grace, suspension and reactivation end to end in required CI. *(`phase7.integration.test.ts` has local PostgreSQL coverage; cross-repo CI run `43443896254`, job `131990355076`, passed against isolated PostgreSQL databases for both repos.)*
+- [x] Exercise paid order, duplicate payment callback, command retry, provisioning success, worker restart, compensation, manual review, grace, suspension and reactivation end to end in required CI. *(`phase7.integration.test.ts` has local PostgreSQL coverage; cross-repo CI run `43470680396`, job `132041433181`, passed against isolated PostgreSQL databases for both repos.)*
 - [ ] Repeat this scenario in remote staging and record pilot evidence.
 - [x] Reconcile every paid order ↔ operation ↔ installation ↔ entitlement ↔ deployment; publish exception reports with owner and age, and run scheduled cross-entity pushes with drift alerts. *(Implemented in `CrossEntityReconciliationService` + `POST /internal/commercial/reconciliation/report`, `/operations/cutover`, and Bazionweb `PlatformProvisioningReconciliationService.pushCrossEntityReconciliationSnapshot` + `@Cron('0 */15 * * * *')` with `PLATFORM_RECONCILIATION_DRIFT_ALERT`.)*
 - [x] Define SLOs and alerts for command acceptance, provision-ready latency, callback lag, dead-letter age, operation lease age, compensation-required count and reconciliation drift. *(Implemented in `observability.ts` `ProvisioningSloService` / `evaluateSloAlerts` + `GET /admin/platform/commercial-provisioning/slo-alerts` and `/operations/cutover`)*
@@ -275,8 +275,8 @@ The following findings describe earlier snapshots. Their completion state is tra
 
 | Repository | Remote URL | Branch | Evidence Commit | Working tree | Latest schema / migration | Database evidence |
 | --- | --- | --- | --- | --- | --- | --- |
-| Bazion Platform | `https://github.com/bazionweb/bazionwebs-platform/` | `main` | `57edcbe` (GitHub App CI checkout) | Pre-existing local UI and dependency work across `apps/admin`, `apps/storefront`, `packages/ui` and `pnpm-lock.yaml` is preserved and excluded from this work | `0025_installation_changes.sql` | Full local `pnpm test`, typecheck, catalog validation and build passed. Required integrated CI run [`43443896254`](https://github.com/bazionweb/bazionwebs-platform/actions/runs/43443896254), job `131990355076`, also passed migrations for both repos, typecheck, unit/auth/tenant tests, joint PostgreSQL E2E and build. |
-| Bazionweb | `https://github.com/bazionweb/bazionweb.git` | `main` | `be0c8b3` (enum migration parity) | Migration and regression-test changes committed and pushed; no unrelated changes were present before implementation | `20261113090000_add_extended_billing_cycles` | `workspace-invariants.spec.ts` passes 11/11; integrated CI run `43443896254`, job `131990355076`, passed fresh Prisma migrations and the joint PostgreSQL E2E suite. |
+| Bazion Platform | `https://github.com/bazionweb/bazionwebs-platform/` | `main` | `fd76d1b` (deterministic OIDC signature test) | Pre-existing local UI and dependency work across `apps/admin`, `apps/storefront`, `packages/ui` and `pnpm-lock.yaml` is preserved and excluded from this work | `0025_installation_changes.sql` | Full local `pnpm test`, typecheck, catalog validation and build passed. Required integrated CI run [`43470680396`](https://github.com/bazionweb/bazionwebs-platform/actions/runs/43470680396), job `132041433181`, passed migrations for both repos, typecheck, unit/auth/tenant tests, joint PostgreSQL E2E and build. |
+| Bazionweb | `https://github.com/bazionweb/bazionweb.git` | `main` | `be0c8b3` (enum migration parity) | Migration and regression-test changes committed and pushed; no unrelated changes were present before implementation | `20261113090000_add_extended_billing_cycles` | `workspace-invariants.spec.ts` passes 11/11; integrated CI run `43470680396`, job `132041433181`, passed fresh Prisma migrations and the joint PostgreSQL E2E suite. |
 
 ### Phase 0 — Environment, Service Identity, Secret & Database Ownership Matrix
 
@@ -309,7 +309,7 @@ The commercial delivery feature is committed in Bazionweb (`5dcdf2f`) and the pl
 ### Remaining Live Staging/Production Operational Cutover Gates
 
 - Promote one complete release trio (`church-ministry` v1.0.0 manifests currently `"status": "partial"`) to `stable` and publish the audited production binding via `promoteApprovedProductionOfferBindings`.
-- [x] Observe a green required CI run of the joint cross-repo E2E suite: run `43443896254`, job `131990355076`.
+- [x] Observe a green required CI run of the joint cross-repo E2E suite: run `43470680396`, job `132041433181`.
 - [ ] Execute the suite in staging with both PostgreSQL instances and verify zero unresolved drift.
 - Complete live staging `pg_dump`/`pg_restore` and S3 offboarding archive round-trip sign-off, live customer hosting row mapping, dual-read parity review, rollback drill evidence, human operator training, and then retire Bazionweb's legacy `HostingService` / `DokployProvider` mutation paths.
 - Keep `dedicated` distribution mode disabled until tenant-scoped Secret Manager credentials are provisioned and verified in live infrastructure.
