@@ -64,14 +64,23 @@ jobs:
       BAZIONWEB_REPO_REF: ${{ vars.BAZIONWEB_REPO_REF || 'main' }}
 
     steps:
-      - name: Require read access to sibling Bazionweb repository
+      - name: Validate sibling Bazionweb repository and GitHub App credentials
+        id: bazionweb-repo
         env:
-          BAZIONWEB_REPO_TOKEN: ${{ secrets.BAZIONWEB_REPO_TOKEN }}
+          BAZIONWEB_APP_CLIENT_ID: ${{ vars.BAZIONWEB_APP_CLIENT_ID }}
+          BAZIONWEB_APP_PRIVATE_KEY: ${{ secrets.BAZIONWEB_APP_PRIVATE_KEY }}
+          BAZIONWEB_REPO: ${{ env.BAZIONWEB_REPO }}
         run: |
-          if [ -z "$BAZIONWEB_REPO_TOKEN" ]; then
-            echo "::error::Configure BAZIONWEB_REPO_TOKEN as an Actions secret with read-only Contents access to the Bazionweb repository."
+          if [ -z "$BAZIONWEB_APP_CLIENT_ID" ] || [ -z "$BAZIONWEB_APP_PRIVATE_KEY" ]; then
+            echo "::error::Configure BAZIONWEB_APP_CLIENT_ID as an Actions variable and BAZIONWEB_APP_PRIVATE_KEY as an Actions secret in the Platform repository."
             exit 1
           fi
+          if [[ ! "$BAZIONWEB_REPO" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]]; then
+            echo "::error::BAZIONWEB_REPO must have the form owner/repository."
+            exit 1
+          fi
+          printf 'owner=%s\n' "${BAZIONWEB_REPO%%/*}" >> "$GITHUB_OUTPUT"
+          printf 'name=%s\n' "${BAZIONWEB_REPO#*/}" >> "$GITHUB_OUTPUT"
 
       - name: Check out pull request head
         uses: actions/checkout@v6
@@ -79,13 +88,23 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
 
+      - name: Create read-only token for the Bazionweb repository
+        id: bazionweb-app-token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ vars.BAZIONWEB_APP_CLIENT_ID }}
+          private-key: ${{ secrets.BAZIONWEB_APP_PRIVATE_KEY }}
+          owner: ${{ steps.bazionweb-repo.outputs.owner }}
+          repositories: ${{ steps.bazionweb-repo.outputs.name }}
+          permission-contents: read
+
       - name: Check out sibling Bazionweb repository for contract parity and joint E2E
         uses: actions/checkout@v6
         with:
           repository: ${{ env.BAZIONWEB_REPO }}
           ref: ${{ env.BAZIONWEB_REPO_REF }}
           path: .bazionweb
-          token: ${{ secrets.BAZIONWEB_REPO_TOKEN }}
+          token: ${{ steps.bazionweb-app-token.outputs.token }}
           persist-credentials: false
 
       - name: Set up Node.js
