@@ -186,8 +186,10 @@ describe("Phase 5 OIDC S256 PKCE, RS256 JWKS, Vault, and Sandbox isolation", () 
     ).toThrow(OidcSecurityError);
 
     const [h, p, s] = token.split(".");
+    expect(s).toBeDefined();
+    const tamperedSignature = `${s!.startsWith("A") ? "B" : "A"}${s!.slice(1)}`;
     expect(() =>
-      verifyOidcJwt(`${h}.${p}.${s?.slice(0, -2)}AA`, keyPair, {
+      verifyOidcJwt(`${h}.${p}.${tamperedSignature}`, keyPair, {
         expectedIssuer: "https://auth.bazion.example",
       }),
     ).toThrow(/signature/i);
