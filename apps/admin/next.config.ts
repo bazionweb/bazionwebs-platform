@@ -1,6 +1,6 @@
 import type { NextConfig } from "next";
 
-const apiBaseUrl = (process.env.API_BASE_URL ?? "http://localhost:4100").replace(/\/$/, "");
+const apiBaseUrl = (process.env.API_BASE_URL ?? "http://localhost:4000").replace(/\/$/, "");
 
 const nextConfig: NextConfig = {
   transpilePackages: ["@bazion/auth"],

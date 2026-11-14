@@ -28,7 +28,7 @@ import {
 import { requireActiveTenantPermission } from "@bazion/auth";
 import type { AppConfig } from "../../config.js";
 import { withTenantTransaction } from "../../lib/database.js";
-import { resolveTenantId } from "../../lib/tenant-resolution.js";
+import { resolveRequestTenantId } from "../../lib/tenant-resolution.js";
 import { isTenantModuleEnabled } from "../../lib/tenant-modules.js";
 import { assertTenantNotInMaintenance } from "../../lib/tenant-maintenance.js";
 
@@ -44,8 +44,7 @@ async function assertChurchEnabled(tenantId: string): Promise<void> {
 export async function registerChurchOperationsRoutes(app: FastifyInstance, options: { config: AppConfig }) {
   const { config } = options;
   const tenantForRequest = (request: FastifyRequest) => {
-    const explicit = request.headers["x-bazion-tenant"] as string | undefined;
-    return resolveTenantId(request.hostname, config, explicit);
+    return resolveRequestTenantId(request, config);
   };
   // ── PUBLIC ENDPOINTS ────────────────────────────────────────────────────────
 

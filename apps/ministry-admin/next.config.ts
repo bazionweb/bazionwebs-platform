@@ -7,7 +7,6 @@ const nextConfig: NextConfig = {
   distDir: process.env.NEXT_DIST_DIR ?? ".next",
   async rewrites() {
     return [
-      { source: "/v1/:path*", destination: `${apiBaseUrl}/v1/:path*` },
       { source: "/api/auth/:path*", destination: `${apiBaseUrl}/api/auth/:path*` },
     ];
   },

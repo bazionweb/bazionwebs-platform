@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildTenantDomainVisitUrl,
   buildTenantStorefrontUrl,
+  buildTenantSubdomainHostname,
   buildTenantWorkspacePickerUrl,
+  extractTenantSlugFromHost,
   resolveConfiguredWorkspaceBaseUrl,
   resolveSafeRedirectTarget,
 } from "@bazion/auth/client";
@@ -34,10 +37,22 @@ describe("storefront redirect and URL helpers", () => {
     ).toBe("https://portal.bazionweb.test/workspace?select=org_1");
   });
 
-  it("builds configurable tenant storefront and workspace picker URLs without hardcoded hosts", () => {
+  it("builds configurable subdomain tenant storefront and workspace picker URLs without hardcoded hosts", () => {
     expect(resolveConfiguredWorkspaceBaseUrl("https://stores.bazionweb.com/ignored")).toBe("https://stores.bazionweb.com");
     expect(buildTenantStorefrontUrl("https://stores.bazionweb.com", "grace-chapel")).toBe(
-      "https://stores.bazionweb.com/?tenant=grace-chapel",
+      "https://grace-chapel.stores.bazionweb.com/",
+    );
+    expect(buildTenantStorefrontUrl("http://localhost:3000", "global-mission-fc")).toBe(
+      "http://global-mission-fc.localhost:3000/",
+    );
+    expect(buildTenantSubdomainHostname("https://stores.bazionweb.com", "grace-chapel")).toBe(
+      "grace-chapel.stores.bazionweb.com",
+    );
+    expect(extractTenantSlugFromHost("grace-chapel.stores.bazionweb.com", "https://stores.bazionweb.com")).toBe(
+      "grace-chapel",
+    );
+    expect(buildTenantDomainVisitUrl("grace-chapel.localhost", "http://localhost:3000")).toBe(
+      "http://grace-chapel.localhost:3000/",
     );
     expect(
       buildTenantWorkspacePickerUrl("https://stores.bazionweb.com", {

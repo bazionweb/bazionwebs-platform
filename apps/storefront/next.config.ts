@@ -10,7 +10,6 @@ const nextConfig: NextConfig = {
   // domain. The browser calls /v1 on this origin; Next proxies it to the API.
   async rewrites() {
     return [
-      { source: "/v1/:path*", destination: `${apiBaseUrl}/v1/:path*` },
       { source: "/api/auth/:path*", destination: `${apiBaseUrl}/api/auth/:path*` },
     ];
   },

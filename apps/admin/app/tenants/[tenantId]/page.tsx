@@ -104,6 +104,7 @@ export default async function TenantDetail({ params }: { params: Promise<{ tenan
     />
     <TenantControlPanel
       tenantId={tenant.id}
+      tenantSlug={tenant.slug}
       ownerInitial={owner.data}
       ownerStatus={owner.status}
       modulesInitial={modules.data}

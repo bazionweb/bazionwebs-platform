@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("../../lib/tenant-resolution.js", () => ({
   resolveTenantId: mocks.resolveTenantId,
+  resolveRequestTenantId: mocks.resolveTenantId,
 }));
 
 vi.mock("../../lib/tenant-modules.js", () => ({

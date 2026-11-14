@@ -36,7 +36,7 @@ import { registerChurchSiteSettingsVersionsRoutes } from "./site-settings-routes
 import { requireActiveTenantPermission } from "@bazion/auth";
 import type { AppConfig } from "../../config.js";
 import { withTenantTransaction, type TenantTransaction } from "../../lib/database.js";
-import { resolveTenantId } from "../../lib/tenant-resolution.js";
+import { resolveRequestTenantId } from "../../lib/tenant-resolution.js";
 import { isTenantModuleEnabled } from "../../lib/tenant-modules.js";
 import { assertTenantNotInMaintenance, getTenantMaintenanceStatus } from "../../lib/tenant-maintenance.js";
 import { DarajaClient, normalizeKenyanPhoneNumber } from "@bazion/payments";
@@ -173,8 +173,7 @@ export async function churchRoutes(app: FastifyInstance, options: RouteOptions) 
   };
 
   const tenantForRequest = (request: FastifyRequest) => {
-    const explicit = request.headers["x-bazion-tenant"] as string | undefined;
-    return resolveTenantId(request.hostname, config, explicit);
+    return resolveRequestTenantId(request, config);
   };
 
   // ─────────────────────────────────────────────────────────────────────────────
