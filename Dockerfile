@@ -9,6 +9,11 @@ ENV NEXT_TELEMETRY_DISABLED=1
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY --parents apps/*/package.json packages/*/package.json templates/package.json ./
 
+# Database role bootstrap is part of the versioned image, not a mount from
+# Dokploy's ephemeral checkout directory.
+FROM postgres:18.7-alpine3.24 AS database
+COPY packages/database/init/001-create-roles.sh /docker-entrypoint-initdb.d/001-create-roles.sh
+
 # The migration target is an operator-run, one-shot image. It requires the
 # least-privilege MIGRATION_DATABASE_URL at runtime and does not start an API.
 FROM workspace AS migrate
@@ -40,7 +45,7 @@ CMD ["node", "dist/server.js"]
 
 FROM workspace AS admin-build
 ARG API_BASE_URL=http://api:4000
-ARG PUBLIC_STOREFRONT_URL=https://staging.bazionweb.com
+ARG PUBLIC_STOREFRONT_URL=https://church-staging.bazionweb.com
 ENV API_BASE_URL=${API_BASE_URL}
 ENV PUBLIC_STOREFRONT_URL=${PUBLIC_STOREFRONT_URL}
 RUN --mount=type=cache,id=bazion-pnpm-store,target=/root/.local/share/pnpm/store/v11 \
@@ -83,3 +88,17 @@ USER node
 EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 CMD ["node", "-e", "fetch('http://127.0.0.1:3000/').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
 CMD ["node", "apps/storefront/server.js"]
+
+FROM workspace AS notification-worker-build
+RUN --mount=type=cache,id=bazion-pnpm-store,target=/root/.local/share/pnpm/store/v11 \
+    pnpm install --frozen-lockfile --filter @bazion/notifications...
+COPY . .
+RUN pnpm --filter @bazion/notifications... run build
+RUN pnpm --filter @bazion/notifications --prod deploy /out
+
+FROM node:26-bookworm-slim AS notification-worker
+ENV NODE_ENV=production
+WORKDIR /app
+COPY --from=notification-worker-build --chown=node:node /out/ ./
+USER node
+CMD ["node", "dist/worker.js"]

@@ -10,19 +10,21 @@ Build from the repository root so the Docker build includes the pnpm workspace a
 docker build --target api -t bazion-platform-api:staging .
 docker build --target admin -t bazion-platform-admin:staging \
   --build-arg API_BASE_URL=http://api:4000 \
-  --build-arg PUBLIC_STOREFRONT_URL=https://staging.bazionweb.com .
+  --build-arg PUBLIC_STOREFRONT_URL=https://church-staging.bazionweb.com .
 docker build --target storefront -t bazion-platform-storefront:staging \
   --build-arg API_BASE_URL=http://api:4000 .
 docker build --target migrate -t bazion-platform-migrate:staging .
+docker build --target database -t bazion-platform-db:staging .
+docker build --target notification-worker -t bazion-platform-notification-worker:staging .
 ```
 
 The API target deploys production workspace dependencies only and runs as the unprivileged `node` user. The admin and storefront targets use Next.js standalone output. The migration target is an operator-run, one-shot image; provide `MIGRATION_DATABASE_URL` through Dokploy's protected runtime environment and run it before starting or updating the API. Never bake database URLs or application secrets into image build arguments.
 
 ## Build and delivery performance
 
-The main-branch CI workflow publishes the four runtime targets to GitHub Container Registry only after the full validation job passes. Images receive an immutable `sha-<commit>` tag and the default branch also updates a `staging` tag. The packages are `ghcr.io/bazionweb/bazionwebs-platform-api`, `...-admin`, `...-storefront`, and `...-migrate`. The workflow builds for `linux/amd64`, limits parallel image builds, uses a separate BuildKit cache per image, and includes provenance and an SBOM. This moves CPU and memory intensive image compilation to GitHub-hosted runners instead of Dokploy's 3-core VPS. The workflow does not deploy or change live services. Before pulling on the VPS, verify `uname -m` reports `x86_64`; for an ARM host, adjust the workflow architecture first.
+The main-branch CI workflow publishes six targets to GitHub Container Registry only after the full validation job passes: API, admin, storefront, migration, database bootstrap, and notification worker. Images receive a commit-addressed `sha-<commit>` tag and the default branch also updates a `staging` tag. The package names are `ghcr.io/bazionweb/bazionwebs-platform-api`, `...-admin`, `...-storefront`, `...-migrate`, `...-db`, and `...-notification-worker`. The workflow builds for `linux/amd64`, limits parallel image builds, uses a separate BuildKit cache per image, and includes provenance and an SBOM. This moves CPU and memory intensive image compilation to GitHub-hosted runners instead of Dokploy's 3-core VPS. The workflow does not deploy or change live services. Before pulling on the VPS, verify `uname -m` reports `x86_64`; for an ARM host, adjust the workflow architecture first.
 
-For a release, configure Dokploy to pull the `sha-<commit>` image tag so the API, admin, storefront, and migration image all correspond to the same validated commit. Use the `staging` tag only when deliberately testing the latest successful main build. GHCR packages are private by default; configure a read-only package pull credential in Dokploy's registry settings. CI publishing uses the repository-scoped `GITHUB_TOKEN` and does not require a long-lived registry token.
+For a release, configure Dokploy to pull the same `sha-<commit>` image tag for every service so the API, admin, storefront, workers, database, and migration images correspond to the same validated commit. Use the `staging` tag only when deliberately testing the latest successful main build. GHCR packages are private by default; configure a read-only package pull credential in Dokploy's registry settings. CI publishing uses the repository-scoped `GITHUB_TOKEN` and does not require a long-lived registry token.
 
 The Dockerfile copies workspace manifests and the lockfile before application source, so ordinary source edits reuse the dependency installation layer. A BuildKit cache mount retains pnpm downloads. Runtime Next.js images use standalone output, and app containers run as the unprivileged `node` user. Typography uses local system font stacks; builds and page views do not contact Google Fonts or ship font binaries. Build telemetry is disabled.
 
@@ -46,19 +48,93 @@ The public storefront is tenant-host-driven and dynamically rendered. Keep that 
 
 References: [Next.js production checklist](https://nextjs.org/docs/app/guides/production-checklist), [Next.js fetch API](https://nextjs.org/docs/app/api-reference/functions/fetch), [Docker cache optimization](https://docs.docker.com/build/cache/optimize/), [Docker multi-stage builds](https://docs.docker.com/build/building/multi-stage/), [Cloudflare image transformations](https://developers.cloudflare.com/images/optimization/transformations/overview/), [Cloudflare responsive images](https://developers.cloudflare.com/images/optimization/make-responsive-images/), [Cloudflare cache guidance for login and dynamic content](https://developers.cloudflare.com/cache/troubleshooting/dynamic-content-and-login-issues/), [Core Web Vitals thresholds](https://web.dev/articles/vitals).
 
-## Dokploy service wiring
+## Guided Dokploy setup
 
-Create an isolated staging project/environment. The API, admin, storefront and staging database must communicate over private service networking. Do not publish PostgreSQL or the Dokploy management port on the public interface. Route the storefront to `https://staging.bazionweb.com` and the platform admin to `https://platform-staging.bazionweb.com` through Traefik-managed HTTPS.
+The release Compose file is [`deploy/dokploy/platform-staging.compose.yml`](../../deploy/dokploy/platform-staging.compose.yml). It deploys Platform PostgreSQL, a migration job, API, admin, storefront, commercial status worker, and notification worker. Images are pulled from GHCR; the VPS does not build images. The Platform database is private to the migration/API/workers network, while the UI services cannot resolve or connect to the database. No container port is published on the VPS.
 
-The Next.js API rewrites are set at image build time. Set `API_BASE_URL` to an internal service address reachable from both Next.js containers (the examples use `http://api:4000`). Keep the API off the public network unless an explicitly reviewed integration requires a public callback endpoint.
+### 1. Confirm the staging names
 
-Use staging-only Better Auth secrets, trusted origins, callback URLs, SMTP credentials, and database roles. Generate fresh values in the deployment secret store. Keep `COMMERCIAL_PROVISIONING_PILOT_MODE=staging_pilot`, `COMMERCIAL_PROVISIONING_HOSTING_MUTATIONS_ENABLED=false`, and `NODE_ENV=production` for the isolated staging service. Do not enable canary or production offer intake from this guide.
+The Cloudflare screenshot confirms these proxied A records already point to `102.208.217.249`: `staging.bazionweb.com`, `staging-api.bazionweb.com`, `platform-staging.bazionweb.com`, `platform-api-staging.bazionweb.com`, and `church-staging.bazionweb.com`. Keep the apex `bazionweb.com`, `www`, and `media.bazionweb.com` records unchanged. The first two names are reserved for Bazionweb; the other three are for Platform admin, API and tenant storefront respectively.
 
-The first staging offer remains `website-launch@1.0.0` with shared-managed delivery. Use a newly created, empty staging tenant. Do not copy production church member data into it.
+After Dokploy issues origin certificates, set the `bazionweb.com` Cloudflare zone SSL/TLS mode to **Full (strict)**. Do not use Flexible mode.
+
+### 2. Create the Platform staging project
+
+In Dokploy, create a project named **Bazion Staging** and an environment named **staging**. Create a Docker Compose service using the Platform GitHub repository, branch `main`, and Compose path `deploy/dokploy/platform-staging.compose.yml`. Select normal **Docker Compose**, not Docker Stack: the migration job must complete successfully before the API starts. Leave Dokploy's additional Isolated Deployments toggle off; the checked-in Compose file creates a dedicated application network and a separate `internal: true` data network, and only the three public services receive Dokploy/Traefik domain routing.
+
+Configure GHCR as a private registry in Dokploy and select it for the Compose service. GHCR supports PAT (classic) authentication for external pulls. Use a dedicated token with only `read:packages`, grant that GitHub identity access to these packages, set an expiry and rotate it. Do not use the broader `repo`, `workflow`, `write:packages`, or `delete:packages` permissions listed in some older Dokploy examples. The GitHub App used by CI for repository contents is not the GHCR pull credential.
+
+The Platform workflow publishes immutable `sha-<commit>` images only after validation on `main`. Wait for the validated main-branch publish job, then set `PLATFORM_IMAGE_TAG` to that exact SHA tag. Do not use `latest` or a mutable `staging` tag for a release.
+
+### 3. Find the exact trusted proxy range
+
+The API accepts forwarded client IP information only from a configured proxy CIDR. Before the first deployment, run this non-secret command in the VPS SSH session:
+
+```bash
+sudo docker network inspect dokploy-network --format '{{range .IPAM.Config}}{{.Subnet}}{{end}}'
+```
+
+Use the returned subnet exactly for `TRUSTED_PROXY_ADDRESSES` in Dokploy. Do not put a broad range such as `172.16.0.0/12` there. If the network does not exist, add the domains in step 5, save the Compose app, then run the command again; do not start the API with an empty or guessed trusted-proxy value.
+
+### 4. Add environment variables in Dokploy
+
+Open the Compose service's **Environment** tab and add these as staging environment variables. Use a password manager to generate a different 32-byte random hexadecimal value for each `BAZION_*_PASSWORD` and the PostgreSQL admin password; hex avoids special-character escaping in the PostgreSQL URLs. Never send values in chat, screenshots, or Git. Dokploy writes Compose variables to its deployment `.env`; restrict Dokploy access to trusted operators and plan an external secrets-provider integration before production customer data is placed here.
+
+Required variables (the file rejects missing values before starting):
+
+- Image and network: `PLATFORM_IMAGE_TAG`, `TRUSTED_PROXY_ADDRESSES`.
+- PostgreSQL: `POSTGRES_ADMIN_PASSWORD`, `BAZION_APP_PASSWORD`, `BAZION_MIGRATOR_PASSWORD`, `BAZION_AUTH_PASSWORD`, `BAZION_TENANT_RESOLVER_PASSWORD`, `BAZION_TENANT_PROVISIONER_PASSWORD`, `BAZION_NOTIFICATION_ENQUEUER_PASSWORD`, `BAZION_NOTIFICATION_WORKER_PASSWORD`, `BAZION_HOSTING_RECONCILER_PASSWORD`, `BAZION_PRODUCT_PROVISIONER_PASSWORD`, `BAZION_TENANT_BACKUP_PASSWORD`.
+- Platform auth: `PLATFORM_BETTER_AUTH_SECRET`, `OIDC_BFF_CLIENT_SECRET`, `OIDC_SIGNING_PRIVATE_KEY_PEM`.
+- Mock staging payments only: `STAGING_MOCK_PAYMENT_SECRET`. `APP_ENV=staging` permits the mock provider while `NODE_ENV=production` keeps secure cookies, HTTPS, and the production hardening checks active. This must never be used for production.
+- R2: `R2_S3_ENDPOINT` (format `https://<Cloudflare-account-id>.r2.cloudflarestorage.com`), `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`. Use the token scoped to **Object Read & Write for the `bazionweb-public-media` bucket only**. The API gets these credentials; the admin and storefront get only the public `https://media.bazionweb.com` URL. The media transformation flag is enabled because you confirmed the custom domain and transformations are active. Site-asset transformations remain off until verified for the `bazionweb.com` zone.
+- Encrypted email queue: `NOTIFICATION_ENCRYPTION_KEY` (random canonical Base64 encoding of exactly 32 bytes), `NOTIFICATION_SMTP_HOST`, `NOTIFICATION_SMTP_USER`, `NOTIFICATION_SMTP_PASSWORD`, `NOTIFICATION_EMAIL_FROM`. Optional settings default to port 465 and implicit TLS; use `NOTIFICATION_SMTP_PORT=587` and `NOTIFICATION_SMTP_SECURE=false` only when your provider requires STARTTLS. Staging signup requires verified-email delivery.
+- Callback authentication: `PLATFORM_CALLBACK_SIGNING_SECRET`, `PLATFORM_CALLBACK_BEARER_SECRET`. Generate unique high-entropy staging values and use the corresponding Bazionweb callback-secret settings in the Bazionweb staging API later.
+
+To create the OIDC private key locally, use OpenSSL (for example from Git for Windows):
+
+```bash
+openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:3072 -out platform-staging-oidc.pem
+```
+
+Paste its PEM into the Dokploy variable as one line, replacing each line break with the two characters `\n`. The Platform API converts those separators back to newlines at runtime. Do not commit the key or paste it into this chat.
+
+### 5. Add the three Platform domains
+
+In the Compose service's **Domains** tab, add domains with HTTPS/Let's Encrypt enabled and the service port below. Use Dokploy's native Domains UI, not handwritten labels:
+
+| Hostname | Compose service | Container port |
+| --- | --- | ---: |
+| `platform-api-staging.bazionweb.com` | `api` | 4000 |
+| `platform-staging.bazionweb.com` | `admin` | 3001 |
+| `church-staging.bazionweb.com` | `storefront` | 3000 |
+
+Do not add public domains to `db`, `migrate`, `status-worker`, or `notification-worker`. Save the service and use Dokploy's Compose preview to check these routes and the private networks before deploying.
+
+### 6. Deploy and bootstrap
+
+Deploy the selected commit-addressed SHA. The first deployment initializes the named Postgres volume and applies migrations once. The API and workers start after migration success, and the UIs start after the API health check passes. Wait for all long-running services to show healthy/running; a failed `migrate` service blocks API startup by design. Use Dokploy service logs to diagnose it; never publish database port 5432 to troubleshoot.
+
+The first release intentionally keeps `COMMERCIAL_PROVISIONING_ENABLED=false`, the saga worker disabled, and Dokploy hosting mutations disabled. Create a verified platform-owner account through the normal admin sign-up flow, then bootstrap its platform role using the audited `platform:create-admin` command. Create a new empty staging tenant, bind `church-staging.bazionweb.com` to it, and run the website-launch pilot only after Bazionweb staging is deployed and the signed callback round-trip is tested. Do not copy live church member data into staging.
+
+### 7. Add Bazionweb as a separate Dokploy service
+
+Bazionweb remains a separate project/service and separate database. It must use a staging-only Compose file with `staging.bazionweb.com` and `staging-api.bazionweb.com`, a private PostgreSQL service, and materially smaller resource caps than its current 4.5 GiB / 5-core Compose limits. Its existing production Compose file targets the live apex and www hosts and must not be used for this staging service. I can update and validate the Bazionweb files once `D:\bazionweb` is added as a writable workspace; it is currently outside this workspace's write boundary. Until then, do not create the Bazionweb Compose app from its current production file.
+
+### Resource budget
+
+Platform staging hard limits in the Compose file total about 2.5 GiB RAM and 2 CPU cores, including the one-shot migration limit. The migration container exits after deployment. Build CPU/memory stays on GitHub Actions. This is a staging ceiling, not a performance guarantee; measure Dokploy, monitoring, both databases, and app containers together before increasing caps or placing customer data on the host. The VPS has 6 GiB RAM and 3 CPU cores, so the Bazionweb stack must be reduced before both systems run together.
 
 ## Database backups
 
-The existing VPS Restic timer uploads selected system and Dokploy configuration plus monitoring data to the private R2 bucket. It currently does not create PostgreSQL dumps. Before staging databases contain useful data, add consistent per-database `pg_dump` artifacts to the Restic staging directory and confirm that the resulting backup is visible in R2. Restore each dump into an isolated recovery database and run the Platform database preflight before treating it as a verified recovery path. Keep the R2 repository password and access keys only in the root-owned secret configuration on the VPS.
+The existing VPS Restic timer uploads selected system and Dokploy configuration plus monitoring data to the private R2 bucket. It currently does not create PostgreSQL dumps. The Platform repository now provides [`bazion-docker-postgres-dump.sh`](../../deploy/systemd/bazion-docker-postgres-dump.sh), which selects exactly one running DB by an explicit Docker label, writes a mode-0600 custom-format dump, and validates its archive table of contents. The Platform DB carries the label `com.bazion.backup-target=platform-staging`.
+
+After the Platform stack is deployed, copy this helper to `/usr/local/sbin` on the VPS and add this line in `/usr/local/sbin/bazion-restic-backup.sh` after `STAGE` is created and before `restic backup` runs:
+
+```bash
+/usr/local/sbin/bazion-docker-postgres-dump.sh platform-staging bazion_platform bazion_admin "$STAGE/postgres"
+```
+
+Then run the existing backup service once and confirm the Restic log succeeds and a new snapshot exists in the private `bazionweb-backups` R2 bucket. A backup is not recovery proof: before staging holds customer or member data, restore the dump into a separate recovery database and verify the app's migrations/preflight there. When Bazionweb's separate staging database is added, give its DB container a different `com.bazion.backup-target` label and add a second helper invocation with that database's actual name/user. Keep the R2 repository password and access keys only in the root-owned secret configuration on the VPS.
 
 ## Current release limits
 

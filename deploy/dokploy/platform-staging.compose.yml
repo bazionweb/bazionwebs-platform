@@ -1,0 +1,284 @@
+name: bazion-platform-staging
+
+x-default-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+x-runtime-security: &runtime-security
+  cap_drop:
+    - ALL
+  security_opt:
+    - no-new-privileges:true
+
+x-api-environment: &api-environment
+  NODE_ENV: production
+  APP_ENV: staging
+  PORT: "4000"
+  LOG_LEVEL: info
+  TENANT_DATABASE_SECRET_BACKEND: docker
+  HOSTING_SECRET_DIRECTORY: /run/secrets
+  TENANT_DATABASE_SCHEMA_VERSION: 0025_installation_changes.sql
+  TENANT_RESOLUTION_MODE: verified_domain
+  CORS_ORIGINS: https://platform-staging.bazionweb.com,https://church-staging.bazionweb.com,https://staging.bazionweb.com
+  BETTER_AUTH_URL: https://platform-api-staging.bazionweb.com
+  BETTER_AUTH_SECRET: ${PLATFORM_BETTER_AUTH_SECRET:?Set a unique staging Better Auth secret}
+  BETTER_AUTH_TRUSTED_ORIGINS: https://platform-staging.bazionweb.com,https://church-staging.bazionweb.com,https://staging.bazionweb.com
+  AUTH_APP_URL: https://platform-staging.bazionweb.com
+  PLATFORM_CONSOLE_URL: https://platform-staging.bazionweb.com
+  COMMERCIAL_PORTAL_URL: https://staging.bazionweb.com
+  PUBLIC_STOREFRONT_URL: https://church-staging.bazionweb.com
+  AUTH_REQUIRE_EMAIL_VERIFICATION: "true"
+  DEFAULT_TENANT_CURRENCY: KES
+  TRUSTED_PROXY_ADDRESSES: ${TRUSTED_PROXY_ADDRESSES:?Set the exact Dokploy/Traefik proxy subnet}
+  PAYMENT_PROVIDER: mock
+  DEV_PAYMENT_SECRET: ${STAGING_MOCK_PAYMENT_SECRET:?Set a unique staging-only mock payment secret}
+  NOTIFICATION_ENCRYPTION_KEY: ${NOTIFICATION_ENCRYPTION_KEY:?Set a random Base64 32-byte key}
+  MEDIA_STORAGE_DRIVER: s3
+  MEDIA_STORAGE_ENDPOINT: ${R2_S3_ENDPOINT:?Set the Cloudflare account R2 endpoint}
+  MEDIA_STORAGE_REGION: auto
+  MEDIA_STORAGE_BUCKET: bazionweb-public-media
+  MEDIA_STORAGE_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID:?Set the scoped R2 access key ID}
+  MEDIA_STORAGE_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY:?Set the scoped R2 secret access key}
+  MEDIA_STORAGE_PUBLIC_BASE_URL: https://media.bazionweb.com
+  MEDIA_IMAGE_TRANSFORMS_ENABLED: "true"
+  SITE_IMAGE_TRANSFORMS_ENABLED: "false"
+  HOSTING_PROVIDER: disabled
+  COMMERCIAL_PROVISIONING_ENABLED: "false"
+  COMMERCIAL_PROVISIONING_WORKER_ENABLED: "false"
+  COMMERCIAL_PROVISIONING_PILOT_MODE: staging_pilot
+  COMMERCIAL_PROVISIONING_HOSTING_MUTATIONS_ENABLED: "false"
+  COMMERCIAL_PROVISIONING_LEGACY_FALLBACK_ENABLED: "true"
+  COMMERCIAL_PROVISIONING_DUAL_READ_RECONCILIATION_ENABLED: "true"
+  OIDC_ISSUER: https://platform-api-staging.bazionweb.com
+  OIDC_SIGNING_PRIVATE_KEY_PEM: ${OIDC_SIGNING_PRIVATE_KEY_PEM:?Set the staging OIDC private key as one line with literal \n separators}
+  OIDC_SIGNING_KEY_ID: staging-2026-11
+  OIDC_BFF_CLIENT_ID: bazion-bff-platform
+  OIDC_BFF_CLIENT_SECRET: ${OIDC_BFF_CLIENT_SECRET:?Set a unique staging OIDC BFF secret}
+  DATABASE_URL: postgres://bazion_app:${BAZION_APP_PASSWORD:?Set BAZION_APP_PASSWORD}@db:5432/bazion_platform
+  AUTH_DATABASE_URL: postgres://bazion_auth_runtime:${BAZION_AUTH_PASSWORD:?Set BAZION_AUTH_PASSWORD}@db:5432/bazion_platform
+  TENANT_RESOLVER_DATABASE_URL: postgres://bazion_tenant_resolver:${BAZION_TENANT_RESOLVER_PASSWORD:?Set BAZION_TENANT_RESOLVER_PASSWORD}@db:5432/bazion_platform
+  TENANT_PROVISIONER_DATABASE_URL: postgres://bazion_tenant_provisioner:${BAZION_TENANT_PROVISIONER_PASSWORD:?Set BAZION_TENANT_PROVISIONER_PASSWORD}@db:5432/bazion_platform
+  NOTIFICATION_ENQUEUER_DATABASE_URL: postgres://bazion_notification_enqueuer:${BAZION_NOTIFICATION_ENQUEUER_PASSWORD:?Set BAZION_NOTIFICATION_ENQUEUER_PASSWORD}@db:5432/bazion_platform
+
+services:
+  db:
+    image: ghcr.io/bazionweb/bazionwebs-platform-db:${PLATFORM_IMAGE_TAG:?Set a validated sha- image tag}
+    restart: unless-stopped
+    labels:
+      com.bazion.backup-target: platform-staging
+    environment:
+      POSTGRES_DB: bazion_platform
+      POSTGRES_USER: bazion_admin
+      POSTGRES_PASSWORD: ${POSTGRES_ADMIN_PASSWORD:?Set a unique staging PostgreSQL admin password}
+      POSTGRES_INITDB_ARGS: --auth-host=scram-sha-256
+      BAZION_APP_PASSWORD: ${BAZION_APP_PASSWORD:?Set BAZION_APP_PASSWORD}
+      BAZION_MIGRATOR_PASSWORD: ${BAZION_MIGRATOR_PASSWORD:?Set BAZION_MIGRATOR_PASSWORD}
+      BAZION_AUTH_PASSWORD: ${BAZION_AUTH_PASSWORD:?Set BAZION_AUTH_PASSWORD}
+      BAZION_TENANT_RESOLVER_PASSWORD: ${BAZION_TENANT_RESOLVER_PASSWORD:?Set BAZION_TENANT_RESOLVER_PASSWORD}
+      BAZION_TENANT_PROVISIONER_PASSWORD: ${BAZION_TENANT_PROVISIONER_PASSWORD:?Set BAZION_TENANT_PROVISIONER_PASSWORD}
+      BAZION_NOTIFICATION_ENQUEUER_PASSWORD: ${BAZION_NOTIFICATION_ENQUEUER_PASSWORD:?Set BAZION_NOTIFICATION_ENQUEUER_PASSWORD}
+      BAZION_NOTIFICATION_WORKER_PASSWORD: ${BAZION_NOTIFICATION_WORKER_PASSWORD:?Set BAZION_NOTIFICATION_WORKER_PASSWORD}
+      BAZION_HOSTING_RECONCILER_PASSWORD: ${BAZION_HOSTING_RECONCILER_PASSWORD:?Set BAZION_HOSTING_RECONCILER_PASSWORD}
+      BAZION_PRODUCT_PROVISIONER_PASSWORD: ${BAZION_PRODUCT_PROVISIONER_PASSWORD:?Set BAZION_PRODUCT_PROVISIONER_PASSWORD}
+      BAZION_TENANT_BACKUP_PASSWORD: ${BAZION_TENANT_BACKUP_PASSWORD:?Set BAZION_TENANT_BACKUP_PASSWORD}
+    volumes:
+      - platform_staging_pgdata:/var/lib/postgresql
+    command:
+      - postgres
+      - -c
+      - max_connections=50
+      - -c
+      - shared_buffers=96MB
+      - -c
+      - effective_cache_size=256MB
+      - -c
+      - work_mem=4MB
+      - -c
+      - maintenance_work_mem=32MB
+      - -c
+      - log_min_duration_statement=1000
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bazion_admin -d bazion_platform"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.35"
+          memory: 512M
+    logging: *default-logging
+    networks:
+      - platform-data
+
+  migrate:
+    image: ghcr.io/bazionweb/bazionwebs-platform-migrate:${PLATFORM_IMAGE_TAG:?Set a validated sha- image tag}
+    restart: "no"
+    environment:
+      NODE_ENV: production
+      MIGRATION_DATABASE_URL: postgres://bazion_migrator:${BAZION_MIGRATOR_PASSWORD:?Set BAZION_MIGRATOR_PASSWORD}@db:5432/bazion_platform
+    depends_on:
+      db:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: "0.35"
+          memory: 384M
+    logging: *default-logging
+    networks:
+      - platform-data
+
+  api:
+    image: ghcr.io/bazionweb/bazionwebs-platform-api:${PLATFORM_IMAGE_TAG:?Set a validated sha- image tag}
+    restart: unless-stopped
+    environment:
+      <<: *api-environment
+      AUTH_DATABASE_URL: postgres://bazion_auth_runtime:${BAZION_AUTH_PASSWORD:?Set BAZION_AUTH_PASSWORD}@db:5432/bazion_platform
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    stop_grace_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 640M
+    logging: *default-logging
+    <<: *runtime-security
+    networks:
+      - platform-app
+      - platform-data
+
+  admin:
+    image: ghcr.io/bazionweb/bazionwebs-platform-admin:${PLATFORM_IMAGE_TAG:?Set a validated sha- image tag}
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: "3001"
+      HOSTNAME: 0.0.0.0
+      API_BASE_URL: http://api:4000
+      PUBLIC_STOREFRONT_URL: https://church-staging.bazionweb.com
+      MEDIA_STORAGE_PUBLIC_BASE_URL: https://media.bazionweb.com
+      MEDIA_IMAGE_TRANSFORMS_ENABLED: "true"
+      SITE_IMAGE_TRANSFORMS_ENABLED: "false"
+    depends_on:
+      api:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: "0.20"
+          memory: 256M
+    logging: *default-logging
+    <<: *runtime-security
+    networks:
+      - platform-app
+
+  storefront:
+    image: ghcr.io/bazionweb/bazionwebs-platform-storefront:${PLATFORM_IMAGE_TAG:?Set a validated sha- image tag}
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      HOSTNAME: 0.0.0.0
+      API_BASE_URL: http://api:4000
+      MEDIA_STORAGE_PUBLIC_BASE_URL: https://media.bazionweb.com
+      MEDIA_IMAGE_TRANSFORMS_ENABLED: "true"
+      SITE_IMAGE_TRANSFORMS_ENABLED: "false"
+    depends_on:
+      api:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: "0.30"
+          memory: 384M
+    logging: *default-logging
+    <<: *runtime-security
+    networks:
+      - platform-app
+
+  status-worker:
+    image: ghcr.io/bazionweb/bazionwebs-platform-api:${PLATFORM_IMAGE_TAG:?Set a validated sha- image tag}
+    command: ["node", "dist/commercial-status-worker.js"]
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      COMMERCIAL_PROVISIONING_WORKER_ENABLED: "false"
+      COMMERCIAL_PROVISIONING_PILOT_MODE: staging_pilot
+      COMMERCIAL_PROVISIONING_HOSTING_MUTATIONS_ENABLED: "false"
+      COMMERCIAL_PROVISIONING_LEGACY_FALLBACK_ENABLED: "true"
+      COMMERCIAL_PROVISIONING_DUAL_READ_RECONCILIATION_ENABLED: "true"
+      PRODUCT_PROVISIONER_DATABASE_URL: postgres://bazion_product_provisioner:${BAZION_PRODUCT_PROVISIONER_PASSWORD:?Set BAZION_PRODUCT_PROVISIONER_PASSWORD}@db:5432/bazion_platform
+      TENANT_PROVISIONER_DATABASE_URL: postgres://bazion_tenant_provisioner:${BAZION_TENANT_PROVISIONER_PASSWORD:?Set BAZION_TENANT_PROVISIONER_PASSWORD}@db:5432/bazion_platform
+      COMMERCIAL_PROVISIONING_CALLBACK_URL: https://staging-api.bazionweb.com/api/v1/webhooks/platform/provisioning-status
+      COMMERCIAL_PROVISIONING_CALLBACK_SIGNING_SECRET: ${PLATFORM_CALLBACK_SIGNING_SECRET:?Set the shared staging callback signing secret}
+      COMMERCIAL_PROVISIONING_CALLBACK_BEARER_SECRET: ${PLATFORM_CALLBACK_BEARER_SECRET:?Set the shared staging callback bearer secret}
+      COMMERCIAL_STATUS_WORKER_BATCH_SIZE: "3"
+      COMMERCIAL_STATUS_WORKER_IDLE_MS: "5000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    stop_grace_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.15"
+          memory: 192M
+    logging: *default-logging
+    <<: *runtime-security
+    networks:
+      - platform-app
+      - platform-data
+
+  notification-worker:
+    image: ghcr.io/bazionweb/bazionwebs-platform-notification-worker:${PLATFORM_IMAGE_TAG:?Set a validated sha- image tag}
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      NOTIFICATION_WORKER_DATABASE_URL: postgres://bazion_notification_worker:${BAZION_NOTIFICATION_WORKER_PASSWORD:?Set BAZION_NOTIFICATION_WORKER_PASSWORD}@db:5432/bazion_platform
+      NOTIFICATION_ENCRYPTION_KEY: ${NOTIFICATION_ENCRYPTION_KEY:?Set the same random Base64 32-byte key as the API}
+      NOTIFICATION_SMTP_HOST: ${NOTIFICATION_SMTP_HOST:?Set your authenticated SMTP host}
+      NOTIFICATION_SMTP_PORT: ${NOTIFICATION_SMTP_PORT:-465}
+      NOTIFICATION_SMTP_SECURE: ${NOTIFICATION_SMTP_SECURE:-true}
+      NOTIFICATION_SMTP_REQUIRE_TLS: "true"
+      NOTIFICATION_SMTP_USER: ${NOTIFICATION_SMTP_USER:?Set the SMTP username}
+      NOTIFICATION_SMTP_PASSWORD: ${NOTIFICATION_SMTP_PASSWORD:?Set the SMTP password/API key}
+      NOTIFICATION_EMAIL_FROM: ${NOTIFICATION_EMAIL_FROM:?Set a verified sender, e.g. Bazion Web <noreply@bazionweb.com>}
+      NOTIFICATION_WORKER_BATCH_SIZE: "3"
+      NOTIFICATION_WORKER_IDLE_MS: "1000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    stop_grace_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.15"
+          memory: 160M
+    logging: *default-logging
+    <<: *runtime-security
+    networks:
+      - platform-app
+      - platform-data
+
+volumes:
+  platform_staging_pgdata:
+    name: bazion_platform_staging_pgdata
+
+networks:
+  platform-app:
+    name: bazion-platform-staging-app
+  platform-data:
+    name: bazion-platform-staging-data
+    internal: true

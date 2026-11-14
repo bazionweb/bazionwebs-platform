@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { readFile } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
 import test from "node:test";
 
 const dockerfile = await readFile(new URL("../Dockerfile", import.meta.url), "utf8");
@@ -11,11 +13,16 @@ const storefrontLayout = await readFile(new URL("../apps/storefront/app/layout.t
 const adminFontFallbacks = await readFile(new URL("../apps/admin/app/font-fallbacks.css", import.meta.url), "utf8");
 const storefrontFontFallbacks = await readFile(new URL("../apps/storefront/app/font-fallbacks.css", import.meta.url), "utf8");
 const ciWorkflow = await readFile(new URL("../.github/workflows/ci.yml", import.meta.url), "utf8");
+const stagingCompose = await readFile(new URL("../deploy/dokploy/platform-staging.compose.yml", import.meta.url), "utf8");
+const postgresDumpScript = await readFile(new URL("../deploy/systemd/bazion-docker-postgres-dump.sh", import.meta.url), "utf8");
 
 test("Dockerfile provides a production target for each platform app and a one-shot migration target", () => {
-  for (const target of ["api", "admin", "storefront", "storefront-test", "migrate"]) {
+  for (const target of ["api", "admin", "storefront", "storefront-test", "migrate", "database", "notification-worker"]) {
     assert.match(dockerfile, new RegExp(`AS ${target}\\b`), `missing ${target} target`);
   }
+  assert.match(dockerfile, /COPY packages\/database\/init\/001-create-roles\.sh \/docker-entrypoint-initdb\.d\/001-create-roles\.sh/);
+  assert.match(dockerfile, /postgres:18\.7-alpine3\.24 AS database/);
+  assert.match(dockerfile, /CMD \["node", "dist\/worker\.js"\]/);
   assert.match(dockerfile, /pnpm --filter @bazion\/api --prod deploy \/out/);
   assert.match(dockerfile, /pnpm install --frozen-lockfile --filter @bazion\/api\.\.\./);
   assert.match(dockerfile, /CMD \["pnpm", "--filter", "@bazion\/database", "migrate"\]/);
@@ -68,8 +75,15 @@ test("Docker build context excludes credentials and generated files", () => {
 test("successful main CI publishes SHA-addressed images with isolated BuildKit caches", () => {
   assert.match(ciWorkflow, /publish-container-images:[\s\S]{0,200}needs: validate/);
   assert.match(ciWorkflow, /if: github\.ref == 'refs\/heads\/main'/);
-  for (const image of ["api", "admin", "storefront", "migrate"]) {
-    assert.match(ciWorkflow, new RegExp(`target: ${image}\\b`), `missing published ${image} image`);
+  for (const [target, image] of [
+    ["api", "api"],
+    ["admin", "admin"],
+    ["storefront", "storefront"],
+    ["migrate", "migrate"],
+    ["database", "db"],
+    ["notification-worker", "notification-worker"],
+  ]) {
+    assert.match(ciWorkflow, new RegExp(`target: ${target}\\b`), `missing ${target} image target`);
     assert.match(ciWorkflow, new RegExp(`image: ${image}\\b`), `missing ${image} registry image`);
   }
   assert.match(ciWorkflow, /type=sha,prefix=sha-/);
@@ -82,4 +96,45 @@ test("successful main CI publishes SHA-addressed images with isolated BuildKit c
   assert.match(publishJob, /push: true/);
   assert.match(publishJob, /provenance: mode=max/);
   assert.match(publishJob, /sbom: true/);
+});
+
+test("Dokploy staging stack isolates the database, runs migrations before app services, and caps resource use", () => {
+  for (const service of ["db", "migrate", "api", "admin", "storefront", "status-worker", "notification-worker"]) {
+    assert.match(stagingCompose, new RegExp(`^  ${service}:\\s*$`, "m"), `missing staging ${service} service`);
+  }
+  for (const image of ["db", "migrate", "api", "admin", "storefront", "notification-worker"]) {
+    assert.ok(stagingCompose.includes(`image: ghcr.io/bazionweb/bazionwebs-platform-${image}:`), `wrong or missing GHCR image for ${image}`);
+  }
+  assert.ok(!stagingCompose.includes("ghcr.io/bazionwebs/"), "Compose image owner must match the repository owner used by CI");
+  assert.match(stagingCompose, /PLATFORM_IMAGE_TAG:\?Set a validated sha-/);
+  assert.match(stagingCompose, /condition: service_completed_successfully/);
+  assert.match(stagingCompose, /name: bazion-platform-staging-data\n    internal: true/);
+  assert.match(stagingCompose, /name: bazion_platform_staging_pgdata/);
+  assert.match(stagingCompose, /com\.bazion\.backup-target: platform-staging/);
+  assert.match(stagingCompose, /APP_ENV: staging/);
+  assert.match(stagingCompose, /PAYMENT_PROVIDER: mock/);
+  assert.match(stagingCompose, /COMMERCIAL_PROVISIONING_WORKER_ENABLED: "false"/);
+  assert.match(stagingCompose, /MEDIA_IMAGE_TRANSFORMS_ENABLED: "true"/);
+  assert.match(stagingCompose, /SITE_IMAGE_TRANSFORMS_ENABLED: "false"/);
+  assert.doesNotMatch(stagingCompose, /^\s+ports:/m, "staging services must not publish container ports directly");
+  assert.doesNotMatch(stagingCompose, /container_name:/);
+  assert.doesNotMatch(stagingCompose, /docker-entrypoint-initdb\.d/);
+  assert.doesNotMatch(stagingCompose, /DOKPLOY_API_KEY/);
+  assert.match(stagingCompose, /MEDIA_STORAGE_SECRET_ACCESS_KEY: \$\{R2_SECRET_ACCESS_KEY:/);
+  assert.match(stagingCompose, /PLATFORM_CALLBACK_SIGNING_SECRET:\?Set the shared staging callback signing secret/);
+});
+
+test("PostgreSQL backup helper selects exactly one labelled DB and validates a restricted dump", () => {
+  assert.match(postgresDumpScript, /label=com\.bazion\.backup-target=\$target_label/);
+  assert.match(postgresDumpScript, /\$\{#containers\[@\]\} -ne 1/);
+  assert.match(postgresDumpScript, /pg_dump[\s\S]*--format=custom/);
+  assert.match(postgresDumpScript, /pg_restore --list -/);
+  assert.match(postgresDumpScript, /umask 077/);
+  assert.doesNotMatch(postgresDumpScript, /PGPASSWORD|--password|echo .*secret/i);
+});
+
+test("PostgreSQL backup helper has valid Bash syntax on the Linux CI runner", { skip: process.platform === "win32" }, () => {
+  const scriptPath = fileURLToPath(new URL("../deploy/systemd/bazion-docker-postgres-dump.sh", import.meta.url));
+  const result = spawnSync("bash", ["-n", scriptPath], { encoding: "utf8" });
+  assert.equal(result.status, 0, result.stderr || "Bash syntax check failed.");
 });

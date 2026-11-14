@@ -95,6 +95,41 @@ describe("API runtime configuration", () => {
     expect(loadConfig().mediaStorage.driver).toBe("local");
   });
 
+  it("allows staging to use the mock payment adapter while preserving production-mode security checks", () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("APP_ENV", "staging");
+    vi.stubEnv("AUTH_REQUIRE_EMAIL_VERIFICATION", "true");
+    vi.stubEnv("MEDIA_STORAGE_DRIVER", "s3");
+    vi.stubEnv("MEDIA_STORAGE_ENDPOINT", "https://account.r2.cloudflarestorage.com");
+    vi.stubEnv("MEDIA_STORAGE_BUCKET", "bazionweb-public-media");
+    vi.stubEnv("MEDIA_STORAGE_ACCESS_KEY_ID", "staging-access-key");
+    vi.stubEnv("MEDIA_STORAGE_SECRET_ACCESS_KEY", "staging-secret-key");
+    vi.stubEnv("MEDIA_STORAGE_PUBLIC_BASE_URL", "https://media.bazionweb.com");
+    vi.stubEnv("TENANT_RESOLUTION_MODE", "verified_domain");
+    vi.stubEnv("TRUSTED_PROXY_ADDRESSES", "172.20.0.0/24");
+    vi.stubEnv("BETTER_AUTH_SECRET", "staging-grade-better-auth-secret-at-least-32");
+    vi.stubEnv("BETTER_AUTH_URL", "https://platform-api-staging.bazionweb.com");
+    vi.stubEnv("AUTH_APP_URL", "https://platform-staging.bazionweb.com");
+    vi.stubEnv("PUBLIC_STOREFRONT_URL", "https://church-staging.bazionweb.com");
+    vi.stubEnv("PLATFORM_CONSOLE_URL", "https://platform-staging.bazionweb.com");
+    vi.stubEnv("CORS_ORIGINS", "https://platform-staging.bazionweb.com,https://church-staging.bazionweb.com");
+    vi.stubEnv("BETTER_AUTH_TRUSTED_ORIGINS", "https://platform-staging.bazionweb.com,https://church-staging.bazionweb.com");
+    vi.stubEnv("PAYMENT_PROVIDER", "mock");
+    vi.stubEnv("DEV_PAYMENT_SECRET", "staging-only-random-payment-secret-value");
+    vi.stubEnv("OIDC_SIGNING_PRIVATE_KEY_PEM", `-----BEGIN PRIVATE KEY-----\\n${"A".repeat(100)}\\n-----END PRIVATE KEY-----`);
+    vi.stubEnv("OIDC_BFF_CLIENT_SECRET", "staging-grade-oidc-bff-secret-at-least-32");
+
+    const config = loadConfig();
+    expect(config.APP_ENV).toBe("staging");
+    expect(config.PAYMENT_PROVIDER).toBe("mock");
+    expect(config.OIDC_SIGNING_PRIVATE_KEY_PEM).toContain("\n");
+    vi.stubEnv("MPESA_ENVIRONMENT", "production");
+    expect(() => loadConfig()).toThrow(/cannot be used outside the production application environment/);
+    vi.stubEnv("MPESA_ENVIRONMENT", "sandbox");
+    vi.stubEnv("APP_ENV", "production");
+    expect(() => loadConfig()).toThrow(/M-Pesa payment adapter/);
+  });
+
   it("rejects partially configured S3 media storage", () => {
     vi.stubEnv("MEDIA_STORAGE_ENDPOINT", "https://account.r2.cloudflarestorage.com");
     expect(() => loadConfig()).toThrow(/Configure all MEDIA_STORAGE_ENDPOINT/);
