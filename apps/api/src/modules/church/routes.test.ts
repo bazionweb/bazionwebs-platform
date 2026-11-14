@@ -326,7 +326,7 @@ describe("Church & Ministry Module Routes", () => {
       mocks.requireActiveTenantPermission.mockResolvedValue({ tenantId, userId: "user-admin", roles: ["admin"] });
       const storage = createTestStorage();
       const app = await buildTestApp(storage);
-      const png = Buffer.from("89504e470d0a1a0a0000000049454e44", "hex");
+      const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAADUlEQVQImWPgqfjwHwAEfAJ0Uva4SQAAAABJRU5ErkJggg==", "base64");
       const response = await app.inject({
         method: "POST",
         url: "/v1/admin/church/media?filename=revival-hero.png&contentType=image%2Fpng",
@@ -336,16 +336,39 @@ describe("Church & Ministry Module Routes", () => {
 
       expect(response.statusCode).toBe(201);
       const { asset } = response.json();
-      expect(asset.contentType).toBe("image/png");
-      expect(asset.sizeBytes).toBe(png.byteLength);
+      expect(asset).toMatchObject({
+        contentType: "image/webp",
+        originalSizeBytes: png.byteLength,
+        optimized: true,
+        width: 1,
+        height: 1,
+      });
+      expect(asset.sizeBytes).toBeLessThan(png.byteLength);
+      expect(asset.savedBytes).toBe(png.byteLength - asset.sizeBytes);
       expect(asset.url).toMatch(/^https:\/\/media\.example\.test\//);
       expect(storage.putObject).toHaveBeenCalledWith(expect.objectContaining({
         tenantId,
-        key: expect.stringContaining(`${tenantId}/`),
-        body: png,
-        contentType: "image/png",
+        key: expect.stringMatching(new RegExp(`^${tenantId}/[a-f0-9]{32}/revival-hero\\.webp$`)),
+        body: expect.any(Buffer),
+        contentType: "image/webp",
       }));
       expect(mocks.requireActiveTenantPermission).toHaveBeenCalledWith(expect.any(Object), { store: ["update"] });
+    });
+
+    it("rejects a corrupt image even when the filename and signature look valid", async () => {
+      mocks.requireActiveTenantPermission.mockResolvedValue({ tenantId, userId: "user-admin", roles: ["admin"] });
+      const storage = createTestStorage();
+      const app = await buildTestApp(storage);
+      const response = await app.inject({
+        method: "POST",
+        url: "/v1/admin/church/media?filename=corrupt.png&contentType=image%2Fpng",
+        headers: { host: "gmfc.test", "content-type": "application/octet-stream" },
+        payload: Buffer.from("89504e470d0a1a0a0000000049454e44", "hex"),
+      });
+
+      expect(response.statusCode).toBe(415);
+      expect(response.json().error).toBe("INVALID_IMAGE_DATA");
+      expect(storage.putObject).not.toHaveBeenCalled();
     });
 
     it("rejects unsupported or mismatched image content before writing to storage", async () => {

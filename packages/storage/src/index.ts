@@ -11,6 +11,15 @@ export {
   type SupportedImageContentType,
 } from "./image-upload.js";
 export {
+  ImageOptimizationBusyError,
+  InvalidUploadedImageError,
+  MAX_IMAGE_INPUT_PIXELS,
+  MAX_IMAGE_OUTPUT_EDGE,
+  optimizeUploadedImage,
+  UploadedImageTooLargeError,
+  type OptimizedImageUpload,
+} from "./image-optimization.js";
+export {
   EncryptedPrivateArchiveStorage,
 } from "./encrypted-private-archive.js";
 export {

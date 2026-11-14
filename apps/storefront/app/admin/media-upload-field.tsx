@@ -9,6 +9,9 @@ export type MinistryMediaAsset = {
   contentType: string;
   sizeBytes: number;
   lastModified: string;
+  originalSizeBytes?: number;
+  savedBytes?: number;
+  optimized?: boolean;
 };
 
 type MediaResponse = { items?: MinistryMediaAsset[]; asset?: MinistryMediaAsset; message?: string; error?: string };
@@ -52,6 +55,7 @@ export function MediaUploadField({
   const [loadingLibrary, setLoadingLibrary] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
 
   async function openLibrary() {
     setLibraryOpen(true);
@@ -70,6 +74,7 @@ export function MediaUploadField({
   async function uploadFile(file: File | undefined) {
     if (!file) return;
     setError("");
+    setNotice("");
     if (!allowedImageTypes.has(file.type)) {
       setError("Choose a JPEG, PNG, WebP, or AVIF image.");
       return;
@@ -90,6 +95,9 @@ export function MediaUploadField({
       if (!payload.asset) throw new Error("The upload completed without an asset link.");
       onChange(payload.asset.url);
       setAssets((current) => [payload.asset!, ...current.filter((asset) => asset.key !== payload.asset!.key)]);
+      setNotice(payload.asset.optimized
+        ? `Image converted to WebP and saved ${formatBytes(payload.asset.savedBytes ?? 0)}.`
+        : "Image was already compact; the original format was kept to avoid increasing storage.");
       setLibraryOpen(false);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "The image could not be uploaded.");
@@ -128,6 +136,7 @@ export function MediaUploadField({
     </div>
     <small className="ministry-media-help">JPEG, PNG, WebP, or AVIF · up to 8 MB. URLs must use HTTPS or a site-relative path.</small>
     {value && safePreviewUrl(value) && <div className="ministry-media-preview"><ResponsiveImage src={value} alt={`${label} preview`} sizes="180px" /><span>Current image preview</span></div>}
+    {notice && <p role="status" className="ministry-media-help">{notice}</p>}
     {error && <p className="ministry-media-error" role="alert">{error}</p>}
     {libraryOpen && <section className="ministry-media-library" aria-label={`${label} media library`}>
       <div className="ministry-media-library-heading"><div><strong>Tenant media library</strong><small>Uploaded assets are available only in this workspace.</small></div><button type="button" onClick={() => setLibraryOpen(false)} aria-label="Close media library">Close</button></div>

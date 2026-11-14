@@ -41,8 +41,11 @@ import {
   buildTenantObjectKey,
   createObjectStorage,
   detectImageContentType,
-  imageExtensionForContentType,
+  ImageOptimizationBusyError,
+  InvalidUploadedImageError,
+  optimizeUploadedImage,
   sanitizeImageFilename,
+  UploadedImageTooLargeError,
   type ObjectStorage,
 } from "@bazion/storage";
 
@@ -822,7 +825,16 @@ export async function churchRoutes(app: FastifyInstance, options: RouteOptions) 
   });
 
   // POST /v1/admin/church/media
-  app.post<{ Querystring: { filename?: string; contentType?: string } }>("/admin/church/media", { bodyLimit: MEDIA_UPLOAD_LIMIT_BYTES }, async (request, reply) => {
+  app.post<{ Querystring: { filename?: string; contentType?: string } }>("/admin/church/media", {
+    bodyLimit: MEDIA_UPLOAD_LIMIT_BYTES,
+    config: {
+      rateLimit: {
+        max: 10,
+        timeWindow: "1 minute",
+        keyGenerator: (request) => request.ip,
+      },
+    },
+  }, async (request, reply) => {
     const context = await requireActiveTenantPermission(request.raw.headers, { store: ["update"] });
     await assertChurchEnabled(context.tenantId);
     const bytes = request.body;
@@ -834,20 +846,40 @@ export async function churchRoutes(app: FastifyInstance, options: RouteOptions) 
     }
     const declaredType = request.query.contentType?.trim().toLowerCase() ?? "";
     const actualType = detectImageContentType(bytes);
-    const extension = actualType ? imageExtensionForContentType(actualType) : undefined;
-    if (!actualType || actualType !== declaredType || !extension) {
+    if (!actualType || actualType !== declaredType) {
       return reply.code(415).send({ error: "UNSUPPORTED_MEDIA_TYPE", message: "Upload a valid JPEG, PNG, WebP, or AVIF image." });
     }
 
-    const filename = sanitizeImageFilename(request.query.filename, extension);
+    let optimized: Awaited<ReturnType<typeof optimizeUploadedImage>>;
+    try {
+      optimized = await optimizeUploadedImage(bytes, actualType);
+    } catch (error) {
+      if (error instanceof UploadedImageTooLargeError) {
+        return reply.code(413).send({ error: "IMAGE_DIMENSIONS_TOO_LARGE", message: error.message });
+      }
+      if (error instanceof ImageOptimizationBusyError) {
+        return reply.header("retry-after", "5").code(503).send({ error: "IMAGE_PROCESSOR_BUSY", message: error.message });
+      }
+      if (error instanceof InvalidUploadedImageError) {
+        return reply.code(415).send({ error: "INVALID_IMAGE_DATA", message: error.message });
+      }
+      throw error;
+    }
+
+    const filename = sanitizeImageFilename(request.query.filename, optimized.extension);
     const key = buildTenantObjectKey(context.tenantId, randomBytes(16).toString("hex"), filename);
-    await storage.putObject({ tenantId: context.tenantId, key, body: bytes, contentType: actualType });
+    await storage.putObject({ tenantId: context.tenantId, key, body: optimized.body, contentType: optimized.contentType });
     return reply.code(201).send({
       asset: {
         key,
         url: storage.publicUrl(key),
-        contentType: actualType,
-        sizeBytes: bytes.byteLength,
+        contentType: optimized.contentType,
+        sizeBytes: optimized.body.byteLength,
+        originalSizeBytes: optimized.originalSizeBytes,
+        savedBytes: Math.max(0, optimized.originalSizeBytes - optimized.body.byteLength),
+        optimized: optimized.optimized,
+        width: optimized.width,
+        height: optimized.height,
         lastModified: new Date().toISOString(),
       },
     });
