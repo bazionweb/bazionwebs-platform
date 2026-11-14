@@ -373,6 +373,9 @@ importers:
       react-dom:
         specifier: ^19.2.0
         version: 19.3.1(react@19.3.1)
+      swiper:
+        specifier: ^14.4.0
+        version: 14.4.0
     devDependencies:
       '@types/node':
         specifier: ^26.6.6
@@ -2472,6 +2475,10 @@ packages:
       babel-plugin-macros:
         optional: true
 
+  swiper@14.4.0:
+    resolution: {integrity: sha512-6axnAuBsttFJe0gwsM5tT203/Bts0vcI+FwIX6dqFE4pUFVW6qrdRprNFQVxOYMW7V0S6A/KIqJ6JaPpNN2MCw==}
+    engines: {node: '>= 4.7.0'}
+
   thread-stream@4.2.1:
     resolution: {integrity: sha512-Stg6edJXC/6/xqGwSXwFokrUhChJ18amEjpKH89WrQQ0oVFDF+pUUcTpiwWhFUrE89Vf16FBOlwhaw+lescxMQ==}
     engines: {node: '>=20'}
@@ -3998,6 +4005,8 @@ snapshots:
     dependencies:
       client-only: 0.0.1
       react: 19.3.1
+
+  swiper@14.4.0: {}
 
   thread-stream@4.2.1:
     dependencies:

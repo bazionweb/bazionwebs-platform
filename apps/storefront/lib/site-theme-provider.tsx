@@ -42,6 +42,19 @@ export function SiteThemeProvider({ children }: { children: ReactNode }) {
       fontPairing: "outfit-inter" as const,
     };
 
+    const resolvedGold =
+      theme.preset === "maroon-gold" && site.branding.accentColor.toUpperCase() === "#B45E14"
+        ? "#D9A857"
+        : site.branding.accentColor;
+
+    // Bridge active church branding tokens into .gmfci-* custom properties
+    root.style.setProperty("--color-maroon", site.branding.primaryColor);
+    root.style.setProperty("--color-maroon-dark", site.branding.primaryColor);
+    root.style.setProperty("--color-maroon-light", site.branding.secondaryColor);
+    root.style.setProperty("--gmfci-maroon", site.branding.secondaryColor);
+    root.style.setProperty("--gmfci-maroon-deep", site.branding.primaryColor);
+    root.style.setProperty("--color-gold", resolvedGold);
+
     root.dataset.churchTheme = theme.preset;
     root.dataset.fontPairing = theme.fontPairing;
     root.dataset.cardStyle = theme.cardStyle;

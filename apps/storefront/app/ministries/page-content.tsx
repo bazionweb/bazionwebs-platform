@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { ChurchFooter, ChurchNav, PageHero } from "@bazion/ui";
+import { PageHero } from "../../components/gmfc/PageHero";
+import { SiteChrome } from "../../components/gmfc/SiteChrome";
 import { useMinistrySite } from "../../lib/use-ministry-site";
 
 type CategoryTab = "all" | "departments" | "ministries" | "groups" | "volunteerTeams" | "locations";
@@ -17,21 +18,13 @@ export default function MinistriesPage() {
   const hasLocations = (site.locations?.length ?? 0) > 0;
 
   return (
-    <>
-      <ChurchNav
-        ministryName={site.ministryName}
-        logoUrl={site.branding.logoUrl}
-        links={site.navigation}
-        currentPath="/ministries"
-        giveHref={site.pages.some((page) => page.id === "giving" && page.enabled) ? "/give" : null}
-      />
+    <SiteChrome currentPath="/ministries">
       <main id="main-content">
         <PageHero
-          eyebrow="FIND YOUR PLACE"
+          eyebrow="Find Your Place"
           title="Life is better"
-          highlightedTitle="in community"
+          titleHighlight="in community"
           subtitle="Explore the departments, ministry wings, fellowship circles, and volunteer teams that empower every member to grow and serve."
-          bgImageUrl={site.branding.heroBgUrl}
         />
 
         <section className="ch-section">
@@ -343,13 +336,6 @@ export default function MinistriesPage() {
           </div>
         </section>
       </main>
-      <ChurchFooter
-        ministryName={site.ministryName}
-        tagline={site.tagline}
-        phoneNumbers={site.contact.phones}
-        email={site.contact.email}
-        address={site.contact.address}
-      />
-    </>
+    </SiteChrome>
   );
 }

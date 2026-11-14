@@ -1,0 +1,368 @@
+/* Admin Specific Styles */
+.gmfci-admin-layout {
+  display: flex;
+  min-height: 100vh;
+  background-color: #f3f4f6;
+  font-family: var(--font-inter), sans-serif;
+}
+
+/* Sidebar */
+.gmfci-admin-sidebar {
+  width: 260px;
+  background-color: #ffffff;
+  border-right: 1px solid #e5e7eb;
+  display: flex;
+  flex-direction: column;
+}
+
+.gmfci-admin-brand {
+  padding: 24px;
+  border-bottom: 1px solid #e5e7eb;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.gmfci-admin-brand img {
+  width: 40px;
+  height: 40px;
+}
+
+.gmfci-admin-brand h2 {
+  font-family: var(--font-outfit), sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+  color: #111827;
+  line-height: 1.2;
+}
+
+.gmfci-admin-nav {
+  padding: 20px 12px;
+  flex: 1;
+}
+
+.gmfci-admin-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: 8px;
+  color: #4b5563;
+  text-decoration: none;
+  font-weight: 500;
+  margin-bottom: 4px;
+  transition: all 0.2s;
+}
+
+.gmfci-admin-nav-item:hover {
+  background-color: #f9fafb;
+  color: #111827;
+}
+
+.gmfci-admin-nav-item.active {
+  background-color: #eff6ff;
+  color: #2563eb;
+}
+
+.gmfci-admin-nav-item.active svg {
+  color: #2563eb;
+}
+
+.gmfci-admin-logout {
+  padding: 20px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.gmfci-admin-logout-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid #e5e7eb;
+  background: white;
+  border-radius: 8px;
+  color: #4b5563;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.gmfci-admin-logout-btn:hover {
+  background: #f9fafb;
+  color: #ef4444;
+  border-color: #fecaca;
+}
+
+/* Main Content */
+.gmfci-admin-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.gmfci-admin-topbar {
+  height: 64px;
+  background-color: #ffffff;
+  border-bottom: 1px solid #e5e7eb;
+  display: flex;
+  align-items: center;
+  padding: 0 32px;
+}
+
+.gmfci-admin-topbar h1 {
+  font-size: 20px;
+  font-weight: 600;
+  color: #111827;
+  font-family: var(--font-outfit), sans-serif;
+}
+
+.gmfci-admin-content {
+  padding: 32px;
+  flex: 1;
+  overflow-y: auto;
+}
+
+/* Login Page */
+.gmfci-admin-login {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #f3f4f6;
+  padding: 20px;
+}
+
+.gmfci-admin-login-card {
+  background: white;
+  padding: 40px;
+  border-radius: 16px;
+  box-shadow:
+    0 4px 6px -1px rgba(0, 0, 0, 0.1),
+    0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  width: 100%;
+  max-width: 440px;
+}
+
+.gmfci-admin-login-header {
+  text-align: center;
+  margin-bottom: 32px;
+}
+
+.gmfci-admin-login-icon {
+  width: 48px;
+  height: 48px;
+  background: #eff6ff;
+  color: #2563eb;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 16px;
+}
+
+.gmfci-admin-login-header h2 {
+  font-family: var(--font-outfit), sans-serif;
+  font-size: 24px;
+  font-weight: 700;
+  color: #111827;
+  margin-bottom: 8px;
+}
+
+.gmfci-admin-login-header p {
+  color: #6b7280;
+  font-size: 15px;
+}
+
+.gmfci-admin-login-error {
+  background: #fef2f2;
+  color: #b91c1c;
+  padding: 12px;
+  border-radius: 8px;
+  font-size: 14px;
+  margin-bottom: 24px;
+  border: 1px solid #fecaca;
+}
+
+.gmfci-admin-input-group {
+  margin-bottom: 20px;
+}
+
+.gmfci-admin-input-group label {
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+  color: #374151;
+  margin-bottom: 8px;
+}
+
+.gmfci-admin-input-group input {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 15px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.gmfci-admin-input-group input:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.gmfci-admin-btn-primary {
+  width: 100%;
+  padding: 12px;
+  background: #2563eb;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.gmfci-admin-btn-primary:hover {
+  background: #1d4ed8;
+}
+
+.gmfci-admin-btn-primary:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+/* Dashboard Cards */
+.gmfci-admin-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 24px;
+  margin-bottom: 32px;
+}
+
+.gmfci-admin-stat-card {
+  background: white;
+  padding: 24px;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.gmfci-admin-stat-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.gmfci-admin-stat-icon.blue {
+  background: #eff6ff;
+  color: #2563eb;
+}
+
+.gmfci-admin-stat-icon.green {
+  background: #f0fdf4;
+  color: #16a34a;
+}
+
+.gmfci-admin-stat-info h3 {
+  font-size: 14px;
+  font-weight: 500;
+  color: #6b7280;
+  margin-bottom: 4px;
+}
+
+.gmfci-admin-stat-info p {
+  font-size: 28px;
+  font-weight: 700;
+  color: #111827;
+  font-family: var(--font-outfit), sans-serif;
+  line-height: 1;
+}
+
+/* Tables */
+.gmfci-admin-table-wrap {
+  background: white;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  overflow: hidden;
+}
+
+.gmfci-admin-table-header {
+  padding: 20px 24px;
+  border-bottom: 1px solid #e5e7eb;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.gmfci-admin-table-header h3 {
+  font-size: 16px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.gmfci-admin-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.gmfci-admin-table th {
+  text-align: left;
+  padding: 12px 24px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: #f9fafb;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.gmfci-admin-table td {
+  padding: 16px 24px;
+  font-size: 14px;
+  color: #374151;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.gmfci-admin-table tr:last-child td {
+  border-bottom: none;
+}
+
+.gmfci-admin-action-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 6px;
+  transition: all 0.2s;
+  color: #6b7280;
+}
+
+.gmfci-admin-action-btn:hover {
+  background: #f3f4f6;
+  color: #111827;
+}
+
+.gmfci-admin-action-btn.delete:hover {
+  background: #fef2f2;
+  color: #ef4444;
+}
+
+@keyframes gmfci-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.gmfci-spinner {
+  animation: gmfci-spin 0.8s linear infinite;
+}

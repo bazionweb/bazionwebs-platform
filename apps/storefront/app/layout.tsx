@@ -7,6 +7,7 @@ import "@bazion/ui/primitives.css";
 import "@bazion/ui/navigation.css";
 import "@bazion/ui/church.css";
 import "@bazion/ui/pulse.css";
+import "../styles/gmfc/index.css";
 import { PulseHost } from "@bazion/ui";
 import { SiteThemeProvider } from "../lib/site-theme-provider";
 import { fetchTenantPublicData, getTenantRequestContext } from "../lib/server-tenant-api";
@@ -32,6 +33,7 @@ const outfit = Outfit({
 const fraunces = Fraunces({
   variable: "--font-fraunces",
   subsets: ["latin"],
+  style: ["normal", "italic"],
   display: "swap",
 });
 
