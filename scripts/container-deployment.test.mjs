@@ -15,6 +15,7 @@ const storefrontFontFallbacks = await readFile(new URL("../apps/storefront/app/f
 const ciWorkflow = await readFile(new URL("../.github/workflows/ci.yml", import.meta.url), "utf8");
 const stagingCompose = await readFile(new URL("../deploy/dokploy/platform-staging.compose.yml", import.meta.url), "utf8");
 const postgresDumpScript = await readFile(new URL("../deploy/systemd/bazion-docker-postgres-dump.sh", import.meta.url), "utf8");
+const stagingGuide = await readFile(new URL("../docs/operations/vps-staging-deployment.md", import.meta.url), "utf8");
 
 test("Dockerfile provides a production target for each platform app and a one-shot migration target", () => {
   for (const target of ["api", "admin", "storefront", "storefront-test", "migrate", "database", "notification-worker"]) {
@@ -130,6 +131,15 @@ test("Dokploy staging stack isolates the database, runs migrations before app se
   assert.match(stagingCompose, /MIGRATION_DATABASE_URL: postgres:\/\/bazion_migrator:/);
 });
 
+test("staging guide describes both separate stacks and blocks deployment until GHCR images exist", () => {
+  assert.match(stagingGuide, /docker-compose\.dokploy\.staging\.yml/);
+  assert.match(stagingGuide, /staging-api\.bazionweb\.com/);
+  assert.match(stagingGuide, /church-staging\.bazionweb\.com/);
+  assert.match(stagingGuide, /locally built image is not available to Dokploy/i);
+  assert.doesNotMatch(stagingGuide, /added as a writable workspace|currently outside this workspace/i);
+  assert.doesNotMatch(stagingGuide, /This repo's Docker targets cover Platform API\/admin\/storefront only/);
+});
+
 test("Better Auth migrations use the locked local CLI and migration-only credentials", async () => {
   const authManifest = JSON.parse(await readFile(new URL("../packages/auth/package.json", import.meta.url), "utf8"));
   const authMigrator = await readFile(new URL("../packages/auth/scripts/migrate.ts", import.meta.url), "utf8");
@@ -150,6 +160,9 @@ test("PostgreSQL backup helper selects exactly one labelled DB and validates a r
   assert.match(postgresDumpScript, /pg_restore --list -/);
   assert.match(postgresDumpScript, /umask 077/);
   assert.doesNotMatch(postgresDumpScript, /PGPASSWORD|--password|echo .*secret/i);
+  assert.match(stagingCompose, /com\.bazion\.backup-target: platform-staging/);
+  assert.match(stagingGuide, /bazion-docker-postgres-dump\.sh platform-staging bazion_platform bazion_admin/);
+  assert.match(stagingGuide, /bazion-docker-postgres-dump\.sh bazionweb-staging bazionweb_staging bazion_admin/);
 });
 
 test("PostgreSQL backup helper has valid Bash syntax on the Linux CI runner", { skip: process.platform === "win32" }, () => {
