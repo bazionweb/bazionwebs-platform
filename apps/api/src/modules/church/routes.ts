@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from "node:crypto";
 import type { FastifyInstance, FastifyRequest } from "fastify";
-import { and, desc, eq, getTableColumns, ilike, or, sql } from "drizzle-orm";
+import { and, desc, eq, getTableColumns, ilike, max, or, sql } from "drizzle-orm";
 import {
   churchPublicSiteSettingsSchema,
   contactMessageSchema,
@@ -26,10 +26,13 @@ import {
   leadershipProfiles,
   ministryProfiles,
   ministrySettings,
+  ministrySiteSettingsVersions,
   tenants,
   sermonCategories,
   sermons,
 } from "@bazion/database";
+import { registerChurchOperationsRoutes } from "./operations-routes.js";
+import { registerChurchSiteSettingsVersionsRoutes } from "./site-settings-routes.js";
 import { requireActiveTenantPermission } from "@bazion/auth";
 import type { AppConfig } from "../../config.js";
 import { withTenantTransaction, type TenantTransaction } from "../../lib/database.js";
@@ -107,6 +110,9 @@ export async function churchRoutes(app: FastifyInstance, options: RouteOptions) 
     ...(mediaStorageConfig.localDirectory ? { localDirectory: mediaStorageConfig.localDirectory } : {}),
     ...(mediaStorageConfig.s3 ? { s3: mediaStorageConfig.s3 } : {}),
   });
+
+  await registerChurchOperationsRoutes(app, { config });
+  await registerChurchSiteSettingsVersionsRoutes(app);
 
   const ministrySiteSettingsRepository = {
     load: (tenantId: string) => withTenantTransaction(tenantId, async (tx) => {
@@ -229,6 +235,7 @@ export async function churchRoutes(app: FastifyInstance, options: RouteOptions) 
         profile: profile ?? null,
         leaders,
         siteSettings,
+        siteSettingsStored: Boolean(storedSiteSettings?.settingValue),
       });
     });
   });

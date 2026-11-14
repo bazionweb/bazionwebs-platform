@@ -1,9 +1,27 @@
-import type { ChurchPublicSiteSettings } from "@bazion/church-ministry-contracts";
+import type {
+  ChurchPublicSiteSettings,
+  ChurchTheme,
+  ChurchDepartment,
+  ChurchSmallGroup,
+  ChurchAsset,
+  ChurchVolunteerTeam,
+  ChurchTestimony,
+} from "@bazion/church-ministry-contracts";
+
+export type {
+  ChurchTheme,
+  ChurchDepartment,
+  ChurchSmallGroup,
+  ChurchAsset,
+  ChurchVolunteerTeam,
+  ChurchTestimony,
+};
 
 export interface MinistryConfig {
   tenantSlug: string;
   ministryName: string;
   tagline: string;
+  theme?: ChurchTheme;
   branding: {
     logoUrl: string;
     primaryColor: string;
@@ -16,6 +34,7 @@ export interface MinistryConfig {
     title: string;
     highlightedTitle: string;
     subtitle: string;
+    rotatorWords?: string[];
   };
   contact: {
     phones: string[];
@@ -50,7 +69,11 @@ export interface MinistryConfig {
   visitorInfo: { arrival: string; children: string; accessibility: string; parking: string };
   online: { liveStreamUrl?: string; description: string };
   scripture: { verse: string; reference: string; version: string };
+  departments?: ChurchDepartment[];
   ministries: Array<{ title: string; description: string; audience?: string }>;
+  groups?: ChurchSmallGroup[];
+  volunteerTeams?: ChurchVolunteerTeam[];
+  testimonies?: ChurchTestimony[];
   galleryImages: Array<{ imageUrl: string; alt: string; caption?: string }>;
   faqs: Array<{ question: string; answer: string }>;
   metadata: { title: string; description: string };

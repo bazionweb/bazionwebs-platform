@@ -58,8 +58,15 @@ export default function AboutPage() {
                     paddingLeft: "16px",
                   }}
                 >
-                  {lead.bio}
+                  &ldquo;{lead.bio}&rdquo;
                 </blockquote>}
+                {lead && (
+                  <div className="ch-director-sig" style={{ marginBottom: "20px" }}>
+                    Grace and Peace,<br />
+                    {lead.name}
+                    <span>{lead.role}{site.ministryName ? ` · ${site.ministryName}` : ""}</span>
+                  </div>
+                )}
                 <p style={{ fontSize: "15px", lineHeight: 1.7, color: "var(--church-text-muted)" }}>
                   {site.mission.statement || site.outreach.statement || "More information about this ministry will be shared here."}
                 </p>
@@ -168,6 +175,39 @@ export default function AboutPage() {
                   </h3>
                   <p style={{ fontSize: "14px", lineHeight: 1.6, color: "var(--church-text-muted)", margin: 0 }}>
                     {sof.belief}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>}
+
+        {/* 6b. Frequently Asked Questions */}
+        {site.faqs.length > 0 && <section className="ch-section">
+          <div className="ch-container">
+            <div className="ch-heading-wrap">
+              <span className="ch-eyebrow">Common Questions</span>
+              <h2 className="ch-title">Frequently Asked Questions</h2>
+              <p className="ch-subtitle">
+                Helpful answers about our services, beliefs, visitor experience, and giving.
+              </p>
+            </div>
+            <div style={{ maxWidth: "840px", margin: "0 auto", display: "grid", gap: "16px" }}>
+              {site.faqs.map((faq, idx) => (
+                <div
+                  key={idx}
+                  style={{
+                    background: "#ffffff",
+                    padding: "20px 24px",
+                    borderRadius: "var(--church-radius)",
+                    border: "1px solid var(--church-border)",
+                  }}
+                >
+                  <h3 style={{ fontSize: "17px", fontWeight: 700, color: "var(--church-primary)", margin: "0 0 6px 0" }}>
+                    {faq.question}
+                  </h3>
+                  <p style={{ fontSize: "14px", lineHeight: 1.6, color: "var(--church-text-muted)", margin: 0 }}>
+                    {faq.answer}
                   </p>
                 </div>
               ))}

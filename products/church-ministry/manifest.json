@@ -10,7 +10,8 @@
   },
   "applications": [
     { "packageName": "@bazion/api", "version": "0.1.0", "role": "api" },
-    { "packageName": "@bazion/storefront", "version": "0.1.0", "role": "storefront" }
+    { "packageName": "@bazion/storefront", "version": "0.1.0", "role": "storefront" },
+    { "packageName": "@bazion/ministry-admin", "version": "0.1.0", "role": "admin" }
   ],
   "requiredModules": [
     { "id": "platform-identity", "version": "1.0.0" },
@@ -29,5 +30,5 @@
     "schemaVersion": "1.0.0",
     "sourcePath": "packages/church-ministry-contracts/src/index.ts"
   },
-  "databaseSchemaVersion": "0025_installation_changes.sql"
+  "databaseSchemaVersion": "0027_church_site_settings_versions.sql"
 }

@@ -21,6 +21,7 @@ interface SiteResponse {
   } | null;
   leaders?: Array<{ id: string; name: string; position: string; biography?: string | null; photoUrl?: string | null }>;
   siteSettings?: ChurchPublicSiteSettings | null;
+  siteSettingsStored?: boolean;
 }
 
 let siteRequest: Promise<SiteResponse | null> | null = null;
@@ -94,9 +95,10 @@ export function useMinistrySite(): MinistryConfig {
     void loadMinistrySite().then((data) => {
       if (!active || !data) return;
       const profile = data.profile;
-      const settings = data.siteSettings;
       const isGlobalMission = data.tenant?.slug === globalMissionConfig.tenantSlug;
       const fallback = getMinistrySiteFallback(data.tenant);
+      const hasStoredSettings = Boolean(data.siteSettingsStored);
+      const settings = hasStoredSettings ? data.siteSettings : null;
       const pages = settings?.pages ?? fallback.pages;
       const phones = Array.isArray(profile?.telephoneNumbers)
         ? profile.telephoneNumbers.filter((phone): phone is string => typeof phone === "string" && phone.trim().length > 0)
@@ -116,12 +118,13 @@ export function useMinistrySite(): MinistryConfig {
         ...fallback,
         ministryName: profile?.ministryName?.trim() || fallback.ministryName,
         tagline: profile?.description?.trim() || fallback.tagline,
+        theme: settings?.theme ?? fallback.theme,
         branding: {
           ...fallback.branding,
-          primaryColor: safeColor(settings?.branding.primaryColor, fallback.branding.primaryColor),
-          secondaryColor: safeColor(settings?.branding.secondaryColor, fallback.branding.secondaryColor),
-          accentColor: safeColor(settings?.branding.accentColor, fallback.branding.accentColor),
-          heroBgUrl: safeImageUrl(settings?.branding.heroImageUrl) || fallback.branding.heroBgUrl,
+          primaryColor: safeColor(settings?.branding?.primaryColor, fallback.branding.primaryColor),
+          secondaryColor: safeColor(settings?.branding?.secondaryColor, fallback.branding.secondaryColor),
+          accentColor: safeColor(settings?.branding?.accentColor, fallback.branding.accentColor),
+          heroBgUrl: safeImageUrl(settings?.branding?.heroImageUrl) || fallback.branding.heroBgUrl,
           logoUrl: safeImageUrl(profile?.logoAssetUrl) || fallback.branding.logoUrl,
         },
         hero: settings?.hero ?? fallback.hero,
@@ -140,12 +143,16 @@ export function useMinistrySite(): MinistryConfig {
         visitorInfo: settings?.visitorInfo ?? fallback.visitorInfo,
         online: settings?.online ?? fallback.online,
         scripture: settings?.scripture ?? fallback.scripture,
-        ministries: settings?.ministries ?? fallback.ministries,
-        galleryImages: settings?.galleryImages ?? fallback.galleryImages,
-        faqs: settings?.faqs ?? fallback.faqs,
+        departments: (settings?.departments && settings.departments.length > 0) ? settings.departments : (fallback.departments ?? []),
+        ministries: (settings?.ministries && settings.ministries.length > 0) ? settings.ministries : fallback.ministries,
+        groups: (settings?.groups && settings.groups.length > 0) ? settings.groups : (fallback.groups ?? []),
+        volunteerTeams: (settings?.volunteerTeams && settings.volunteerTeams.length > 0) ? settings.volunteerTeams : (fallback.volunteerTeams ?? []),
+        testimonies: (settings?.testimonies && settings.testimonies.length > 0) ? settings.testimonies : (fallback.testimonies ?? []),
+        galleryImages: (settings?.galleryImages && settings.galleryImages.length > 0) ? settings.galleryImages : fallback.galleryImages,
+        faqs: (settings?.faqs && settings.faqs.length > 0) ? settings.faqs : fallback.faqs,
         metadata: settings?.metadata ?? fallback.metadata,
-        coreValues: settings?.coreValues ?? fallback.coreValues,
-        statementOfFaith: settings?.statementOfFaith ?? fallback.statementOfFaith,
+        coreValues: (settings?.coreValues && settings.coreValues.length > 0) ? settings.coreValues : fallback.coreValues,
+        statementOfFaith: (settings?.statementOfFaith && settings.statementOfFaith.length > 0) ? settings.statementOfFaith : fallback.statementOfFaith,
         vision: { ...fallback.vision, statement: profile?.vision?.trim() || fallback.vision.statement },
         mission: { ...fallback.mission, statement: profile?.mission?.trim() || fallback.mission.statement },
         outreach: { ...fallback.outreach, statement: profile?.outreach?.trim() || fallback.outreach.statement },
