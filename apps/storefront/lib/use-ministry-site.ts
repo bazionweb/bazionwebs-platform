@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { getPublicWebsiteNavigation, type ChurchPublicSiteSettings } from "@bazion/church-ministry-contracts";
 import { globalMissionConfig, type MinistryConfig } from "@bazion/church-ministry-template";
+import { detectClientTenantSlug, getClientTenantHeaders } from "./client-tenant";
 import { getMinistrySiteFallback, neutralMinistrySite } from "./ministry-site-defaults";
 
 interface SiteResponse {
@@ -24,15 +25,25 @@ interface SiteResponse {
   siteSettingsStored?: boolean;
 }
 
-let siteRequest: Promise<SiteResponse | null> | null = null;
-let siteRequestResolved = false;
+const siteRequests = new Map<string, Promise<SiteResponse | null>>();
+const resolvedSiteKeys = new Set<string>();
+
+function getSiteCacheKey(): string {
+  return detectClientTenantSlug() ?? "__default__";
+}
 
 async function loadMinistrySite(): Promise<SiteResponse | null> {
+  const cacheKey = getSiteCacheKey();
+  let siteRequest = siteRequests.get(cacheKey);
   if (!siteRequest) {
-    siteRequest = fetch("/v1/public/church/site", { cache: "no-store" })
-      .then(async (response) => response.ok ? await response.json() as SiteResponse : null)
+    siteRequest = fetch("/v1/public/church/site", {
+      cache: "no-store",
+      headers: getClientTenantHeaders(),
+    })
+      .then(async (response) => (response.ok ? await response.json() as SiteResponse : null))
       .catch(() => null)
-      .finally(() => { siteRequestResolved = true; });
+      .finally(() => { resolvedSiteKeys.add(cacheKey); });
+    siteRequests.set(cacheKey, siteRequest);
   }
   return siteRequest;
 }
@@ -92,6 +103,10 @@ export function useMinistrySite(): MinistryConfig {
   const [site, setSite] = useState(neutralMinistrySite);
   useEffect(() => {
     let active = true;
+    const detectedSlug = detectClientTenantSlug();
+    if (detectedSlug) {
+      setSite((prev) => (prev === neutralMinistrySite ? getMinistrySiteFallback({ slug: detectedSlug }) : prev));
+    }
     void loadMinistrySite().then((data) => {
       if (!active || !data) return;
       const profile = data.profile;
@@ -174,9 +189,12 @@ export function useMinistrySite(): MinistryConfig {
 
 /** Resolves when the first tenant settings request finishes, including its failure fallback. */
 export function useMinistrySiteLoaded(): boolean {
-  const [loaded, setLoaded] = useState(siteRequestResolved);
+  const [loaded, setLoaded] = useState(() => resolvedSiteKeys.has(getSiteCacheKey()));
   useEffect(() => {
-    if (siteRequestResolved) return;
+    if (resolvedSiteKeys.has(getSiteCacheKey())) {
+      setLoaded(true);
+      return;
+    }
     let active = true;
     void loadMinistrySite().finally(() => { if (active) setLoaded(true); });
     return () => { active = false; };

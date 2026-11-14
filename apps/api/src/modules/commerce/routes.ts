@@ -6,7 +6,7 @@ import { addCartItemSchema, checkoutSchema, createCartSchema, productListQuerySc
 import { carts, cartItems, commerceStoreSettings, idempotencyRecords, orderItems, orders, paymentAttempts, products, webhookEvents } from "@bazion/database";
 import { withTenantTransaction, type TenantTransaction } from "../../lib/database.js";
 import type { AppConfig } from "../../config.js";
-import { resolveTenantId } from "../../lib/tenant-resolution.js";
+import { resolveRequestTenantId } from "../../lib/tenant-resolution.js";
 import { isTenantModuleEnabled } from "../../lib/tenant-modules.js";
 import { assertTenantNotInMaintenance } from "../../lib/tenant-maintenance.js";
 import { DarajaClient, DarajaRequestError, normalizeKenyanPhoneNumber } from "@bazion/payments";
@@ -98,8 +98,7 @@ function toPublicCart(cart: { id: string; currency: string; status: string; expi
 export async function commerceRoutes(app: FastifyInstance, options: RouteOptions) {
   const daraja = options.config.mpesa ? new DarajaClient(options.config.mpesa) : null;
   const tenantForRequest = (request: FastifyRequest) => {
-    const explicit = request.headers["x-bazion-tenant"] as string | undefined;
-    return resolveTenantId(request.hostname, options.config, explicit);
+    return resolveRequestTenantId(request, options.config);
   };
   app.get("/storefront", async (request) => {
     const tenantId = await tenantForRequest(request);

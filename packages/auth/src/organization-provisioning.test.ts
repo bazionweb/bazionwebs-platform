@@ -67,4 +67,21 @@ describe("auth organization to platform tenant mapping", () => {
 
     expect(query).toHaveBeenCalledTimes(1);
   });
+
+  it("provisions a server-based preview subdomain in production when PUBLIC_STOREFRONT_URL is configured", async () => {
+    const query = vi.fn()
+      .mockResolvedValueOnce({ rowCount: 1, rows: [{ id: "tenant-1" }] })
+      .mockResolvedValueOnce({ rowCount: 1, rows: [{ tenant_id: "tenant-1" }] });
+    const hook = createAfterCreateOrganizationHook(
+      { query } as unknown as OrganizationTenantLinkQuery,
+      "production",
+      "https://sites.bazion.example",
+    );
+
+    await hook({ organization: { id: "org-1", slug: "global-mission", name: "Global Mission" } });
+
+    expect(query).toHaveBeenCalledTimes(2);
+    expect(query.mock.calls[1]?.[0]).toContain("INSERT INTO public.tenant_domains");
+    expect(query.mock.calls[1]?.[1]).toEqual(["tenant-1", "global-mission.sites.bazion.example"]);
+  });
 });

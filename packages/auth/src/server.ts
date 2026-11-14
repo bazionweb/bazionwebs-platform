@@ -12,6 +12,7 @@ import {
   resolveTrustedOriginsForRequest,
 } from "./security-policy.js";
 import { createAfterCreateOrganizationHook } from "./organization-provisioning.js";
+import { extractTenantSlugFromHost } from "./deep-links.js";
 
 function required(name: string): string {
   const value = process.env[name];
@@ -86,7 +87,13 @@ export async function isVerifiedTenantHost(hostname: string): Promise<boolean> {
     "SELECT 1 FROM public.tenant_domain_directory WHERE hostname = $1 LIMIT 1",
     [host],
   );
-  return result.rowCount === 1;
+  if (result.rowCount === 1) return true;
+  const previewSlug = extractTenantSlugFromHost(host, process.env.PUBLIC_STOREFRONT_URL);
+  if (previewSlug) {
+    const tenant = await resolvePublicTenantBySlug(previewSlug);
+    if (tenant) return true;
+  }
+  return false;
 }
 
 async function trustedOriginsForRequest(request?: Request): Promise<string[]> {
@@ -156,6 +163,7 @@ async function beforeCreateOrganization({ organization: org, user }: {
 const afterCreateOrganization = createAfterCreateOrganizationHook(
   { query: (sql, values) => tenantProvisionerPool.query(sql, values) },
   nodeEnv,
+  process.env.PUBLIC_STOREFRONT_URL,
 );
 
 export const auth = betterAuth({

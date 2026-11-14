@@ -5,7 +5,7 @@ import { prepareSiteEnquiry, siteEnquiryPolicyInputSchema, websiteEnquirySchema 
 import { requireActiveTenantPermission } from "@bazion/auth";
 import type { AppConfig } from "../../config.js";
 import { withTenantTransaction } from "../../lib/database.js";
-import { resolveTenantId } from "../../lib/tenant-resolution.js";
+import { resolveRequestTenantId } from "../../lib/tenant-resolution.js";
 import { isTenantModuleEnabled } from "../../lib/tenant-modules.js";
 
 interface RouteOptions {
@@ -63,7 +63,7 @@ export async function formsLeadsRoutes(app: FastifyInstance, { config }: RouteOp
       },
     },
   }, async (request, reply) => {
-    const tenantId = await resolveTenantId(request.hostname, config);
+    const tenantId = await resolveRequestTenantId(request, config);
     await assertFormsLeadsEnabled(tenantId);
 
     const parsed = websiteEnquirySchema.safeParse(request.body);

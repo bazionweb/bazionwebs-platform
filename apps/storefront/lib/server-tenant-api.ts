@@ -1,7 +1,9 @@
 import { cookies, headers } from "next/headers";
 import { cache } from "react";
+import { extractTenantSlugFromHost } from "@bazion/auth";
 
 const apiBaseUrl = (process.env.API_BASE_URL ?? "http://localhost:4000").replace(/\/$/, "");
+const devFallbackApiBaseUrl = "http://localhost:4000";
 
 export async function getTenantRequestContext(): Promise<{ origin: string; headers: HeadersInit } | null> {
   try {
@@ -13,10 +15,12 @@ export async function getTenantRequestContext(): Promise<{ origin: string; heade
     const protocol = rawProtocol === "http" ? "http" : "https";
     if (!host) return null;
     const url = new URL(`${protocol}://${host}`);
-    const tenantCookie = cookieStore.get("bazion_tenant")?.value;
+    const subdomainSlug = extractTenantSlugFromHost(url.hostname, process.env.PUBLIC_STOREFRONT_URL);
+    const tenantCookie = cookieStore.get("bazion_tenant")?.value?.trim().toLowerCase();
+    const tenantSlug = subdomainSlug || tenantCookie;
     const extraHeaders: Record<string, string> = {};
-    if (tenantCookie) {
-      extraHeaders["x-bazion-tenant"] = tenantCookie;
+    if (tenantSlug) {
+      extraHeaders["x-bazion-tenant"] = tenantSlug;
     }
     return {
       origin: url.origin,
@@ -27,19 +31,33 @@ export async function getTenantRequestContext(): Promise<{ origin: string; heade
   }
 }
 
+async function fetchFromApi(baseUrl: string, path: string, requestHeaders: HeadersInit): Promise<Response> {
+  return fetch(`${baseUrl}${path}`, {
+    headers: requestHeaders,
+    cache: "no-store",
+    signal: AbortSignal.timeout(3_000),
+  });
+}
+
 /** Fetch public tenant content for server-rendered metadata using the site's incoming host. */
 export const fetchTenantPublicData = cache(async function fetchTenantPublicData<T>(path: string): Promise<T | null> {
+  const tenantContext = await getTenantRequestContext();
+  if (!tenantContext) return null;
+
   try {
-    const tenantContext = await getTenantRequestContext();
-    if (!tenantContext) return null;
-    const response = await fetch(`${apiBaseUrl}${path}`, {
-      headers: tenantContext.headers,
-      cache: "no-store",
-      signal: AbortSignal.timeout(3_000),
-    });
+    const response = await fetchFromApi(apiBaseUrl, path, tenantContext.headers);
     if (!response.ok) return null;
     return await response.json() as T;
   } catch {
+    if (process.env.NODE_ENV !== "production" && apiBaseUrl !== devFallbackApiBaseUrl) {
+      try {
+        const retry = await fetchFromApi(devFallbackApiBaseUrl, path, tenantContext.headers);
+        if (!retry.ok) return null;
+        return await retry.json() as T;
+      } catch {
+        return null;
+      }
+    }
     return null;
   }
 });

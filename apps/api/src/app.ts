@@ -46,7 +46,7 @@ export async function buildApp(config: AppConfig) {
     if (configuredOrigins.has(origin)) return true;
     try {
       const parsed = new URL(origin);
-      const local = parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1";
+      const local = parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1" || parsed.hostname.endsWith(".localhost");
       if (local && config.NODE_ENV !== "production") return true;
       if (parsed.protocol !== "https:" || (parsed.port !== "" && parsed.port !== "443")) return false;
       if (parsed.username || parsed.password) return false;

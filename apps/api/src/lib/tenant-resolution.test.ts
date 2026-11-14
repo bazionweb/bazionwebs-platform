@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AppConfig } from "../config.js";
-import { resolveTenantId, resolveTenantRouting } from "./tenant-resolution.js";
+import { extractRequestTenantInputs, resolveRequestTenantId, resolveTenantId, resolveTenantRouting } from "./tenant-resolution.js";
 
 const mocks = vi.hoisted(() => ({
   resolvePublicTenantByHostname: vi.fn(),
@@ -17,12 +17,14 @@ vi.mock("@bazion/auth/server", () => ({
 const productionConfig = {
   NODE_ENV: "production",
   TENANT_RESOLUTION_MODE: "verified_domain",
+  PUBLIC_STOREFRONT_URL: "https://sites.bazionweb.com",
 } as AppConfig;
 
 const developmentConfig = {
   NODE_ENV: "development",
   TENANT_RESOLUTION_MODE: "verified_domain",
   DEFAULT_TENANT_ID: "default-tenant-id",
+  PUBLIC_STOREFRONT_URL: "http://localhost:3000",
 } as AppConfig;
 
 describe("resolveTenantId", () => {
@@ -115,5 +117,44 @@ describe("resolveTenantId", () => {
 
     await expect(resolveTenantRouting("legacy.example.org", productionConfig))
       .resolves.toEqual({ tenantId: "tenant-1", installationId: null });
+  });
+
+  it("resolves server-based production preview subdomains from PUBLIC_STOREFRONT_URL before custom domain verification", async () => {
+    mocks.resolvePublicTenantBySlug.mockResolvedValueOnce({ id: "grace-tenant-id" });
+
+    await expect(resolveTenantId("grace.sites.bazionweb.com:443", productionConfig))
+      .resolves.toBe("grace-tenant-id");
+    expect(mocks.resolvePublicTenantBySlug).toHaveBeenCalledWith("grace");
+
+    mocks.resolvePublicTenantBySlug.mockResolvedValueOnce({ id: "grace-tenant-id" });
+    await expect(resolveTenantRouting("grace.sites.bazionweb.com", productionConfig))
+      .resolves.toEqual({ tenantId: "grace-tenant-id", installationId: null });
+  });
+
+  it("ignores reserved preview subdomains in production unless mapped as verified domains", async () => {
+    await expect(resolveTenantId("www.sites.bazionweb.com", productionConfig))
+      .rejects.toMatchObject({ statusCode: 404, code: "TENANT_NOT_FOUND" });
+    expect(mocks.resolvePublicTenantBySlug).not.toHaveBeenCalled();
+  });
+
+  it("extracts x-forwarded-host, local origin subdomain, and bazion_tenant cookie in dev requests", async () => {
+    mocks.resolvePublicTenantBySlug.mockResolvedValueOnce({ id: "gmfc-id" });
+    await expect(resolveRequestTenantId({
+      hostname: "localhost:4000",
+      headers: { "x-forwarded-host": "global-mission-fc.localhost:3000" },
+    }, developmentConfig)).resolves.toBe("gmfc-id");
+    expect(mocks.resolvePublicTenantBySlug).toHaveBeenCalledWith("global-mission-fc");
+
+    mocks.resolvePublicTenantBySlug.mockResolvedValueOnce({ id: "gmfc-id" });
+    await expect(resolveRequestTenantId({
+      hostname: "localhost:4000",
+      headers: { cookie: "other=1; bazion_tenant=global-mission-fc" },
+    }, developmentConfig)).resolves.toBe("gmfc-id");
+
+    const prodExtracted = extractRequestTenantInputs({
+      hostname: "unknown.example.org",
+      headers: { "x-forwarded-host": "global-mission-fc.localhost:3000", cookie: "bazion_tenant=global-mission-fc" },
+    }, productionConfig);
+    expect(prodExtracted).toEqual({ hostname: "unknown.example.org" });
   });
 });

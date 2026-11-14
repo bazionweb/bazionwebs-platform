@@ -132,6 +132,12 @@ try {
      ON CONFLICT (tenant_id, module_id) DO NOTHING`,
     [tenantId],
   );
+  await client.query(
+    `INSERT INTO public.tenant_domains (tenant_id, hostname, status, verified_at)
+     VALUES ($1, $2, 'active', now())
+     ON CONFLICT (hostname) DO NOTHING`,
+    [tenantId, `${globalMissionConfig.tenantSlug}.localhost`],
+  );
 
   await client.query("SELECT set_config('app.tenant_id', $1, true)", [tenantId]);
   await client.query(
