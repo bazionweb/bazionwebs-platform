@@ -4,11 +4,16 @@
    Typography: Trebuchet MS & Plus Jakarta Sans
    ========================================================================== */
 
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
-
 :root {
-  --font-sans: "Plus Jakarta Sans", Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-sans: var(--font-jakarta, "Plus Jakarta Sans", "Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif);
   --font-serif: "Trebuchet MS", "Lucida Grande", "Lucida Sans Unicode", "Lucida Sans", Tahoma, sans-serif;
+  --font-outfit: var(--font-outfit, "Outfit", sans-serif);
+  --font-inter: var(--font-inter, "Inter", sans-serif);
+  --font-fraunces: var(--font-fraunces, "Fraunces", Georgia, serif);
+  --church-gold: #D9A857;
+  --church-gold-light: #F59E0B;
+  --church-maroon: #4A1110;
+  --church-cream: #F8F1E5;
   --church-primary: #193a31;
   --church-primary-light: #28574b;
   --church-primary-dark: #102820;
@@ -1126,3 +1131,478 @@ button:disabled { cursor: not-allowed; opacity: 0.65; }
   font-size: 13px;
   color: #b8c4bd;
 }
+
+/* ==========================================================================
+   Church Theme Presets & Dynamic Layout Styles
+   ========================================================================== */
+
+/* ── Theme Presets ────────────────────────────────────────────── */
+:root.theme-maroon-gold,
+body.theme-maroon-gold,
+[data-church-theme="maroon-gold"] {
+  --church-primary: #4A1110;
+  --church-primary-light: #6B1A18;
+  --church-primary-dark: #2F0A09;
+  --church-secondary: #6B1A18;
+  --church-secondary-light: #8B2523;
+  --church-accent: #B45E14;
+  --church-accent-hover: #964A0B;
+  --church-accent-light: #F8F1E5;
+  --church-gold: #D9A857;
+  --church-gold-light: #F59E0B;
+  --church-bg: #FAF6F0;
+  --church-bg-alt: #F4EDE2;
+  --church-bg-muted: #EAE1D3;
+  --church-text: #1A1612;
+  --church-text-muted: #5C554E;
+  --church-border: #E8DED1;
+  --church-border-dark: #D4C6B6;
+}
+
+:root.theme-forest-bronze,
+body.theme-forest-bronze,
+[data-church-theme="forest-bronze"] {
+  --church-primary: #193A31;
+  --church-primary-light: #28574B;
+  --church-primary-dark: #102820;
+  --church-secondary: #315E50;
+  --church-secondary-light: #648575;
+  --church-accent: #8B5B29;
+  --church-accent-hover: #71471F;
+  --church-accent-light: #F5EADB;
+  --church-gold: #C99A43;
+  --church-bg: #FFFDF9;
+  --church-bg-alt: #F7F4EE;
+  --church-bg-muted: #EEE9DF;
+  --church-text: #27312B;
+  --church-text-muted: #66716A;
+  --church-border: #E6DFD3;
+}
+
+:root.theme-royal-navy,
+body.theme-royal-navy,
+[data-church-theme="royal-navy"] {
+  --church-primary: #0F2B48;
+  --church-primary-light: #1A446F;
+  --church-primary-dark: #0A1C30;
+  --church-secondary: #1E4976;
+  --church-secondary-light: #35679B;
+  --church-accent: #A16207;
+  --church-accent-hover: #854D0E;
+  --church-accent-light: #FEF3C7;
+  --church-gold: #EAB308;
+  --church-bg: #F8FAFC;
+  --church-bg-alt: #F1F5F9;
+  --church-bg-muted: #E2E8F0;
+  --church-text: #0F172A;
+  --church-text-muted: #475569;
+  --church-border: #CBD5E1;
+}
+
+:root.theme-living-waters,
+body.theme-living-waters,
+[data-church-theme="living-waters"] {
+  --church-primary: #0F4C5C;
+  --church-primary-light: #186F86;
+  --church-primary-dark: #0A333E;
+  --church-secondary: #136F63;
+  --church-secondary-light: #239E8E;
+  --church-accent: #C25E00;
+  --church-accent-hover: #A04D00;
+  --church-accent-light: #FFEDD5;
+  --church-gold: #FB8500;
+  --church-bg: #F4F8F8;
+  --church-bg-alt: #EBF2F2;
+  --church-bg-muted: #D9E5E5;
+  --church-text: #132A2F;
+  --church-text-muted: #49686E;
+  --church-border: #C8DADB;
+}
+
+:root.theme-sanctuary-charcoal,
+body.theme-sanctuary-charcoal,
+[data-church-theme="sanctuary-charcoal"] {
+  --church-primary: #18181B;
+  --church-primary-light: #27272A;
+  --church-primary-dark: #09090B;
+  --church-secondary: #3F3F46;
+  --church-secondary-light: #52525B;
+  --church-accent: #881337;
+  --church-accent-hover: #700F2D;
+  --church-accent-light: #FFE4E6;
+  --church-gold: #D97706;
+  --church-bg: #FAFAFA;
+  --church-bg-alt: #F4F4F5;
+  --church-bg-muted: #E4E4E7;
+  --church-text: #18181B;
+  --church-text-muted: #71717A;
+  --church-border: #D4D4D8;
+}
+
+/* ── Font Pairings ────────────────────────────────────────────── */
+:root.font-pairing-outfit-inter,
+body.font-pairing-outfit-inter,
+[data-font-pairing="outfit-inter"] {
+  --church-font: var(--font-inter);
+  --church-serif: var(--font-outfit);
+}
+
+:root.font-pairing-jakarta-inter,
+body.font-pairing-jakarta-inter,
+[data-font-pairing="jakarta-inter"] {
+  --church-font: var(--font-inter);
+  --church-serif: var(--font-sans);
+}
+
+:root.font-pairing-serif-classic,
+body.font-pairing-serif-classic,
+[data-font-pairing="serif-classic"] {
+  --church-font: var(--font-inter);
+  --church-serif: var(--font-fraunces);
+}
+
+/* ── Card Styles ──────────────────────────────────────────────── */
+[data-card-style="rounded"] {
+  --church-radius: 12px;
+  --church-radius-lg: 22px;
+}
+
+[data-card-style="sharp"] {
+  --church-radius: 4px;
+  --church-radius-lg: 8px;
+}
+
+[data-card-style="warm-tint"] {
+  --church-radius: 16px;
+  --church-radius-lg: 24px;
+}
+
+/* ── Word Rotator Animation (Hero) ────────────────────────────── */
+.gmfci-word-rotator {
+  position: relative;
+  display: inline-block;
+  vertical-align: baseline;
+  min-width: 240px;
+}
+
+.gmfci-word {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  opacity: 0;
+  transform: translateY(16px);
+  transition: opacity 0.45s ease, transform 0.45s cubic-bezier(0.2, 0.8, 0.2, 1);
+  pointer-events: none;
+}
+
+.gmfci-word.active {
+  position: relative;
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.gmfci-word.exit {
+  opacity: 0;
+  transform: translateY(-16px);
+}
+
+.gmfci-highlight {
+  color: #f0c98f;
+  text-shadow: 0 2px 14px rgba(217, 168, 87, 0.25);
+}
+
+/* ── Director's Message / Lead Quote Block ────────────────────── */
+.ch-director-section {
+  padding: 64px 0;
+  background: var(--church-bg-alt);
+  border-radius: var(--church-radius-lg);
+  margin: 48px 0;
+  border: 1px solid var(--church-border);
+}
+
+.ch-director-grid {
+  display: grid;
+  grid-template-columns: minmax(260px, 340px) 1fr;
+  gap: 48px;
+  align-items: center;
+}
+
+@media (max-width: 820px) {
+  .ch-director-grid {
+    grid-template-columns: 1fr;
+    gap: 32px;
+    text-align: center;
+  }
+}
+
+.ch-director-photo-frame {
+  position: relative;
+  border-radius: var(--church-radius-lg);
+  overflow: hidden;
+  box-shadow: var(--church-shadow-lg);
+  border: 3px solid #ffffff;
+}
+
+.ch-director-photo-frame img {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 4 / 5;
+  object-fit: cover;
+  display: block;
+}
+
+.ch-director-content h2 {
+  font-family: var(--church-serif);
+  font-size: clamp(26px, 3.5vw, 36px);
+  color: var(--church-primary);
+  margin: 8px 0 16px;
+}
+
+.ch-director-quote {
+  font-size: 16px;
+  line-height: 1.8;
+  color: var(--church-text);
+  font-style: italic;
+  margin-bottom: 24px;
+}
+
+.ch-director-sig {
+  font-weight: 700;
+  color: var(--church-primary);
+}
+
+.ch-director-sig span {
+  display: block;
+  font-weight: 500;
+  font-size: 13px;
+  color: var(--church-accent);
+}
+
+/* ── Church Department Cards ──────────────────────────────────── */
+.ch-dept-card {
+  background: #ffffff;
+  border: 1px solid var(--church-border);
+  border-radius: var(--church-radius-lg);
+  padding: 28px;
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.ch-dept-card:hover {
+  transform: translateY(-3px);
+  border-color: var(--church-accent);
+  box-shadow: var(--church-shadow);
+}
+
+.ch-dept-icon {
+  font-size: 32px;
+  margin-bottom: 14px;
+  display: inline-block;
+}
+
+.ch-dept-title {
+  font-size: 20px;
+  font-family: var(--church-serif);
+  font-weight: 700;
+  color: var(--church-primary);
+  margin: 0 0 10px;
+}
+
+.ch-dept-desc {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--church-text-muted);
+  flex-grow: 1;
+  margin-bottom: 18px;
+}
+
+.ch-dept-meta {
+  font-size: 12px;
+  padding-top: 14px;
+  border-top: 1px solid var(--church-border);
+  color: var(--church-text-muted);
+}
+
+.ch-dept-leader {
+  font-weight: 600;
+  color: var(--church-primary);
+}
+
+.ch-dept-schedule {
+  color: var(--church-accent);
+  margin-top: 4px;
+}
+
+/* ── Small Groups / Cell Circles ──────────────────────────────── */
+.ch-group-card {
+  background: var(--church-bg-alt);
+  border: 1px solid var(--church-border);
+  border-radius: var(--church-radius);
+  padding: 22px;
+  transition: border-color 0.2s ease;
+}
+
+.ch-group-card:hover {
+  border-color: var(--church-secondary);
+}
+
+.ch-group-category {
+  display: inline-block;
+  font-size: 11px;
+  text-transform: uppercase;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--church-accent);
+  margin-bottom: 6px;
+}
+
+.ch-group-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--church-primary);
+  margin: 0 0 8px;
+}
+
+.ch-group-info-item {
+  font-size: 13px;
+  color: var(--church-text-muted);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+/* ── Ministry Assets & Facilities ─────────────────────────────── */
+.ch-asset-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
+  gap: 20px;
+}
+
+.ch-asset-card {
+  background: #ffffff;
+  border: 1px solid var(--church-border);
+  border-radius: var(--church-radius);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+}
+
+.ch-asset-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.ch-asset-status {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.ch-asset-status.available {
+  background: #DCFCE7;
+  color: #15803D;
+}
+
+.ch-asset-status.in_use {
+  background: #DBEAFE;
+  color: #1D4ED8;
+}
+
+.ch-asset-status.maintenance {
+  background: #FEF3C7;
+  color: #B45309;
+}
+
+.ch-asset-status.reserved {
+  background: #F3E8FF;
+  color: #7E22CE;
+}
+
+/* ── Testimonies ──────────────────────────────────────────────── */
+.ch-testimony-card {
+  background: #ffffff;
+  border-radius: var(--church-radius-lg);
+  border: 1px solid var(--church-border);
+  padding: 32px 28px;
+  position: relative;
+  box-shadow: var(--church-shadow-sm);
+  display: flex;
+  flex-direction: column;
+}
+
+.ch-testimony-quote-mark {
+  font-family: var(--church-serif);
+  font-size: 54px;
+  line-height: 1;
+  color: var(--church-accent-light);
+  margin-bottom: -18px;
+}
+
+.ch-testimony-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--church-primary);
+  margin: 0 0 12px;
+}
+
+.ch-testimony-body {
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--church-text);
+  flex-grow: 1;
+  margin-bottom: 16px;
+}
+
+.ch-testimony-author {
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--church-primary);
+}
+
+.ch-testimony-date {
+  font-size: 12px;
+  color: var(--church-text-muted);
+}
+
+/* ── Interactive Category Tabs ────────────────────────────────── */
+.ch-tabs-bar {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+  margin-bottom: 32px;
+  border-bottom: 1px solid var(--church-border);
+}
+
+.ch-tab-button {
+  padding: 10px 20px;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--church-text-muted);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+}
+
+.ch-tab-button:hover {
+  color: var(--church-primary);
+}
+
+.ch-tab-button.active {
+  color: var(--church-primary);
+  border-bottom-color: var(--church-accent);
+}
+

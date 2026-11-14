@@ -31,12 +31,22 @@
     { "name": "church_payment_transactions", "owner": "church-ministry", "tenantScoped": true, "rls": "forced", "migration": "0009_church_integrity_and_payment_callbacks.sql" },
     { "name": "church_contact_messages", "owner": "church-ministry", "tenantScoped": true, "rls": "forced", "migration": "0008_church_ministry_domain.sql" },
     { "name": "church_prayer_requests", "owner": "church-ministry", "tenantScoped": true, "rls": "forced", "migration": "0008_church_ministry_domain.sql" },
-    { "name": "church_newsletter_subscribers", "owner": "church-ministry", "tenantScoped": true, "rls": "forced", "migration": "0008_church_ministry_domain.sql" }
+    { "name": "church_newsletter_subscribers", "owner": "church-ministry", "tenantScoped": true, "rls": "forced", "migration": "0008_church_ministry_domain.sql" },
+    { "name": "church_departments", "owner": "church-ministry", "tenantScoped": true, "rls": "forced", "migration": "0026_church_ministry_operations.sql" },
+    { "name": "church_small_groups", "owner": "church-ministry", "tenantScoped": true, "rls": "forced", "migration": "0026_church_ministry_operations.sql" },
+    { "name": "church_group_memberships", "owner": "church-ministry", "tenantScoped": true, "rls": "forced", "migration": "0026_church_ministry_operations.sql" },
+    { "name": "church_volunteer_teams", "owner": "church-ministry", "tenantScoped": true, "rls": "forced", "migration": "0026_church_ministry_operations.sql" },
+    { "name": "church_volunteer_applications", "owner": "church-ministry", "tenantScoped": true, "rls": "forced", "migration": "0026_church_ministry_operations.sql" },
+    { "name": "church_inventory_assets", "owner": "church-ministry", "tenantScoped": true, "rls": "forced", "migration": "0026_church_ministry_operations.sql" },
+    { "name": "church_inventory_asset_events", "owner": "church-ministry", "tenantScoped": true, "rls": "forced", "migration": "0026_church_ministry_operations.sql" },
+    { "name": "ministry_site_settings_versions", "owner": "church-ministry", "tenantScoped": true, "rls": "forced", "migration": "0027_church_site_settings_versions.sql" }
   ],
   "migrations": [
     "0008_church_ministry_domain.sql",
     "0009_church_integrity_and_payment_callbacks.sql",
-    "0011_church_site_and_privacy.sql"
+    "0011_church_site_and_privacy.sql",
+    "0026_church_ministry_operations.sql",
+    "0027_church_site_settings_versions.sql"
   ],
   "providers": ["Safaricom Daraja M-Pesa STK Push for donations; requires merchant credentials and provider callback verification"],
   "dependencies": ["platform-identity", "media-storage"],
@@ -51,9 +61,13 @@
   "jobs": [],
   "tests": [
     "apps/api/src/modules/church/routes.test.ts",
+    "apps/api/src/modules/church/operations-routes.test.ts",
+    "apps/api/src/modules/church/site-settings-routes.test.ts",
     "packages/church-ministry-domain/src/index.test.ts",
     "packages/church-ministry-domain/src/site-settings.test.ts",
-    "packages/church-ministry-contracts/src/index.test.ts"
+    "packages/church-ministry-domain/src/operations.test.ts",
+    "packages/church-ministry-contracts/src/index.test.ts",
+    "packages/church-ministry-contracts/src/operations.test.ts"
   ],
   "docs": ["docs/church-ministry-platform.md"]
 }

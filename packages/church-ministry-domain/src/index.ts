@@ -44,3 +44,7 @@ export {
   type MinistrySiteSettingsRepository,
   type MinistrySiteSettingsSnapshot,
 } from "./site-settings.js";
+
+export * from "./operations.js";
+export * from "./site-settings-versions.js";
+

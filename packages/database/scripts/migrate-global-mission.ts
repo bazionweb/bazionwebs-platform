@@ -3,7 +3,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Pool } from "pg";
 import { mapGlobalMissionEvents, type SourceEvent } from "../src/global-mission-migration.js";
-import { globalMissionConfig } from "@bazion/church-ministry-template";
+import { globalMissionConfig, sampleAssets } from "@bazion/church-ministry-template";
 
 const args = process.argv.slice(2);
 const apply = args.includes("--apply");
@@ -51,6 +51,7 @@ const profile = {
   social,
 };
 const settings = {
+  theme: globalMissionConfig.theme,
   branding: {
     primaryColor: branding.primaryColor,
     secondaryColor: branding.secondaryColor,
@@ -63,7 +64,11 @@ const settings = {
   visitorInfo: globalMissionConfig.visitorInfo,
   online: globalMissionConfig.online,
   scripture: globalMissionConfig.scripture,
+  departments: globalMissionConfig.departments,
   ministries: globalMissionConfig.ministries,
+  groups: globalMissionConfig.groups,
+  volunteerTeams: globalMissionConfig.volunteerTeams,
+  testimonies: globalMissionConfig.testimonies,
   galleryImages,
   faqs: globalMissionConfig.faqs,
   giving: globalMissionConfig.giving,
@@ -147,6 +152,63 @@ try {
      ON CONFLICT (tenant_id, setting_key) DO UPDATE SET setting_value=EXCLUDED.setting_value, updated_at=now()`,
     [tenantId, JSON.stringify(settings)],
   );
+
+  // Record initial published version in ministry_site_settings_versions
+  await client.query(
+    `INSERT INTO public.ministry_site_settings_versions
+       (tenant_id, version_number, status, profile, settings, note, created_by, published_at, published_by)
+     VALUES ($1, 1, 'published', $2::jsonb, $3::jsonb, 'Initial GMFC baseline import', 'system:gmfc-baseline', now(), 'system:gmfc-baseline')
+     ON CONFLICT (tenant_id, version_number) DO NOTHING`,
+    [tenantId, JSON.stringify(profile), JSON.stringify(settings)],
+  );
+
+  // Seed departments into church_departments
+  for (const [idx, dept] of (globalMissionConfig.departments ?? []).entries()) {
+    const slug = dept.id || dept.name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+    await client.query(
+      `INSERT INTO public.church_departments
+         (tenant_id, name, slug, description, icon, leader_name, leader_role, meeting_schedule, contact_email, display_order, status)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'active')
+       ON CONFLICT (tenant_id, slug) DO NOTHING`,
+      [tenantId, dept.name, slug, dept.description, dept.icon ?? null, dept.leaderName ?? null, dept.leaderRole ?? null, dept.meetingSchedule ?? null, dept.contactEmail ?? null, idx],
+    );
+  }
+
+  // Seed small groups into church_small_groups
+  for (const grp of globalMissionConfig.groups ?? []) {
+    const slug = grp.id || grp.name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+    await client.query(
+      `INSERT INTO public.church_small_groups
+         (tenant_id, name, slug, category, description, leader_name, meeting_schedule, public_location_label, accepting_members, status)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,true,'active')
+       ON CONFLICT (tenant_id, slug) DO NOTHING`,
+      [tenantId, grp.name, slug, grp.category, grp.description ?? null, grp.leaderName, grp.meetingSchedule, grp.locationOrVirtual],
+    );
+  }
+
+  // Seed volunteer teams into church_volunteer_teams
+  for (const vol of globalMissionConfig.volunteerTeams ?? []) {
+    const slug = vol.id || vol.title.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+    await client.query(
+      `INSERT INTO public.church_volunteer_teams
+         (tenant_id, name, slug, description, requirements, coordinator_name, accepting_applications, status)
+       VALUES ($1,$2,$3,$4,$5,$6,true,'active')
+       ON CONFLICT (tenant_id, slug) DO NOTHING`,
+      [tenantId, vol.title, slug, vol.description, vol.requirements ?? null, vol.coordinatorName ?? null],
+    );
+  }
+
+  // Seed private equipment inventory into church_inventory_assets
+  for (const asset of sampleAssets) {
+    const assetTag = asset.id.toUpperCase();
+    await client.query(
+      `INSERT INTO public.church_inventory_assets
+         (tenant_id, name, asset_tag, category, location, condition, status, notes)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+       ON CONFLICT (tenant_id, asset_tag) DO NOTHING`,
+      [tenantId, asset.name, assetTag, asset.category, asset.location, asset.condition, asset.status, asset.notes ?? null],
+    );
+  }
 
   let insertedEvents = 0;
   for (const event of eventRows) {

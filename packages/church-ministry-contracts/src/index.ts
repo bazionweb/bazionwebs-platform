@@ -150,8 +150,85 @@ const publicExternalUrlSchema = z.string().trim().max(2048).url().refine((value)
   try { return new URL(value).protocol === "https:"; } catch { return false; }
 }, "Use an HTTPS link.");
 
+export const churchThemeSchema = z.object({
+  preset: z.enum([
+    "maroon-gold",
+    "forest-bronze",
+    "royal-navy",
+    "living-waters",
+    "sanctuary-charcoal",
+    "custom",
+  ]).default("maroon-gold"),
+  headerStyle: z.enum(["classic", "centered", "minimal"]).default("classic"),
+  heroStyle: z.enum(["rotator", "centered-bold", "split-card"]).default("rotator"),
+  cardStyle: z.enum(["rounded", "sharp", "warm-tint"]).default("rounded"),
+  fontPairing: z.enum(["outfit-inter", "jakarta-inter", "serif-classic"]).default("outfit-inter"),
+}).default({
+  preset: "maroon-gold",
+  headerStyle: "classic",
+  heroStyle: "rotator",
+  cardStyle: "rounded",
+  fontPairing: "outfit-inter",
+});
+export type ChurchTheme = z.infer<typeof churchThemeSchema>;
+
+export const churchDepartmentSchema = z.object({
+  id: z.string().trim().min(1).max(80),
+  name: z.string().trim().min(2).max(120),
+  description: z.string().trim().min(2).max(1000),
+  leaderName: z.string().trim().max(160).optional(),
+  leaderRole: z.string().trim().max(120).optional(),
+  meetingSchedule: z.string().trim().max(200).optional(),
+  contactEmail: z.string().trim().email().max(254).optional().or(z.literal("")),
+  icon: z.string().trim().max(32).optional(),
+});
+export type ChurchDepartment = z.infer<typeof churchDepartmentSchema>;
+
+export const churchSmallGroupSchema = z.object({
+  id: z.string().trim().min(1).max(80),
+  name: z.string().trim().min(2).max(120),
+  category: z.string().trim().max(80).default("Home Fellowship"),
+  leaderName: z.string().trim().min(2).max(160),
+  meetingSchedule: z.string().trim().min(2).max(200),
+  locationOrVirtual: z.string().trim().min(2).max(300),
+  description: z.string().trim().max(800).optional(),
+});
+export type ChurchSmallGroup = z.infer<typeof churchSmallGroupSchema>;
+
+export const churchAssetSchema = z.object({
+  id: z.string().trim().min(1).max(80),
+  name: z.string().trim().min(2).max(160),
+  category: z.string().trim().max(80),
+  location: z.string().trim().max(180).default("Main Campus"),
+  condition: z.enum(["excellent", "good", "fair", "needs_repair"]).default("good"),
+  status: z.enum(["available", "in_use", "maintenance", "reserved"]).default("available"),
+  notes: z.string().trim().max(500).optional(),
+});
+export type ChurchAsset = z.infer<typeof churchAssetSchema>;
+
+export const churchVolunteerTeamSchema = z.object({
+  id: z.string().trim().min(1).max(80),
+  title: z.string().trim().min(2).max(120),
+  department: z.string().trim().max(120),
+  description: z.string().trim().min(2).max(1000),
+  requirements: z.string().trim().max(500).optional(),
+  coordinatorName: z.string().trim().max(160).optional(),
+});
+export type ChurchVolunteerTeam = z.infer<typeof churchVolunteerTeamSchema>;
+
+export const churchTestimonySchema = z.object({
+  id: z.string().trim().min(1).max(80),
+  authorName: z.string().trim().min(2).max(160),
+  title: z.string().trim().min(2).max(200),
+  story: z.string().trim().min(10).max(3000),
+  date: z.string().trim().max(40).optional(),
+  verified: z.boolean().default(true),
+});
+export type ChurchTestimony = z.infer<typeof churchTestimonySchema>;
+
 export const churchPublicSiteSettingsSchema = z.object({
   schemaVersion: websiteConfigurationVersionSchema.default(WEBSITE_CONFIGURATION_VERSION),
+  theme: churchThemeSchema,
   branding: websiteBrandingSchema.default({
     primaryColor: "#193a31",
     secondaryColor: "#315e50",
@@ -164,11 +241,13 @@ export const churchPublicSiteSettingsSchema = z.object({
     title: z.string().trim().max(120).default("A place to belong"),
     highlightedTitle: z.string().trim().max(120).default("and grow in faith"),
     subtitle: z.string().trim().max(500).default("Join us for worship, community, and a life of faith."),
+    rotatorWords: z.array(z.string().trim().min(1).max(80)).max(10).default([]),
   }).default({
     eyebrow: "WELCOME",
     title: "A place to belong",
     highlightedTitle: "and grow in faith",
     subtitle: "Join us for worship, community, and a life of faith.",
+    rotatorWords: [],
   }),
   serviceTimes: z.array(z.object({
     label: z.string().trim().min(2).max(100),
@@ -196,11 +275,15 @@ export const churchPublicSiteSettingsSchema = z.object({
     reference: z.string().trim().max(120).default(""),
     version: z.string().trim().max(40).default(""),
   }).default({ verse: "", reference: "", version: "" }),
+  departments: z.array(churchDepartmentSchema).max(30).default([]),
   ministries: z.array(z.object({
     title: z.string().trim().min(2).max(120),
     description: z.string().trim().min(2).max(1000),
     audience: z.string().trim().max(120).optional(),
   })).max(30).default([]),
+  groups: z.array(churchSmallGroupSchema).max(50).default([]),
+  volunteerTeams: z.array(churchVolunteerTeamSchema).max(40).default([]),
+  testimonies: z.array(churchTestimonySchema).max(50).default([]),
   galleryImages: z.array(z.object({
     imageUrl: publicHttpsUrlSchema,
     alt: z.string().trim().min(3).max(240),
@@ -265,3 +348,7 @@ export const churchSiteSettingsInputSchema = z.object({
   settings: churchPublicSiteSettingsSchema,
 });
 export type ChurchSiteSettingsInput = z.infer<typeof churchSiteSettingsInputSchema>;
+
+export * from "./operations.js";
+export * from "./site-versions.js";
+

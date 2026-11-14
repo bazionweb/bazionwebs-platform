@@ -41,6 +41,7 @@ export default function ChurchHomePage() {
   const site = useMinistrySite();
   const isGlobalMissionSite = site.tenantSlug === globalMissionConfig.tenantSlug
     || site.ministryName.trim().toLowerCase() === globalMissionConfig.ministryName.toLowerCase();
+  const lead = site.leadership[0];
   const [activeVideo, setActiveVideo] = useState<{ title: string; youtubeVideoId?: string } | null>(
     null
   );
@@ -118,6 +119,7 @@ export default function ChurchHomePage() {
           title={site.hero.title}
           highlightedTitle={site.hero.highlightedTitle}
           subtitle={site.hero.subtitle || site.tagline}
+          rotatorWords={site.hero.rotatorWords}
           primaryCtaText={isGlobalMissionSite ? "Watch the latest sermon" : "Plan your visit"}
           primaryCtaHref={isGlobalMissionSite ? "/sermons" : "/visit"}
           secondaryCtaText={isGlobalMissionSite ? "Give to the mission" : "Explore messages"}
@@ -130,6 +132,37 @@ export default function ChurchHomePage() {
           title="Our mission in action"
           subtitle="Serving communities and carrying the Gospel from Kenya to the nations."
         />}
+
+        {/* 2b. Director / Senior Leadership Greeting */}
+        {lead && lead.bio && (
+          <section className="ch-section ch-section-alt">
+            <div className="ch-container">
+              <div className="ch-director-section">
+                <div className="ch-director-grid">
+                  {lead.photoUrl && (
+                    <div className="ch-director-photo-wrap">
+                      <div className="ch-director-photo-frame">
+                        <img src={lead.photoUrl} alt={lead.name} />
+                      </div>
+                    </div>
+                  )}
+                  <div className="ch-director-content">
+                    <span className="ch-director-badge">✝ Leadership Message</span>
+                    <h2>{lead.name}</h2>
+                    <blockquote className="ch-director-quote">
+                      &ldquo;{lead.bio}&rdquo;
+                    </blockquote>
+                    <div className="ch-director-sig">
+                      Grace and Peace,<br />
+                      {lead.name}
+                      <span>{lead.role}{site.ministryName ? ` · ${site.ministryName}` : ""}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+        )}
 
         {/* 3. Ministry Introduction */}
         <section className="ch-section">
@@ -205,11 +238,64 @@ export default function ChurchHomePage() {
           </div>
         </section>}
 
-        {site.ministries.length > 0 && <section className="ch-section">
+        {/* 4. Departments */}
+        {(site.departments?.length ?? 0) > 0 && <section className="ch-section">
+          <div className="ch-container">
+            <div className="ch-heading-wrap">
+              <span className="ch-eyebrow">Organized for Service</span>
+              <h2 className="ch-title">Ministry Departments</h2>
+              <p className="ch-subtitle">Equipping believers and coordinating active ministry wings across our fellowship.</p>
+            </div>
+            <div className="ch-grid-3">
+              {(site.departments ?? []).slice(0, 6).map((dept) => (
+                <article className="ch-dept-card" key={dept.name}>
+                  <span className="ch-dept-icon">{dept.icon || "🏛️"}</span>
+                  <h3 className="ch-dept-title">{dept.name}</h3>
+                  <p className="ch-dept-desc">{dept.description}</p>
+                  {(dept.leaderName || dept.meetingSchedule) && (
+                    <div className="ch-dept-meta">
+                      {dept.leaderName && <div className="ch-dept-leader">Leader: {dept.leaderName}</div>}
+                      {dept.meetingSchedule && <div className="ch-dept-schedule">Meets: {dept.meetingSchedule}</div>}
+                    </div>
+                  )}
+                </article>
+              ))}
+            </div>
+            <div style={{ textAlign: "center", marginTop: 28 }}>
+              <a href="/ministries" className="ch-btn ch-btn-outline">View all departments & ministries →</a>
+            </div>
+          </div>
+        </section>}
+
+        {/* 5. Ministries & Outreach Programs */}
+        {site.ministries.length > 0 && <section className="ch-section ch-section-alt">
           <div className="ch-container">
             <div className="ch-heading-wrap"><span className="ch-eyebrow">Find your community</span><h2 className="ch-title">Connect through ministry</h2></div>
             <div className="ch-grid-3">{site.ministries.slice(0, 3).map((ministry) => <article className="ch-info-card" key={ministry.title}><h3>{ministry.title}</h3><p>{ministry.description}</p></article>)}</div>
             <div style={{ textAlign: "center", marginTop: 28 }}><a href="/ministries" className="ch-btn ch-btn-outline">Explore ministries</a></div>
+          </div>
+        </section>}
+
+        {/* 5b. Small Groups / Cell Circles */}
+        {(site.groups?.length ?? 0) > 0 && <section className="ch-section">
+          <div className="ch-container">
+            <div className="ch-heading-wrap">
+              <span className="ch-eyebrow">Life in Fellowship</span>
+              <h2 className="ch-title">Cell Groups & Fellowship Circles</h2>
+              <p className="ch-subtitle">Connect in homes and smaller fellowships for prayer, discipleship, and care.</p>
+            </div>
+            <div className="ch-grid-4">
+              {(site.groups ?? []).slice(0, 4).map((group) => (
+                <article className="ch-group-card" key={group.name}>
+                  <span className="ch-group-category">{group.category}</span>
+                  <h3 className="ch-group-title">{group.name}</h3>
+                  <p style={{ fontSize: 13, color: "var(--church-text-muted)", margin: "0 0 10px" }}>{group.description}</p>
+                  {group.meetingSchedule && <div className="ch-group-info-item"><span>🕒</span> <span>{group.meetingSchedule}</span></div>}
+                  {group.locationOrVirtual && <div className="ch-group-info-item"><span>📍</span> <span>{group.locationOrVirtual}</span></div>}
+                  {group.leaderName && <div className="ch-group-info-item"><span>👤</span> <span>{group.leaderName}</span></div>}
+                </article>
+              ))}
+            </div>
           </div>
         </section>}
 
@@ -296,6 +382,51 @@ export default function ChurchHomePage() {
             </div>
           </div>
         </section>
+
+        {/* 8. Praise Reports & Testimonies */}
+        {(site.testimonies?.length ?? 0) > 0 && <section className="ch-section ch-section-alt">
+          <div className="ch-container">
+            <div className="ch-heading-wrap">
+              <span className="ch-eyebrow">God at Work</span>
+              <h2 className="ch-title">Praise Reports & Testimonies</h2>
+              <p className="ch-subtitle">Celebrating God&apos;s transforming power and faithfulness in the lives of His people.</p>
+            </div>
+            <div className="ch-grid-3">
+              {(site.testimonies ?? []).slice(0, 3).map((testimony, index) => (
+                <article className="ch-testimony-card" key={`${testimony.authorName}-${index}`}>
+                  <div className="ch-testimony-quote-mark" aria-hidden="true">&ldquo;</div>
+                  {testimony.title && <h3 className="ch-testimony-title">{testimony.title}</h3>}
+                  <p className="ch-testimony-body">{testimony.story}</p>
+                  <div style={{ marginTop: "auto", display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                    <span className="ch-testimony-author">{testimony.authorName}</span>
+                    {testimony.date && <span className="ch-sermon-badge">{testimony.date}</span>}
+                  </div>
+                </article>
+              ))}
+            </div>
+          </div>
+        </section>}
+
+        {/* 9. Ministry Life & Photo Gallery */}
+        {site.galleryImages.length > 0 && <section className="ch-section">
+          <div className="ch-container">
+            <div className="ch-heading-wrap">
+              <span className="ch-eyebrow">Moments of Faith</span>
+              <h2 className="ch-title">Ministry Life & Gatherings</h2>
+              <p className="ch-subtitle">Glimpses into worship, missions, conferences, and community outreaches.</p>
+            </div>
+            <div className="ch-grid-4">
+              {site.galleryImages.slice(0, 8).map((img, idx) => (
+                <div key={idx} style={{ borderRadius: "var(--church-radius)", overflow: "hidden", aspectRatio: "4/3", border: "1px solid var(--church-border)", background: "#000" }}>
+                  <img src={img.imageUrl} alt={img.alt || "Ministry gallery photo"} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                </div>
+              ))}
+            </div>
+            <div style={{ textAlign: "center", marginTop: 28 }}>
+              <a href="/gallery" className="ch-btn ch-btn-outline">View full gallery →</a>
+            </div>
+          </div>
+        </section>}
 
         {/* 10. Giving Call to Action */}
         <section className="ch-section ch-section-dark">
