@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { pulse } from "@bazion/ui";
 import {
   churchPublicSiteSettingsSchema,
   type ChurchPublicSiteSettings,
@@ -260,10 +261,18 @@ export function SiteSettingsEditor() {
           })),
         giving: { ...settings.giving, suggestedAmounts: settings.giving.suggestedAmounts },
       });
-      await requestJson("/v1/admin/church/site-settings", {
-        method: "PUT",
-        body: JSON.stringify({ profile, settings: parsedSettings }),
-      });
+      await pulse.track(
+        () =>
+          requestJson("/v1/admin/church/site-settings", {
+            method: "PUT",
+            body: JSON.stringify({ profile, settings: parsedSettings }),
+          }),
+        {
+          pending: "Saving website settings…",
+          success: "Website settings saved",
+          group: "ministry:site-settings",
+        },
+      );
       setSettings(parsedSettings);
       setNotice("Website settings saved. Refresh the public site or preview tab to see the changes.");
     } catch (reason) {

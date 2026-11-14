@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import { assertOk, pulse } from "@bazion/ui";
 import { getPublicStorefrontBaseUrl, getTenantStorefrontUrl } from "@/lib/public-urls";
 
 type Candidate = { userId: string; name: string; email: string; emailVerified: boolean; roles: string[] };
@@ -77,15 +78,34 @@ export function TenantControlPanel(props: {
     const target = owners?.candidates.find((item) => item.userId === candidateId && item.emailVerified && !item.roles.includes("owner"));
     if (!target) return;
     const current = owners?.currentOwners[0];
-    const question = current
-      ? `Transfer ownership from ${current.name} to ${target.name}? The previous owner will become an administrator.`
-      : `Assign ${target.name} as the initial tenant owner?`;
-    if (!window.confirm(question)) return;
+    const confirmed = await pulse.confirm({
+      title: current ? `Transfer ownership to ${target.name}?` : `Assign ${target.name} as owner?`,
+      message: current
+        ? `Transfers ownership from ${current.name} to ${target.name}. The previous owner will become an administrator.`
+        : `Assigns ${target.name} as the initial tenant owner.`,
+      tone: "warning",
+      confirmLabel: current ? "Transfer ownership" : "Assign owner",
+    });
+    if (!confirmed) return;
     setBusy("owner-transfer"); setMessage("owner", "");
     try {
-      const response = await fetch(url("owner"), { method: "POST", credentials: "include", headers: { "content-type": "application/json" }, body: JSON.stringify({ targetUserId: candidateId }) });
-      const data = await responseData(response);
-      if (!response.ok) throw new Error(String(data.message ?? data.error ?? `Request failed (${response.status})`));
+      await pulse.track(
+        async () => {
+          const response = await fetch(url("owner"), {
+            method: "POST",
+            credentials: "include",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ targetUserId: candidateId }),
+          });
+          await assertOk(response);
+        },
+        {
+          title: "Updating tenant ownership",
+          pendingDetail: `Assigning ${target.name}…`,
+          successTitle: "Tenant ownership updated",
+          group: `tenant:owner:${props.tenantId}`,
+        },
+      );
       setMessage("owner", current ? `Ownership transferred to ${target.name}; the former owner is now an administrator.` : `${target.name} is now the tenant owner.`);
       setCandidateId(""); router.refresh();
     } catch (error) { setMessage("owner", error instanceof Error ? error.message : "Ownership transfer failed."); }
@@ -94,14 +114,30 @@ export function TenantControlPanel(props: {
 
   async function setModule(module: ModuleItem, enabled: boolean) {
     if (!module.canManage) return;
-    if (!enabled && !window.confirm(`Disable ${module.name}? Existing data is retained; APIs that enforce this entitlement will be blocked.`)) return;
+    if (!enabled) {
+      const confirmed = await pulse.confirm({
+        title: `Disable ${module.name}?`,
+        message: "Existing data is retained, but APIs enforcing this entitlement will be blocked.",
+        tone: "warning",
+        confirmLabel: "Disable module",
+      });
+      if (!confirmed) return;
+    }
     setBusy(`module:${module.id}`); setMessage("modules", "");
     try {
-      const response = await fetch(url(`modules/${encodeURIComponent(module.id)}`), {
-        method: "PUT", credentials: "include", headers: { "content-type": "application/json" }, body: JSON.stringify({ enabled }),
-      });
-      const data = await responseData(response);
-      if (!response.ok) throw new Error(String(data.message ?? data.error ?? `Request failed (${response.status})`));
+      await pulse.track(
+        async () => {
+          const response = await fetch(url(`modules/${encodeURIComponent(module.id)}`), {
+            method: "PUT", credentials: "include", headers: { "content-type": "application/json" }, body: JSON.stringify({ enabled }),
+          });
+          await assertOk(response);
+        },
+        {
+          title: `${enabled ? "Enabling" : "Disabling"} ${module.name}`,
+          successTitle: `${module.name} ${enabled ? "enabled" : "disabled"}`,
+          group: `tenant:module:${module.id}`,
+        },
+      );
       setModules((current) => current.map((item) => item.id === module.id ? { ...item, enabled } : item));
       setMessage("modules", `${module.name} ${enabled ? "enabled" : "disabled"} for this tenant.`);
     } catch (error) { setMessage("modules", error instanceof Error ? error.message : "Entitlement update failed."); }
@@ -113,16 +149,23 @@ export function TenantControlPanel(props: {
     if (!settings) return;
     setBusy("settings"); setMessage("settings", "");
     try {
-      const response = await fetch(url("settings"), {
-        method: "PATCH", credentials: "include", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ expectedVersion: settings.version, settings: draft }),
-      });
-      const data = await responseData(response);
-      if (!response.ok) {
-        if (response.status === 409) router.refresh();
-        throw new Error(String(data.message ?? data.error ?? `Request failed (${response.status})`));
-      }
-      const value = data as unknown as SettingsState;
+      const value = await pulse.track(
+        async () => {
+          const response = await fetch(url("settings"), {
+            method: "PATCH", credentials: "include", headers: { "content-type": "application/json" },
+            body: JSON.stringify({ expectedVersion: settings.version, settings: draft }),
+          });
+          if (response.status === 409) router.refresh();
+          await assertOk(response);
+          return (await responseData(response)) as unknown as SettingsState;
+        },
+        {
+          title: "Saving workspace settings",
+          pendingDetail: `Version ${settings.version}…`,
+          successTitle: "Workspace settings saved",
+          group: `tenant:settings:${props.tenantId}`,
+        },
+      );
       setSettings(value); setDraft(value.settings); setMessage("settings", "Workspace settings saved.");
     } catch (error) { setMessage("settings", error instanceof Error ? error.message : "Could not save settings."); }
     finally { setBusy(""); }
@@ -133,14 +176,26 @@ export function TenantControlPanel(props: {
     event.preventDefault();
     setBusy("domain-create"); setMessage("domains", "");
     try {
-      const response = await fetch(url("domains"), {
-        method: "POST", credentials: "include", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ hostname: domainInput }),
-      });
-      const data = await responseData(response);
-      if (!response.ok) throw new Error(String(data.message ?? data.error ?? `Request failed (${response.status})`));
-      const domain = data.domain as TenantDomain;
-      const challenge = data.challenge as { type: "TXT"; name: string; value: string };
+      const { domain, challenge } = await pulse.track(
+        async () => {
+          const response = await fetch(url("domains"), {
+            method: "POST", credentials: "include", headers: { "content-type": "application/json" },
+            body: JSON.stringify({ hostname: domainInput }),
+          });
+          await assertOk(response);
+          const data = await responseData(response);
+          return {
+            domain: data.domain as TenantDomain,
+            challenge: data.challenge as { type: "TXT"; name: string; value: string },
+          };
+        },
+        {
+          title: "Adding custom domain",
+          pendingDetail: `Generating DNS TXT challenge for ${domainInput}…`,
+          successTitle: "DNS challenge created",
+          group: `tenant:domain:add:${props.tenantId}`,
+        },
+      );
       setDomains((current) => [domain, ...current.filter((item) => item.id !== domain.id)]);
       setDomainChallenge({ domainId: domain.id, hostname: domain.hostname, name: challenge.name, value: challenge.value });
       setDomainInput("");
@@ -152,12 +207,22 @@ export function TenantControlPanel(props: {
   async function verifyDomain(domain: TenantDomain) {
     setBusy(`domain-verify:${domain.id}`); setMessage("domains", "");
     try {
-      const response = await fetch(url(`domains/${encodeURIComponent(domain.id)}/verify`), {
-        method: "POST", credentials: "include",
-      });
-      const data = await responseData(response);
-      if (!response.ok) throw new Error(String(data.message ?? data.error ?? `Request failed (${response.status})`));
-      const updated = data.domain as TenantDomain;
+      const updated = await pulse.track(
+        async () => {
+          const response = await fetch(url(`domains/${encodeURIComponent(domain.id)}/verify`), {
+            method: "POST", credentials: "include",
+          });
+          await assertOk(response);
+          const data = await responseData(response);
+          return data.domain as TenantDomain;
+        },
+        {
+          title: `Verifying ${domain.hostname}`,
+          pendingDetail: "Checking DNS TXT record propagation…",
+          successTitle: `${domain.hostname} verified`,
+          group: `tenant:domain:verify:${domain.id}`,
+        },
+      );
       setDomains((current) => current.map((item) => item.id === updated.id ? updated : item));
       setDomainChallenge((current) => current?.domainId === updated.id ? null : current);
       setMessage("domains", `${updated.hostname} is verified and active.`);
@@ -166,15 +231,30 @@ export function TenantControlPanel(props: {
   }
 
   async function disableDomain(domain: TenantDomain) {
-    if (!window.confirm(`Disable ${domain.hostname}? It will stop resolving to this tenant.`)) return;
+    const confirmed = await pulse.confirm({
+      title: `Disable ${domain.hostname}?`,
+      message: "This domain will stop resolving to this tenant.",
+      tone: "danger",
+      confirmLabel: "Disable domain",
+    });
+    if (!confirmed) return;
     setBusy(`domain-disable:${domain.id}`); setMessage("domains", "");
     try {
-      const response = await fetch(url(`domains/${encodeURIComponent(domain.id)}/disable`), {
-        method: "POST", credentials: "include",
-      });
-      const data = await responseData(response);
-      if (!response.ok) throw new Error(String(data.message ?? data.error ?? `Request failed (${response.status})`));
-      const updated = data.domain as TenantDomain;
+      const updated = await pulse.track(
+        async () => {
+          const response = await fetch(url(`domains/${encodeURIComponent(domain.id)}/disable`), {
+            method: "POST", credentials: "include",
+          });
+          await assertOk(response);
+          const data = await responseData(response);
+          return data.domain as TenantDomain;
+        },
+        {
+          title: `Disabling ${domain.hostname}`,
+          successTitle: `${domain.hostname} disabled`,
+          group: `tenant:domain:disable:${domain.id}`,
+        },
+      );
       setDomains((current) => current.map((item) => item.id === updated.id ? updated : item));
       if (domainChallenge?.domainId === updated.id) setDomainChallenge(null);
       setMessage("domains", `${updated.hostname} has been disabled.`);

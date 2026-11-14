@@ -2,6 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import { assertOk, pulse } from "@bazion/ui";
 
 type Deployment = {
   id: string;
@@ -74,29 +75,68 @@ export function TenantHostingPanel({
     action: "start" | "stop" | "redeploy" | "remove",
   ) {
     if (!initial?.providerConfigured || busy) return;
-    const warning = action === "remove"
-      ? "Permanently remove the stopped provider resource? The platform will preserve its persistent volumes; volume cleanup remains a separate, explicit operation."
-      : action === "redeploy"
-        ? "Redeploy this tenant's application? Existing persistent volumes will be preserved."
-        : action === "stop"
-          ? "Stop this tenant's application? Its data volumes will be preserved."
-          : "Start this tenant's stopped application?";
-    if (!window.confirm(warning)) return;
+    const confirmed = await pulse.confirm(
+      action === "remove"
+        ? {
+            title: "Remove hosting provider resource?",
+            message: "Permanently remove the stopped provider resource? Persistent volumes are preserved; volume cleanup remains a separate operation.",
+            tone: "danger",
+            confirmLabel: "Remove resource",
+          }
+        : action === "redeploy"
+          ? {
+              title: "Redeploy tenant application?",
+              message: "Existing persistent volumes will be preserved during redeployment.",
+              tone: "warning",
+              confirmLabel: "Redeploy",
+            }
+          : action === "stop"
+            ? {
+                title: "Stop tenant application?",
+                message: "The application will go offline while its data volumes are preserved.",
+                tone: "warning",
+                confirmLabel: "Stop app",
+              }
+            : {
+                title: "Start tenant application?",
+                message: "Starts the stopped application container for this tenant.",
+                tone: "neutral",
+                confirmLabel: "Start app",
+              },
+    );
+    if (!confirmed) return;
     setBusy(true);
     setMessage("");
     try {
-      const response = await fetch(
-        `${baseUrl}/deployments/${encodeURIComponent(deployment.id)}/actions`,
+      const result = await pulse.track<{ state?: string; confirmed?: boolean } | undefined>(
+        async () => {
+          const response = await fetch(
+            `${baseUrl}/deployments/${encodeURIComponent(deployment.id)}/actions`,
+            {
+              method: "POST",
+              credentials: "include",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify({ action }),
+            },
+          );
+          await assertOk(response);
+          const data = await responseData(response);
+          return data.deployment as { state?: string; confirmed?: boolean } | undefined;
+        },
         {
-          method: "POST",
-          credentials: "include",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ action }),
+          title: `Hosting ${action}`,
+          pendingDetail: `Contacting hosting provider for ${deployment.template}…`,
+          successTitle: (r) =>
+            r?.confirmed
+              ? `Hosting ${action} complete (${r.state ?? "updated"})`
+              : `Hosting ${action} accepted`,
+          successDetail: (r) =>
+            r?.confirmed
+              ? undefined
+              : "Provider state is still being verified; check status shortly.",
+          group: `hosting:${deployment.id}`,
         },
       );
-      const data = await responseData(response);
-      if (!response.ok) throw new Error(String(data.message ?? data.error ?? `Request failed (${response.status})`));
-      const result = data.deployment as { state?: string; confirmed?: boolean } | undefined;
       setMessage(result?.confirmed
         ? `${action} completed. The provider reports ${result.state ?? "the updated state"}.`
         : `${action} was accepted. Provider state is still being verified; check the deployment status shortly.`);
@@ -112,22 +152,43 @@ export function TenantHostingPanel({
     event.preventDefault();
     if (!initial?.providerConfigured || tenantStatus !== "active" || busy) return;
     const selected = templates.find((item) => item.id === template);
-    if (!window.confirm(`Create a ${selected?.name ?? template} hosting resource for this tenant? This contacts the configured hosting provider and may incur infrastructure costs.`)) return;
+    const confirmed = await pulse.confirm({
+      title: `Provision ${selected?.name ?? template} hosting?`,
+      message: "This contacts the configured hosting provider and may incur infrastructure costs.",
+      tone: "warning",
+      confirmLabel: "Provision hosting",
+    });
+    if (!confirmed) return;
     setBusy(true);
     setMessage("");
     try {
-      const response = await fetch(`${baseUrl}/provision`, {
-        method: "POST",
-        credentials: "include",
-        headers: {
-          "content-type": "application/json",
-          "idempotency-key": `host-${crypto.randomUUID()}`,
+      const deployment = await pulse.track<{ state?: string } | undefined>(
+        async () => {
+          const response = await fetch(`${baseUrl}/provision`, {
+            method: "POST",
+            credentials: "include",
+            headers: {
+              "content-type": "application/json",
+              "idempotency-key": `host-${crypto.randomUUID()}`,
+            },
+            body: JSON.stringify({ template }),
+          });
+          await assertOk(response);
+          const data = await responseData(response);
+          return data.deployment as { state?: string } | undefined;
         },
-        body: JSON.stringify({ template }),
-      });
-      const data = await responseData(response);
-      if (!response.ok) throw new Error(String(data.message ?? data.error ?? `Request failed (${response.status})`));
-      const deployment = data.deployment as { state?: string } | undefined;
+        {
+          title: `Provisioning ${selected?.name ?? template}`,
+          pendingDetail: "Allocating hosting resources…",
+          successTitle: (d) =>
+            d?.state === "running" ? "Hosting resource running" : "Hosting resource created",
+          successDetail: (d) =>
+            d?.state === "running"
+              ? undefined
+              : "Deployment is still being checked; review status below.",
+          group: `hosting:provision:${tenantId}`,
+        },
+      );
       setMessage(deployment?.state === "running"
         ? "Hosting resource was created and its running state was confirmed."
         : "Hosting resource was created. Deployment is still being checked; review its status below.");

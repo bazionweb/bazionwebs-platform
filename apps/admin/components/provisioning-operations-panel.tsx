@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { assertOk, pulse } from "@bazion/ui";
 
 export interface OperationSummaryItem {
   operation: {
@@ -178,38 +179,61 @@ export function ProvisioningOperationsPanel(props: {
   async function runOperatorAction(action: "retry" | "resume" | "reconcile" | "compensate") {
     if (!detail) return;
     if (actionReason.trim().length < 8) {
-      setFeedback({ kind: "error", text: "Provide an operator reason of at least 8 characters." });
+      const msg = "Provide an operator reason of at least 8 characters.";
+      setFeedback({ kind: "error", text: msg });
+      pulse.warning(msg);
       return;
     }
     if (action === "compensate" && !confirmDestructive) {
-      setFeedback({ kind: "error", text: "Confirm destructive rollback before executing compensation." });
+      const msg = "Confirm destructive rollback before executing compensation.";
+      setFeedback({ kind: "error", text: msg });
+      pulse.warning(msg);
       return;
+    }
+    if (action === "compensate") {
+      const ok = await pulse.confirm({
+        title: `Compensate operation ${detail.operation.operationId}?`,
+        message: "This executes a destructive rollback of provisioned infrastructure.",
+        tone: "danger",
+        confirmLabel: "Compensate & rollback",
+      });
+      if (!ok) return;
     }
     setBusyAction(action);
     setFeedback(null);
     try {
-      const res = await fetch(
-        `/v1/admin/platform/commercial-provisioning/operations/${encodeURIComponent(detail.operation.operationId)}/${action}`,
+      const body = await pulse.track(
+        async () => {
+          const res = await fetch(
+            `/v1/admin/platform/commercial-provisioning/operations/${encodeURIComponent(detail.operation.operationId)}/${action}`,
+            {
+              method: "POST",
+              credentials: "include",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify({
+                reason: actionReason.trim(),
+                ...(action === "compensate" ? { confirmDestructive: true } : {}),
+              }),
+            },
+          );
+          await assertOk(res);
+          return await res.json();
+        },
         {
-          method: "POST",
-          credentials: "include",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({
-            reason: actionReason.trim(),
-            ...(action === "compensate" ? { confirmDestructive: true } : {}),
-          }),
+          title: `Executing ${action}`,
+          pendingDetail: `Operation ${detail.operation.operationId}…`,
+          successTitle: `Action '${action}' executed`,
+          successDetail: (b) => `Status: ${b?.operation?.status ?? "updated"}`,
+          group: `op:${detail.operation.operationId}`,
         },
       );
-      const body = await res.json().catch(() => null);
-      if (!res.ok) {
-        setFeedback({ kind: "error", text: body?.message ?? `${action} failed (HTTP ${res.status}).` });
-        return;
-      }
       setDetail(body);
       setActionReason("");
       setConfirmDestructive(false);
       setFeedback({ kind: "success", text: `Operator action '${action}' executed (${body.operation?.status ?? "updated"}).` });
       await refreshList();
+    } catch (err) {
+      setFeedback({ kind: "error", text: err instanceof Error ? err.message : `${action} failed.` });
     } finally {
       setBusyAction(null);
     }
@@ -219,41 +243,63 @@ export function ProvisioningOperationsPanel(props: {
     event.preventDefault();
     if (!detail) return;
     if (actionReason.trim().length < 8 || reviewNote.trim().length < 4) {
-      setFeedback({ kind: "error", text: "Manual review requires a reason (8+ chars) and note (4+ chars)." });
+      const msg = "Manual review requires a reason (8+ chars) and note (4+ chars).";
+      setFeedback({ kind: "error", text: msg });
+      pulse.warning(msg);
       return;
     }
     if (reviewResolution === "trigger_compensate" && !confirmDestructive) {
-      setFeedback({ kind: "error", text: "Confirm destructive compensation before triggering manual rollback." });
+      const msg = "Confirm destructive compensation before triggering manual rollback.";
+      setFeedback({ kind: "error", text: msg });
+      pulse.warning(msg);
       return;
+    }
+    if (reviewResolution === "trigger_compensate") {
+      const ok = await pulse.confirm({
+        title: "Trigger compensation via manual review?",
+        message: "This will initiate a destructive rollback of this provisioning operation.",
+        tone: "danger",
+        confirmLabel: "Confirm compensation",
+      });
+      if (!ok) return;
     }
     setBusyAction("manual-review");
     setFeedback(null);
     try {
-      const res = await fetch(
-        `/v1/admin/platform/commercial-provisioning/operations/${encodeURIComponent(detail.operation.operationId)}/complete-manual-review`,
+      const body = await pulse.track(
+        async () => {
+          const res = await fetch(
+            `/v1/admin/platform/commercial-provisioning/operations/${encodeURIComponent(detail.operation.operationId)}/complete-manual-review`,
+            {
+              method: "POST",
+              credentials: "include",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify({
+                resolution: reviewResolution,
+                note: reviewNote.trim(),
+                reason: actionReason.trim(),
+                ...(reviewResolution === "trigger_compensate" ? { confirmDestructive: true } : {}),
+              }),
+            },
+          );
+          await assertOk(res);
+          return await res.json();
+        },
         {
-          method: "POST",
-          credentials: "include",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({
-            resolution: reviewResolution,
-            note: reviewNote.trim(),
-            reason: actionReason.trim(),
-            ...(reviewResolution === "trigger_compensate" ? { confirmDestructive: true } : {}),
-          }),
+          title: "Submitting manual review",
+          pendingDetail: `Resolution: ${reviewResolution}…`,
+          successTitle: "Manual review completed",
+          group: `op:review:${detail.operation.operationId}`,
         },
       );
-      const body = await res.json().catch(() => null);
-      if (!res.ok) {
-        setFeedback({ kind: "error", text: body?.message ?? `Manual review failed (HTTP ${res.status}).` });
-        return;
-      }
       setDetail(body);
       setActionReason("");
       setReviewNote("");
       setConfirmDestructive(false);
       setFeedback({ kind: "success", text: `Manual review completed with resolution '${reviewResolution}'.` });
       await refreshList();
+    } catch (err) {
+      setFeedback({ kind: "error", text: err instanceof Error ? err.message : "Manual review failed." });
     } finally {
       setBusyAction(null);
     }

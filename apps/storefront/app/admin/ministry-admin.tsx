@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { pulse } from "@bazion/ui";
 import { authClient } from "@bazion/auth/client";
 import { SiteSettingsEditor } from "./site-settings-editor";
 import { MediaUploadField } from "./media-upload-field";
@@ -148,14 +149,25 @@ export function MinistryAdminDashboard() {
   async function createSermon(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault(); setBusy(true); setNotice("");
     try {
-      await apiRequest("/v1/admin/church/sermons", { method: "POST", body: JSON.stringify({
-        ...sermonForm,
-        slug: slugifyContentTitle(sermonForm.title, "sermon"),
-        thumbnailUrl: sermonForm.thumbnailUrl.trim() || undefined,
-        youtubeVideoId: sermonForm.youtubeVideoId || undefined,
-        scriptureReference: sermonForm.scriptureReference || undefined,
-        status: sermonForm.status,
-      }) });
+      await pulse.track(
+        () =>
+          apiRequest("/v1/admin/church/sermons", {
+            method: "POST",
+            body: JSON.stringify({
+              ...sermonForm,
+              slug: slugifyContentTitle(sermonForm.title, "sermon"),
+              thumbnailUrl: sermonForm.thumbnailUrl.trim() || undefined,
+              youtubeVideoId: sermonForm.youtubeVideoId || undefined,
+              scriptureReference: sermonForm.scriptureReference || undefined,
+              status: sermonForm.status,
+            }),
+          }),
+        {
+          pending: "Saving sermon…",
+          success: sermonForm.status === "published" ? "Sermon published" : "Sermon saved as draft",
+          group: "ministry:sermon",
+        },
+      );
       const savedStatus = sermonForm.status;
       setSermonForm({ title: "", speaker: "", description: "", scriptureReference: "", youtubeVideoId: "", thumbnailUrl: "", status: "draft" });
       setReloadKey((value) => value + 1); setNotice(savedStatus === "published" ? "Sermon published." : "Sermon saved as a draft.");
@@ -166,20 +178,33 @@ export function MinistryAdminDashboard() {
   async function createEvent(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault(); setBusy(true); setNotice("");
     if (eventForm.endsAt && new Date(eventForm.endsAt) < new Date(eventForm.startsAt)) {
-      setNotice("Event end time must be after the start time.");
+      const msg = "Event end time must be after the start time.";
+      setNotice(msg);
+      pulse.warning(msg);
       setBusy(false);
       return;
     }
     try {
-      const result = await apiRequest<{ event: { slug: string } }>("/v1/admin/church/events", { method: "POST", body: JSON.stringify({
-        ...eventForm,
-        slug: slugifyContentTitle(eventForm.title, "event"),
-        description: eventForm.description.trim() || undefined,
-        posterUrl: eventForm.posterUrl.trim() || undefined,
-        startsAt: new Date(eventForm.startsAt).toISOString(),
-        endsAt: eventForm.endsAt ? new Date(eventForm.endsAt).toISOString() : undefined,
-        registrationCapacity: eventForm.registrationCapacity ? Number(eventForm.registrationCapacity) : undefined,
-      }) });
+      const result = await pulse.track(
+        () =>
+          apiRequest<{ event: { slug: string } }>("/v1/admin/church/events", {
+            method: "POST",
+            body: JSON.stringify({
+              ...eventForm,
+              slug: slugifyContentTitle(eventForm.title, "event"),
+              description: eventForm.description.trim() || undefined,
+              posterUrl: eventForm.posterUrl.trim() || undefined,
+              startsAt: new Date(eventForm.startsAt).toISOString(),
+              endsAt: eventForm.endsAt ? new Date(eventForm.endsAt).toISOString() : undefined,
+              registrationCapacity: eventForm.registrationCapacity ? Number(eventForm.registrationCapacity) : undefined,
+            }),
+          }),
+        {
+          pending: "Creating ministry event…",
+          success: `Event created (/events/${eventForm.title})`,
+          group: "ministry:event",
+        },
+      );
       setEventForm({ title: "", description: "", startsAt: "", endsAt: "", venue: "", address: "", posterUrl: "", registrationCapacity: "", registrationEnabled: true });
       setReloadKey((value) => value + 1); setNotice(`Event created. Its page link is /events/${result.event.slug}.`);
     } catch (reason) { setNotice(reason instanceof Error ? reason.message : "Could not create the event."); }
@@ -189,13 +214,24 @@ export function MinistryAdminDashboard() {
   async function createCampaign(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault(); setBusy(true); setNotice("");
     try {
-      await apiRequest("/v1/admin/church/campaigns", { method: "POST", body: JSON.stringify({
-        ...campaignForm,
-        slug: slugifyContentTitle(campaignForm.title, "campaign"),
-        targetAmountKsh: Number(campaignForm.targetAmountKsh),
-        startsAt: campaignForm.startsAt ? new Date(campaignForm.startsAt).toISOString() : undefined,
-        endsAt: campaignForm.endsAt ? new Date(campaignForm.endsAt).toISOString() : undefined,
-      }) });
+      await pulse.track(
+        () =>
+          apiRequest("/v1/admin/church/campaigns", {
+            method: "POST",
+            body: JSON.stringify({
+              ...campaignForm,
+              slug: slugifyContentTitle(campaignForm.title, "campaign"),
+              targetAmountKsh: Number(campaignForm.targetAmountKsh),
+              startsAt: campaignForm.startsAt ? new Date(campaignForm.startsAt).toISOString() : undefined,
+              endsAt: campaignForm.endsAt ? new Date(campaignForm.endsAt).toISOString() : undefined,
+            }),
+          }),
+        {
+          pending: "Creating giving campaign…",
+          success: "Giving campaign created",
+          group: "ministry:campaign",
+        },
+      );
       setCampaignForm({ title: "", description: "", targetAmountKsh: "", startsAt: "", endsAt: "" });
       setReloadKey((value) => value + 1); setNotice("Giving campaign created.");
     } catch (reason) { setNotice(reason instanceof Error ? reason.message : "Could not create this campaign."); }
@@ -205,7 +241,14 @@ export function MinistryAdminDashboard() {
   async function setCampaignStatus(id: string, status: string) {
     setBusy(true); setNotice("");
     try {
-      await apiRequest(`/v1/admin/church/campaigns/${id}/status`, { method: "PATCH", body: JSON.stringify({ status }) });
+      await pulse.track(
+        () => apiRequest(`/v1/admin/church/campaigns/${id}/status`, { method: "PATCH", body: JSON.stringify({ status }) }),
+        {
+          pending: `Updating campaign to ${status}…`,
+          success: `Campaign status updated to ${status}`,
+          group: `ministry:campaign:${id}`,
+        },
+      );
       setReloadKey((value) => value + 1); setNotice("Campaign status updated.");
     } catch (reason) { setNotice(reason instanceof Error ? reason.message : "Could not update the campaign."); }
     finally { setBusy(false); }
@@ -214,17 +257,39 @@ export function MinistryAdminDashboard() {
   async function setPublicContentStatus(kind: "sermons" | "events", id: string, status: string) {
     setBusy(true); setNotice("");
     try {
-      await apiRequest(`/v1/admin/church/${kind}/${id}/status`, { method: "PATCH", body: JSON.stringify({ status }) });
+      await pulse.track(
+        () => apiRequest(`/v1/admin/church/${kind}/${id}/status`, { method: "PATCH", body: JSON.stringify({ status }) }),
+        {
+          pending: `Updating ${kind === "sermons" ? "sermon" : "event"} to ${status}…`,
+          success: `${kind === "sermons" ? "Sermon" : "Event"} status updated to ${status}`,
+          group: `ministry:${kind}:${id}`,
+        },
+      );
       setReloadKey((value) => value + 1); setNotice(`${kind === "sermons" ? "Sermon" : "Event"} status updated.`);
     } catch (reason) { setNotice(reason instanceof Error ? reason.message : "Could not update the content status."); }
     finally { setBusy(false); }
   }
 
   async function removeRecord(path: string, label: string) {
-    if (!window.confirm(`Delete this ${label}? This cannot be undone.`)) return;
+    const ok = await pulse.confirm({
+      title: `Delete this ${label}?`,
+      message: "This record will be permanently deleted and cannot be undone.",
+      tone: "danger",
+      confirmLabel: `Delete ${label}`,
+    });
+    if (!ok) return;
     setBusy(true); setNotice("");
-    try { await apiRequest(path, { method: "DELETE" }); setReloadKey((value) => value + 1); setNotice(`${label} deleted.`); }
-    catch (reason) { setNotice(reason instanceof Error ? reason.message : `Could not delete the ${label}.`); }
+    try {
+      await pulse.track(
+        () => apiRequest(path, { method: "DELETE" }),
+        {
+          pending: `Deleting ${label}…`,
+          success: `${label} deleted`,
+          group: `ministry:delete:${path}`,
+        },
+      );
+      setReloadKey((value) => value + 1); setNotice(`${label} deleted.`);
+    } catch (reason) { setNotice(reason instanceof Error ? reason.message : `Could not delete the ${label}.`); }
     finally { setBusy(false); }
   }
 

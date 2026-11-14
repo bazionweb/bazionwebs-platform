@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { assertOk, pulse } from "@bazion/ui";
 import { getTenantStorefrontUrl, getTenantWorkspacePickerUrl } from "@/lib/public-urls";
 
 function slugify(text: string) {
@@ -48,18 +49,24 @@ export function CreateTenantModal() {
     setError("");
 
     try {
-      const response = await fetch("/api/auth/organization/create", {
-        method: "POST",
-        credentials: "include",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ name: name.trim(), slug: slug.trim() }),
-      });
-
-      const data = await response.json().catch(() => ({}));
-
-      if (!response.ok) {
-        throw new Error(data.message || data.error || `Creation failed (${response.status})`);
-      }
+      const data = await pulse.track(
+        async () => {
+          const response = await fetch("/api/auth/organization/create", {
+            method: "POST",
+            credentials: "include",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ name: name.trim(), slug: slug.trim() }),
+          });
+          await assertOk(response);
+          return await response.json();
+        },
+        {
+          title: `Provisioning workspace ${name.trim()}`,
+          pendingDetail: "Creating tenant boundary and auth organization…",
+          successTitle: `Workspace ${name.trim()} provisioned`,
+          group: "tenant:provision",
+        },
+      );
 
       setProvisioned({
         name: name.trim(),
@@ -255,18 +262,25 @@ export function ReconcileButton() {
     setResult(null);
 
     try {
-      const response = await fetch("/v1/admin/platform/tenants/reconcile-provisioning", {
-        method: "POST",
-        credentials: "include",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ staleMinutes: 10, limit: 100 }),
-      });
-
-      const data = await response.json().catch(() => ({}));
-
-      if (!response.ok) {
-        throw new Error(data.message || data.error || `Reconciliation failed (${response.status})`);
-      }
+      const data = await pulse.track(
+        async () => {
+          const response = await fetch("/v1/admin/platform/tenants/reconcile-provisioning", {
+            method: "POST",
+            credentials: "include",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ staleMinutes: 10, limit: 100 }),
+          });
+          await assertOk(response);
+          return await response.json();
+        },
+        {
+          title: "Reconciling provisioning tenants",
+          pendingDetail: "Scanning for stuck provisioning workflows…",
+          successTitle: "Provisioning reconciliation complete",
+          successDetail: (d) => `Scanned ${d?.scanned ?? 0}, Activated ${d?.activated ?? 0}`,
+          group: "tenant:reconcile",
+        },
+      );
 
       setResult(`Scanned ${data.scanned ?? 0}, Activated ${data.activated ?? 0}`);
       router.refresh();

@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { ResponsiveImage } from "@bazion/ui";
+import { pulse } from "@bazion/ui";
 
 export type MinistryMediaAsset = {
   key: string;
@@ -76,22 +77,36 @@ export function MediaUploadField({
     setError("");
     setNotice("");
     if (!allowedImageTypes.has(file.type)) {
-      setError("Choose a JPEG, PNG, WebP, or AVIF image.");
+      const msg = "Choose a JPEG, PNG, WebP, or AVIF image.";
+      setError(msg);
+      pulse.warning(msg);
       return;
     }
     if (file.size > MAX_UPLOAD_BYTES) {
-      setError("Images must be 8 MB or smaller.");
+      const msg = "Images must be 8 MB or smaller.";
+      setError(msg);
+      pulse.warning(msg);
       return;
     }
     setBusy(true);
     try {
       const query = new URLSearchParams({ filename: file.name, contentType: file.type });
-      const payload = await readResponse(await fetch(`/v1/admin/church/media?${query}`, {
-        method: "POST",
-        credentials: "include",
-        headers: { "content-type": "application/octet-stream" },
-        body: file,
-      }));
+      const payload = await pulse.track(
+        async () => {
+          const res = await fetch(`/v1/admin/church/media?${query}`, {
+            method: "POST",
+            credentials: "include",
+            headers: { "content-type": "application/octet-stream" },
+            body: file,
+          });
+          return await readResponse(res);
+        },
+        {
+          pending: `Uploading ${file.name}…`,
+          success: `${file.name} uploaded`,
+          group: "media:upload",
+        },
+      );
       if (!payload.asset) throw new Error("The upload completed without an asset link.");
       onChange(payload.asset.url);
       setAssets((current) => [payload.asset!, ...current.filter((asset) => asset.key !== payload.asset!.key)]);

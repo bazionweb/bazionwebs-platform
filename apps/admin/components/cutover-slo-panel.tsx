@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import { assertOk, pulse } from "@bazion/ui";
 
 export type OperationalDrillType =
   | "database_restore"
@@ -161,33 +162,42 @@ export function CutoverSloPanel({
     event.preventDefault();
     if (!isOwner) return;
     if (evidenceRef.trim().length < 2 || summary.trim().length < 4) {
-      setFeedback({ kind: "error", text: "Provide an evidence reference and summary for the verification drill." });
+      const msg = "Provide an evidence reference and summary for the verification drill.";
+      setFeedback({ kind: "error", text: msg });
+      pulse.warning(msg);
       return;
     }
     setSubmittingDrill(true);
     setFeedback(null);
     try {
-      const res = await fetch("/v1/admin/platform/commercial-provisioning/drills", {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          drillType,
-          evidenceRef: evidenceRef.trim(),
-          summary: summary.trim(),
-        }),
-      });
-      const payload = await res.json().catch(() => ({})) as CutoverReadinessReport & { message?: string };
-      if (!res.ok) {
-        setFeedback({ kind: "error", text: payload.message ?? `Failed to record drill (${res.status}).` });
-        return;
-      }
+      const payload = await pulse.track(
+        async () => {
+          const res = await fetch("/v1/admin/platform/commercial-provisioning/drills", {
+            method: "POST",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              drillType,
+              evidenceRef: evidenceRef.trim(),
+              summary: summary.trim(),
+            }),
+          });
+          await assertOk(res);
+          return (await res.json()) as CutoverReadinessReport & { message?: string };
+        },
+        {
+          title: `Recording operational drill (${drillType})`,
+          pendingDetail: "Validating drill evidence against cutover gates…",
+          successTitle: "Operational drill recorded",
+          group: "cutover:drill",
+        },
+      );
       setCutover(payload);
       setEvidenceRef("");
       setSummary("");
       setFeedback({ kind: "ok", text: `Recorded verified operational drill (${drillType}) and updated cutover gates.` });
-    } catch {
-      setFeedback({ kind: "error", text: "Network error while recording verification drill." });
+    } catch (err) {
+      setFeedback({ kind: "error", text: err instanceof Error ? err.message : "Failed to record verification drill." });
     } finally {
       setSubmittingDrill(false);
     }

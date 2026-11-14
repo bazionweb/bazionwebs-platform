@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { FormEvent } from "react";
+import { pulse } from "@bazion/ui";
 import { authClient, resolveSafeRedirectTarget } from "@bazion/auth/client";
 
 function getSafeCallbackUrl(): string {
@@ -25,16 +26,27 @@ export function AuthPanel() {
     setBusy(true);
     setMessage("");
     try {
-      if (mode === "sign-up") {
-        const result = await authClient.signUp.email({ name, email, password, callbackURL: getSafeCallbackUrl() });
-        if (result.error) throw new Error(result.error.message ?? "Account creation failed.");
-        setMessage("Account created. We’re sending a verification link; check your inbox and spam folder.");
-      } else {
-        const callbackURL = getSafeCallbackUrl();
-        const result = await authClient.signIn.email({ email, password, callbackURL });
-        if (result.error) throw new Error(result.error.message ?? "Sign-in failed.");
-        window.location.assign(callbackURL);
-      }
+      await pulse.track(
+        async () => {
+          if (mode === "sign-up") {
+            const result = await authClient.signUp.email({ name, email, password, callbackURL: getSafeCallbackUrl() });
+            if (result.error) throw new Error(result.error.message ?? "Account creation failed.");
+            setMessage("Account created. We’re sending a verification link; check your inbox and spam folder.");
+            return result;
+          } else {
+            const callbackURL = getSafeCallbackUrl();
+            const result = await authClient.signIn.email({ email, password, callbackURL });
+            if (result.error) throw new Error(result.error.message ?? "Sign-in failed.");
+            window.location.assign(callbackURL);
+            return result;
+          }
+        },
+        {
+          pending: mode === "sign-up" ? "Creating account…" : "Signing in…",
+          success: mode === "sign-up" ? "Verification email queued" : "Signed in securely",
+          scope: "auth",
+        },
+      );
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Authentication request failed.");
     } finally {

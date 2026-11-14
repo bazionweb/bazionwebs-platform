@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { PulseHost } from "@bazion/ui";
+import "@bazion/ui/pulse.css";
 import "./globals.css";
 import "./recovery.css";
 import "./font-fallbacks.css";
@@ -11,7 +13,10 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        {children}
+        <PulseHost position="bottom-right" />
+      </body>
     </html>
   );
 }

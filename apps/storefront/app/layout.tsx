@@ -6,6 +6,8 @@ import "@bazion/ui/tokens.css";
 import "@bazion/ui/primitives.css";
 import "@bazion/ui/navigation.css";
 import "@bazion/ui/church.css";
+import "@bazion/ui/pulse.css";
+import { PulseHost } from "@bazion/ui";
 import { SiteThemeProvider } from "../lib/site-theme-provider";
 import { ResponsiveImageProvider } from "@bazion/ui";
 import { fetchTenantPublicData, getTenantRequestContext } from "../lib/server-tenant-api";
@@ -63,6 +65,7 @@ export default function RootLayout({
         >
           <SiteThemeProvider>{children}</SiteThemeProvider>
         </ResponsiveImageProvider>
+        <PulseHost position="top-right" />
       </body>
     </html>
   );

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { PulseActivityButton } from "@bazion/ui";
 import { authClient } from "@bazion/auth/client";
 import { AdminDashboard } from "./admin-dashboard";
 import { MinistryAdminDashboard } from "./ministry-admin";
@@ -39,6 +40,7 @@ export function AdminShell({ tenantName, isPlatformOwner, notice }: AdminShellPr
         </Link>
 
         <nav className="tenant-admin-actions" aria-label="Tenant administration links">
+          <PulseActivityButton label="Activity" />
           {canSwitchTenant && <Link className="tenant-admin-link" href="/workspace">Switch assigned tenant</Link>}
           {commerceEnabled && <Link className="tenant-admin-link" href="/admin/commerce">Commerce admin</Link>}
           {isPlatformOwner && <Link className="tenant-admin-platform-link" href="/platform">Platform console</Link>}
