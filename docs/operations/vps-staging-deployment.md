@@ -103,11 +103,11 @@ Paste its PEM into the Dokploy variable as one line, replacing each line break w
 
 In the Compose service's **Domains** tab, add domains with HTTPS/Let's Encrypt enabled and the service port below. Use Dokploy's native Domains UI, not handwritten labels:
 
-| Hostname | Compose service | Container port |
-| --- | --- | ---: |
-| `platform-api-staging.bazionweb.com` | `api` | 4000 |
-| `platform-staging.bazionweb.com` | `admin` | 3001 |
-| `church-staging.bazionweb.com` | `storefront` | 3000 |
+| Hostname                             | Compose service | Container port |
+| ------------------------------------ | --------------- | -------------: |
+| `platform-api-staging.bazionweb.com` | `api`           |           4000 |
+| `platform-staging.bazionweb.com`     | `admin`         |           3001 |
+| `church-staging.bazionweb.com`       | `storefront`    |           3000 |
 
 Do not add public domains to `db`, `migrate`, `status-worker`, or `notification-worker`. Save the service and use Dokploy's Compose preview to check these routes and the private networks before deploying.
 
@@ -123,7 +123,11 @@ The staging stack is implemented in the separate [`bazionweb` repository](https:
 
 Create a second Dokploy Compose application from the Bazionweb repository and select `docker-compose.dokploy.staging.yml`. Attach it to the existing `dokploy-network`; the Compose file supplies Traefik routers for `staging.bazionweb.com` and `staging-api.bazionweb.com` on HTTPS. The Cloudflare A records for both names should remain proxied to the VPS address, and Cloudflare SSL/TLS should use **Full (strict)**. Follow the Bazionweb guide for its required environment variables, registry credential, and first-deploy health checks. The Platform storefront remains `church-staging.bazionweb.com`; do not point it at `staging.bazionweb.com`.
 
-The Bazionweb staging Compose file sets the `com.bazion.backup-target=bazionweb-staging` label on its database. Both stacks must use the same staging-only callback signing and bearer secrets on the corresponding API settings before signed callback tests. Keep commercial provisioning, the saga worker, and Dokploy hosting mutations disabled until the callback round trip, staging database backups/restore, pilot tenant, and release approval are verified. The Bazionweb feature branch currently has no GHCR release image; GitHub Actions monthly quota exhaustion prevents image publication. A locally built image is not available to Dokploy. Wait until validated CI can publish the commit-addressed GHCR images before deploying either stack.
+The Bazionweb staging Compose file sets the `com.bazion.backup-target=bazionweb-staging` label on its database. Both stacks must use the same staging-only callback signing and bearer secrets on the corresponding API settings before signed callback tests. Keep commercial provisioning, the saga worker, and Dokploy hosting mutations disabled until the callback round trip, staging database backups/restore, pilot tenant, and release approval are verified.
+
+If Bazionweb's Actions quota is exhausted but the Platform repository still has runner capacity, use the Platform-owned [`Build Bazionweb staging images` workflow](../../.github/workflows/build-bazionweb-staging.yml) after that workflow has been merged to Platform `main`. It checks out an exact 40-character Bazionweb commit using the existing read-only GitHub App credentials, runs Bazionweb's configuration, lint, typecheck, migration, and test gates, then publishes commit-addressed `sha-<commit>` web/API images under the Platform owner's GHCR namespace. The workflow records each registry digest and does not deploy. In Bazionweb's Dokploy Compose application, set `IMAGE_OWNER=bazionweb` and `IMAGE_TAG=sha-<the-validated-bazionweb-commit>` before redeploying. If Platform Actions capacity is also exhausted, use a trusted off-host build/publish path or wait for quota; do not copy the Bazionweb source tree into Platform.
+
+GHCR packages are private. Dokploy needs a read-only `read:packages` credential for the Platform-owned packages; keep it only in Dokploy's registry credentials. The workflow's repository-scoped `GITHUB_TOKEN` publishes packages associated with the Platform repository. It does not need package-write access to the Bazionweb repository.
 
 ### Resource budget
 

@@ -13,6 +13,7 @@ const storefrontLayout = await readFile(new URL("../apps/storefront/app/layout.t
 const adminFontFallbacks = await readFile(new URL("../apps/admin/app/font-fallbacks.css", import.meta.url), "utf8");
 const storefrontFontFallbacks = await readFile(new URL("../apps/storefront/app/font-fallbacks.css", import.meta.url), "utf8");
 const ciWorkflow = await readFile(new URL("../.github/workflows/ci.yml", import.meta.url), "utf8");
+const bazionwebImageWorkflow = await readFile(new URL("../.github/workflows/build-bazionweb-staging.yml", import.meta.url), "utf8");
 const stagingCompose = await readFile(new URL("../deploy/dokploy/platform-staging.compose.yml", import.meta.url), "utf8");
 const postgresDumpScript = await readFile(new URL("../deploy/systemd/bazion-docker-postgres-dump.sh", import.meta.url), "utf8");
 const stagingGuide = await readFile(new URL("../docs/operations/vps-staging-deployment.md", import.meta.url), "utf8");
@@ -102,6 +103,33 @@ test("successful main CI publishes SHA-addressed images with isolated BuildKit c
   assert.match(publishJob, /sbom: true/);
 });
 
+test("Platform Actions validate a pinned Bazionweb commit and publish commit-addressed images without deployment", () => {
+  assert.match(bazionwebImageWorkflow, /^on:\r?\n {2}workflow_dispatch:/m);
+  assert.doesNotMatch(bazionwebImageWorkflow, /^ {2}(push|pull_request):/m);
+  assert.match(bazionwebImageWorkflow, /github\.ref == 'refs\/heads\/main'/);
+  assert.match(bazionwebImageWorkflow, /bazionweb_commit:/);
+  assert.match(bazionwebImageWorkflow, /\[0-9a-fA-F\]\{40\}/);
+  assert.match(bazionwebImageWorkflow, /owner: bazionwebs[\s\S]*repositories: bazionweb[\s\S]*permission-contents: read/);
+  assert.match(bazionwebImageWorkflow, /npm --workspace=@bazionweb\/api run test:cov/);
+  assert.match(bazionwebImageWorkflow, /npm --workspace=@bazionweb\/web test/);
+  assert.match(bazionwebImageWorkflow, /needs: validate-bazionweb/);
+  assert.match(bazionwebImageWorkflow, /packages: write/);
+  assert.match(bazionwebImageWorkflow, /ghcr\.io\/\$\{\{ github\.repository_owner \}\}\/bazionweb-\$\{\{ matrix\.app \}\}:sha-/);
+  assert.match(bazionwebImageWorkflow, /provenance: mode=max/);
+  assert.match(bazionwebImageWorkflow, /sbom: true/);
+  assert.match(bazionwebImageWorkflow, /steps\.image\.outputs\.digest/);
+  assert.match(bazionwebImageWorkflow, /build-args: \$\{\{ matrix\.build_args \}\}/);
+  assert.match(bazionwebImageWorkflow, /NEXT_PUBLIC_APP_URL=https:\/\/staging\.bazionweb\.com/);
+  assert.match(bazionwebImageWorkflow, /NEXT_PUBLIC_PLATFORM_APP_URL=https:\/\/platform-staging\.bazionweb\.com/);
+  assert.doesNotMatch(bazionwebImageWorkflow, /DOKPLOY_API_KEY|compose\.deploy/);
+  assert.match(bazionwebImageWorkflow, /node-version: 24/);
+  const actionRefs = [...bazionwebImageWorkflow.matchAll(/^\s*uses:\s+[^\s]+@([^\s]+)/gm)].map((match) => match[1]);
+  assert.ok(actionRefs.length >= 5, "expected build and source-checkout actions");
+  for (const actionRef of actionRefs) {
+    assert.match(actionRef, /^[a-f0-9]{40}$/, `action must be pinned to a full commit SHA: ${actionRef}`);
+  }
+});
+
 test("Dokploy staging stack isolates the database, runs migrations before app services, and caps resource use", () => {
   for (const service of ["db", "migrate", "api", "admin", "storefront", "status-worker", "notification-worker", "platform-owner-bootstrap"]) {
     assert.match(stagingCompose, new RegExp(`^  ${service}:\\s*$`, "m"), `missing staging ${service} service`);
@@ -135,7 +163,9 @@ test("staging guide describes both separate stacks and blocks deployment until G
   assert.match(stagingGuide, /docker-compose\.dokploy\.staging\.yml/);
   assert.match(stagingGuide, /staging-api\.bazionweb\.com/);
   assert.match(stagingGuide, /church-staging\.bazionweb\.com/);
-  assert.match(stagingGuide, /locally built image is not available to Dokploy/i);
+  assert.match(stagingGuide, /Build Bazionweb staging images/);
+  assert.match(stagingGuide, /publishes commit-addressed `sha-<commit>` web\/API images/);
+  assert.match(stagingGuide, /workflow does not deploy/i);
   assert.doesNotMatch(stagingGuide, /added as a writable workspace|currently outside this workspace/i);
   assert.doesNotMatch(stagingGuide, /This repo's Docker targets cover Platform API\/admin\/storefront only/);
 });
