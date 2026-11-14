@@ -25,7 +25,9 @@ test("Dockerfile provides a production target for each platform app and a one-sh
   assert.match(dockerfile, /CMD \["node", "dist\/worker\.js"\]/);
   assert.match(dockerfile, /pnpm --filter @bazion\/api --prod deploy \/out/);
   assert.match(dockerfile, /pnpm install --frozen-lockfile --filter @bazion\/api\.\.\./);
-  assert.match(dockerfile, /CMD \["pnpm", "--filter", "@bazion\/database", "migrate"\]/);
+  assert.match(dockerfile, /pnpm install --frozen-lockfile --filter @bazion\/database\.\.\. --filter @bazion\/auth\.\.\./);
+  assert.match(dockerfile, /pnpm --filter @bazion\/database migrate && pnpm --filter @bazion\/auth migrate/);
+  assert.match(stagingCompose, /AUTH_MIGRATION_DATABASE_URL: postgres:\/\/bazion_migrator:/);
 });
 
 test("workspace manifests are copied before source to preserve dependency-install cache", () => {
@@ -126,6 +128,19 @@ test("Dokploy staging stack isolates the database, runs migrations before app se
   assert.match(stagingCompose, /profiles:\n      - operator-bootstrap/);
   assert.match(stagingCompose, /PLATFORM_ADMIN_CONFIRM_EMAIL: \$\{PLATFORM_ADMIN_CONFIRM_EMAIL:-\}/);
   assert.match(stagingCompose, /MIGRATION_DATABASE_URL: postgres:\/\/bazion_migrator:/);
+});
+
+test("Better Auth migrations use the locked local CLI and migration-only credentials", async () => {
+  const authManifest = JSON.parse(await readFile(new URL("../packages/auth/package.json", import.meta.url), "utf8"));
+  const authMigrator = await readFile(new URL("../packages/auth/scripts/migrate.ts", import.meta.url), "utf8");
+  assert.equal(authManifest.dependencies["better-auth"], "1.7.17");
+  assert.equal(authManifest.devDependencies.auth, authManifest.dependencies["better-auth"]);
+  assert.match(authMigrator, /\["exec", "auth", "migrate", "--yes", "--config", "\.\/src\/server\.ts"\]/);
+  assert.match(authMigrator, /AUTH_MIGRATION_DATABASE_URL is required/);
+  assert.match(authMigrator, /TENANT_RESOLVER_DATABASE_URL: migrationUrl/);
+  assert.match(authMigrator, /TENANT_PROVISIONER_DATABASE_URL: migrationUrl/);
+  assert.match(authMigrator, /NOTIFICATION_ENQUEUER_DATABASE_URL: migrationUrl/);
+  assert.doesNotMatch(authMigrator, /\bdlx\b|npmCommand|registryCheck/);
 });
 
 test("PostgreSQL backup helper selects exactly one labelled DB and validates a restricted dump", () => {

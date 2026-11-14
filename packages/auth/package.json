@@ -6,10 +6,22 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
-    ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" },
-    "./server": { "types": "./dist/server.d.ts", "import": "./dist/server.js" },
-    "./client": { "types": "./dist/client.d.ts", "import": "./dist/client.js" },
-    "./recovery-ui": { "types": "./dist/recovery-ui.d.ts", "import": "./dist/recovery-ui.js" }
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./server": {
+      "types": "./dist/server.d.ts",
+      "import": "./dist/server.js"
+    },
+    "./client": {
+      "types": "./dist/client.d.ts",
+      "import": "./dist/client.js"
+    },
+    "./recovery-ui": {
+      "types": "./dist/recovery-ui.d.ts",
+      "import": "./dist/recovery-ui.js"
+    }
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
@@ -24,14 +36,17 @@
     "better-auth": "1.7.17",
     "pg": "^8.23.1"
   },
-  "peerDependencies": { "react": ">=19" },
+  "peerDependencies": {
+    "react": ">=19"
+  },
   "devDependencies": {
-    "@types/react": "^19.2.2",
     "@types/node": "^26.6.6",
+    "@types/pg": "^8.15.5",
+    "@types/react": "^19.2.2",
+    "auth": "1.7.17",
     "react": "^19.2.0",
     "tsx": "^4.20.6",
     "typescript": "^5.9.3",
-    "vitest": "^5.1.0",
-    "@types/pg": "^8.15.5"
+    "vitest": "^5.1.0"
   }
 }

@@ -1,35 +1,33 @@
 import { spawnSync } from "node:child_process";
+import { randomBytes } from "node:crypto";
 
-const betterAuthVersion = "1.7.17";
 const migrationUrl = process.env.AUTH_MIGRATION_DATABASE_URL;
 if (!migrationUrl) {
   throw new Error("AUTH_MIGRATION_DATABASE_URL is required. Never run Better Auth migrations with a runtime database role.");
 }
 
-// The Better Auth core npm release currently leads its separate CLI package.
-// Require an exact CLI/library version match instead of quietly applying an
-// older schema and hoping it is compatible.
 const isWindows = process.platform === "win32";
-const npmCommand = isWindows ? "npm.cmd" : "npm";
-const registryCheck = spawnSync(
-  npmCommand,
-  ["view", `auth@${betterAuthVersion}`, "version"],
-  { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], shell: isWindows },
-);
-if (registryCheck.status !== 0 || registryCheck.stdout.trim() !== betterAuthVersion) {
-  throw new Error(
-    `The matching Better Auth CLI auth@${betterAuthVersion} is not available in the npm registry yet. ` +
-    "Do not run an older CLI against a newer Better Auth runtime. Retry this command once the matching CLI release is published.",
-  );
-}
-
 const command = isWindows ? "pnpm.cmd" : "pnpm";
 const result = spawnSync(
   command,
-  ["dlx", `auth@${betterAuthVersion}`, "migrate", "--yes", "--config", "./src/server.ts"],
+  ["exec", "auth", "migrate", "--yes", "--config", "./src/server.ts"],
   {
     cwd: process.cwd(),
-    env: { ...process.env, AUTH_DATABASE_URL: migrationUrl },
+    env: {
+      ...process.env,
+      AUTH_DATABASE_URL: migrationUrl,
+      // The CLI imports the application auth configuration to discover its
+      // plugins/schema. Keep that import isolated from runtime credentials and
+      // make every pool point at the same migration-only database role. Hooks
+      // are registered during schema discovery; the CLI does not serve requests
+      // or invoke those hooks.
+      TENANT_RESOLVER_DATABASE_URL: migrationUrl,
+      TENANT_PROVISIONER_DATABASE_URL: migrationUrl,
+      NOTIFICATION_ENQUEUER_DATABASE_URL: migrationUrl,
+      NOTIFICATION_ENCRYPTION_KEY: randomBytes(32).toString("base64"),
+      BETTER_AUTH_URL: "http://localhost:4000",
+      BETTER_AUTH_SECRET: randomBytes(32).toString("base64"),
+    },
     stdio: "inherit",
     shell: isWindows,
   },

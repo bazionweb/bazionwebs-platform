@@ -120,6 +120,7 @@ services:
     environment:
       NODE_ENV: production
       MIGRATION_DATABASE_URL: postgres://bazion_migrator:${BAZION_MIGRATOR_PASSWORD:?Set BAZION_MIGRATOR_PASSWORD}@db:5432/bazion_platform
+      AUTH_MIGRATION_DATABASE_URL: postgres://bazion_migrator:${BAZION_MIGRATOR_PASSWORD:?Set BAZION_MIGRATOR_PASSWORD}@db:5432/bazion_platform
     depends_on:
       db:
         condition: service_healthy

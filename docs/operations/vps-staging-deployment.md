@@ -51,7 +51,7 @@ References: [Next.js production checklist](https://nextjs.org/docs/app/guides/pr
 
 ## Guided Dokploy setup
 
-The release Compose file is [`deploy/dokploy/platform-staging.compose.yml`](../../deploy/dokploy/platform-staging.compose.yml). It deploys Platform PostgreSQL, a migration job, API, admin, storefront, commercial status worker, and notification worker. Images are pulled from GHCR; the VPS does not build images. The Platform database is private to the migration/API/workers network, while the UI services cannot resolve or connect to the database. No container port is published on the VPS.
+The release Compose file is [`deploy/dokploy/platform-staging.compose.yml`](../../deploy/dokploy/platform-staging.compose.yml). It deploys Platform PostgreSQL, a migration job, API, admin, storefront, commercial status worker, and notification worker. The one-shot migration target applies both the application schema and the Better Auth schema using the same least-privilege migrator role; the Better Auth CLI is pinned in the workspace lockfile, so deployment does not download tools at runtime. Images are pulled from GHCR; the VPS does not build images. The Platform database is private to the migration/API/workers network, while the UI services cannot resolve or connect to the database. No container port is published on the VPS.
 
 ### 1. Confirm the staging names
 
@@ -113,7 +113,7 @@ Do not add public domains to `db`, `migrate`, `status-worker`, or `notification-
 
 ### 6. Deploy and bootstrap
 
-Deploy the selected commit-addressed SHA with `COMPOSE_PROFILES` unset. The first deployment initializes the named Postgres volume and applies migrations once. The API and workers start after migration success, and the UIs start after the API health check passes. Wait for all long-running services to show healthy/running; a failed `migrate` service blocks API startup by design. Use Dokploy service logs to diagnose it; never publish database port 5432 to troubleshoot.
+Deploy the selected commit-addressed SHA with `COMPOSE_PROFILES` unset. The first deployment initializes the named Postgres volume and applies the application and Better Auth migrations once. The API and workers start after both migration steps succeed, and the UIs start after the API health check passes. Wait for all long-running services to show healthy/running; a failed `migrate` service blocks API startup by design. Use Dokploy service logs to diagnose it; never publish database port 5432 to troubleshoot.
 
 The first release intentionally keeps `COMMERCIAL_PROVISIONING_ENABLED=false`, the saga worker disabled, and Dokploy hosting mutations disabled. Create an account through the admin sign-up flow and verify its email. In the Dokploy Environment tab, temporarily set `COMPOSE_PROFILES=operator-bootstrap`, `PLATFORM_ADMIN_EMAIL`, and `PLATFORM_ADMIN_CONFIRM_EMAIL` to that same verified address, then redeploy. Confirm the `platform-owner-bootstrap` one-shot service exits successfully in its logs. Immediately remove `COMPOSE_PROFILES` and both email variables, then redeploy to leave the bootstrap service inactive. This command only grants the role to an existing verified account; it does not create or change a password. Create a new empty staging tenant, bind `church-staging.bazionweb.com` to it, and run the website-launch pilot only after Bazionweb staging is deployed and the signed callback round-trip is tested. Do not copy live church member data into staging.
 
