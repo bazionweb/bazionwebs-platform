@@ -11,15 +11,16 @@
     "test": "vitest run lib --fsModuleCachePath .vitest-cache"
   },
   "dependencies": {
-    "next": "16.4.5",
-    "react": "^19.2.0",
-    "react-dom": "^19.2.0",
     "@bazion/api-contracts": "workspace:*",
+    "@bazion/auth": "workspace:*",
     "@bazion/church-ministry-contracts": "workspace:*",
     "@bazion/church-ministry-domain": "workspace:*",
     "@bazion/church-ministry-template": "workspace:*",
-    "@bazion/auth": "workspace:*",
-    "@bazion/ui": "workspace:*"
+    "@bazion/ui": "workspace:*",
+    "next": "16.4.5",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "swiper": "^14.4.0"
   },
   "devDependencies": {
     "@types/node": "^26.6.6",

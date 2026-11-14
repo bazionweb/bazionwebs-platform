@@ -1,17 +1,10 @@
 "use client";
 
-import { useState } from "react";
-import {
-  ChurchNav,
-  ChurchFooter,
-  PageHero,
-  Container,
-  Section,
-  Grid,
-  SelectField,
-  TextAreaField,
-  TextField,
-} from "@bazion/ui";
+import { useState, type FormEvent } from "react";
+import Link from "next/link";
+import { PageHero } from "../../components/gmfc/PageHero";
+import { SiteChrome } from "../../components/gmfc/SiteChrome";
+import { getClientTenantHeaders } from "../../lib/client-tenant";
 import { useMinistrySite } from "../../lib/use-ministry-site";
 
 export default function ContactPage() {
@@ -23,284 +16,328 @@ export default function ContactPage() {
   const [phone, setPhone] = useState("");
   const [subject, setSubject] = useState("");
   const [message, setMessage] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [privacyConsent, setPrivacyConsent] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [submissionError, setSubmissionError] = useState("");
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const isPrayerRequest = category === "Prayer Request";
+  const ministryLabel = site.ministryName || "Global Mission Fellowship Church";
+
+  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setSubmissionError("");
-    setIsSubmitting(true);
-    try {
-      const isPrayer = category === "Prayer Request";
-      const endpoint = isPrayer ? "/v1/public/church/prayer-requests" : "/v1/public/church/contact";
-      const payload = isPrayer
-        ? { fullName: name, email: email.trim() || undefined, telephone: phone.trim() || undefined, requestText: message, privacyPreference: "confidential", privacyConsent: true }
-        : { fullName: name, email, telephone: phone, subject, message, category, privacyConsent: true };
 
-      const response = await fetch(endpoint, {
+    if (!privacyConsent) {
+      setSubmissionError(
+        isPrayerRequest
+          ? "Please confirm that you agree to share this prayer request with authorized prayer staff."
+          : "Please confirm that you agree to the privacy notice before sending your message.",
+      );
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      const endpoint = isPrayerRequest ? "/v1/public/church/prayer-requests" : "/v1/public/church/contact";
+      const bodyPayload = isPrayerRequest
+        ? {
+            fullName: name.trim(),
+            email: email.trim() || undefined,
+            telephone: phone.trim() || undefined,
+            requestText: message.trim(),
+            privacyPreference: "confidential" as const,
+            privacyConsent: true,
+          }
+        : {
+            fullName: name.trim(),
+            email: email.trim(),
+            telephone: phone.trim(),
+            subject: subject.trim(),
+            message: message.trim(),
+            category,
+            privacyConsent: true,
+          };
+
+      const res = await fetch(endpoint, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        headers: { "Content-Type": "application/json", ...getClientTenantHeaders() },
+        body: JSON.stringify(bodyPayload),
       });
-      const result = await response.json().catch(() => null);
-      if (!response.ok || result?.success !== true) {
-        throw new Error(typeof result?.message === "string" ? result.message : "Your message could not be submitted. Please try again.");
+
+      const payload = (await res.json().catch(() => null)) as { error?: string; message?: string } | null;
+      if (!res.ok) {
+        throw new Error(payload?.error ?? payload?.message ?? "Something went wrong. Please try again.");
       }
+
       setSubmitted(true);
-    } catch (reason) {
-      setSubmissionError(reason instanceof Error ? reason.message : "Your message could not be submitted. Please try again.");
+      setName("");
+      setEmail("");
+      setPhone("");
+      setSubject("");
+      setMessage("");
+      setPrivacyConsent(false);
+    } catch (err) {
+      setSubmissionError(err instanceof Error ? err.message : "Network error. Please check your connection and try again.");
     } finally {
       setIsSubmitting(false);
     }
-  };
+  }
 
   return (
-    <>
-      <ChurchNav
-        ministryName={site.ministryName}
-        logoUrl={site.branding.logoUrl}
-        links={site.navigation}
-        currentPath="/contact"
-        giveHref={site.pages.some((page) => page.id === "giving" && page.enabled) ? "/give" : null}
-      />
-
+    <SiteChrome currentPath="/contact">
       <main id="main-content">
-        {/* 1. Page Hero */}
         <PageHero
-          eyebrow="COMMUNICATION & PRAYER"
-          title="Get in Touch with"
-          highlightedTitle="Our Ministry"
-          subtitle="Have a question, prayer request, testimony, or want to invite us for a mission? We would love to hear from you."
-          bgImageUrl={site.branding.heroBgUrl}
+          eyebrow="Connect With Us"
+          title="Get in Touch"
+          subtitle="We would love to hear from you. Send us a message, a prayer request, or an inquiry."
         />
 
-        {/* 2. Contact Details & Form */}
-        <Section>
-          <Container>
-            <Grid columns="two" style={{ alignItems: "start", gap: "32px" }}>
-              {/* Left Column: Verified Information */}
-              <div>
-                <span className="ch-eyebrow">Direct Contacts</span>
-                <h2 className="ch-title">We Are Here to Serve You</h2>
-                <p className="ch-subtitle" style={{ marginBottom: "32px" }}>
-                  Reach out to our leadership, administrative secretariat, or pastoral team through
-                  the verified channels below.
-                </p>
+        <section className="gmfci-contact-wrap">
+          <div className="gmfci-contact-inner">
+            <div>
+              <h2 className="gmfci-contact-heading">Reach Out Anytime</h2>
+              <p className="gmfci-contact-intro">
+                Whether you have a prayer request, want to learn more about our ministries, or feel called to partner
+                with {ministryLabel} in evangelism and church planting, our team is ready to connect with you.
+              </p>
 
-                <div style={{ display: "grid", gap: "20px" }}>
-                  {site.contact.phones.length > 0 && <div
-                    style={{
-                      background: "var(--church-bg-alt)",
-                      padding: "20px",
-                      borderRadius: "var(--church-radius)",
-                      border: "1px solid var(--church-border)",
-                    }}
-                  >
-                    <div style={{ fontSize: "12px", fontWeight: 700, color: "var(--church-accent)", textTransform: "uppercase" }}>
-                      Telephone & Hotlines
+              <div className="gmfci-contact-cards">
+                {site.contact.phones.length > 0 && (
+                  <div className="gmfci-contact-card">
+                    <div className="gmfci-contact-card-icon phone">📞</div>
+                    <div>
+                      <h4>Call Us</h4>
+                      <p>
+                        {site.contact.phones.map((phoneNumber, idx) => (
+                          <span key={phoneNumber}>
+                            {idx > 0 && <br />}
+                            <a href={`tel:${phoneNumber.replace(/\s+/g, "")}`}>{phoneNumber}</a>
+                          </span>
+                        ))}
+                      </p>
                     </div>
-                    {site.contact.phones.map((phone) => (
-                      <div key={phone} style={{ fontSize: "16px", fontWeight: 600, marginTop: "6px" }}>
-                        📞 <a href={`tel:${phone}`} style={{ color: "var(--church-primary)", textDecoration: "none" }}>{phone}</a>
-                      </div>
-                    ))}
-                  </div>}
-
-                  {site.contact.email && <div
-                    style={{
-                      background: "var(--church-bg-alt)",
-                      padding: "20px",
-                      borderRadius: "var(--church-radius)",
-                      border: "1px solid var(--church-border)",
-                    }}
-                  >
-                    <div style={{ fontSize: "12px", fontWeight: 700, color: "var(--church-accent)", textTransform: "uppercase" }}>
-                      Email Address
-                    </div>
-                    <div style={{ fontSize: "16px", fontWeight: 600, marginTop: "6px" }}>
-                      ✉️ <a href={`mailto:${site.contact.email}`} style={{ color: "var(--church-primary)", textDecoration: "none" }}>
-                        {site.contact.email}
-                      </a>
-                    </div>
-                  </div>}
-
-                  {site.contact.address && <div
-                    style={{
-                      background: "var(--church-bg-alt)",
-                      padding: "20px",
-                      borderRadius: "var(--church-radius)",
-                      border: "1px solid var(--church-border)",
-                    }}
-                  >
-                    <div style={{ fontSize: "12px", fontWeight: 700, color: "var(--church-accent)", textTransform: "uppercase" }}>
-                      Postal & Physical Address
-                    </div>
-                    <div style={{ fontSize: "15px", color: "var(--church-text)", marginTop: "6px" }}>
-                      📍 {site.contact.address}
-                    </div>
-                  </div>}
-
-                  {/* Direct WhatsApp Action */}
-                  {site.social.whatsapp && <a
-                    href={site.social.whatsapp}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="ch-btn ch-btn-accent"
-                    style={{ padding: "16px", fontSize: "16px", justifyContent: "center" }}
-                  >
-                    Chat With Us on WhatsApp 💬
-                  </a>}
-                  {!site.contact.phones.length && !site.contact.email && !site.contact.address && !site.social.whatsapp && <p>Direct contact details have not been published yet. Use the message form and the ministry team will receive your enquiry.</p>}
-                </div>
-              </div>
-
-              {/* Right Column: Contact & Prayer Request Form */}
-              <div
-                style={{
-                  background: "#ffffff",
-                  padding: "36px",
-                  borderRadius: "var(--church-radius-lg)",
-                  border: "1px solid var(--church-border)",
-                  boxShadow: "var(--church-shadow)",
-                }}
-              >
-                {submitted ? (
-                  <div style={{ textAlign: "center", padding: "40px 0" }}>
-                    <div style={{ fontSize: "52px", marginBottom: "16px" }}>🕊️</div>
-                    <h3 style={{ fontSize: "22px", color: "var(--church-primary)", marginBottom: "8px" }}>
-                      Thank You!
-                    </h3>
-                    <p style={{ fontSize: "15px", color: "var(--church-text-muted)", lineHeight: 1.6 }}>
-                      {category === "Prayer Request"
-                        ? "Your request has been received and will be available to authorized ministry prayer staff."
-                        : "Your message has been received by the ministry team."}
-                    </p>
-                    <button
-                      type="button"
-                      className="ch-btn ch-btn-outline"
-                      style={{ marginTop: "20px" }}
-                      onClick={() => { setSubmitted(false); setPrivacyConsent(false); }}
-                    >
-                      Send Another Message
-                    </button>
                   </div>
-                ) : (
-                  <form
-                    onSubmit={handleSubmit}
-                    style={{ display: "grid", gap: "16px" }}
+                )}
+
+                {site.contact.email && (
+                  <div className="gmfci-contact-card">
+                    <div className="gmfci-contact-card-icon email">✉️</div>
+                    <div>
+                      <h4>Email Us</h4>
+                      <p>
+                        <a href={`mailto:${site.contact.email}`}>{site.contact.email}</a>
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {site.contact.address && (
+                  <div className="gmfci-contact-card">
+                    <div className="gmfci-contact-card-icon address">📍</div>
+                    <div>
+                      <h4>Postal Address</h4>
+                      <p>{site.contact.address}</p>
+                    </div>
+                  </div>
+                )}
+
+                {(site.social.facebook || site.social.youtube || site.social.instagram || site.social.whatsapp) && (
+                  <div className="gmfci-contact-card">
+                    <div className="gmfci-contact-card-icon social">🌐</div>
+                    <div>
+                      <h4>Follow Us</h4>
+                      <div className="gmfci-contact-social">
+                        {site.social.facebook && (
+                          <a href={site.social.facebook} target="_blank" rel="noopener noreferrer" className="fb" title="Facebook" aria-label="Facebook">
+                            f
+                          </a>
+                        )}
+                        {site.social.youtube && (
+                          <a href={site.social.youtube} target="_blank" rel="noopener noreferrer" className="yt" title="YouTube" aria-label="YouTube">
+                            ▶
+                          </a>
+                        )}
+                        {site.social.instagram && (
+                          <a href={site.social.instagram} target="_blank" rel="noopener noreferrer" className="ig" title="Instagram" aria-label="Instagram">
+                            📷
+                          </a>
+                        )}
+                        {site.social.whatsapp && (
+                          <a href={site.social.whatsapp} target="_blank" rel="noopener noreferrer" className="wa" title="WhatsApp" aria-label="WhatsApp">
+                            💬
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {!site.contact.phones.length && !site.contact.email && !site.contact.address && (
+                  <p className="gmfci-contact-intro" style={{ marginBottom: 0 }}>
+                    Direct contact details have not been published yet. Use the message form and the ministry team will receive your enquiry.
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="gmfci-form-wrap">
+              <h3>{isPrayerRequest ? "Share a Prayer Request" : "Send Us a Message"}</h3>
+              <p className="form-subtitle">
+                {isPrayerRequest
+                  ? "Your prayer request will be received confidentially by authorized ministry prayer staff."
+                  : "Fill out the form below and we will respond as soon as possible."}
+              </p>
+
+              {submitted && (
+                <div className="gmfci-form-message success" role="status">
+                  {isPrayerRequest
+                    ? "Thank you! Your confidential prayer request has been received by our ministry prayer team."
+                    : "Thank you for reaching out! Your message has been received and our team will respond shortly."}
+                </div>
+              )}
+
+              {submissionError && (
+                <div className="gmfci-form-message error" role="alert">
+                  {submissionError}
+                </div>
+              )}
+
+              <form onSubmit={handleSubmit}>
+                <div className="gmfci-form-group">
+                  <label htmlFor="gmfci-category">Message Type *</label>
+                  <select
+                    id="gmfci-category"
+                    value={category}
+                    onChange={(e) => {
+                      setCategory(e.target.value);
+                      setSubmitted(false);
+                      setPrivacyConsent(false);
+                      setSubmissionError("");
+                    }}
                   >
-                    <span className="ch-eyebrow">Send a Message</span>
-                    <h3 style={{ fontSize: "22px", margin: "4px 0 12px 0", color: "var(--church-primary)" }}>
-                      How Can We Help or Pray With You?
-                    </h3>
+                    <option value="General Enquiry">General Enquiry</option>
+                    <option value="Prayer Request">Prayer Request (Confidential)</option>
+                    <option value="Partnership">Ministry Partnership</option>
+                    <option value="Event Enquiry">Event / Conference Enquiry</option>
+                    <option value="Testimony">Share a Testimony</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
 
-                    <SelectField
-                      id="contact-category"
-                      label="Category"
-                      required
-                      value={category}
-                      onChange={(e) => { setCategory(e.target.value); setPrivacyConsent(false); setSubmissionError(""); }}
-                    >
-                        <option value="General Enquiry">General Enquiry</option>
-                        <option value="Prayer Request">Prayer Request (Confidential)</option>
-                        <option value="Partnership">Ministry Partnership</option>
-                        <option value="Event Enquiry">Event / Conference Enquiry</option>
-                        <option value="Testimony">Share a Testimony</option>
-                        <option value="Other">Other</option>
-                    </SelectField>
-
-                    {submissionError && <p className="ch-form-error" role="alert">{submissionError}</p>}
-
-                    <TextField
-                      id="contact-name"
-                      label="Full Name"
+                <div className="gmfci-form-row">
+                  <div className="gmfci-form-group">
+                    <label htmlFor="gmfci-name">Full Name *</label>
+                    <input
                       type="text"
+                      id="gmfci-name"
                       required
                       minLength={2}
                       maxLength={160}
+                      placeholder="Your full name"
                       value={name}
                       onChange={(e) => setName(e.target.value)}
-                      placeholder="e.g. John Doe"
                     />
-
-                    <label style={{ display: "flex", alignItems: "flex-start", gap: 10, fontSize: 13, lineHeight: 1.6 }}>
-                      <input type="checkbox" required checked={privacyConsent} onChange={(event) => setPrivacyConsent(event.target.checked)} style={{ marginTop: 3, minWidth: 18, minHeight: 18 }} />
-                      <span>{category === "Prayer Request"
-                        ? "I agree to share this prayer request with authorized ministry prayer staff."
-                        : "I agree that the ministry may use these details to respond to my enquiry."} Read the <a href="/privacy">privacy notice</a>.</span>
+                  </div>
+                  <div className="gmfci-form-group">
+                    <label htmlFor="gmfci-email">
+                      {isPrayerRequest ? "Email Address (optional)" : "Email Address *"}
                     </label>
-
-                    <Grid columns="two" style={{ gap: "12px" }}>
-                      <TextField
-                        id="contact-email"
-                        label={category === "Prayer Request" ? "Email Address (optional)" : "Email Address"}
-                        type="email"
-                        required={category !== "Prayer Request"}
-                        maxLength={254}
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        placeholder="e.g. john@example.com"
-                      />
-                      <TextField
-                        id="contact-phone"
-                        label="Telephone"
-                        type="tel"
-                        value={phone}
-                        onChange={(e) => setPhone(e.target.value)}
-                        placeholder="e.g. +254 712 345 678"
-                      />
-                    </Grid>
-
-                    {category !== "Prayer Request" && <TextField
-                      id="contact-subject"
-                      label="Subject"
-                      type="text"
-                      required
-                      minLength={2}
-                      maxLength={200}
-                      value={subject}
-                      onChange={(e) => setSubject(e.target.value)}
-                      placeholder="Brief summary of your message..."
-                    />}
-
-                    <TextAreaField
-                      id="contact-message"
-                      label={category === "Prayer Request" ? "Your Prayer Request" : "Message"}
-                      required
-                      minLength={10}
-                      maxLength={5000}
-                      rows={5}
-                      value={message}
-                      onChange={(e) => setMessage(e.target.value)}
-                      placeholder={category === "Prayer Request"
-                        ? "Please write your prayer need here. Our prayer team will lift you up before God..."
-                        : "Write your message here..."}
+                    <input
+                      type="email"
+                      id="gmfci-email"
+                      required={!isPrayerRequest}
+                      maxLength={254}
+                      placeholder="you@example.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
                     />
+                  </div>
+                </div>
 
-                    <button
-                      type="submit"
-                      disabled={isSubmitting}
-                      className="ch-btn ch-btn-primary"
-                      style={{ marginTop: "6px" }}
-                    >
-                      {isSubmitting ? "Sending..." : "Send Message"}
-                    </button>
-                  </form>
-                )}
-              </div>
-            </Grid>
-          </Container>
-        </Section>
+                <div className={isPrayerRequest ? undefined : "gmfci-form-row"}>
+                  <div className="gmfci-form-group">
+                    <label htmlFor="gmfci-phone">Phone Number</label>
+                    <input
+                      type="tel"
+                      id="gmfci-phone"
+                      placeholder="+254 700 000 000"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                    />
+                  </div>
+                  {!isPrayerRequest && (
+                    <div className="gmfci-form-group">
+                      <label htmlFor="gmfci-subject">Subject *</label>
+                      <input
+                        type="text"
+                        id="gmfci-subject"
+                        required
+                        minLength={2}
+                        maxLength={200}
+                        placeholder="How can we help?"
+                        value={subject}
+                        onChange={(e) => setSubject(e.target.value)}
+                      />
+                    </div>
+                  )}
+                </div>
+
+                <div className="gmfci-form-group">
+                  <label htmlFor="gmfci-message">{isPrayerRequest ? "Your Prayer Request *" : "Your Message *"}</label>
+                  <textarea
+                    id="gmfci-message"
+                    required
+                    minLength={10}
+                    maxLength={5000}
+                    placeholder={
+                      isPrayerRequest
+                        ? "Share your prayer need here. Our prayer team will stand with you..."
+                        : "Write your message or prayer request here..."
+                    }
+                    value={message}
+                    onChange={(e) => setMessage(e.target.value)}
+                  />
+                </div>
+
+                <label
+                  style={{
+                    display: "flex",
+                    alignItems: "flex-start",
+                    gap: 10,
+                    fontSize: "0.875rem",
+                    lineHeight: 1.55,
+                    color: "#4B5563",
+                    marginBottom: 20,
+                    cursor: "pointer",
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    required
+                    checked={privacyConsent}
+                    onChange={(e) => setPrivacyConsent(e.target.checked)}
+                    style={{ marginTop: 3, width: 18, minWidth: 18, height: 18 }}
+                  />
+                  <span>
+                    {isPrayerRequest
+                      ? "I agree to share this prayer request confidentially with authorized ministry prayer staff. "
+                      : "I agree that the ministry may use these details to respond to my enquiry. "}
+                    <Link href="/privacy" style={{ color: "#6B1A18", fontWeight: 600 }}>
+                      Read the privacy notice
+                    </Link>
+                    .
+                  </span>
+                </label>
+
+                <button type="submit" className="gmfci-form-submit" disabled={isSubmitting}>
+                  {isSubmitting ? "Sending..." : isPrayerRequest ? "Send Prayer Request" : "Send Message →"}
+                </button>
+              </form>
+            </div>
+          </div>
+        </section>
       </main>
-
-      <ChurchFooter
-        ministryName={site.ministryName}
-        tagline={site.tagline}
-        phoneNumbers={site.contact.phones}
-        email={site.contact.email}
-        address={site.contact.address}
-      />
-    </>
+    </SiteChrome>
   );
 }

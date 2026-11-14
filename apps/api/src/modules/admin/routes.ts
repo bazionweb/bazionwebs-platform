@@ -12,6 +12,7 @@ import { isTenantModuleEnabled } from "../../lib/tenant-modules.js";
 import { getPlatformModule, platformModuleCatalog } from "./module-catalog.js";
 import { verifyTenantDomainTxt } from "./domain-verification.js";
 import { troubleshootingRoutes } from "./troubleshooting-routes.js";
+import { websiteOnboardingRoutes } from "./website-onboarding-routes.js";
 
 const auditWriter = new PostgresAuditEventWriter(pool);
 
@@ -85,6 +86,7 @@ async function requirePermission(
 
 export async function adminRoutes(app: FastifyInstance): Promise<void> {
   await troubleshootingRoutes(app);
+  await websiteOnboardingRoutes(app);
 
   app.get("/admin/tenant/modules", async (request, reply) => {
     const context = await requireActiveTenantPermission(request.headers, { store: ["read"] });

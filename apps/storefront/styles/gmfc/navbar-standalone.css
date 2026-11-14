@@ -1,0 +1,295 @@
+/* ==========================================================================
+   NAVBAR STANDALONE — Clean version for Next.js (no Enfold overrides needed)
+   Uses the same design tokens from navbar.css
+   ========================================================================== */
+
+/* ── Design tokens (same as navbar.css) ──────────────────────────────────── */
+:root {
+    --gmfci-cream:          #F8F1E5;
+    --gmfci-cream-2:        #FBF6EC;
+    --gmfci-maroon:         #6B1A18;
+    --gmfci-maroon-deep:    #4A1110;
+    --gmfci-orange:         #E47A2B;
+    --gmfci-orange-soft:    #F0A058;
+    --gmfci-orange-deep:    #A85410;
+    --gmfci-blue:           #1A56DB;
+    --gmfci-blue-deep:      #143FA8;
+    --gmfci-ink:            #1A1612;
+    --gmfci-ink-soft:       #4A413A;
+    --gmfci-rule:           rgba(26, 22, 18, 0.10);
+    --gmfci-ease:           cubic-bezier(.2, .8, .2, 1);
+}
+
+/* ── Utility Bar ─────────────────────────────────────────────────────────── */
+.gmfci-utility-nav {
+    display: block;
+    background: var(--color-maroon);
+    color: rgba(255, 255, 255, 0.85);
+    font-size: 12.5px;
+    font-family: 'Inter', system-ui, sans-serif;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.gmfci-utility-nav__inner {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 0 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.gmfci-utility-nav__left {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+}
+
+.gmfci-util-label {
+    color: rgba(255, 255, 255, 0.45);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    white-space: nowrap;
+}
+
+.gmfci-utility-nav__right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.gmfci-util-social {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    color: rgba(255, 255, 255, 0.75);
+    text-decoration: none;
+    border-radius: 6px;
+    transition: background 0.18s ease, color 0.18s ease;
+}
+
+.gmfci-util-social svg {
+    width: 15px;
+    height: 15px;
+}
+
+.gmfci-util-social:hover {
+    background: rgba(255, 255, 255, 0.12);
+    color: #ffffff;
+}
+
+/* ── Main Site Header ────────────────────────────────────────────────────── */
+.gmfci-site-header {
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    background: rgba(248, 241, 229, 0.92);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.gmfci-header-inner {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 0 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 80px;
+}
+
+/* ── Logo / Brand ────────────────────────────────────────────────────────── */
+.gmfci-logo-link {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    text-decoration: none;
+    flex-shrink: 0;
+}
+
+.gmfci-logo-link img {
+    max-height: 56px;
+    width: auto;
+    object-fit: contain;
+}
+
+#gmfci-site-brand {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: center;
+    line-height: 1;
+    gap: 0;
+    margin: 0;
+    padding: 0;
+    width: fit-content;
+}
+
+.gmfci-brand-top {
+    font-family: var(--font-outfit), 'Segoe UI', sans-serif;
+    font-weight: 700;
+    font-size: 24px;
+    color: #1A1612;
+    letter-spacing: -0.02em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    line-height: 1;
+    margin: 0 0 3px 0;
+}
+
+.gmfci-brand-bottom {
+    font-family: var(--font-fraunces), 'Times New Roman', Georgia, serif;
+    font-weight: 500;
+    font-size: 12px;
+    color: #C0392B;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    line-height: 1.1;
+    margin: 0;
+}
+
+/* Visual separator */
+.gmfci-nav-separator {
+    display: block;
+    width: 1px;
+    height: 40px;
+    background: var(--gmfci-rule);
+    margin: 0 20px 0 auto;
+    flex-shrink: 0;
+}
+
+/* ── Navigation ──────────────────────────────────────────────────────────── */
+.gmfci-main-nav {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.gmfci-main-nav li a {
+    display: inline-flex;
+    align-items: center;
+    padding: 7px 12px;
+    border-radius: 999px;
+    font-family: 'Inter', system-ui, sans-serif;
+    font-weight: 500;
+    font-size: 13px;
+    color: var(--color-dark);
+    text-decoration: none;
+    white-space: nowrap;
+    transition: background 0.2s var(--gmfci-ease), color 0.2s var(--gmfci-ease);
+}
+
+.gmfci-main-nav li a:hover {
+    color: var(--color-maroon);
+}
+
+.gmfci-main-nav li.active a {
+    background: var(--color-maroon);
+    color: #ffffff;
+}
+
+/* Give button */
+.gmfci-main-nav li.nav-give a {
+    background: #F59E0B;
+    color: #111827;
+    font-weight: 700;
+    font-size: 14px;
+    padding: 10px 24px;
+    box-shadow: 0 4px 15px rgba(245, 158, 11, 0.2);
+    margin-left: 10px;
+}
+
+.gmfci-main-nav li.nav-give a:hover {
+    background: #D97706;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(245, 158, 11, 0.4);
+}
+
+/* ── Mobile hamburger ─────────────────────────────────────────────────────── */
+.gmfci-hamburger {
+    display: none;
+    flex-direction: column;
+    gap: 5px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 8px;
+}
+
+.gmfci-hamburger span {
+    display: block;
+    width: 24px;
+    height: 2px;
+    background: var(--color-dark);
+    border-radius: 2px;
+    transition: all 0.3s ease;
+}
+
+/* ── Responsive ──────────────────────────────────────────────────────────── */
+@media (max-width: 1024px) {
+    .gmfci-nav-separator { display: none; }
+
+    .gmfci-hamburger { display: flex; }
+
+    .gmfci-main-nav {
+        display: none;
+        position: absolute;
+        top: 100%;
+        right: 24px;
+        background: var(--gmfci-cream-2);
+        border: 1px solid var(--gmfci-rule);
+        border-radius: 14px;
+        padding: 8px;
+        box-shadow: 0 12px 40px rgba(0,0,0,0.08);
+        min-width: 220px;
+        flex-direction: column;
+        gap: 2px;
+        z-index: 999;
+    }
+
+    .gmfci-main-nav.open { display: flex; }
+
+    .gmfci-main-nav li a {
+        width: 100%;
+        padding: 10px 14px;
+        border-radius: 10px;
+    }
+
+    .gmfci-main-nav li.nav-give a {
+        background: transparent;
+        box-shadow: none;
+        margin-left: 0;
+        color: var(--color-dark);
+    }
+}
+
+@media (max-width: 768px) {
+    .gmfci-utility-nav__inner { padding: 0 12px; }
+    .gmfci-util-label { display: none; }
+    .gmfci-utility-nav { font-size: 11px; }
+    .gmfci-util-social { width: 26px; height: 26px; }
+    .gmfci-util-social svg { width: 13px; height: 13px; }
+
+    .gmfci-brand-top { font-size: 16px; }
+    .gmfci-brand-bottom { font-size: 10px; letter-spacing: 0.02em; }
+    .gmfci-header-inner { min-height: 64px; padding: 0 16px; }
+    .gmfci-logo-link img { max-height: 42px; }
+    .gmfci-logo-link { gap: 8px; }
+}
+
+@media (max-width: 480px) {
+    .gmfci-brand-top { font-size: 14px; }
+    .gmfci-brand-bottom { font-size: 9px; }
+    .gmfci-logo-link img { max-height: 36px; }
+    .gmfci-header-inner { min-height: 56px; gap: 6px; }
+}

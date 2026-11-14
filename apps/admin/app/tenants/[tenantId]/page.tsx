@@ -6,6 +6,10 @@ import { LifecycleActions } from "./lifecycle-actions";
 import { TenantControlPanel } from "./control-panel";
 import { TenantHostingPanel, type TenantHostingInventory } from "./hosting-panel";
 import { TenantInstallationsPanel, type TenantInstallationItem } from "./installations-panel";
+import {
+  TenantWebsiteOnboardingPanel,
+  type TenantWebsiteOnboardingData,
+} from "./website-onboarding-panel";
 
 type OwnerCandidate = { userId: string; name: string; email: string; emailVerified: boolean; roles: string[] };
 type ModuleItem = {
@@ -37,7 +41,7 @@ export default async function TenantDetail({ params }: { params: Promise<{ tenan
   if (!result.data) return <main className="detail-shell"><Link href="/">← Back to tenants</Link><section className="notice-card"><h1>Unable to load tenant</h1><p>Request failed with HTTP {result.status}. You may need platform tenant-read permission.</p></section></main>;
   const tenant = result.data.tenant;
 
-  const [owner, modules, settings, audit, usage, domains, hosting, installations] = await Promise.all([
+  const [owner, modules, settings, audit, usage, domains, hosting, installations, websiteOnboarding] = await Promise.all([
     platformFetch<{ currentOwners: OwnerCandidate[]; candidates: OwnerCandidate[]; total: number; limit: number; offset: number }>(
       `tenants/${encodeURIComponent(tenantId)}/owner-candidates?limit=50`,
     ),
@@ -50,6 +54,7 @@ export default async function TenantDetail({ params }: { params: Promise<{ tenan
     platformFetch<TenantDomains>(`tenants/${encodeURIComponent(tenantId)}/domains`),
     platformFetch<TenantHostingInventory>(`tenants/${encodeURIComponent(tenantId)}/hosting`),
     platformFetch<{ items: TenantInstallationItem[] }>(`tenants/${encodeURIComponent(tenantId)}/installations`),
+    platformFetch<TenantWebsiteOnboardingData>(`tenants/${encodeURIComponent(tenantId)}/website-onboarding`),
   ]);
 
   return <main className="detail-shell">
@@ -95,6 +100,13 @@ export default async function TenantDetail({ params }: { params: Promise<{ tenan
       tenantStatus={tenant.status}
       initial={hosting.data}
       status={hosting.status}
+    />
+    <TenantWebsiteOnboardingPanel
+      tenantId={tenant.id}
+      tenantName={tenant.name}
+      tenantStatus={tenant.status}
+      initial={websiteOnboarding.data}
+      status={websiteOnboarding.status}
     />
     <TenantInstallationsPanel
       tenantId={tenant.id}

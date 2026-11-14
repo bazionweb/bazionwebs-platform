@@ -3,7 +3,62 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Pool } from "pg";
 import { mapGlobalMissionEvents, type SourceEvent } from "../src/global-mission-migration.js";
-import { globalMissionConfig, sampleAssets } from "@bazion/church-ministry-template";
+import { globalMissionConfig } from "@bazion/church-ministry-template";
+
+const IMAGE_EXTENSIONS = new Set([".jpg", ".jpeg", ".png", ".webp", ".gif", ".avif"]);
+const NON_GALLERY_FILES = new Set([
+  "hero-bg.png",
+  "hero-bg-optimized.jpg",
+  "anthony-githui.jpeg",
+  "apostle-shadrach.jpeg",
+  "dr-young.jpg",
+  "pastor-betty.jpg",
+  "pastor-kamwaga.jpeg",
+  "rev-bishop.jpeg",
+  "camp.png",
+  "conference.png",
+]);
+
+function altFromFilename(filename: string): string {
+  const base = filename.replace(/\.[^.]+$/, "");
+  return (
+    base
+      .replace(/[-_]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+      .replace(/^./, (c) => c.toUpperCase()) || "Gallery photo"
+  );
+}
+
+async function discoverGalleryImages(repoRoot: string): Promise<Array<{ imageUrl: string; alt: string }>> {
+  const imagesDir = join(repoRoot, "apps/storefront/public/images/images");
+  const primaryEntries = await readdir(imagesDir, { withFileTypes: true }).catch(() => []);
+  const primaryImages = primaryEntries
+    .filter((entry) => {
+      if (!entry.isFile()) return false;
+      const ext = entry.name.slice(entry.name.lastIndexOf(".")).toLowerCase();
+      return IMAGE_EXTENSIONS.has(ext) && !NON_GALLERY_FILES.has(entry.name);
+    })
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .slice(0, 60)
+    .map((entry) => ({
+      imageUrl: `/images/images/${encodeURIComponent(entry.name)}`,
+      alt: altFromFilename(entry.name),
+    }));
+
+  if (primaryImages.length > 0) return primaryImages;
+
+  const fallbackDir = join(repoRoot, "apps/storefront/public/images/gallery");
+  const fallbackEntries = await readdir(fallbackDir, { withFileTypes: true }).catch(() => []);
+  return fallbackEntries
+    .filter((entry) => entry.isFile() && /\.(jpe?g|png|webp|avif)$/i.test(entry.name))
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .slice(0, 60)
+    .map((entry) => ({
+      imageUrl: `/images/gallery/${encodeURIComponent(entry.name)}`,
+      alt: altFromFilename(entry.name),
+    }));
+}
 
 const args = process.argv.slice(2);
 const apply = args.includes("--apply");
@@ -29,17 +84,9 @@ if (eventExport.source !== "global-mission-fc" || !Array.isArray(eventExport.eve
 }
 
 const { events: eventRows, skipped: skippedEvents } = mapGlobalMissionEvents(eventExport.events as SourceEvent[]);
+const galleryImages = await discoverGalleryImages(repoRoot);
 
 const { ministryName, tagline, branding, hero, contact, social, vision, mission, outreach } = globalMissionConfig;
-const galleryDirectory = join(repoRoot, "apps/storefront/public/images/gallery");
-const galleryEntries = await readdir(galleryDirectory, { withFileTypes: true }).catch(() => []);
-const galleryImages = galleryEntries
-  .filter((entry) => entry.isFile() && /\.(jpe?g|png|webp|avif)$/i.test(entry.name))
-  .sort((a, b) => a.name.localeCompare(b.name))
-  .map((entry) => ({
-    imageUrl: `/images/gallery/${encodeURIComponent(entry.name)}`,
-    alt: "Global Mission for Christ International ministry gallery photo",
-  }));
 const profile = {
   ministryName,
   tagline,
@@ -58,6 +105,8 @@ const settings = {
     accentColor: branding.accentColor,
     heroImageUrl: branding.heroBgUrl,
   },
+  navigation: globalMissionConfig.navigation,
+  pages: globalMissionConfig.pages,
   hero,
   serviceTimes: globalMissionConfig.serviceTimes,
   locations: globalMissionConfig.locations,
@@ -78,11 +127,13 @@ const settings = {
   metadata: globalMissionConfig.metadata,
 };
 
-console.log(`Previewing ${globalMissionConfig.ministryName} → tenant ${tenantId}`);
-console.log(`Site profile/settings: 1; valid public events: ${eventRows.length}; skipped events with incomplete identifiers/dates: ${skippedEvents}.`);
-console.log(`Target database: local PostgreSQL only; source contact messages, prayer requests, donations and subscribers are excluded.`);
+console.log(`Previewing clean-slate import for ${globalMissionConfig.ministryName} → tenant ${tenantId}`);
+console.log(
+  `Site profile/settings: 1; leaders: ${globalMissionConfig.leadership.length}; gallery images: ${galleryImages.length}; valid public events: ${eventRows.length}; skipped events: ${skippedEvents}.`,
+);
+console.log("Target database: local PostgreSQL only; existing GMFC tenant data will be deleted and replaced cleanly.");
 if (!apply) {
-  console.log("Dry run only. Add --apply to write the profile, public settings, and event records.");
+  console.log("Dry run only. Add --apply to reset and re-import GMFC.");
   process.exit(0);
 }
 if (!connectionString) throw new Error("MIGRATION_DATABASE_URL is required.");
@@ -140,79 +191,74 @@ try {
   );
 
   await client.query("SELECT set_config('app.tenant_id', $1, true)", [tenantId]);
+
+  // Clean-slate deletion of all existing GMFC tenant data (child tables before parent tables)
+  const deleteTables = [
+    "church_event_registrations",
+    "church_events",
+    "sermons",
+    "sermon_categories",
+    "church_group_memberships",
+    "church_small_groups",
+    "church_volunteer_applications",
+    "church_volunteer_teams",
+    "church_departments",
+    "church_inventory_asset_events",
+    "church_inventory_assets",
+    "church_payment_transactions",
+    "church_donations",
+    "donation_campaigns",
+    "church_contact_messages",
+    "church_prayer_requests",
+    "church_newsletter_subscribers",
+    "leadership_profiles",
+    "ministry_site_settings_versions",
+    "ministry_settings",
+    "ministry_profiles",
+  ] as const;
+
+  for (const table of deleteTables) {
+    await client.query(`DELETE FROM public.${table} WHERE tenant_id = $1`, [tenantId]);
+  }
+
   await client.query(
     `INSERT INTO public.ministry_profiles
        (tenant_id, ministry_name, logo_asset_url, description, vision, mission, outreach, address, email, telephone_numbers, social_links)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11::jsonb)
-     ON CONFLICT (tenant_id) DO UPDATE SET
-       ministry_name=EXCLUDED.ministry_name, logo_asset_url=EXCLUDED.logo_asset_url,
-       description=EXCLUDED.description, vision=EXCLUDED.vision, mission=EXCLUDED.mission,
-       outreach=EXCLUDED.outreach, address=EXCLUDED.address, email=EXCLUDED.email,
-       telephone_numbers=EXCLUDED.telephone_numbers, social_links=EXCLUDED.social_links, updated_at=now()`,
-    [tenantId, profile.ministryName, profile.logoUrl, profile.tagline, profile.vision, profile.mission,
-      profile.outreach, profile.contact.address, profile.contact.email, JSON.stringify(profile.contact.phones), JSON.stringify(profile.social)],
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11::jsonb)`,
+    [
+      tenantId,
+      profile.ministryName,
+      profile.logoUrl,
+      profile.tagline,
+      profile.vision,
+      profile.mission,
+      profile.outreach,
+      profile.contact.address,
+      profile.contact.email,
+      JSON.stringify(profile.contact.phones),
+      JSON.stringify(profile.social),
+    ],
   );
+
   await client.query(
     `INSERT INTO public.ministry_settings (tenant_id, setting_key, setting_value)
-     VALUES ($1, 'public_site', $2)
-     ON CONFLICT (tenant_id, setting_key) DO UPDATE SET setting_value=EXCLUDED.setting_value, updated_at=now()`,
+     VALUES ($1, 'public_site', $2)`,
     [tenantId, JSON.stringify(settings)],
   );
 
-  // Record initial published version in ministry_site_settings_versions
   await client.query(
     `INSERT INTO public.ministry_site_settings_versions
        (tenant_id, version_number, status, profile, settings, note, created_by, published_at, published_by)
-     VALUES ($1, 1, 'published', $2::jsonb, $3::jsonb, 'Initial GMFC baseline import', 'system:gmfc-baseline', now(), 'system:gmfc-baseline')
-     ON CONFLICT (tenant_id, version_number) DO NOTHING`,
+     VALUES ($1, 1, 'published', $2::jsonb, $3::jsonb, 'Initial GMFC live site import', 'system:gmfc-baseline', now(), 'system:gmfc-baseline')`,
     [tenantId, JSON.stringify(profile), JSON.stringify(settings)],
   );
 
-  // Seed departments into church_departments
-  for (const [idx, dept] of (globalMissionConfig.departments ?? []).entries()) {
-    const slug = dept.id || dept.name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+  for (const [displayOrder, leader] of globalMissionConfig.leadership.entries()) {
     await client.query(
-      `INSERT INTO public.church_departments
-         (tenant_id, name, slug, description, icon, leader_name, leader_role, meeting_schedule, contact_email, display_order, status)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'active')
-       ON CONFLICT (tenant_id, slug) DO NOTHING`,
-      [tenantId, dept.name, slug, dept.description, dept.icon ?? null, dept.leaderName ?? null, dept.leaderRole ?? null, dept.meetingSchedule ?? null, dept.contactEmail ?? null, idx],
-    );
-  }
-
-  // Seed small groups into church_small_groups
-  for (const grp of globalMissionConfig.groups ?? []) {
-    const slug = grp.id || grp.name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
-    await client.query(
-      `INSERT INTO public.church_small_groups
-         (tenant_id, name, slug, category, description, leader_name, meeting_schedule, public_location_label, accepting_members, status)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,true,'active')
-       ON CONFLICT (tenant_id, slug) DO NOTHING`,
-      [tenantId, grp.name, slug, grp.category, grp.description ?? null, grp.leaderName, grp.meetingSchedule, grp.locationOrVirtual],
-    );
-  }
-
-  // Seed volunteer teams into church_volunteer_teams
-  for (const vol of globalMissionConfig.volunteerTeams ?? []) {
-    const slug = vol.id || vol.title.toLowerCase().replace(/[^a-z0-9]+/g, "-");
-    await client.query(
-      `INSERT INTO public.church_volunteer_teams
-         (tenant_id, name, slug, description, requirements, coordinator_name, accepting_applications, status)
-       VALUES ($1,$2,$3,$4,$5,$6,true,'active')
-       ON CONFLICT (tenant_id, slug) DO NOTHING`,
-      [tenantId, vol.title, slug, vol.description, vol.requirements ?? null, vol.coordinatorName ?? null],
-    );
-  }
-
-  // Seed private equipment inventory into church_inventory_assets
-  for (const asset of sampleAssets) {
-    const assetTag = asset.id.toUpperCase();
-    await client.query(
-      `INSERT INTO public.church_inventory_assets
-         (tenant_id, name, asset_tag, category, location, condition, status, notes)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
-       ON CONFLICT (tenant_id, asset_tag) DO NOTHING`,
-      [tenantId, asset.name, assetTag, asset.category, asset.location, asset.condition, asset.status, asset.notes ?? null],
+      `INSERT INTO public.leadership_profiles
+         (tenant_id, name, position, biography, photo_url, display_order, status)
+       VALUES ($1,$2,$3,$4,$5,$6,'active')`,
+      [tenantId, leader.name, leader.role, leader.bio ?? null, leader.photoUrl ?? null, displayOrder],
     );
   }
 
@@ -221,14 +267,26 @@ try {
     const result = await client.query(
       `INSERT INTO public.church_events
          (tenant_id, title, slug, description, poster_url, venue, starts_at, ends_at, registration_enabled, status)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,false,$9)
-       ON CONFLICT (tenant_id, slug) DO NOTHING`,
-      [tenantId, event.title, event.slug, event.description, event.posterUrl, event.venue, event.startsAt, event.endsAt, event.status],
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,false,$9)`,
+      [
+        tenantId,
+        event.title,
+        event.slug,
+        event.description,
+        event.posterUrl,
+        event.venue,
+        event.startsAt,
+        event.endsAt,
+        event.status,
+      ],
     );
     insertedEvents += result.rowCount ?? 0;
   }
+
   await client.query("COMMIT");
-  console.log(`Migration applied. Tenant site settings saved; ${insertedEvents} new events inserted; existing same-slug events were preserved.`);
+  console.log(
+    `Clean-slate import applied: profile & public_site saved, ${globalMissionConfig.leadership.length} leaders inserted, ${galleryImages.length} gallery images stored, ${insertedEvents} events inserted.`,
+  );
 } catch (error) {
   await client.query("ROLLBACK");
   throw error;

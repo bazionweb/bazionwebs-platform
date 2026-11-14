@@ -1,283 +1,358 @@
 "use client";
 
-import {
-  ChurchNav,
-  ChurchFooter,
-  PageHero,
-  LeadershipCard,
-  ScriptureQuote,
-} from "@bazion/ui";
+import { useState } from "react";
+import { SiteChrome } from "../../components/gmfc/SiteChrome";
+import { PageHero } from "../../components/gmfc/PageHero";
 import { useMinistrySite } from "../../lib/use-ministry-site";
+
+const DEFAULT_DIRECTOR_MESSAGE =
+  "At Global Mission for Christ International, our heartbeat is to see lives transformed by the power of Jesus Christ and revival spread to the nations of the world. We are committed to raising men and women grounded in prayer, rooted in the Word of God, empowered by the Holy Spirit, passionate for righteousness, and dedicated to impacting their generation for Christ. As a ministry, we continue to reach communities through the Gospel, prayer gatherings, revival meetings, and acts of compassion — supporting the needy through medical and community outreach programs. May this ministry continue to inspire faith, ignite passion for God, and draw many into a deeper relationship with Christ. Together, let us shine His light and carry the message of hope to the world.";
+
+function cleanHandle(url: string | undefined, fallback: string): string {
+  if (!url) return fallback;
+  const match = url.match(/\/(@[^/?#]+|[^/?#]+)\/?$/);
+  if (!match?.[1]) return fallback;
+  return match[1].startsWith("@") ? match[1] : `@${match[1]}`;
+}
+
+function splitAboutHeroTitle(ministryName: string): { title: string; highlight: string } {
+  const trimmed = ministryName.trim();
+  if (!trimmed) {
+    return { title: "About Our", highlight: "Ministry" };
+  }
+  if (/^global mission for christ international$/i.test(trimmed)) {
+    return { title: "Global Mission For", highlight: "Christ International" };
+  }
+  const words = trimmed.split(/\s+/);
+  if (words.length === 1) {
+    return { title: "About", highlight: words[0] };
+  }
+  if (words.length <= 3) {
+    return { title: words[0], highlight: words.slice(1).join(" ") };
+  }
+  return {
+    title: words.slice(0, -2).join(" "),
+    highlight: words.slice(-2).join(" "),
+  };
+}
 
 export default function AboutPage() {
   const site = useMinistrySite();
-  const lead = site.leadership[0];
-  return (
-    <>
-      <ChurchNav
-        ministryName={site.ministryName}
-        logoUrl={site.branding.logoUrl}
-        links={site.navigation}
-        currentPath="/about"
-        giveHref={site.pages.some((page) => page.id === "giving" && page.enabled) ? "/give" : null}
-      />
+  const [leadershipLayout, setLeadershipLayout] = useState<"portrait" | "compact">("portrait");
 
+  const vmCards = [
+    {
+      icon: "🌍",
+      title: site.vision.title || "Vision",
+      body: site.vision.statement,
+      bg: "V",
+    },
+    {
+      icon: "⛪",
+      title: site.mission.title || "Mission",
+      body: site.mission.statement,
+      bg: "M",
+    },
+    {
+      icon: "🌱",
+      title: site.outreach.title || "Outreach",
+      body: site.outreach.statement,
+      bg: "O",
+    },
+  ].filter((c) => c.body.trim().length > 0);
+
+  const heroTitle = splitAboutHeroTitle(site.ministryName);
+  const director = site.leadership[0];
+  const directorName = director?.name || "";
+  const directorDisplay = directorName
+    ? /rev\.|pastor|bishop|apostle|dr\./i.test(directorName)
+      ? directorName
+      : `Rev. ${directorName}`
+    : "";
+  const directorImg = director?.photoUrl || "/images/anthony-githui.jpg";
+  const directorBody =
+    director?.bio?.trim() ||
+    (site.tenantSlug === "global-mission-fc"
+      ? DEFAULT_DIRECTOR_MESSAGE
+      : site.mission.statement || site.vision.statement);
+  const addressDisplay = site.contact.poBox || site.contact.address;
+  const twitterHandle = cleanHandle(site.social.twitter, "");
+  const youtubeHandle = cleanHandle(site.social.youtube, "");
+
+  return (
+    <SiteChrome currentPath="/about">
       <main id="main-content">
-        {/* 1. Page Hero */}
         <PageHero
-          eyebrow="ABOUT OUR MINISTRY"
-          title={`About ${site.ministryName}`}
-          highlightedTitle="Ministry"
-          subtitle={site.tagline}
-          bgImageUrl={site.branding.heroBgUrl}
+          eyebrow="Our Story & Purpose"
+          title={heroTitle.title}
+          titleHighlight={heroTitle.highlight}
+          subtitle={site.tagline || "Grounded in prayer, the Word of God, and community transformation."}
+          subtitleSecondLine={
+            site.tenantSlug === "global-mission-fc"
+              ? "From Kenya to the ends of the earth — Christ for Every Nation."
+              : undefined
+          }
         />
 
-        {/* 2. Ministry Introduction & Leadership Message */}
-        <section className="ch-section">
-          <div className="ch-container">
-            <div className="ch-grid-2" style={{ alignItems: "center" }}>
-              <div>
-                {lead?.photoUrl && <div className="ch-lead-portrait">
-                  <img src={lead.photoUrl} alt={lead.name} />
-                </div>}
+        <div className="gmfci-about-wrap">
+          {vmCards.length > 0 && (
+            <div className="gmfci-vm-section">
+              <p className="gmfci-section-label">What We Stand For</p>
+              <h2 className="gmfci-section-title">Our Vision &amp; Mission</h2>
+              <div className="gmfci-vm-grid">
+                {vmCards.map((c) => (
+                  <div key={c.title} className="gmfci-vm-card">
+                    <span className="gmfci-vm-icon">{c.icon}</span>
+                    <h3>{c.title}</h3>
+                    <p>{c.body}</p>
+                    <div className="vmcard-bg-text">{c.bg}</div>
+                  </div>
+                ))}
               </div>
-              <div>
-                <span className="ch-eyebrow">{lead ? "A Message from Ministry Leadership" : "Our story"}</span>
-                <h2 className="ch-title">{lead?.name || site.ministryName}</h2>
-                {lead?.role && <div style={{ fontSize: "14px", fontWeight: 700, color: "var(--church-accent)", marginBottom: "16px" }}>
-                  {lead.role}
-                </div>}
-                {lead?.bio && <blockquote
-                  style={{
-                    fontSize: "16px",
-                    lineHeight: 1.8,
-                    color: "var(--church-text)",
-                    fontStyle: "italic",
-                    margin: "0 0 20px 0",
-                    borderLeft: "4px solid var(--church-secondary)",
-                    paddingLeft: "16px",
-                  }}
-                >
-                  &ldquo;{lead.bio}&rdquo;
-                </blockquote>}
-                {lead && (
-                  <div className="ch-director-sig" style={{ marginBottom: "20px" }}>
-                    Grace and Peace,<br />
-                    {lead.name}
-                    <span>{lead.role}{site.ministryName ? ` · ${site.ministryName}` : ""}</span>
+            </div>
+          )}
+
+          {site.coreValues.length > 0 && (
+            <div className="gmfci-values-section">
+              <div className="gmfci-values-inner">
+                <p className="gmfci-section-label">What We Believe</p>
+                <h2 className="gmfci-section-title">Our Core Values</h2>
+                <div className="gmfci-values-list">
+                  {site.coreValues.map((cv) => (
+                    <div key={cv.title} className="gmfci-value-card">
+                      <div className="icon">{cv.icon || "✝️"}</div>
+                      <h3>{cv.title}</h3>
+                      <p>{cv.description}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {director && (
+            <div className="gmfci-director-section">
+              <div className="gmfci-director-grid">
+                <div className="gmfci-director-photo-wrap">
+                  <div className="gmfci-director-photo-frame">
+                    <img
+                      src={directorImg}
+                      alt={directorDisplay}
+                      style={{
+                        width: "300px",
+                        height: "400px",
+                        maxWidth: "100%",
+                        objectFit: "cover",
+                        borderRadius: "12px",
+                        display: "block",
+                      }}
+                    />
+                  </div>
+                </div>
+                <div className="gmfci-director-content">
+                  <div className="role-badge">✝ {director.role || "Director"}&apos;s Message</div>
+                  <h2>{directorDisplay}</h2>
+                  {directorBody && <p className="director-message">&ldquo;{directorBody}&rdquo;</p>}
+                  <div className="director-sig">
+                    Grace and Peace,
+                    <br />
+                    {directorDisplay}
+                    <span>
+                      {director.role || "Director"}, {site.ministryName}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {site.leadership.length > 0 && (
+            <section className="gmfci-leadership-section" aria-labelledby="leadership-heading">
+              <div className="gmfci-leadership-inner">
+                <div className="gmfci-leadership-header">
+                  <p className="gmfci-section-label">Servant Leaders</p>
+                  <h2 id="leadership-heading" className="gmfci-section-title" style={{ marginBottom: 14 }}>
+                    Our Leadership Team
+                  </h2>
+                  <p className="gmfci-leadership-subtitle">
+                    Dedicated men and women of God guiding {site.ministryName} in prayer, revival, and governance.
+                  </p>
+                  <div className="gmfci-layout-switcher" role="group" aria-label="Leadership layout style">
+                    <button
+                      type="button"
+                      className={`gmfci-layout-btn${leadershipLayout === "portrait" ? " active" : ""}`}
+                      aria-pressed={leadershipLayout === "portrait"}
+                      onClick={() => setLeadershipLayout("portrait")}
+                    >
+                      Portrait Cards
+                    </button>
+                    <button
+                      type="button"
+                      className={`gmfci-layout-btn${leadershipLayout === "compact" ? " active" : ""}`}
+                      aria-pressed={leadershipLayout === "compact"}
+                      onClick={() => setLeadershipLayout("compact")}
+                    >
+                      Classic View
+                    </button>
+                  </div>
+                </div>
+
+                {leadershipLayout === "portrait" ? (
+                  <div className="gmfci-leadership-grid">
+                    {site.leadership.map((leader) => {
+                      const isShadrach =
+                        /shadrach/i.test(leader.name) ||
+                        Boolean(leader.photoUrl?.includes("apostle-shadrach"));
+                      return (
+                        <article key={leader.id} className="gmfci-leader-card ch-card">
+                          <div className="gmfci-leader-media">
+                            <img
+                              src={leader.photoUrl || "/images/anthony-githui.jpg"}
+                              alt={leader.name}
+                              loading="lazy"
+                              style={isShadrach ? { objectPosition: "center 24%" } : undefined}
+                            />
+                            <span className="gmfci-leader-badge">{leader.role}</span>
+                          </div>
+                          <div className="gmfci-leader-body">
+                            <span className="gmfci-leader-divider" aria-hidden="true" />
+                            <h3 className="gmfci-leader-name">{leader.name}</h3>
+                            <div className="gmfci-leader-role">{leader.role}</div>
+                            <p className="gmfci-leader-ministry">{site.ministryName}</p>
+                          </div>
+                        </article>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="gmfci-bishops-grid">
+                    {site.leadership.map((leader) => {
+                      const isShadrach =
+                        /shadrach/i.test(leader.name) ||
+                        Boolean(leader.photoUrl?.includes("apostle-shadrach"));
+                      return (
+                        <article key={leader.id} className="gmfci-bishop-card gmfci-bishop-card--elevated ch-card">
+                          <div
+                            className="gmfci-bishop-avatar gmfci-bishop-avatar--lg"
+                            style={
+                              leader.photoUrl
+                                ? {
+                                    backgroundImage: `url(${leader.photoUrl})`,
+                                    ...(isShadrach ? { backgroundPosition: "center 24%" } : {}),
+                                  }
+                                : undefined
+                            }
+                          />
+                          <h4>{leader.name}</h4>
+                          <span className="gmfci-bishop-role-pill">{leader.role}</span>
+                        </article>
+                      );
+                    })}
                   </div>
                 )}
-                <p style={{ fontSize: "15px", lineHeight: 1.7, color: "var(--church-text-muted)" }}>
-                  {site.mission.statement || site.outreach.statement || "More information about this ministry will be shared here."}
-                </p>
+              </div>
+            </section>
+          )}
+
+          {/* Platform feature layered on top when statement of faith is configured */}
+          {site.statementOfFaith.length > 0 && (
+            <div className="gmfci-values-section">
+              <div className="gmfci-values-inner">
+                <p className="gmfci-section-label">Doctrine</p>
+                <h2 className="gmfci-section-title">Statement of Faith</h2>
+                <div className="gmfci-values-list">
+                  {site.statementOfFaith.map((item) => (
+                    <div key={item.topic} className="gmfci-value-card">
+                      <h3>{item.topic}</h3>
+                      <p>{item.belief}</p>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
-          </div>
-        </section>
+          )}
 
-        {/* 4. Vision & Mission Cards */}
-        <section className="ch-section">
-          <div className="ch-container">
-            <div className="ch-grid-3">
-              {site.vision.statement && <div className="ch-card">
-                <div className="ch-card-body">
-                  <span style={{ fontSize: "36px", marginBottom: "12px" }}>🌍</span>
-                  <h3 style={{ fontSize: "20px", fontWeight: 700, color: "var(--church-primary)", marginBottom: "8px" }}>
-                    {site.vision.title}
-                  </h3>
-                  <p style={{ fontSize: "15px", lineHeight: 1.6, color: "var(--church-text-muted)", margin: 0 }}>
-                    {site.vision.statement}
-                  </p>
-                </div>
-              </div>}
-
-              {site.mission.statement && <div className="ch-card">
-                <div className="ch-card-body">
-                  <span style={{ fontSize: "36px", marginBottom: "12px" }}>⛪</span>
-                  <h3 style={{ fontSize: "20px", fontWeight: 700, color: "var(--church-primary)", marginBottom: "8px" }}>
-                    {site.mission.title}
-                  </h3>
-                  <p style={{ fontSize: "15px", lineHeight: 1.6, color: "var(--church-text-muted)", margin: 0 }}>
-                    {site.mission.statement}
-                  </p>
-                </div>
-              </div>}
-
-              {site.outreach.statement && <div className="ch-card">
-                <div className="ch-card-body">
-                  <span style={{ fontSize: "36px", marginBottom: "12px" }}>🌱</span>
-                  <h3 style={{ fontSize: "20px", fontWeight: 700, color: "var(--church-primary)", marginBottom: "8px" }}>
-                    {site.outreach.title}
-                  </h3>
-                  <p style={{ fontSize: "15px", lineHeight: 1.6, color: "var(--church-text-muted)", margin: 0 }}>
-                    {site.outreach.statement}
-                  </p>
-                </div>
-              </div>}
-              {!site.vision.statement && !site.mission.statement && !site.outreach.statement && <p>Ministry profile information will appear here when published.</p>}
-            </div>
-          </div>
-        </section>
-
-        {/* 5. Core Values */}
-        {site.coreValues.length > 0 && <section className="ch-section ch-section-alt">
-          <div className="ch-container">
-            <div className="ch-heading-wrap">
-              <span className="ch-eyebrow">Pillars of Faith</span>
-              <h2 className="ch-title">Our Core Values</h2>
-              <p className="ch-subtitle">
-                The non-negotiable spiritual standards that guide our fellowship and ministry work.
-              </p>
-            </div>
-
-            <div className="ch-grid-3">
-              {site.coreValues.map((val) => (
-                <div key={val.title} className="ch-card">
-                  <div className="ch-card-body">
-                    {val.icon && <span aria-hidden="true" style={{ fontSize: "32px", marginBottom: "12px" }}>{val.icon}</span>}
-                    <h3 style={{ fontSize: "18px", fontWeight: 700, margin: "0 0 8px 0", color: "var(--church-primary)" }}>
-                      {val.title}
-                    </h3>
-                    <p style={{ fontSize: "14px", lineHeight: 1.6, color: "var(--church-text-muted)", margin: 0 }}>
-                      {val.description}
+          <div className="gmfci-about-contact">
+            <div className="gmfci-about-contact-inner">
+              {site.contact.phones.length > 0 && (
+                <div className="gmfci-contact-item">
+                  <div className="gmfci-contact-icon" aria-hidden="true">📞</div>
+                  <div>
+                    <h4>Phone</h4>
+                    <p>
+                      {site.contact.phones.map((phone, i) => (
+                        <span key={phone}>
+                          {i > 0 && <br />}
+                          <a href={`tel:${phone.replace(/\s+/g, "")}`}>{phone}</a>
+                        </span>
+                      ))}
                     </p>
                   </div>
                 </div>
-              ))}
-            </div>
-          </div>
-        </section>}
+              )}
 
-        {/* 6. Statement of Faith */}
-        {site.statementOfFaith.length > 0 && <section className="ch-section">
-          <div className="ch-container">
-            <div className="ch-heading-wrap">
-              <span className="ch-eyebrow">Biblical Doctrine</span>
-              <h2 className="ch-title">Statement of Faith</h2>
-              <p className="ch-subtitle">
-                What we believe based strictly on the Holy Scriptures of the Old and New Testaments.
-              </p>
-            </div>
-
-            <div style={{ maxWidth: "840px", margin: "0 auto", display: "grid", gap: "16px" }}>
-              {site.statementOfFaith.map((sof, idx) => (
-                <div
-                  key={idx}
-                  style={{
-                    background: "#ffffff",
-                    padding: "20px 24px",
-                    borderRadius: "var(--church-radius)",
-                    border: "1px solid var(--church-border)",
-                  }}
-                >
-                  <h3 style={{ fontSize: "17px", fontWeight: 700, color: "var(--church-secondary)", margin: "0 0 6px 0" }}>
-                    {sof.topic}
-                  </h3>
-                  <p style={{ fontSize: "14px", lineHeight: 1.6, color: "var(--church-text-muted)", margin: 0 }}>
-                    {sof.belief}
-                  </p>
+              {site.contact.email && (
+                <div className="gmfci-contact-item">
+                  <div className="gmfci-contact-icon" aria-hidden="true">📧</div>
+                  <div>
+                    <h4>Email</h4>
+                    <p>
+                      <a href={`mailto:${site.contact.email}`} className="gmfci-contact-link">
+                        {site.contact.email}
+                      </a>
+                    </p>
+                  </div>
                 </div>
-              ))}
-            </div>
-          </div>
-        </section>}
+              )}
 
-        {/* 6b. Frequently Asked Questions */}
-        {site.faqs.length > 0 && <section className="ch-section">
-          <div className="ch-container">
-            <div className="ch-heading-wrap">
-              <span className="ch-eyebrow">Common Questions</span>
-              <h2 className="ch-title">Frequently Asked Questions</h2>
-              <p className="ch-subtitle">
-                Helpful answers about our services, beliefs, visitor experience, and giving.
-              </p>
-            </div>
-            <div style={{ maxWidth: "840px", margin: "0 auto", display: "grid", gap: "16px" }}>
-              {site.faqs.map((faq, idx) => (
-                <div
-                  key={idx}
-                  style={{
-                    background: "#ffffff",
-                    padding: "20px 24px",
-                    borderRadius: "var(--church-radius)",
-                    border: "1px solid var(--church-border)",
-                  }}
-                >
-                  <h3 style={{ fontSize: "17px", fontWeight: 700, color: "var(--church-primary)", margin: "0 0 6px 0" }}>
-                    {faq.question}
-                  </h3>
-                  <p style={{ fontSize: "14px", lineHeight: 1.6, color: "var(--church-text-muted)", margin: 0 }}>
-                    {faq.answer}
-                  </p>
+              {addressDisplay && (
+                <div className="gmfci-contact-item">
+                  <div className="gmfci-contact-icon" aria-hidden="true">📮</div>
+                  <div>
+                    <h4>Postal Address</h4>
+                    <p>{addressDisplay}</p>
+                  </div>
                 </div>
-              ))}
+              )}
+
+              {(site.social.twitter || site.social.youtube) && (
+                <div className="gmfci-contact-item">
+                  <div className="gmfci-contact-icon" aria-hidden="true">🐦</div>
+                  <div>
+                    <h4>Follow Us</h4>
+                    <p>
+                      {site.social.twitter && twitterHandle && (
+                        <>
+                          <a
+                            href={site.social.twitter}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="gmfci-contact-link"
+                          >
+                            {twitterHandle}
+                          </a>
+                          {site.social.youtube && youtubeHandle && <br />}
+                        </>
+                      )}
+                      {site.social.youtube && youtubeHandle && (
+                        <a
+                          href={site.social.youtube}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="gmfci-contact-link"
+                        >
+                          {youtubeHandle}
+                        </a>
+                      )}
+                      {!twitterHandle && !youtubeHandle && <span>Connect via social links</span>}
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
-        </section>}
-
-        {/* 7. Leadership Team */}
-        {site.leadership.length > 0 && <section className="ch-section ch-section-alt">
-          <div className="ch-container">
-            <div className="ch-heading-wrap">
-              <span className="ch-eyebrow">Servant Leaders</span>
-              <h2 className="ch-title">Our Leadership Team</h2>
-              <p className="ch-subtitle">
-                Meet the people serving this ministry.
-              </p>
-            </div>
-
-            <div className="ch-grid-3 ch-leadership-grid">
-              {site.leadership.map((leader) => (
-                <LeadershipCard
-                  key={leader.id}
-                  id={leader.id}
-                  name={leader.name}
-                  role={leader.role}
-                  bio={leader.bio}
-                  photoUrl={leader.photoUrl}
-                />
-              ))}
-            </div>
-          </div>
-        </section>}
-
-        {site.scripture.verse && <div className="ch-container">
-          <ScriptureQuote
-            verse={site.scripture.verse}
-            reference={site.scripture.reference}
-            version={site.scripture.version || undefined}
-          />
-        </div>}
-
-        {/* 9. Partnership Invitation */}
-        <section className="ch-section ch-section-dark">
-          <div className="ch-container" style={{ textAlign: "center", maxWidth: "700px" }}>
-            <span className="ch-eyebrow">Join the Harvest</span>
-            <h2 className="ch-title" style={{ color: "#ffffff" }}>
-              Partner With {site.ministryName} Today
-            </h2>
-            <p className="ch-subtitle" style={{ color: "#cbd5e1", marginBottom: "32px" }}>
-              Connect with the ministry through prayer, service, or financial support.
-            </p>
-            <div style={{ display: "flex", justifyContent: "center", gap: "16px" }}>
-              <a href="/give" className="ch-btn ch-btn-accent">
-                Partner Financially
-              </a>
-              <a href="/contact" className="ch-btn ch-btn-outline-white">
-                Contact Ministry Office
-              </a>
-            </div>
-          </div>
-        </section>
+        </div>
       </main>
-
-      <ChurchFooter
-        ministryName={site.ministryName}
-        tagline={site.tagline}
-        phoneNumbers={site.contact.phones}
-        email={site.contact.email}
-        address={site.contact.address}
-      />
-    </>
+    </SiteChrome>
   );
 }

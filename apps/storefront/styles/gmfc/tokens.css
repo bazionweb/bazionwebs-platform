@@ -1,0 +1,58 @@
+:root {
+  /* Brand */
+  --color-maroon: #4A1110;
+  --color-maroon-light: #6B1A18;
+  --color-gold: #D9A857;
+  --color-gold-light: #F59E0B;
+  --color-cream: #F8F1E5;
+  --color-dark: #1A1612;
+  --color-white: #FFFFFF;
+  --color-orange: #E47A2B;
+  --color-orange-soft: #F0A058;
+  --color-orange-dark: #B45E14;
+  --color-orange-deep: #A85410;
+
+  /* Neutrals */
+  --color-gray-50: #F9FAFB;
+  --color-gray-100: #F3F4F6;
+  --color-gray-200: #E5E7EB;
+  --color-gray-300: #D1D5DB;
+  --color-gray-400: #9CA3AF;
+  --color-gray-500: #6B7280;
+  --color-gray-600: #4B5563;
+  --color-gray-700: #374151;
+  --color-gray-800: #1F2937;
+  --color-gray-900: #111827;
+
+  /* Utility */
+  --color-off-white: #FAF9F6;
+  --color-youtube-red: #FF0000;
+  --color-fb-blue: #1877F2;
+  --color-ig-pink: #E4405F;
+  --color-wa-green: #25D366;
+
+  /* Typography */
+  --font-heading: var(--font-outfit, 'Outfit', sans-serif);
+  --font-body: var(--font-inter, 'Inter', sans-serif);
+  --font-accent: var(--font-fraunces, 'Fraunces', serif);
+
+  /* Spacing */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 32px;
+  --space-2xl: 60px;
+
+  /* Radii */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --radius-full: 9999px;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
+  --shadow-md: 0 4px 6px rgba(0,0,0,0.07);
+  --shadow-lg: 0 10px 30px rgba(0,0,0,0.1);
+}

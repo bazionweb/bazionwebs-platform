@@ -1,22 +1,22 @@
 "use client";
 
-import { ChurchFooter, ChurchNav, PageHero } from "@bazion/ui";
+import { PageHero } from "../../components/gmfc/PageHero";
+import { SiteChrome } from "../../components/gmfc/SiteChrome";
 import { useMinistrySite } from "../../lib/use-ministry-site";
 
 export default function VisitPage() {
   const site = useMinistrySite();
   const hasVisitorDetails = Boolean(site.serviceTimes.length || site.locations.length || Object.values(site.visitorInfo).some((value) => value.trim()));
 
-  return <>
-    <ChurchNav ministryName={site.ministryName} logoUrl={site.branding.logoUrl} links={site.navigation} currentPath="/visit" giveHref={site.pages.some((page) => page.id === "giving" && page.enabled) ? "/give" : null} />
-    <main id="main-content">
-      <PageHero
-        eyebrow="YOU ARE WELCOME HERE"
-        title="Plan your"
-        highlightedTitle="visit"
-        subtitle="Find a gathering time, a location, and the details that help you feel at home."
-        bgImageUrl={site.branding.heroBgUrl}
-      />
+  return (
+    <SiteChrome currentPath="/visit">
+      <main id="main-content">
+        <PageHero
+          eyebrow="You Are Welcome Here"
+          title="Plan your"
+          titleHighlight="visit"
+          subtitle="Find a gathering time, a location, and the details that help you feel at home."
+        />
 
       <section className="ch-section">
         <div className="ch-container">
@@ -91,7 +91,7 @@ export default function VisitPage() {
           <a href="/contact" className="ch-btn ch-btn-accent" style={{ marginTop: 24 }}>Get in touch</a>
         </div>
       </section>
-    </main>
-    <ChurchFooter ministryName={site.ministryName} tagline={site.tagline} phoneNumbers={site.contact.phones} email={site.contact.email} address={site.contact.address} />
-  </>;
+      </main>
+    </SiteChrome>
+  );
 }

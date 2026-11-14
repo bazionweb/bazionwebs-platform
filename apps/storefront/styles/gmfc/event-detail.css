@@ -1,0 +1,264 @@
+/* ==================================
+   Event Detail Page Styles
+   ================================== */
+
+.gmfci-evd-main {
+  background: #f8f9fb;
+  min-height: 100vh;
+}
+
+.gmfci-evd-container {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 64px 24px 80px;
+}
+
+/* Two-column layout: image left, content right */
+.gmfci-evd-layout {
+  display: grid;
+  grid-template-columns: 420px 1fr;
+  gap: 48px;
+  align-items: start;
+}
+
+/* === Image Column === */
+.gmfci-evd-image-col {
+  position: sticky;
+  top: 32px;
+}
+
+/* 
+ * ASPECT RATIO BEST PRACTICE:
+ * We use `aspect-ratio: auto` with a max-height so the image expands
+ * naturally to fill its intrinsic ratio (portrait or landscape).
+ * `object-fit: contain` ensures nothing is ever cropped — the full
+ * poster is always shown, centred within the frame with a neutral bg.
+ */
+.gmfci-evd-image-wrap {
+  position: relative;
+  width: 100%;
+  /* Tall enough for portrait posters (3:4), capped so landscape images
+     don't become enormous. The image element is set to height:auto so
+     the browser sizes it from its own intrinsic dimensions. */
+  aspect-ratio: 3 / 4;
+  max-height: 600px;
+  border-radius: 20px;
+  overflow: hidden;
+  background: #1a0b00;
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.18);
+}
+
+.gmfci-evd-image {
+  object-fit: contain !important; /* show full poster without cropping */
+  object-position: center;
+  padding: 0;
+}
+
+/* === Content Column === */
+.gmfci-evd-content-col {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+.gmfci-evd-content-col--full {
+  grid-column: 1 / -1;
+}
+
+/* Status pill */
+.gmfci-evd-meta-row {
+  display: flex;
+  gap: 8px;
+}
+
+.gmfci-evd-status-pill {
+  display: inline-flex;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 5px 14px;
+  border-radius: 100px;
+}
+
+.gmfci-evd-status-pill.upcoming {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.gmfci-evd-status-pill.past {
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
+/* Title */
+.gmfci-evd-title {
+  font-family: var(--font-outfit), sans-serif;
+  font-size: 36px;
+  font-weight: 800;
+  color: #111827;
+  line-height: 1.2;
+  margin: 0;
+}
+
+/* Info cards */
+.gmfci-evd-info-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.gmfci-evd-info-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  background: white;
+  border-radius: 12px;
+  padding: 16px 20px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+  border: 1px solid #f3f4f6;
+}
+
+.gmfci-evd-info-icon {
+  width: 36px;
+  height: 36px;
+  background: #fef3c7;
+  color: #c05d1a;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.gmfci-evd-info-icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+.gmfci-evd-info-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #9ca3af;
+  margin-bottom: 4px;
+}
+
+.gmfci-evd-info-value {
+  display: block;
+  font-size: 15px;
+  font-weight: 600;
+  color: #1f2937;
+  line-height: 1.4;
+}
+
+/* Description */
+.gmfci-evd-description {
+  background: white;
+  border-radius: 16px;
+  padding: 28px 32px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+  border: 1px solid #f3f4f6;
+  font-size: 16px;
+  color: #374151;
+  line-height: 1.8;
+}
+
+.gmfci-evd-description h2,
+.gmfci-evd-description h3 {
+  font-family: var(--font-outfit), sans-serif;
+  color: #111827;
+  margin-top: 24px;
+  margin-bottom: 12px;
+}
+
+.gmfci-evd-description h2 {
+  font-size: 22px;
+}
+.gmfci-evd-description h3 {
+  font-size: 18px;
+}
+
+.gmfci-evd-description p {
+  margin: 0 0 16px;
+}
+
+.gmfci-evd-description ul,
+.gmfci-evd-description ol {
+  padding-left: 20px;
+  margin: 0 0 16px;
+}
+
+.gmfci-evd-description li {
+  margin-bottom: 6px;
+}
+
+.gmfci-evd-description strong {
+  color: #111827;
+}
+
+/* Back link */
+.gmfci-evd-back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #4b5563;
+  text-decoration: none;
+  transition:
+    color 0.2s,
+    gap 0.2s;
+  padding: 12px 0;
+}
+
+.gmfci-evd-back-link svg {
+  width: 18px;
+  height: 18px;
+  transition: transform 0.2s;
+}
+
+.gmfci-evd-back-link:hover {
+  color: #c05d1a;
+  gap: 12px;
+}
+
+.gmfci-evd-back-link:hover svg {
+  transform: translateX(-3px);
+}
+
+/* === Responsive === */
+@media (max-width: 900px) {
+  .gmfci-evd-layout {
+    grid-template-columns: 1fr;
+    gap: 32px;
+  }
+
+  .gmfci-evd-image-col {
+    position: static;
+  }
+
+  /* On mobile, switch to a natural aspect-ratio box so portrait
+     images don't take the entire viewport height */
+  .gmfci-evd-image-wrap {
+    aspect-ratio: 4 / 3;
+    max-height: 360px;
+  }
+
+  .gmfci-evd-title {
+    font-size: 28px;
+  }
+}
+
+@media (max-width: 480px) {
+  .gmfci-evd-container {
+    padding: 40px 16px 60px;
+  }
+
+  .gmfci-evd-description {
+    padding: 20px;
+  }
+}

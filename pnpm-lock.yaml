@@ -233,6 +233,9 @@ importers:
       '@bazion/church-ministry-domain':
         specifier: workspace:*
         version: link:../../packages/church-ministry-domain
+      '@bazion/church-ministry-template':
+        specifier: workspace:*
+        version: link:../../templates
       '@bazion/commerce-domain':
         specifier: workspace:*
         version: link:../../packages/commerce-domain
@@ -257,9 +260,15 @@ importers:
       '@bazion/product-installations':
         specifier: workspace:*
         version: link:../../packages/product-installations
+      '@bazion/sme-website-template':
+        specifier: workspace:*
+        version: link:../../packages/sme-website-template
       '@bazion/storage':
         specifier: workspace:*
         version: link:../../packages/storage
+      '@bazion/website-contracts':
+        specifier: workspace:*
+        version: link:../../packages/website-contracts
       '@fastify/cors':
         specifier: ^11.4.0
         version: 11.4.1
@@ -373,6 +382,9 @@ importers:
       react-dom:
         specifier: ^19.2.0
         version: 19.3.1(react@19.3.1)
+      swiper:
+        specifier: ^14.4.0
+        version: 14.4.0
     devDependencies:
       '@types/node':
         specifier: ^26.6.6
@@ -708,6 +720,9 @@ importers:
       '@bazion/church-ministry-contracts':
         specifier: workspace:*
         version: link:../packages/church-ministry-contracts
+      '@bazion/website-contracts':
+        specifier: workspace:*
+        version: link:../packages/website-contracts
     devDependencies:
       typescript:
         specifier: ^5.9.3
@@ -2472,6 +2487,10 @@ packages:
       babel-plugin-macros:
         optional: true
 
+  swiper@14.4.0:
+    resolution: {integrity: sha512-6axnAuBsttFJe0gwsM5tT203/Bts0vcI+FwIX6dqFE4pUFVW6qrdRprNFQVxOYMW7V0S6A/KIqJ6JaPpNN2MCw==}
+    engines: {node: '>= 4.7.0'}
+
   thread-stream@4.2.1:
     resolution: {integrity: sha512-Stg6edJXC/6/xqGwSXwFokrUhChJ18amEjpKH89WrQQ0oVFDF+pUUcTpiwWhFUrE89Vf16FBOlwhaw+lescxMQ==}
     engines: {node: '>=20'}
@@ -3998,6 +4017,8 @@ snapshots:
     dependencies:
       client-only: 0.0.1
       react: 19.3.1
+
+  swiper@14.4.0: {}
 
   thread-stream@4.2.1:
     dependencies:
