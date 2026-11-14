@@ -82,6 +82,7 @@ test("successful main CI publishes SHA-addressed images with isolated BuildKit c
     ["migrate", "migrate"],
     ["database", "db"],
     ["notification-worker", "notification-worker"],
+    ["platform-bootstrap", "bootstrap"],
   ]) {
     assert.match(ciWorkflow, new RegExp(`target: ${target}\\b`), `missing ${target} image target`);
     assert.match(ciWorkflow, new RegExp(`image: ${image}\\b`), `missing ${image} registry image`);
@@ -99,10 +100,10 @@ test("successful main CI publishes SHA-addressed images with isolated BuildKit c
 });
 
 test("Dokploy staging stack isolates the database, runs migrations before app services, and caps resource use", () => {
-  for (const service of ["db", "migrate", "api", "admin", "storefront", "status-worker", "notification-worker"]) {
+  for (const service of ["db", "migrate", "api", "admin", "storefront", "status-worker", "notification-worker", "platform-owner-bootstrap"]) {
     assert.match(stagingCompose, new RegExp(`^  ${service}:\\s*$`, "m"), `missing staging ${service} service`);
   }
-  for (const image of ["db", "migrate", "api", "admin", "storefront", "notification-worker"]) {
+  for (const image of ["db", "migrate", "api", "admin", "storefront", "notification-worker", "bootstrap"]) {
     assert.ok(stagingCompose.includes(`image: ghcr.io/bazionweb/bazionwebs-platform-${image}:`), `wrong or missing GHCR image for ${image}`);
   }
   assert.ok(!stagingCompose.includes("ghcr.io/bazionwebs/"), "Compose image owner must match the repository owner used by CI");
@@ -122,6 +123,9 @@ test("Dokploy staging stack isolates the database, runs migrations before app se
   assert.doesNotMatch(stagingCompose, /DOKPLOY_API_KEY/);
   assert.match(stagingCompose, /MEDIA_STORAGE_SECRET_ACCESS_KEY: \$\{R2_SECRET_ACCESS_KEY:/);
   assert.match(stagingCompose, /PLATFORM_CALLBACK_SIGNING_SECRET:\?Set the shared staging callback signing secret/);
+  assert.match(stagingCompose, /profiles:\n      - operator-bootstrap/);
+  assert.match(stagingCompose, /PLATFORM_ADMIN_CONFIRM_EMAIL: \$\{PLATFORM_ADMIN_CONFIRM_EMAIL:-\}/);
+  assert.match(stagingCompose, /MIGRATION_DATABASE_URL: postgres:\/\/bazion_migrator:/);
 });
 
 test("PostgreSQL backup helper selects exactly one labelled DB and validates a restricted dump", () => {

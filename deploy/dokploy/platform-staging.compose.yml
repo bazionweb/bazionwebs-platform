@@ -272,6 +272,29 @@ services:
       - platform-app
       - platform-data
 
+  platform-owner-bootstrap:
+    image: ghcr.io/bazionweb/bazionwebs-platform-bootstrap:${PLATFORM_IMAGE_TAG:?Set a validated sha- image tag}
+    profiles:
+      - operator-bootstrap
+    restart: "no"
+    environment:
+      NODE_ENV: production
+      MIGRATION_DATABASE_URL: postgres://bazion_migrator:${BAZION_MIGRATOR_PASSWORD:?Set BAZION_MIGRATOR_PASSWORD}@db:5432/bazion_platform
+      PLATFORM_ADMIN_EMAIL: ${PLATFORM_ADMIN_EMAIL:-}
+      PLATFORM_ADMIN_CONFIRM_EMAIL: ${PLATFORM_ADMIN_CONFIRM_EMAIL:-}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    deploy:
+      resources:
+        limits:
+          cpus: "0.10"
+          memory: 128M
+    logging: *default-logging
+    <<: *runtime-security
+    networks:
+      - platform-data
+
 volumes:
   platform_staging_pgdata:
     name: bazion_platform_staging_pgdata
