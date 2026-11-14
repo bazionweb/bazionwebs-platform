@@ -43,7 +43,9 @@ export function Footer() {
   const addressDisplay = site.contact.poBox || site.contact.address;
   const missionQuote =
     site.vision.statement ||
-    '"Propagating revival to the nations of the world and drawing men to Christ by the power of the gospel."';
+    site.mission.statement ||
+    site.tagline ||
+    '"Proclaiming the Gospel, building disciples, and serving our community in love."';
   const hasMinistriesData =
     site.ministries.length > 0 ||
     (site.departments?.length ?? 0) > 0 ||

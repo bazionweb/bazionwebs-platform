@@ -86,7 +86,7 @@ export default function SermonsPage() {
   });
 
   const featuredSermon = sermons[0];
-  const youtubeUrl = site.social.youtube || "https://www.youtube.com/@GlobalMissionfc";
+  const youtubeUrl = site.social.youtube?.trim() || "";
 
   return (
     <SiteChrome currentPath="/sermons">
@@ -95,8 +95,8 @@ export default function SermonsPage() {
           eyebrow="Online Ministry"
           title="Sermons & Messages"
           subtitle="Watch our latest sermons, worship sessions, and ministry updates."
-          btn1Text="Watch on YouTube"
-          btn1Url={youtubeUrl}
+          btn1Text={youtubeUrl ? "Watch on YouTube" : undefined}
+          btn1Url={youtubeUrl || undefined}
         />
 
         <div className="gmfci-videos-container">
@@ -109,20 +109,23 @@ export default function SermonsPage() {
             </div>
             <h2>Experience {site.ministryName.replace(/\s+for Christ International$/i, "")} Online</h2>
             <p>
-              Join our online community and watch our latest sermons, worship sessions,
-              and ministry updates directly on our official YouTube channel.
+              {youtubeUrl
+                ? "Join our online community and watch our latest sermons, worship sessions, and ministry updates directly on our official YouTube channel."
+                : "Join our online community and explore our latest sermons, teachings, and ministry updates."}
             </p>
-            <a
-              href={youtubeUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="gmfci-btn-yt"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M8 5v14l11-7z" />
-              </svg>
-              Watch on YouTube
-            </a>
+            {youtubeUrl && (
+              <a
+                href={youtubeUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="gmfci-btn-yt"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M8 5v14l11-7z" />
+                </svg>
+                Watch on YouTube
+              </a>
+            )}
           </div>
         </div>
 

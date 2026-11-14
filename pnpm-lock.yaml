@@ -233,6 +233,9 @@ importers:
       '@bazion/church-ministry-domain':
         specifier: workspace:*
         version: link:../../packages/church-ministry-domain
+      '@bazion/church-ministry-template':
+        specifier: workspace:*
+        version: link:../../templates
       '@bazion/commerce-domain':
         specifier: workspace:*
         version: link:../../packages/commerce-domain
@@ -257,9 +260,15 @@ importers:
       '@bazion/product-installations':
         specifier: workspace:*
         version: link:../../packages/product-installations
+      '@bazion/sme-website-template':
+        specifier: workspace:*
+        version: link:../../packages/sme-website-template
       '@bazion/storage':
         specifier: workspace:*
         version: link:../../packages/storage
+      '@bazion/website-contracts':
+        specifier: workspace:*
+        version: link:../../packages/website-contracts
       '@fastify/cors':
         specifier: ^11.4.0
         version: 11.4.1
@@ -711,6 +720,9 @@ importers:
       '@bazion/church-ministry-contracts':
         specifier: workspace:*
         version: link:../packages/church-ministry-contracts
+      '@bazion/website-contracts':
+        specifier: workspace:*
+        version: link:../packages/website-contracts
     devDependencies:
       typescript:
         specifier: ^5.9.3

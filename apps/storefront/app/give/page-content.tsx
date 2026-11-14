@@ -27,9 +27,9 @@ const CATEGORIES = [
 ];
 
 function extractAccountNo(instructions: string | undefined): string {
-  if (!instructions) return "262518";
+  if (!instructions) return "";
   const match = instructions.match(/Account\s*No:\s*([A-Za-z0-9-]+)/i);
-  return match?.[1] ?? "262518";
+  return match?.[1] ?? "";
 }
 
 export default function GivePage() {
@@ -51,11 +51,11 @@ export default function GivePage() {
   const [attempt, setAttempt] = useState<{ idempotencyKey: string; statusToken: string } | null>(null);
 
   const effectiveAmount = selectedAmount !== null ? selectedAmount : Number(customAmount) || 0;
-  const paybillNo = site.giving.mpesaPaybill || "247 247";
-  const accountNo = extractAccountNo(site.giving.instructions);
-  const accountName = site.giving.accountName || "GLOBAL · YINV";
+  const paybillNo = site.giving.mpesaPaybill.trim() || "Not published";
+  const accountNo = extractAccountNo(site.giving.instructions) || "See instructions";
+  const accountName = site.giving.accountName.trim() || site.ministryName;
   const amounts = site.giving.suggestedAmounts.length > 0 ? site.giving.suggestedAmounts : [500, 1000, 2500, 5000];
-  const whatsappPhone = site.contact.whatsappNumber || site.contact.phones[1] || site.contact.phones[0] || "+254 721 341793";
+  const whatsappPhone = site.contact.whatsappNumber || site.contact.phones[1] || site.contact.phones[0] || "";
   const whatsappDigits = whatsappPhone.replace(/[^0-9]/g, "");
 
   useEffect(() => {

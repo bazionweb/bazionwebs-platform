@@ -15,6 +15,27 @@ function cleanHandle(url: string | undefined, fallback: string): string {
   return match[1].startsWith("@") ? match[1] : `@${match[1]}`;
 }
 
+function splitAboutHeroTitle(ministryName: string): { title: string; highlight: string } {
+  const trimmed = ministryName.trim();
+  if (!trimmed) {
+    return { title: "About Our", highlight: "Ministry" };
+  }
+  if (/^global mission for christ international$/i.test(trimmed)) {
+    return { title: "Global Mission For", highlight: "Christ International" };
+  }
+  const words = trimmed.split(/\s+/);
+  if (words.length === 1) {
+    return { title: "About", highlight: words[0] };
+  }
+  if (words.length <= 3) {
+    return { title: words[0], highlight: words.slice(1).join(" ") };
+  }
+  return {
+    title: words.slice(0, -2).join(" "),
+    highlight: words.slice(-2).join(" "),
+  };
+}
+
 export default function AboutPage() {
   const site = useMinistrySite();
   const [leadershipLayout, setLeadershipLayout] = useState<"portrait" | "compact">("portrait");
@@ -40,24 +61,37 @@ export default function AboutPage() {
     },
   ].filter((c) => c.body.trim().length > 0);
 
+  const heroTitle = splitAboutHeroTitle(site.ministryName);
   const director = site.leadership[0];
-  const directorName = director?.name || "Rev. Anthony Githui";
-  const directorDisplay = /rev\./i.test(directorName) ? directorName : `Rev. ${directorName}`;
+  const directorName = director?.name || "";
+  const directorDisplay = directorName
+    ? /rev\.|pastor|bishop|apostle|dr\./i.test(directorName)
+      ? directorName
+      : `Rev. ${directorName}`
+    : "";
   const directorImg = director?.photoUrl || "/images/anthony-githui.jpg";
-  const directorBody = director?.bio?.trim() || DEFAULT_DIRECTOR_MESSAGE;
+  const directorBody =
+    director?.bio?.trim() ||
+    (site.tenantSlug === "global-mission-fc"
+      ? DEFAULT_DIRECTOR_MESSAGE
+      : site.mission.statement || site.vision.statement);
   const addressDisplay = site.contact.poBox || site.contact.address;
-  const twitterHandle = cleanHandle(site.social.twitter, "@globalmissionfc");
-  const youtubeHandle = cleanHandle(site.social.youtube, "@GlobalMissionfc");
+  const twitterHandle = cleanHandle(site.social.twitter, "");
+  const youtubeHandle = cleanHandle(site.social.youtube, "");
 
   return (
     <SiteChrome currentPath="/about">
       <main id="main-content">
         <PageHero
           eyebrow="Our Story & Purpose"
-          title="Global Mission For"
-          titleHighlight="Christ International"
-          subtitle="Revive the Nations. Preach the Gospel. Win Souls."
-          subtitleSecondLine="From Kenya to the ends of the earth — Christ for Every Nation."
+          title={heroTitle.title}
+          titleHighlight={heroTitle.highlight}
+          subtitle={site.tagline || "Grounded in prayer, the Word of God, and community transformation."}
+          subtitleSecondLine={
+            site.tenantSlug === "global-mission-fc"
+              ? "From Kenya to the ends of the earth — Christ for Every Nation."
+              : undefined
+          }
         />
 
         <div className="gmfci-about-wrap">
@@ -96,37 +130,41 @@ export default function AboutPage() {
             </div>
           )}
 
-          <div className="gmfci-director-section">
-            <div className="gmfci-director-grid">
-              <div className="gmfci-director-photo-wrap">
-                <div className="gmfci-director-photo-frame">
-                  <img
-                    src={directorImg}
-                    alt={directorDisplay}
-                    style={{
-                      width: "300px",
-                      height: "400px",
-                      maxWidth: "100%",
-                      objectFit: "cover",
-                      borderRadius: "12px",
-                      display: "block",
-                    }}
-                  />
+          {director && (
+            <div className="gmfci-director-section">
+              <div className="gmfci-director-grid">
+                <div className="gmfci-director-photo-wrap">
+                  <div className="gmfci-director-photo-frame">
+                    <img
+                      src={directorImg}
+                      alt={directorDisplay}
+                      style={{
+                        width: "300px",
+                        height: "400px",
+                        maxWidth: "100%",
+                        objectFit: "cover",
+                        borderRadius: "12px",
+                        display: "block",
+                      }}
+                    />
+                  </div>
                 </div>
-              </div>
-              <div className="gmfci-director-content">
-                <div className="role-badge">✝ Director&apos;s Message</div>
-                <h2>{directorDisplay}</h2>
-                <p className="director-message">&ldquo;{directorBody}&rdquo;</p>
-                <div className="director-sig">
-                  Grace and Peace,
-                  <br />
-                  {directorDisplay}
-                  <span>Director, {site.ministryName}</span>
+                <div className="gmfci-director-content">
+                  <div className="role-badge">✝ {director.role || "Director"}&apos;s Message</div>
+                  <h2>{directorDisplay}</h2>
+                  {directorBody && <p className="director-message">&ldquo;{directorBody}&rdquo;</p>}
+                  <div className="director-sig">
+                    Grace and Peace,
+                    <br />
+                    {directorDisplay}
+                    <span>
+                      {director.role || "Director"}, {site.ministryName}
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
+          )}
 
           {site.leadership.length > 0 && (
             <section className="gmfci-leadership-section" aria-labelledby="leadership-heading">
@@ -283,7 +321,7 @@ export default function AboutPage() {
                   <div>
                     <h4>Follow Us</h4>
                     <p>
-                      {site.social.twitter && (
+                      {site.social.twitter && twitterHandle && (
                         <>
                           <a
                             href={site.social.twitter}
@@ -293,10 +331,10 @@ export default function AboutPage() {
                           >
                             {twitterHandle}
                           </a>
-                          <br />
+                          {site.social.youtube && youtubeHandle && <br />}
                         </>
                       )}
-                      {site.social.youtube && (
+                      {site.social.youtube && youtubeHandle && (
                         <a
                           href={site.social.youtube}
                           target="_blank"
@@ -306,6 +344,7 @@ export default function AboutPage() {
                           {youtubeHandle}
                         </a>
                       )}
+                      {!twitterHandle && !youtubeHandle && <span>Connect via social links</span>}
                     </p>
                   </div>
                 </div>
