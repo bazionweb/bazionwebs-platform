@@ -1,10 +1,11 @@
 import {
+  buildTenantDomainVisitUrl,
   buildTenantStorefrontUrl,
   buildTenantWorkspacePickerUrl,
   resolveConfiguredWorkspaceBaseUrl,
 } from "@bazion/auth/client";
 
-const DEV_FALLBACK_STOREFRONT_ORIGIN = "http://localhost:3100";
+const DEV_FALLBACK_STOREFRONT_ORIGIN = "http://localhost:3000";
 
 export function getPublicStorefrontBaseUrl(): string {
   const configured =
@@ -16,6 +17,10 @@ export function getPublicStorefrontBaseUrl(): string {
 
 export function getTenantStorefrontUrl(tenantSlug: string): string {
   return buildTenantStorefrontUrl(getPublicStorefrontBaseUrl(), tenantSlug);
+}
+
+export function getTenantDomainUrl(hostname: string): string {
+  return buildTenantDomainVisitUrl(hostname, getPublicStorefrontBaseUrl());
 }
 
 export function getTenantWorkspacePickerUrl(

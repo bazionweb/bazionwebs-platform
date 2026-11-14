@@ -20,6 +20,17 @@ describe("church public site settings contracts", () => {
       secondaryColor: "#315e50",
       accentColor: "#8b5b29",
     });
+    expect(settings.theme).toMatchObject({
+      preset: "maroon-gold",
+      headerStyle: "classic",
+      heroStyle: "rotator",
+      cardStyle: "rounded",
+      fontPairing: "outfit-inter",
+    });
+    expect(settings.departments).toEqual([]);
+    expect(settings.groups).toEqual([]);
+    expect(settings.volunteerTeams).toEqual([]);
+    expect(settings.testimonies).toEqual([]);
     expect(settings.schemaVersion).toBe("1.0.0");
     expect(settings.navigation.map(({ href }) => href)).toContain("/contact");
     expect(settings.pages.find(({ id }) => id === "home")?.sections).toContain("hero");
@@ -27,6 +38,63 @@ describe("church public site settings contracts", () => {
     expect(settings.visitorInfo).toEqual({ arrival: "", children: "", accessibility: "", parking: "" });
     expect(settings.serviceTimes).toEqual([]);
     expect(settings.giving.suggestedAmounts).toEqual([]);
+  });
+
+  it("validates themes, departments, small groups, assets, and testimonies", () => {
+    const result = churchPublicSiteSettingsSchema.safeParse({
+      theme: {
+        preset: "forest-bronze",
+        headerStyle: "centered",
+        heroStyle: "centered-bold",
+        cardStyle: "sharp",
+        fontPairing: "jakarta-inter",
+      },
+      departments: [
+        {
+          id: "dept-worship",
+          name: "Praise & Worship",
+          description: "Leading the congregation into the presence of God through spirit-filled music.",
+          leaderName: "David Ochieng",
+          leaderRole: "Worship Pastor",
+        },
+      ],
+      groups: [
+        {
+          id: "cell-kiamariga",
+          name: "Kiamariga Revival Cell",
+          category: "Home Fellowship",
+          leaderName: "Elder John",
+          meetingSchedule: "Wednesdays 6:00 PM",
+          locationOrVirtual: "Kiamariga Estate, Block B",
+        },
+      ],
+      volunteerTeams: [
+        {
+          id: "vol-media",
+          title: "Camera & Live Stream Operator",
+          department: "Media & Communications",
+          description: "Operate cameras during Sunday services and conferences.",
+        },
+      ],
+      testimonies: [
+        {
+          id: "testimony-1",
+          authorName: "Sarah W.",
+          title: "Healed at the Mega Conference",
+          story: "During the August Conference, prayer was made and the chronic back pain disappeared completely.",
+          verified: true,
+        },
+      ],
+    });
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.theme.preset).toBe("forest-bronze");
+      expect(result.data.departments[0]?.name).toBe("Praise & Worship");
+      expect(result.data.groups[0]?.name).toBe("Kiamariga Revival Cell");
+      expect(result.data.volunteerTeams[0]?.title).toBe("Camera & Live Stream Operator");
+      expect(result.data.testimonies[0]?.verified).toBe(true);
+    }
   });
 
   it("accepts site-relative media and HTTPS external links", () => {

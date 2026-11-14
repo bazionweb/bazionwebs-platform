@@ -68,6 +68,31 @@ function normalizeBaseUrl(rawUrl: string | null | undefined, label: string): URL
   return new URL(parsed.origin);
 }
 
+const RESERVED_SUBDOMAINS = new Set(["www", "api", "admin", "platform", "portal", "auth", "mail"]);
+const SINGLE_DNS_LABEL_REGEX = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
+
+function isLoopbackHostForUrl(hostname: string): boolean {
+  const clean = hostname.trim().toLowerCase().replace(/^\[|\]$/g, "");
+  return clean === "localhost" || clean === "127.0.0.1" || clean === "::1" || clean.endsWith(".localhost");
+}
+
+/**
+ * Derive the canonical preview subdomain hostname for a tenant from the configured
+ * storefront origin (e.g. `grace.localhost` in dev or `grace.sites.bazion.example` in production).
+ */
+export function buildTenantSubdomainHostname(storefrontOrigin: string, tenantSlug: string): string {
+  const cleanSlug = tenantSlug.trim().toLowerCase();
+  if (!cleanSlug) {
+    throw new DeepLinkPolicyError(400, "DEEP_LINK_TENANT_REQUIRED", "tenantSlug is required to build a subdomain hostname.");
+  }
+  const base = normalizeBaseUrl(storefrontOrigin, "PUBLIC_STOREFRONT_URL");
+  if (isLoopbackHostForUrl(base.hostname)) {
+    return `${cleanSlug}.localhost`;
+  }
+  const rootHost = base.hostname.toLowerCase().replace(/^www\./, "");
+  return `${cleanSlug}.${rootHost}`;
+}
+
 /**
  * Resolve dashboard base URLs from explicit runtime configuration without
  * hardcoding development hosts inside UI components.
@@ -78,9 +103,58 @@ export function resolveConfiguredWorkspaceBaseUrl(storefrontOrigin: string): str
 
 export function buildTenantStorefrontUrl(storefrontOrigin: string, tenantSlug: string): string {
   const base = normalizeBaseUrl(storefrontOrigin, "PUBLIC_STOREFRONT_URL");
+  base.hostname = buildTenantSubdomainHostname(storefrontOrigin, tenantSlug);
   base.pathname = "/";
-  base.searchParams.set("tenant", tenantSlug);
+  base.search = "";
   return base.toString();
+}
+
+export function extractTenantSlugFromHost(hostname: string, storefrontOrigin?: string | null): string | null {
+  const rawHost = (hostname || "").trim().toLowerCase();
+  if (!rawHost) return null;
+  const hostWithoutPort = rawHost.startsWith("[") && rawHost.includes("]")
+    ? rawHost.slice(1, rawHost.indexOf("]"))
+    : rawHost.split(":", 1)[0] ?? "";
+  const cleanHost = hostWithoutPort.replace(/\.$/, "");
+  if (!cleanHost) return null;
+
+  if (cleanHost.endsWith(".localhost")) {
+    const label = cleanHost.slice(0, -".localhost".length);
+    if (SINGLE_DNS_LABEL_REGEX.test(label) && !RESERVED_SUBDOMAINS.has(label)) {
+      return label;
+    }
+    return null;
+  }
+
+  if (storefrontOrigin) {
+    try {
+      const base = normalizeBaseUrl(storefrontOrigin, "PUBLIC_STOREFRONT_URL");
+      const rootHost = base.hostname.toLowerCase().replace(/^www\./, "");
+      if (!isLoopbackHostForUrl(rootHost) && cleanHost.endsWith(`.${rootHost}`)) {
+        const label = cleanHost.slice(0, -(`.${rootHost}`.length));
+        if (SINGLE_DNS_LABEL_REGEX.test(label) && !RESERVED_SUBDOMAINS.has(label)) {
+          return label;
+        }
+      }
+    } catch {
+      return null;
+    }
+  }
+
+  return null;
+}
+
+export function buildTenantDomainVisitUrl(hostname: string, storefrontOrigin: string): string {
+  const cleanHost = (hostname || "").trim().toLowerCase().replace(/\.$/, "");
+  const base = normalizeBaseUrl(storefrontOrigin, "PUBLIC_STOREFRONT_URL");
+  if (!cleanHost) return base.toString();
+  if (cleanHost.endsWith(".localhost")) {
+    base.hostname = cleanHost;
+    base.pathname = "/";
+    base.search = "";
+    return base.toString();
+  }
+  return `https://${cleanHost}/`;
 }
 
 export function buildTenantWorkspacePickerUrl(

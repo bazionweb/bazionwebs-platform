@@ -1,0 +1,522 @@
+/* ============================================
+   Event Banner — Premium Eye-Catching Strip
+   Best Practices:
+   - All animations use transform/opacity (GPU-accelerated, no layout repaints)
+   - prefers-reduced-motion disables all motion for accessibility
+   - animation-fill-mode: both prevents flash-of-unstyled-content
+   - will-change used sparingly only on animated elements
+   ============================================ */
+
+/* ── Keyframes ── */
+
+/* Entrance: banner slides down from -100% */
+@keyframes gmfci-eb-slide-in {
+  from {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* Moving light sweep across background */
+@keyframes gmfci-eb-sweep {
+  0% {
+    transform: translateX(-100%) skewX(-15deg);
+  }
+  100% {
+    transform: translateX(300%) skewX(-15deg);
+  }
+}
+
+/* Accent bar glow pulse */
+@keyframes gmfci-eb-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 6px 2px rgba(249, 115, 22, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 18px 5px rgba(249, 115, 22, 0.75);
+  }
+}
+
+/* Countdown number breathing */
+@keyframes gmfci-eb-breathe {
+  0%,
+  100% {
+    text-shadow: 0 0 0px rgba(249, 115, 22, 0);
+  }
+  50% {
+    text-shadow: 0 0 14px rgba(249, 115, 22, 0.7);
+  }
+}
+
+/* CTA shimmer sweep */
+@keyframes gmfci-eb-shimmer {
+  0% {
+    background-position: -200% center;
+  }
+  100% {
+    background-position: 200% center;
+  }
+}
+
+/*
+ * Cinematic reveal: enters from the right, holds, exits to the right.
+ * Timeline:
+ *  0-5%   → off-screen right, invisible (waiting)
+ *  5-18%  → glides in from the right (ease-out feel)
+ *  18-72% → fully visible, idle
+ *  72-85% → subtle left micro-drift (anticipation)
+ *  85-95% → accelerates out to the right
+ *  95-100% → off-screen right, invisible (reset)
+ */
+@keyframes gmfci-eb-cine {
+  0% {
+    transform: translateX(56px);
+    opacity: 0;
+  }
+  5% {
+    transform: translateX(56px);
+    opacity: 0;
+  }
+  18% {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  72% {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  80% {
+    transform: translateX(-6px);
+    opacity: 1;
+  }
+  95% {
+    transform: translateX(64px);
+    opacity: 0;
+  }
+  100% {
+    transform: translateX(64px);
+    opacity: 0;
+  }
+}
+
+/* Arrow nudge — pulses rightward while CTA is visible */
+@keyframes gmfci-eb-arrow-nudge {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  50% {
+    transform: translateX(5px);
+  }
+}
+
+/* Staggered fade-up for children */
+@keyframes gmfci-eb-fadeup {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Live dot ripple */
+@keyframes gmfci-eb-pulse {
+  0% {
+    opacity: 0.8;
+    transform: scale(0.7);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(2);
+  }
+}
+
+/* ── Section ── */
+.gmfci-eb-section {
+  background: #0f172a;
+  width: 100%;
+  position: relative;
+  overflow: hidden;
+  z-index: 10;
+  /* Entrance animation */
+  animation: gmfci-eb-slide-in 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+  will-change: transform, opacity;
+}
+
+/* Ambient radial colour blobs */
+.gmfci-eb-section::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(ellipse at 75% 50%, rgba(192, 93, 26, 0.18) 0%, transparent 55%),
+    radial-gradient(ellipse at 15% 50%, rgba(59, 130, 246, 0.07) 0%, transparent 50%);
+  pointer-events: none;
+}
+
+/* Moving light beam sweep — runs once, then repeats every 6s */
+.gmfci-eb-section::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 40%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.04) 50%,
+    transparent 100%
+  );
+  animation: gmfci-eb-sweep 3.5s ease-in-out 1s infinite;
+  pointer-events: none;
+  will-change: transform;
+}
+
+/* ── Inner ── */
+.gmfci-eb-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 32px;
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  min-height: 88px;
+  position: relative;
+  z-index: 1;
+}
+
+/* ── Staggered child animations ── */
+.gmfci-eb-accent {
+  animation: gmfci-eb-fadeup 0.4s 0.15s ease both;
+}
+.gmfci-eb-date-block {
+  animation: gmfci-eb-fadeup 0.4s 0.25s ease both;
+}
+.gmfci-eb-divider {
+  animation: gmfci-eb-fadeup 0.4s 0.3s ease both;
+}
+.gmfci-eb-text {
+  animation: gmfci-eb-fadeup 0.4s 0.35s ease both;
+}
+.gmfci-eb-countdown {
+  animation: gmfci-eb-fadeup 0.4s 0.45s ease both;
+}
+.gmfci-eb-thumbnail {
+  animation: gmfci-eb-fadeup 0.4s 0.5s ease both;
+}
+.gmfci-eb-cta {
+  animation: gmfci-eb-fadeup 0.4s 0.55s ease both;
+}
+
+/* ── Accent bar — glowing pulse ── */
+.gmfci-eb-accent {
+  width: 4px;
+  height: 52px;
+  background: linear-gradient(to bottom, #fb923c, #c05d1a);
+  border-radius: 4px;
+  flex-shrink: 0;
+  animation:
+    gmfci-eb-fadeup 0.4s 0.15s ease both,
+    gmfci-eb-glow 2.4s 1s ease-in-out infinite;
+  will-change: box-shadow;
+}
+
+/* ── Date block ── */
+.gmfci-eb-date-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.gmfci-eb-date-day {
+  font-family: var(--font-outfit), sans-serif;
+  font-size: 32px;
+  font-weight: 900;
+  color: #f97316;
+  line-height: 1;
+}
+
+.gmfci-eb-date-month {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  color: #94a3b8;
+  margin-top: 2px;
+}
+
+.gmfci-eb-date-year {
+  font-size: 11px;
+  font-weight: 500;
+  color: #475569;
+  margin-top: 2px;
+}
+
+/* ── Divider ── */
+.gmfci-eb-divider {
+  width: 1px;
+  height: 44px;
+  background: rgba(255, 255, 255, 0.08);
+  flex-shrink: 0;
+}
+
+/* ── Text ── */
+.gmfci-eb-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.gmfci-eb-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #94a3b8;
+  margin-bottom: 5px;
+}
+
+/* ── Live dot — double ring ripple ── */
+.gmfci-eb-live-dot {
+  width: 8px;
+  height: 8px;
+  background: #22c55e;
+  border-radius: 50%;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.gmfci-eb-live-dot::before,
+.gmfci-eb-live-dot::after {
+  content: "";
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  border: 2px solid #22c55e;
+  animation: gmfci-eb-pulse 2s infinite;
+  opacity: 0;
+}
+
+.gmfci-eb-live-dot::after {
+  animation-delay: 0.7s;
+}
+
+.gmfci-eb-title {
+  font-family: var(--font-outfit), sans-serif;
+  font-size: 17px;
+  font-weight: 700;
+  color: #f1f5f9;
+  margin: 0 0 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.gmfci-eb-meta {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.gmfci-eb-meta-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  color: #64748b;
+}
+
+.gmfci-eb-meta-item svg {
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
+  color: #475569;
+}
+
+/* ── Countdown — breathing glow on number ── */
+.gmfci-eb-countdown {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: rgba(249, 115, 22, 0.1);
+  border: 1px solid rgba(249, 115, 22, 0.25);
+  border-radius: 12px;
+  padding: 10px 20px;
+  flex-shrink: 0;
+  transition: border-color 0.3s;
+}
+
+.gmfci-eb-countdown:hover {
+  border-color: rgba(249, 115, 22, 0.5);
+}
+
+.gmfci-eb-countdown-num {
+  font-family: var(--font-outfit), sans-serif;
+  font-size: 22px;
+  font-weight: 900;
+  color: #f97316;
+  line-height: 1;
+  animation: gmfci-eb-breathe 3s ease-in-out infinite;
+  will-change: text-shadow;
+}
+
+.gmfci-eb-countdown-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #64748b;
+  margin-top: 2px;
+}
+
+/* ── Thumbnail — subtle hover lift ── */
+.gmfci-eb-thumbnail {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  border-radius: 10px;
+  overflow: hidden;
+  flex-shrink: 0;
+  border: 2px solid rgba(255, 255, 255, 0.08);
+  transition:
+    transform 0.3s ease,
+    border-color 0.3s;
+}
+
+.gmfci-eb-thumbnail:hover {
+  transform: scale(1.08) rotate(1deg);
+  border-color: rgba(249, 115, 22, 0.4);
+}
+
+.gmfci-eb-thumbnail-img {
+  object-fit: cover !important;
+  object-position: center top;
+}
+
+/* ── CTA button — Cinematic reveal + shimmer ── */
+.gmfci-eb-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  /* Shimmer gradient on background */
+  background: linear-gradient(
+    110deg,
+    #c05d1a 0%,
+    #c05d1a 35%,
+    #e8773a 50%,
+    #c05d1a 65%,
+    #c05d1a 100%
+  );
+  background-size: 200% auto;
+  color: white;
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 700;
+  padding: 12px 22px;
+  border-radius: 10px;
+  flex-shrink: 0;
+  white-space: nowrap;
+  position: relative;
+  overflow: hidden;
+  /* Cinematic loop (7s cycle) + shimmer on background layer */
+  animation:
+    gmfci-eb-cine 7s 0.8s ease-in-out infinite,
+    gmfci-eb-shimmer 2.8s 1.2s linear infinite;
+  will-change: transform, opacity, background-position;
+}
+
+/* Pause the cinematic loop on hover so user can click without it flying away */
+.gmfci-eb-cta:hover {
+  animation-play-state: paused;
+  /* Snap to visible in case mid-animation */
+  opacity: 1 !important;
+  transform: translateY(-2px) !important;
+  box-shadow: 0 8px 28px rgba(192, 93, 26, 0.55);
+  gap: 12px;
+}
+
+.gmfci-eb-cta svg {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  /* Arrow continuously nudges right while button is visible */
+  animation: gmfci-eb-arrow-nudge 1.4s ease-in-out infinite;
+}
+
+.gmfci-eb-cta:hover svg {
+  animation-play-state: paused;
+  transform: translateX(5px);
+}
+
+.gmfci-eb-cta:active {
+  box-shadow: none;
+}
+
+/* ── Responsive ── */
+@media (max-width: 900px) {
+  .gmfci-eb-inner {
+    flex-wrap: wrap;
+    padding: 20px 20px;
+    gap: 16px;
+    min-height: unset;
+  }
+
+  .gmfci-eb-thumbnail,
+  .gmfci-eb-countdown {
+    display: none;
+  }
+
+  .gmfci-eb-title {
+    white-space: normal;
+    font-size: 15px;
+  }
+}
+
+@media (max-width: 540px) {
+  .gmfci-eb-date-block,
+  .gmfci-eb-divider {
+    display: none;
+  }
+
+  .gmfci-eb-cta {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+/* ── Accessibility: Respect reduced motion preference ──
+   Disables all animations for users who prefer no motion.
+   This is a WCAG 2.1 best practice requirement.
+*/
+@media (prefers-reduced-motion: reduce) {
+  .gmfci-eb-section,
+  .gmfci-eb-section::after,
+  .gmfci-eb-accent,
+  .gmfci-eb-date-block,
+  .gmfci-eb-divider,
+  .gmfci-eb-text,
+  .gmfci-eb-countdown,
+  .gmfci-eb-thumbnail,
+  .gmfci-eb-cta,
+  .gmfci-eb-countdown-num,
+  .gmfci-eb-live-dot::before,
+  .gmfci-eb-live-dot::after {
+    animation: none !important;
+    transition: none !important;
+    opacity: 1;
+    transform: none;
+  }
+}

@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { defaultSmeWebsiteTemplateConfig, isSmeEnquiryCollectionAvailable, smeWebsiteTemplateConfigSchema } from "./config.js";
+import {
+  createWhiteLabeledSmeWebsiteConfig,
+  defaultSmeWebsiteTemplateConfig,
+  isSmeEnquiryCollectionAvailable,
+  smeWebsiteTemplateConfigSchema,
+} from "./config.js";
 import { getSmePageMetadata } from "./seo.js";
 import { getSmeEnquiryEndpoint } from "./contact-form.js";
 
@@ -90,5 +95,23 @@ describe("SME website template", () => {
 
     expect([tenantA.business.name, tenantA.website.branding.primaryColor]).toEqual(["Harbour Repairs", "#1d4ed8"]);
     expect([tenantB.business.name, tenantB.website.branding.primaryColor]).toEqual(["Maji Works", "#166534"]);
+  });
+
+  it("creates white-labeled SME website configs through the universal white-label engine", () => {
+    const whiteLabeled = createWhiteLabeledSmeWebsiteConfig({
+      tenantSlug: "rift-valley-solar",
+      businessName: "Rift Valley Solar Systems",
+      templateId: "sme-local-services",
+      tagline: "Reliable Commercial Solar Installations",
+      primaryColor: "#F59E0B",
+      contact: {
+        email: "hello@rvsolar.example",
+        telephone: "+254 700 444555",
+      },
+    });
+
+    expect(whiteLabeled.business.name).toBe("Rift Valley Solar Systems");
+    expect(whiteLabeled.website.pages.some((p) => p.path === "/faq")).toBe(true);
+    expect(whiteLabeled.business.contact.email).toBe("hello@rvsolar.example");
   });
 });

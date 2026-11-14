@@ -47,7 +47,10 @@ export async function resetPassword(token: string, newPassword: string): Promise
 
 export { resolveSafeRedirectTarget } from "./bff-cookies.js";
 export {
+  buildTenantDomainVisitUrl,
   buildTenantStorefrontUrl,
+  buildTenantSubdomainHostname,
   buildTenantWorkspacePickerUrl,
+  extractTenantSlugFromHost,
   resolveConfiguredWorkspaceBaseUrl,
 } from "./deep-links.js";

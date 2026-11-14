@@ -1,22 +1,30 @@
 import type { MinistryConfig } from "./church.types.js";
-import { defaultChurchNavigation, defaultChurchPages } from "@bazion/church-ministry-contracts";
+import { defaultChurchPages } from "@bazion/church-ministry-contracts";
 
 export const globalMissionConfig: MinistryConfig = {
   tenantSlug: "global-mission-fc",
   ministryName: "Global Mission for Christ International",
   tagline: "Revive the Nations. Preach the Gospel. Win Souls.",
+  theme: {
+    preset: "maroon-gold",
+    headerStyle: "classic",
+    heroStyle: "rotator",
+    cardStyle: "rounded",
+    fontPairing: "outfit-inter",
+  },
   branding: {
     logoUrl: "/images/gmfc-logo.png",
-    primaryColor: "#193a31",
-    secondaryColor: "#315e50",
-    accentColor: "#8b5b29",
+    primaryColor: "#4A1110",
+    secondaryColor: "#6B1A18",
+    accentColor: "#B45E14",
     heroBgUrl: "/images/hero-bg-optimized.jpg",
   },
   hero: {
-    eyebrow: "Global Mission for Christ International",
-    title: "Propagating Revival",
-    highlightedTitle: "to the Nations",
-    subtitle: "Revive the Nations. Preach the Gospel. Win Souls. — Propagating revival from Kenya to the ends of the earth.",
+    eyebrow: "✝ Global Mission for Christ International",
+    title: "PROPAGATING REVIVAL",
+    highlightedTitle: "TO THE NATIONS",
+    subtitle: "Revive the Nations. Preach the Gospel. Win Souls. — Propagating Revival from Kenya to the ends of the earth.",
+    rotatorWords: ["TO THE NATIONS", "TO THE COMMUNITIES", "TO THE WORLD"],
   },
   contact: {
     phones: ["+1 (512) 785 6994", "+254 721 341793", "+254 710 642 232"],
@@ -32,44 +40,92 @@ export const globalMissionConfig: MinistryConfig = {
     twitter: "https://twitter.com/globalmissionfc",
     whatsapp: "https://wa.me/254721341793",
   },
-  navigation: defaultChurchNavigation,
+  navigation: [
+    { id: "home", label: "Home", href: "/" },
+    { id: "about", label: "About", href: "/about" },
+    { id: "gallery", label: "Gallery", href: "/gallery" },
+    { id: "sermons", label: "Sermons", href: "/sermons" },
+    { id: "events", label: "Events", href: "/events" },
+    { id: "contact", label: "Contact", href: "/contact" },
+  ],
   pages: defaultChurchPages,
   statistics: [
-    { label: "Souls reached", value: 34200, suffix: "+" },
-    { label: "Annual conferences", value: 5 },
-    { label: "Years of ministry", value: 6, suffix: "+" },
-    { label: "Nations touched", value: 10, suffix: "+" },
+    { label: "Souls Reached", value: 34200, suffix: "+" },
+    { label: "Annual Conferences", value: 5, suffix: "" },
+    { label: "Years of Ministry", value: 6, suffix: "+" },
+    { label: "Nations Touched", value: 10, suffix: "+" },
   ],
   giving: {
-    mpesaPaybill: "247247",
+    mpesaPaybill: "247 247",
     accountName: "GLOBAL · YINV",
-    instructions: "Go to M-Pesa > Lipa na M-Pesa > Paybill > Business No: 247247 (Equity Bank) > Account No: 262518",
+    instructions: "Account No: 262518 — M-Pesa → Lipa na M-Pesa → Paybill → Business No: 247 247 (Equity Bank) → Account No: 262518 (GLOBAL · YINV)",
     suggestedAmounts: [500, 1000, 2500, 5000],
   },
   serviceTimes: [],
   locations: [],
-  visitorInfo: { arrival: "", children: "", accessibility: "", parking: "" },
-  online: { description: "" },
-  scripture: { verse: "", reference: "", version: "" },
+  visitorInfo: {
+    arrival: "",
+    children: "",
+    accessibility: "",
+    parking: "",
+  },
+  online: {
+    liveStreamUrl: "https://www.youtube.com/@GlobalMissionfc",
+    description: "Join our online community and watch our latest sermons, worship sessions, and ministry updates directly on our official YouTube channel.",
+  },
+  scripture: {
+    verse: "Each of you should give what you have decided in your heart to give, not reluctantly or under compulsion, for God loves a cheerful giver.",
+    reference: "2 Corinthians 9:7",
+    version: "NIV",
+  },
+  departments: [],
   ministries: [],
-  galleryImages: [],
+  groups: [],
+  volunteerTeams: [],
+  testimonies: [],
+  galleryImages: [
+    {
+      imageUrl: "/images/images/IMG-20260515-WA0002.jpg",
+      alt: "IMG 20260515 WA0002",
+    },
+    {
+      imageUrl: "/images/images/IMG-20260514-WA0009-720x684.jpg",
+      alt: "IMG 20260514 WA0009 720x684",
+    },
+    {
+      imageUrl: "/images/images/IMG-20260514-WA0005-1536x1152.jpg",
+      alt: "IMG 20260514 WA0005 1536x1152",
+    },
+    {
+      imageUrl: "/images/images/IMG-20260514-WA0010.jpg",
+      alt: "IMG 20260514 WA0010",
+    },
+    {
+      imageUrl: "/images/images/IMG-20260515-WA0001-768x1083.jpg",
+      alt: "IMG 20260515 WA0001 768x1083",
+    },
+    {
+      imageUrl: "/images/images/IMG-20260517-WA0013-845x530.jpg",
+      alt: "IMG 20260517 WA0013 845x530",
+    },
+  ],
   faqs: [],
   metadata: {
     title: "Global Mission for Christ International",
     description: "Propagating revival to the nations through prayer, the Word of God, evangelism, and community outreach. From Kenya to the ends of the earth — Christ for every nation.",
   },
   vision: {
-    title: "Our Vision",
+    title: "Vision",
     statement:
       "Propagate Revival to the nations of the world and draw men to Christ by the power of the gospel of our Lord Jesus Christ.",
   },
   mission: {
-    title: "Our Mission",
+    title: "Mission",
     statement:
       "Global Mission for Christ International is dedicated to igniting the fire of revival and to the teachings of the word of God — raising men and women who will impact their generation through prayer, passion, and praise.",
   },
   outreach: {
-    title: "Community Outreach",
+    title: "Outreach",
     statement:
       "We reach communities through the Gospel, prayer gatherings, revival meetings, and acts of compassion — supporting the needy through medical and community outreach programs.",
   },
@@ -99,80 +155,49 @@ export const globalMissionConfig: MinistryConfig = {
         "We pursue a life of integrity, purity, and holiness that reflects the character of Christ.",
     },
     {
-      title: "Passion for Souls",
+      title: "Passion",
       icon: "❤️",
       description:
-        "We are passionately driven to reach the lost and serve our community with the love of Jesus Christ.",
+        "We are passionately driven to reach the lost and serve our community with the love of Jesus.",
     },
   ],
-  statementOfFaith: [
-    {
-      topic: "The Holy Scriptures",
-      belief:
-        "We believe the Bible is the inspired, infallible, and authoritative Word of God, serving as the supreme rule of faith and conduct.",
-    },
-    {
-      topic: "The Eternal Godhead",
-      belief:
-        "We believe in one God, eternally existent in three persons: Father, Son, and Holy Spirit.",
-    },
-    {
-      topic: "The Lord Jesus Christ",
-      belief:
-        "We believe in the deity of our Lord Jesus Christ, His virgin birth, sinless life, atoning death on the cross, bodily resurrection, and imminent return.",
-    },
-    {
-      topic: "Salvation by Grace",
-      belief:
-        "We believe that salvation is the free gift of God through faith in Jesus Christ, apart from human works.",
-    },
-    {
-      topic: "The Holy Spirit & Revival",
-      belief:
-        "We believe in the baptism of the Holy Spirit with spiritual gifts, empowering believers to preach the gospel with signs following and igniting revival.",
-    },
-  ],
+  statementOfFaith: [],
   leadership: [
     {
       id: "leader-1",
-      name: "Rev. Anthony Githui",
+      name: "Anthony Githui",
       role: "Director",
-      bio: "Committed to propagating revival and raising a praying generation across the nations.",
+      bio: "At Global Mission for Christ International, our heartbeat is to see lives transformed by the power of Jesus Christ and revival spread to the nations of the world. We are committed to raising men and women grounded in prayer, rooted in the Word of God, empowered by the Holy Spirit, passionate for righteousness, and dedicated to impacting their generation for Christ. As a ministry, we continue to reach communities through the Gospel, prayer gatherings, revival meetings, and acts of compassion — supporting the needy through medical and community outreach programs. May this ministry continue to inspire faith, ignite passion for God, and draw many into a deeper relationship with Christ. Together, let us shine His light and carry the message of hope to the world.",
       photoUrl: "/images/anthony-githui.jpg",
     },
     {
       id: "leader-2",
       name: "Apostle Shadrach",
       role: "National Chairman",
-      bio: "Overseeing ministry crusades and pastoral fellowship networks.",
       photoUrl: "/images/apostle-shadrach.jpg",
     },
     {
       id: "leader-3",
       name: "Dr. Young",
       role: "Organizing Secretary",
-      bio: "Coordinating international conferences and mission trips.",
       photoUrl: "/images/dr-young.jpg",
     },
     {
       id: "leader-4",
       name: "Pastor Betty",
       role: "Secretary General",
-      bio: "Serving in ministry administration and prayer outreach.",
       photoUrl: "/images/pastor-betty.jpg",
     },
     {
       id: "leader-5",
       name: "Pastor Kamwaga",
       role: "Treasurer",
-      bio: "Stewarding financial resources with transparency and integrity.",
       photoUrl: "/images/pastor-kamwaga.jpg",
     },
     {
       id: "leader-6",
       name: "Rev. Nyaga",
       role: "Coordinator of Council of Bishops",
-      bio: "Fostering unity and spiritual alignment among bishops and pastors.",
       photoUrl: "/images/rev-bishop.jpg",
     },
   ],

@@ -33,6 +33,44 @@ export function SiteThemeProvider({ children }: { children: ReactNode }) {
     root.style.setProperty("--church-primary", site.branding.primaryColor);
     root.style.setProperty("--church-secondary", site.branding.secondaryColor);
     root.style.setProperty("--church-accent", site.branding.accentColor);
+
+    const theme = site.theme ?? {
+      preset: "maroon-gold" as const,
+      headerStyle: "classic" as const,
+      heroStyle: "rotator" as const,
+      cardStyle: "rounded" as const,
+      fontPairing: "outfit-inter" as const,
+    };
+
+    const resolvedGold =
+      theme.preset === "maroon-gold" && site.branding.accentColor.toUpperCase() === "#B45E14"
+        ? "#D9A857"
+        : site.branding.accentColor;
+
+    // Bridge active church branding tokens into .gmfci-* custom properties
+    root.style.setProperty("--color-maroon", site.branding.primaryColor);
+    root.style.setProperty("--color-maroon-dark", site.branding.primaryColor);
+    root.style.setProperty("--color-maroon-light", site.branding.secondaryColor);
+    root.style.setProperty("--gmfci-maroon", site.branding.secondaryColor);
+    root.style.setProperty("--gmfci-maroon-deep", site.branding.primaryColor);
+    root.style.setProperty("--color-gold", resolvedGold);
+
+    root.dataset.churchTheme = theme.preset;
+    root.dataset.fontPairing = theme.fontPairing;
+    root.dataset.cardStyle = theme.cardStyle;
+    root.dataset.headerStyle = theme.headerStyle;
+    root.dataset.heroStyle = theme.heroStyle;
+
+    const themeClasses = ["theme-maroon-gold", "theme-forest-bronze", "theme-royal-navy", "theme-living-waters", "theme-sanctuary-charcoal"];
+    const fontClasses = ["font-pairing-outfit-inter", "font-pairing-jakarta-inter", "font-pairing-serif-classic"];
+    root.classList.remove(...themeClasses, ...fontClasses);
+    root.classList.add(`theme-${theme.preset}`, `font-pairing-${theme.fontPairing}`);
+
+    if (theme.preset === "maroon-gold") {
+      root.style.setProperty("--church-gold", "#D9A857");
+      root.style.setProperty("--church-bg", "#FAF6F0");
+    }
+
     const titles: Record<string, string> = {
       "/": "Home",
       "/about": "About",
@@ -57,7 +95,17 @@ export function SiteThemeProvider({ children }: { children: ReactNode }) {
       document.head.appendChild(descriptionTag);
     }
     descriptionTag.content = description;
-  }, [pathname, site.branding.primaryColor, site.branding.secondaryColor, site.branding.accentColor, site.metadata.title, site.metadata.description, site.ministryName, site.tagline]);
+  }, [
+    pathname,
+    site.branding.primaryColor,
+    site.branding.secondaryColor,
+    site.branding.accentColor,
+    site.metadata.title,
+    site.metadata.description,
+    site.ministryName,
+    site.tagline,
+    site.theme,
+  ]);
 
   useEffect(() => {
     if (!pageIsUnavailable) return;

@@ -32,8 +32,10 @@ describe("database migration registry", () => {
     expect(requiredDatabaseMigrations).toContain("0023_product_provisioner_hosting_identity_read.sql");
     expect(requiredDatabaseMigrations).toContain("0024_commercial_platform_hardening.sql");
     expect(requiredDatabaseMigrations).toContain("0025_installation_changes.sql");
+    expect(requiredDatabaseMigrations).toContain("0026_church_ministry_operations.sql");
+    expect(requiredDatabaseMigrations).toContain("0027_church_site_settings_versions.sql");
     expect(currentDatabaseSchemaVersion).toBe(requiredDatabaseMigrations.at(-1));
-    expect(currentDatabaseSchemaVersion).toBe("0025_installation_changes.sql");
+    expect(currentDatabaseSchemaVersion).toBe("0027_church_site_settings_versions.sql");
   });
 
   it("enforces immutable installation changes ledger in 0025", () => {

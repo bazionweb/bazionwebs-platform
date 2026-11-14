@@ -1,24 +1,13 @@
 "use client";
 
-import {
-  ChurchNav,
-  ChurchFooter,
-  PageHero,
-} from "@bazion/ui";
+import { PageHero } from "../../components/gmfc/PageHero";
+import { SiteChrome } from "../../components/gmfc/SiteChrome";
 import { useMinistrySite } from "../../lib/use-ministry-site";
 
 export default function PrivacyPolicyPage() {
   const site = useMinistrySite();
   return (
-    <>
-      <ChurchNav
-        ministryName={site.ministryName}
-        logoUrl={site.branding.logoUrl}
-        links={site.navigation}
-        currentPath="/privacy"
-        giveHref={site.pages.some((page) => page.id === "giving" && page.enabled) ? "/give" : null}
-      />
-
+    <SiteChrome currentPath="/privacy">
       <main id="main-content">
         <PageHero
           eyebrow="LEGAL & DATA PROTECTION"
@@ -88,14 +77,6 @@ export default function PrivacyPolicyPage() {
           </div>
         </article>
       </main>
-
-      <ChurchFooter
-        ministryName={site.ministryName}
-        tagline={site.tagline}
-        phoneNumbers={site.contact.phones}
-        email={site.contact.email}
-        address={site.contact.address}
-      />
-    </>
+    </SiteChrome>
   );
 }

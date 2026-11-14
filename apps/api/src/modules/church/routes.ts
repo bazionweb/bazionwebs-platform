@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from "node:crypto";
 import type { FastifyInstance, FastifyRequest } from "fastify";
-import { and, desc, eq, getTableColumns, ilike, or, sql } from "drizzle-orm";
+import { and, desc, eq, getTableColumns, ilike, max, or, sql } from "drizzle-orm";
 import {
   churchPublicSiteSettingsSchema,
   contactMessageSchema,
@@ -26,14 +26,17 @@ import {
   leadershipProfiles,
   ministryProfiles,
   ministrySettings,
+  ministrySiteSettingsVersions,
   tenants,
   sermonCategories,
   sermons,
 } from "@bazion/database";
+import { registerChurchOperationsRoutes } from "./operations-routes.js";
+import { registerChurchSiteSettingsVersionsRoutes } from "./site-settings-routes.js";
 import { requireActiveTenantPermission } from "@bazion/auth";
 import type { AppConfig } from "../../config.js";
 import { withTenantTransaction, type TenantTransaction } from "../../lib/database.js";
-import { resolveTenantId } from "../../lib/tenant-resolution.js";
+import { resolveRequestTenantId } from "../../lib/tenant-resolution.js";
 import { isTenantModuleEnabled } from "../../lib/tenant-modules.js";
 import { assertTenantNotInMaintenance, getTenantMaintenanceStatus } from "../../lib/tenant-maintenance.js";
 import { DarajaClient, normalizeKenyanPhoneNumber } from "@bazion/payments";
@@ -111,6 +114,9 @@ export async function churchRoutes(app: FastifyInstance, options: RouteOptions) 
     ...(mediaStorageConfig.s3 ? { s3: mediaStorageConfig.s3 } : {}),
   });
 
+  await registerChurchOperationsRoutes(app, { config });
+  await registerChurchSiteSettingsVersionsRoutes(app);
+
   const ministrySiteSettingsRepository = {
     load: (tenantId: string) => withTenantTransaction(tenantId, async (tx) => {
       const [tenant] = await tx.select({ name: tenants.name }).from(tenants).where(eq(tenants.id, tenantId)).limit(1);
@@ -170,8 +176,7 @@ export async function churchRoutes(app: FastifyInstance, options: RouteOptions) 
   };
 
   const tenantForRequest = (request: FastifyRequest) => {
-    const explicit = request.headers["x-bazion-tenant"] as string | undefined;
-    return resolveTenantId(request.hostname, config, explicit);
+    return resolveRequestTenantId(request, config);
   };
 
   // ─────────────────────────────────────────────────────────────────────────────
@@ -232,6 +237,7 @@ export async function churchRoutes(app: FastifyInstance, options: RouteOptions) 
         profile: profile ?? null,
         leaders,
         siteSettings,
+        siteSettingsStored: Boolean(storedSiteSettings?.settingValue),
       });
     });
   });

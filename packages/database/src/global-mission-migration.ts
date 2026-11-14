@@ -51,7 +51,8 @@ export function mapGlobalMissionEvents(
           ? "/images/events/conference.jpg"
           : undefined;
     const rawImage = typeof source.imageUrl === "string" ? source.imageUrl.trim() : "";
-    const posterUrl = localPosterBySlug[slug] ?? localPoster ?? safeImageUrl(rawImage);
+    const localSourceImage = rawImage.startsWith("/") && !rawImage.startsWith("//") ? rawImage : null;
+    const posterUrl = localSourceImage ?? localPosterBySlug[slug] ?? localPoster ?? safeImageUrl(rawImage);
     const description = [source.description, source.excerpt]
       .filter((value): value is string => typeof value === "string" && value.trim().length > 0)
       .map((value) => value.trim())

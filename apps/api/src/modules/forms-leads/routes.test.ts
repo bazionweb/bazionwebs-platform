@@ -14,7 +14,10 @@ const mocks = vi.hoisted(() => ({
   rows: [] as Array<Record<string, unknown>>,
 }));
 
-vi.mock("../../lib/tenant-resolution.js", () => ({ resolveTenantId: mocks.resolveTenantId }));
+vi.mock("../../lib/tenant-resolution.js", () => ({
+  resolveTenantId: mocks.resolveTenantId,
+  resolveRequestTenantId: mocks.resolveTenantId,
+}));
 vi.mock("../../lib/tenant-modules.js", () => ({ isTenantModuleEnabled: mocks.isTenantModuleEnabled }));
 vi.mock("../../lib/database.js", () => ({
   withTenantTransaction: mocks.withTenantTransaction,

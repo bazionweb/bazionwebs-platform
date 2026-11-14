@@ -11,8 +11,11 @@ import {
 } from "./bff-cookies.js";
 import {
   DeepLinkPolicyError,
+  buildTenantDomainVisitUrl,
   buildTenantStorefrontUrl,
+  buildTenantSubdomainHostname,
   buildTenantWorkspacePickerUrl,
+  extractTenantSlugFromHost,
   resolveScopedDeepLink,
 } from "./deep-links.js";
 import {
@@ -220,10 +223,24 @@ describe("Phase 5 scoped deep links & dashboard boundaries", () => {
   const tenantA = "00000000-0000-4000-8000-00000000000a";
   const tenantB = "00000000-0000-4000-8000-00000000000b";
 
-  it("builds storefront and workspace URLs from configured origins without hardcoded hosts", () => {
+  it("builds canonical subdomain storefront and workspace URLs from configured origins without hardcoded hosts", () => {
     expect(buildTenantStorefrontUrl("https://sites.bazion.example/ignored", "grace")).toBe(
-      "https://sites.bazion.example/?tenant=grace",
+      "https://grace.sites.bazion.example/",
     );
+    expect(buildTenantStorefrontUrl("http://localhost:3000", "global-mission-fc")).toBe(
+      "http://global-mission-fc.localhost:3000/",
+    );
+    expect(buildTenantStorefrontUrl("http://global-mission-fc.localhost:3000", "grace")).toBe(
+      "http://grace.localhost:3000/",
+    );
+    expect(buildTenantSubdomainHostname("https://www.sites.bazion.example", "grace")).toBe(
+      "grace.sites.bazion.example",
+    );
+    expect(extractTenantSlugFromHost("grace.sites.bazion.example", "https://sites.bazion.example")).toBe("grace");
+    expect(extractTenantSlugFromHost("www.sites.bazion.example", "https://sites.bazion.example")).toBeNull();
+    expect(extractTenantSlugFromHost("global-mission-fc.localhost:3000")).toBe("global-mission-fc");
+    expect(buildTenantDomainVisitUrl("gmfc.localhost", "http://localhost:3000")).toBe("http://gmfc.localhost:3000/");
+    expect(buildTenantDomainVisitUrl("gmfc.org", "https://sites.bazion.example")).toBe("https://gmfc.org/");
     expect(
       buildTenantWorkspacePickerUrl("https://sites.bazion.example", {
         organizationId: "org_1",

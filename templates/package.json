@@ -17,7 +17,8 @@
     "test": "vitest run --fsModuleCachePath .vitest-cache"
   },
   "dependencies": {
-    "@bazion/church-ministry-contracts": "workspace:*"
+    "@bazion/church-ministry-contracts": "workspace:*",
+    "@bazion/website-contracts": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^5.9.3",

@@ -1,0 +1,343 @@
+/* ============================
+   Give Page — Elegant Styling
+   ============================ */
+
+.gmfci-give-main {
+  background: #f8f9fb;
+  min-height: 100vh;
+}
+
+.gmfci-give-section {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 80px 24px;
+}
+
+/* ── Hero Give Card ── */
+.gmfci-give-hero-card {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+  background: white;
+  border-radius: 24px;
+  overflow: hidden;
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.08);
+  margin-bottom: 40px;
+}
+
+/* Left panel */
+.gmfci-give-hero-left {
+  padding: 56px 48px;
+  background: linear-gradient(145deg, #0f172a 0%, #1e293b 100%);
+  color: white;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 24px;
+}
+
+.gmfci-give-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #93c5fd;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 16px;
+  border-radius: 100px;
+  width: fit-content;
+  letter-spacing: 0.02em;
+}
+
+.gmfci-give-hero-left h2 {
+  font-family: var(--font-outfit), sans-serif;
+  font-size: 36px;
+  font-weight: 800;
+  color: white;
+  line-height: 1.15;
+  margin: 0;
+}
+
+.gmfci-give-hero-left p {
+  font-size: 16px;
+  color: #94a3b8;
+  line-height: 1.7;
+  margin: 0;
+}
+
+.gmfci-give-amounts {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.gmfci-give-amounts > span {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #64748b;
+  font-weight: 600;
+}
+
+.gmfci-give-amount-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.gmfci-give-amount-chips span {
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #e2e8f0;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 6px 16px;
+  border-radius: 100px;
+  cursor: default;
+  transition: background 0.2s;
+}
+
+.gmfci-give-amount-chips span:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+/* Right panel — phone-style card */
+.gmfci-give-hero-right {
+  padding: 56px 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f8faff;
+}
+
+.gmfci-give-phone-card {
+  width: 100%;
+  max-width: 340px;
+  background: white;
+  border-radius: 20px;
+  box-shadow:
+    0 4px 24px rgba(0, 0, 0, 0.1),
+    0 0 0 1px rgba(0, 0, 0, 0.05);
+  overflow: hidden;
+}
+
+.gmfci-give-phone-header {
+  background: linear-gradient(135deg, #16a34a, #15803d);
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: white;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.gmfci-give-equity-logo {
+  width: 32px;
+  height: 32px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.gmfci-give-detail-block {
+  padding: 4px 0;
+}
+
+.gmfci-give-detail-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 18px 24px;
+  text-align: center;
+  gap: 4px;
+}
+
+.gmfci-give-detail-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #9ca3af;
+  font-weight: 600;
+}
+
+.gmfci-give-detail-number {
+  font-family: var(--font-outfit), sans-serif;
+  font-size: 28px;
+  font-weight: 800;
+  color: #111827;
+  letter-spacing: 0.04em;
+}
+
+.gmfci-give-detail-name {
+  font-family: var(--font-outfit), sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+  color: #374151;
+  letter-spacing: 0.05em;
+}
+
+.gmfci-give-divider {
+  height: 1px;
+  background: #f3f4f6;
+  margin: 0 24px;
+}
+
+.gmfci-give-steps-compact {
+  background: #f9fafb;
+  border-top: 1px solid #f3f4f6;
+  padding: 16px 20px;
+}
+
+.gmfci-give-steps-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #6b7280;
+  margin-bottom: 10px;
+}
+
+.gmfci-give-steps-compact ol {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13px;
+  color: #374151;
+  line-height: 1.6;
+}
+
+.gmfci-give-steps-compact li {
+  margin-bottom: 4px;
+}
+
+.gmfci-give-steps-compact strong {
+  color: #111827;
+}
+
+/* ── Contact Bar ── */
+.gmfci-give-contact-bar {
+  background: white;
+  border-radius: 16px;
+  padding: 28px 40px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.05);
+  margin-bottom: 40px;
+  flex-wrap: wrap;
+}
+
+.gmfci-give-contact-bar p {
+  font-size: 15px;
+  color: #4b5563;
+  margin: 0;
+}
+
+.gmfci-give-contact-links {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.gmfci-give-contact-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  border-radius: 100px;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  border: 1.5px solid #e5e7eb;
+  color: #374151;
+  background: white;
+  transition: all 0.2s;
+}
+
+.gmfci-give-contact-link:hover {
+  border-color: #111827;
+  background: #111827;
+  color: white;
+}
+
+/* ── Scripture ── */
+.gmfci-give-quote-wrap {
+  max-width: 780px;
+  margin: 0 auto;
+  text-align: center;
+  padding: 56px 40px;
+  position: relative;
+}
+
+.gmfci-give-quote-mark {
+  font-family: Georgia, serif;
+  font-size: 100px;
+  color: #e5e7eb;
+  line-height: 0.6;
+  margin-bottom: 24px;
+  display: block;
+  user-select: none;
+}
+
+.gmfci-give-quote {
+  font-family: var(--font-fraunces), serif;
+  font-size: 22px;
+  color: #1f2937;
+  font-style: italic;
+  line-height: 1.7;
+  margin: 0 0 20px;
+}
+
+.gmfci-give-quote-wrap cite {
+  font-family: var(--font-outfit), sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  color: #dc2626;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-style: normal;
+}
+
+/* ── Responsive ── */
+@media (max-width: 768px) {
+  .gmfci-give-section {
+    padding: 48px 16px;
+  }
+
+  .gmfci-give-hero-card {
+    grid-template-columns: 1fr;
+  }
+
+  .gmfci-give-hero-left {
+    padding: 40px 28px;
+  }
+
+  .gmfci-give-hero-left h2 {
+    font-size: 28px;
+  }
+
+  .gmfci-give-hero-right {
+    padding: 32px 20px;
+  }
+
+  .gmfci-give-contact-bar {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 24px;
+  }
+
+  .gmfci-give-quote {
+    font-size: 18px;
+  }
+
+  .gmfci-give-quote-mark {
+    font-size: 70px;
+  }
+}

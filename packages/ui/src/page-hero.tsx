@@ -1,5 +1,6 @@
 import type { CSSProperties, ReactNode } from "react";
 import { ResponsiveImage } from "./responsive-image.js";
+import { AnimatedWordRotator } from "./animated-word-rotator.js";
 
 const PARTICLE_SHAPES = ["circle", "diamond", "triangle", "sparkle", "ring", "square"] as const;
 const PARTICLE_SIZES = [5, 7, 4, 9, 6, 8, 5, 7, 4, 8, 6, 9];
@@ -27,6 +28,7 @@ export interface PageHeroProps {
   title: string;
   highlightedTitle?: string;
   subtitle?: string;
+  rotatorWords?: string[];
   primaryCtaText?: string;
   primaryCtaHref?: string;
   secondaryCtaText?: string;
@@ -40,6 +42,7 @@ export function PageHero({
   title,
   highlightedTitle,
   subtitle,
+  rotatorWords,
   primaryCtaText,
   primaryCtaHref = "#",
   secondaryCtaText,
@@ -48,9 +51,7 @@ export function PageHero({
   bgImageUrl,
 }: PageHeroProps) {
   return (
-    <section
-      className="ch-hero-wrap"
-    >
+    <section className="ch-hero-wrap">
       {bgImageUrl && <>
         <ResponsiveImage
           src={bgImageUrl}
@@ -82,7 +83,12 @@ export function PageHero({
         <div className="ch-hero-content">
           {eyebrow && <span className="ch-eyebrow">{eyebrow}</span>}
           <h1 className="ch-hero-title">
-            {title} {highlightedTitle && <span>{highlightedTitle}</span>}
+            {title}{" "}
+            {rotatorWords && rotatorWords.length > 0 ? (
+              <AnimatedWordRotator words={rotatorWords} defaultWord={highlightedTitle} />
+            ) : (
+              highlightedTitle && <span>{highlightedTitle}</span>
+            )}
           </h1>
           {subtitle && <p className="ch-hero-subtitle">{subtitle}</p>}
           {(primaryCtaText || secondaryCtaText) && (

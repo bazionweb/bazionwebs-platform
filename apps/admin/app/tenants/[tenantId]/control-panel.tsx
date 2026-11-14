@@ -3,7 +3,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { assertOk, pulse } from "@bazion/ui";
-import { getPublicStorefrontBaseUrl, getTenantStorefrontUrl } from "@/lib/public-urls";
+import { getTenantDomainUrl, getTenantStorefrontUrl } from "@/lib/public-urls";
 
 type Candidate = { userId: string; name: string; email: string; emailVerified: boolean; roles: string[] };
 type OwnerState = { currentOwners: Candidate[]; candidates: Candidate[]; total: number; limit: number; offset: number };
@@ -25,6 +25,7 @@ function LoadError({ status, label }: { status: number; label: string }) {
 
 export function TenantControlPanel(props: {
   tenantId: string;
+  tenantSlug?: string;
   ownerInitial: OwnerState | null; ownerStatus: number;
   modulesInitial: { modules: ModuleItem[] } | null; modulesStatus: number;
   settingsInitial: SettingsState | null; settingsStatus: number;
@@ -263,6 +264,8 @@ export function TenantControlPanel(props: {
   }
 
 
+  const previewUrl = getTenantStorefrontUrl(props.tenantSlug || "tenant-slug");
+
   return <div className="tenant-controls">
     <section className="panel">
       <div className="panel-head"><div><p className="eyebrow">OWNERSHIP</p><h2>Tenant owner</h2><p className="muted">Platform-owner authority only. New owners must be verified existing tenant members.</p></div></div>
@@ -295,7 +298,7 @@ export function TenantControlPanel(props: {
 
 
     <section className="panel">
-      <div className="panel-head"><div><p className="eyebrow">CUSTOM DOMAINS</p><h2>Tenant domains</h2><p className="muted">Verify domain ownership with a DNS TXT record before the hostname becomes active.</p><p className="muted" style={{ fontSize: 12, marginTop: 4 }}>💡 Without custom DNS configuration, client storefronts remain accessible via <code>{`${getPublicStorefrontBaseUrl()}/?tenant=<slug>`}</code>.</p></div><span className="count">{domains.length} DOMAINS</span></div>
+      <div className="panel-head"><div><p className="eyebrow">CUSTOM DOMAINS</p><h2>Tenant domains</h2><p className="muted">Verify domain ownership with a DNS TXT record before the hostname becomes active.</p><p className="muted" style={{ fontSize: 12, marginTop: 4 }}>💡 Before a custom DNS domain is verified, this storefront is automatically live on its server preview subdomain: <a href={previewUrl} target="_blank" rel="noreferrer" style={{ color: "var(--accent)", textDecoration: "underline" }}><code>{previewUrl}</code> ↗</a></p></div><span className="count">{domains.length} DOMAINS</span></div>
       {props.domainsStatus !== 200 && !props.domainsInitial ? <LoadError status={props.domainsStatus} label="custom domains"/> : <>
         <form className="owner-search" onSubmit={addDomain}>
           <label>Hostname<input value={domainInput} onChange={(event) => setDomainInput(event.target.value)} placeholder="shop.example.com" maxLength={253}/></label>
@@ -313,15 +316,15 @@ export function TenantControlPanel(props: {
               <td>
                 <strong>{domain.hostname}</strong>
                 <small>{domain.id}</small>
-                {domain.hostname.endsWith(".localhost") && (
+                {domain.status === "active" && (
                   <div style={{ marginTop: 4 }}>
                     <a
-                      href={getTenantStorefrontUrl(domain.hostname.replace(/\.localhost$/, ""))}
+                      href={getTenantDomainUrl(domain.hostname)}
                       target="_blank"
                       rel="noreferrer"
                       style={{ fontSize: 11, color: "var(--accent)", textDecoration: "underline" }}
                     >
-                      Open tenant workspace storefront ↗
+                      Open storefront ↗
                     </a>
                   </div>
                 )}

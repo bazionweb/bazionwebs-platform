@@ -1,4 +1,7 @@
 import {
+  extractTenantSlugFromHost,
+} from "@bazion/auth";
+import {
   resolvePublicTenantByHostname,
   resolvePublicTenantBySlug,
   resolvePublicTenantInstallationByHostname,
@@ -19,6 +22,69 @@ function normalizeHostForRouting(hostname: string) {
       : rawHost.split(":", 1)[0]!;
   const isLoopbackHost = cleanHost === "localhost" || cleanHost === "127.0.0.1" || cleanHost === "::1";
   return { cleanHost, isLoopbackHost };
+}
+
+function headerFirst(raw: string | string[] | undefined): string | undefined {
+  const value = Array.isArray(raw) ? raw[0] : raw;
+  const trimmed = value?.trim();
+  return trimmed || undefined;
+}
+
+function parseCookieValue(cookieHeader: string | undefined, name: string): string | undefined {
+  if (!cookieHeader) return undefined;
+  for (const part of cookieHeader.split(";")) {
+    const idx = part.indexOf("=");
+    if (idx === -1) continue;
+    if (part.slice(0, idx).trim() === name) {
+      const rawValue = part.slice(idx + 1).trim();
+      if (!rawValue) return undefined;
+      try {
+        return decodeURIComponent(rawValue);
+      } catch {
+        return rawValue;
+      }
+    }
+  }
+  return undefined;
+}
+
+function extractLocalSubdomainHostFromUrl(rawUrl: string | undefined): string | null {
+  if (!rawUrl) return null;
+  try {
+    const parsed = new URL(rawUrl);
+    return parsed.hostname.toLowerCase().endsWith(".localhost") ? parsed.host : null;
+  } catch {
+    return null;
+  }
+}
+
+export function extractRequestTenantInputs(
+  request: { hostname: string; headers: Record<string, string | string[] | undefined> },
+  config: AppConfig,
+): { hostname: string; explicitTenant?: string } {
+  let effectiveHostname = request.hostname;
+  let explicitTenant = headerFirst(request.headers["x-bazion-tenant"]);
+
+  if (config.NODE_ENV !== "production" && normalizeHostForRouting(request.hostname).isLoopbackHost) {
+    const forwardedHost = headerFirst(request.headers["x-forwarded-host"])?.split(",", 1)[0]?.trim();
+    if (forwardedHost && !normalizeHostForRouting(forwardedHost).isLoopbackHost) {
+      effectiveHostname = forwardedHost;
+    } else {
+      const originHost = extractLocalSubdomainHostFromUrl(headerFirst(request.headers.origin));
+      const refererHost = extractLocalSubdomainHostFromUrl(headerFirst(request.headers.referer));
+      if (originHost) effectiveHostname = originHost;
+      else if (refererHost) effectiveHostname = refererHost;
+    }
+
+    if (!explicitTenant) {
+      explicitTenant = parseCookieValue(headerFirst(request.headers.cookie), "bazion_tenant");
+    }
+  }
+
+  return {
+    hostname: effectiveHostname,
+    ...(explicitTenant ? { explicitTenant } : {}),
+  };
 }
 
 async function resolveFallbackTenantId(
@@ -80,6 +146,14 @@ export async function resolveTenantRouting(
     };
   }
 
+  if (config.PUBLIC_STOREFRONT_URL) {
+    const previewSlug = extractTenantSlugFromHost(cleanHost, config.PUBLIC_STOREFRONT_URL);
+    if (previewSlug) {
+      const previewTenant = await resolvePublicTenantBySlug(previewSlug);
+      if (previewTenant) return { tenantId: previewTenant.id, installationId: null };
+    }
+  }
+
   return {
     tenantId: await resolveFallbackTenantId(cleanHost, isLoopbackHost, config, explicitTenantSlugOrId),
     installationId: null,
@@ -106,5 +180,29 @@ export async function resolveTenantId(
   const tenant = await resolvePublicTenantByHostname(cleanHost);
   if (tenant) return tenant.id;
 
+  if (config.PUBLIC_STOREFRONT_URL) {
+    const previewSlug = extractTenantSlugFromHost(cleanHost, config.PUBLIC_STOREFRONT_URL);
+    if (previewSlug) {
+      const previewTenant = await resolvePublicTenantBySlug(previewSlug);
+      if (previewTenant) return previewTenant.id;
+    }
+  }
+
   return resolveFallbackTenantId(cleanHost, isLoopbackHost, config, explicitTenantSlugOrId);
+}
+
+export async function resolveRequestTenantId(
+  request: { hostname: string; headers: Record<string, string | string[] | undefined> },
+  config: AppConfig,
+): Promise<string> {
+  const { hostname, explicitTenant } = extractRequestTenantInputs(request, config);
+  return resolveTenantId(hostname, config, explicitTenant);
+}
+
+export async function resolveRequestTenantRouting(
+  request: { hostname: string; headers: Record<string, string | string[] | undefined> },
+  config: AppConfig,
+): Promise<TenantRoutingContext> {
+  const { hostname, explicitTenant } = extractRequestTenantInputs(request, config);
+  return resolveTenantRouting(hostname, config, explicitTenant);
 }

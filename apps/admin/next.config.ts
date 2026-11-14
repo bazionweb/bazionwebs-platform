@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 import path from "node:path";
 
-const apiBaseUrl = (process.env.API_BASE_URL ?? "http://localhost:4100").replace(/\/$/, "");
+const apiBaseUrl = (process.env.API_BASE_URL ?? "http://localhost:4000").replace(/\/$/, "");
 
 const nextConfig: NextConfig = {
   output: "standalone",

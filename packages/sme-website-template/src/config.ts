@@ -2,7 +2,9 @@ import { z } from "zod";
 import {
   WEBSITE_ENQUIRY_PRIVACY_NOTICE_VERSION,
   WEBSITE_CONFIGURATION_VERSION,
+  createWhiteLabeledPackageConfig,
   websiteConfigurationSchema,
+  type WhiteLabelPaletteId,
 } from "@bazion/website-contracts";
 
 export const SME_WEBSITE_TEMPLATE_VERSION = "1.0.0" as const;
@@ -67,3 +69,58 @@ export const defaultSmeWebsiteTemplateConfig = smeWebsiteTemplateConfigSchema.pa
     privacyNotice: "",
   },
 });
+
+export interface CreateWhiteLabeledSmeWebsiteInput {
+  tenantSlug: string;
+  businessName: string;
+  templateId?: "sme-corporate-authority" | "sme-local-services";
+  tagline?: string;
+  introduction?: string;
+  about?: string;
+  paletteId?: WhiteLabelPaletteId;
+  primaryColor?: string;
+  secondaryColor?: string;
+  accentColor?: string;
+  contact?: {
+    email?: string;
+    telephone?: string;
+    address?: string;
+  };
+  services?: Array<{ id?: string; name: string; description: string }>;
+  includeStarterContent?: boolean;
+}
+
+/**
+ * Generates a white-labeled, contrast-compliant `SmeWebsiteTemplateConfig` for any SME or
+ * commercial tenant without carrying demo or other tenant identifiers.
+ */
+export function createWhiteLabeledSmeWebsiteConfig(
+  input: CreateWhiteLabeledSmeWebsiteInput,
+): SmeWebsiteTemplateConfig {
+  const generated = createWhiteLabeledPackageConfig({
+    packageId: "sme-website",
+    tenantSlug: input.tenantSlug,
+    brandName: input.businessName,
+    ...(input.templateId ? { templateId: input.templateId } : {}),
+    ...(input.tagline ? { tagline: input.tagline } : {}),
+    ...(input.introduction ? { introduction: input.introduction } : {}),
+    ...(input.about ? { about: input.about } : {}),
+    ...(input.paletteId ? { paletteId: input.paletteId } : {}),
+    themeOverrides: {
+      ...(input.primaryColor ? { primaryColor: input.primaryColor } : {}),
+      ...(input.secondaryColor ? { secondaryColor: input.secondaryColor } : {}),
+      ...(input.accentColor ? { accentColor: input.accentColor } : {}),
+    },
+    contact: {
+      ...(input.contact?.email ? { email: input.contact.email } : {}),
+      ...(input.contact?.telephone ? { phones: [input.contact.telephone] } : {}),
+      ...(input.contact?.address ? { address: input.contact.address } : {}),
+    },
+    ...(input.services ? { offerings: input.services } : {}),
+    ...(input.includeStarterContent !== undefined
+      ? { includeStarterContent: input.includeStarterContent }
+      : {}),
+  });
+
+  return smeWebsiteTemplateConfigSchema.parse(generated.smeConfig);
+}

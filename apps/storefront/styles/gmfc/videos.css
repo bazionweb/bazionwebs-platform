@@ -1,0 +1,125 @@
+/* ==========================================================================
+   VIDEOS PAGE - GLOBAL MISSION FCI
+   ========================================================================== */
+
+.gmfci-videos-container {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 80px 24px 120px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 50vh;
+}
+
+.gmfci-videos-hub {
+    background: var(--color-white);
+    border-radius: 24px;
+    padding: 60px 40px;
+    max-width: 800px;
+    width: 100%;
+    text-align: center;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.06);
+    border: 1px solid rgba(0,0,0,0.05);
+    position: relative;
+    overflow: hidden;
+}
+
+/* Subtle background accent */
+.gmfci-videos-hub::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 6px;
+    background: linear-gradient(90deg, #FF0000, #CC0000); /* YouTube Red */
+}
+
+.gmfci-yt-icon-wrapper {
+    width: 90px;
+    height: 90px;
+    background: rgba(255, 0, 0, 0.08);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 30px;
+    color: var(--color-youtube-red);
+}
+
+.gmfci-yt-icon-wrapper svg {
+    width: 44px;
+    height: 44px;
+}
+
+.gmfci-videos-hub h2 {
+    font-family: 'Fraunces', serif;
+    font-size: 42px;
+    font-weight: 800;
+    color: var(--gmfci-ink);
+    margin-bottom: 20px;
+    line-height: 1.15;
+}
+
+.gmfci-videos-hub p {
+    font-size: 18px;
+    color: var(--gmfci-ink-soft);
+    line-height: 1.6;
+    margin-bottom: 40px;
+    max-width: 600px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.gmfci-btn-yt {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    background: var(--color-youtube-red);
+    color: var(--color-white) !important;
+    padding: 16px 36px;
+    border-radius: 50px;
+    font-size: 16px;
+    font-weight: 700;
+    text-decoration: none !important;
+    box-shadow: 0 8px 25px rgba(255, 0, 0, 0.25);
+    transition: all 0.3s var(--gmfci-ease);
+}
+
+.gmfci-btn-yt svg {
+    width: 24px;
+    height: 24px;
+}
+
+.gmfci-btn-yt:hover {
+    background: #CC0000;
+    transform: translateY(-3px);
+    box-shadow: 0 12px 30px rgba(255, 0, 0, 0.35);
+}
+
+/* ── Live / Recent Tag ─────────────────────────────────────────────────── */
+.gmfci-yt-tag {
+    display: inline-block;
+    padding: 6px 16px;
+    background: rgba(255, 0, 0, 0.1);
+    color: var(--color-youtube-red);
+    border-radius: 50px;
+    font-size: 13px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 24px;
+}
+
+@media (max-width: 768px) {
+    .gmfci-videos-hub {
+        padding: 40px 20px;
+    }
+    .gmfci-videos-hub h2 {
+        font-size: 32px;
+    }
+    .gmfci-videos-hub p {
+        font-size: 16px;
+    }
+}

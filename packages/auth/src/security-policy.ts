@@ -119,8 +119,8 @@ export async function resolveTrustedOriginsForRequest(
   try {
     const parsed = new URL(origin);
     const host = normalizeTenantHostname(parsed.hostname);
-    const local = host === "localhost" || host === "127.0.0.1";
     if (!host || parsed.username || parsed.password) return defaultOrigins;
+    const local = host === "localhost" || host === "127.0.0.1" || host.endsWith(".localhost");
     if (local && nodeEnv !== "production") return [...new Set([...defaultOrigins, origin])];
     if (parsed.protocol !== "https:" || (parsed.port !== "" && parsed.port !== "443")) return defaultOrigins;
     if (await isVerifiedTenantHost(host)) return [...new Set([...defaultOrigins, origin])];
