@@ -13,6 +13,34 @@ test("responsive media uses cached Cloudflare widths for the configured public p
   assert.match(sources.srcSet, /width=1920/);
 });
 
+test("same-zone static raster assets use responsive Cloudflare formats only when explicitly enabled", () => {
+  const source = getResponsiveImageSources("/images/events/mission impact.jpg", "", undefined, true);
+  assert.equal(source.src, "/cdn-cgi/image/fit=scale-down,width=960,quality=80,format=auto/images/events/mission%20impact.jpg");
+  assert.ok(source.srcSet?.includes("width=320,quality=80,format=auto/images/events/mission%20impact.jpg 320w"));
+  assert.ok(source.srcSet?.includes("width=1920,quality=80,format=auto/images/events/mission%20impact.jpg 1920w"));
+  assert.deepEqual(getResponsiveImageSources("/images/events/mission-impact.jpg", ""), { src: "/images/events/mission-impact.jpg" });
+  assert.deepEqual(getResponsiveImageSources(`${mediaBase}/tenant-1/photo.jpg`, mediaBase, undefined, true, false), {
+    src: `${mediaBase}/tenant-1/photo.jpg`,
+  });
+  assert.match(getResponsiveImageSources("/images/site-image.jpg", mediaBase, undefined, true, false).src, /^\/cdn-cgi\/image\//);
+});
+
+test("same-zone transforms reject paths outside raster assets and unsafe path syntax", () => {
+  for (const source of [
+    "/api/private.jpg",
+    "/images/../private.jpg",
+    "/images/%2e%2e/private.jpg",
+    "/images/%252e%252e/private.jpg",
+    "/images/%2fprivate.jpg",
+    "/images//private.jpg",
+    "/images/private.jpg?signature=secret",
+    "/images/logo.svg",
+    "//other.example/images/photo.jpg",
+  ]) {
+    assert.deepEqual(getResponsiveImageSources(source, "", undefined, true), { src: source });
+  }
+});
+
 test("relative, external, and other-origin sources are not sent through a remote fetch proxy", () => {
   for (const source of ["/v1/public/church/media/logo", "https://images.example.net/portrait.jpg", "http://media.example.org/uploads/image.jpg"]) {
     assert.deepEqual(getResponsiveImageSources(source, mediaBase), { src: source });
@@ -94,4 +122,6 @@ test("Cloudflare transforms stay opt-in until the media zone is explicitly enabl
   const layout = await readFile(path.join(process.cwd(), "apps", "storefront", "app", "layout.tsx"), "utf8");
   assert.match(component, /imageTransformsEnabled:\s*false/);
   assert.match(layout, /MEDIA_IMAGE_TRANSFORMS_ENABLED\s*===\s*"true"/);
+  assert.match(layout, /SITE_IMAGE_TRANSFORMS_ENABLED\s*===\s*"true"/);
+  assert.match(component, /siteImageTransformsEnabled:\s*false/);
 });

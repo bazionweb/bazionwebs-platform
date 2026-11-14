@@ -59,6 +59,7 @@ export default function RootLayout({
         <ResponsiveImageProvider
           publicMediaBaseUrl={process.env.MEDIA_STORAGE_PUBLIC_BASE_URL ?? ""}
           imageTransformsEnabled={process.env.MEDIA_IMAGE_TRANSFORMS_ENABLED === "true"}
+          siteImageTransformsEnabled={process.env.SITE_IMAGE_TRANSFORMS_ENABLED === "true"}
         >
           <SiteThemeProvider>{children}</SiteThemeProvider>
         </ResponsiveImageProvider>

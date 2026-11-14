@@ -34,9 +34,14 @@ export function getResponsiveImageSources(
   source: string,
   publicMediaBaseUrl: string,
   widths: readonly number[] = RESPONSIVE_WIDTHS,
+  siteImageTransformsEnabled = false,
+  mediaTransformsEnabled = true,
 ): ResponsiveImageSources {
   const unchanged = { src: source };
-  const mediaBase = parseHttpsUrl(publicMediaBaseUrl);
+  const siteImage = siteImageTransformsEnabled ? getSameZoneImageSources(source, widths) : null;
+  if (siteImage) return siteImage;
+
+  const mediaBase = mediaTransformsEnabled ? parseHttpsUrl(publicMediaBaseUrl) : null;
   const imageUrl = parseHttpsUrl(source);
   if (!mediaBase || !imageUrl || imageUrl.origin !== mediaBase.origin) return unchanged;
 
@@ -53,6 +58,40 @@ export function getResponsiveImageSources(
   };
   const uniqueWidths = [...new Set(widths)].sort((left, right) => left - right);
   const fallbackWidth = uniqueWidths.includes(960) ? 960 : uniqueWidths[uniqueWidths.length - 1];
+  return {
+    src: buildUrl(fallbackWidth!),
+    srcSet: uniqueWidths.map((width) => `${buildUrl(width)} ${width}w`).join(", "),
+  };
+}
+
+/**
+ * Transform only raster assets served by this tenant's own site zone. Keeping
+ * this separate from media-origin transforms avoids proxying arbitrary paths
+ * or relying on a tenant's media bucket being on the same Cloudflare zone.
+ */
+function getSameZoneImageSources(source: string, widths: readonly number[]): ResponsiveImageSources | null {
+  if (!source.startsWith("/images/") || /[?#\\\u0000-\u001f\u007f]/.test(source)) return null;
+  if (!/\.(?:avif|jpe?g|png|webp)$/i.test(source)) return null;
+  if (/%(?:2f|5c|2e)/i.test(source)) return null;
+  if (!widths.length || widths.some((width) => !RESPONSIVE_WIDTHS.includes(width as (typeof RESPONSIVE_WIDTHS)[number]))) return null;
+
+  const segments = source.slice(1).split("/");
+  if (segments.some((segment) => !segment)) return null;
+  const safeSegments: string[] = [];
+  try {
+    for (const segment of segments) {
+      const decoded = decodeURIComponent(segment);
+      if (decoded === "." || decoded === ".." || decoded.includes("%") || /[\\/\u0000-\u001f\u007f]/.test(decoded)) return null;
+      safeSegments.push(encodeURIComponent(decoded));
+    }
+  } catch {
+    return null;
+  }
+
+  const uniqueWidths = [...new Set(widths)].sort((left, right) => left - right);
+  const fallbackWidth = uniqueWidths.includes(960) ? 960 : uniqueWidths[uniqueWidths.length - 1];
+  const sourcePath = safeSegments.join("/");
+  const buildUrl = (width: number) => `/cdn-cgi/image/fit=scale-down,width=${width},quality=80,format=auto/${sourcePath}`;
   return {
     src: buildUrl(fallbackWidth!),
     srcSet: uniqueWidths.map((width) => `${buildUrl(width)} ${width}w`).join(", "),
