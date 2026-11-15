@@ -4,6 +4,7 @@ import { useCallback } from "react";
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Autoplay, Pagination, EffectCoverflow } from "swiper/modules";
 import type { Swiper as SwiperClass } from "swiper";
+import { ResponsiveImage } from "@bazion/ui";
 import "swiper/css";
 import "swiper/css/effect-coverflow";
 import "swiper/css/pagination";
@@ -77,10 +78,11 @@ export function GallerySlider({ images }: { images: GalleryImage[] }) {
                   background: "#1a0b00",
                 }}
               >
-                <img
+                <ResponsiveImage
                   src={img.src}
                   alt={img.alt}
                   loading={index < 3 ? "eager" : "lazy"}
+                  sizes="(max-width: 640px) 88vw, 460px"
                   style={{
                     position: "absolute",
                     inset: 0,
@@ -100,4 +102,3 @@ export function GallerySlider({ images }: { images: GalleryImage[] }) {
 }
 
 export default GallerySlider;
-

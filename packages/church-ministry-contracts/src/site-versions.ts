@@ -22,4 +22,3 @@ export const siteSettingsPublishInputSchema = z.object({
   note: z.string().trim().max(250).optional(),
 });
 export type SiteSettingsPublishInput = z.infer<typeof siteSettingsPublishInputSchema>;
-

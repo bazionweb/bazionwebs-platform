@@ -112,4 +112,3 @@ describe("church ministry operations contracts", () => {
     expect(directory.success).toBe(true);
   });
 });
-

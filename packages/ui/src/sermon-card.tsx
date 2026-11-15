@@ -1,5 +1,7 @@
 "use client";
 
+import { ResponsiveImage } from "./responsive-image.js";
+
 export interface SermonCardProps {
   id: string;
   title: string;
@@ -36,7 +38,7 @@ export function SermonCard({
   return (
     <article className="ch-card">
       <div className="ch-card-media">
-        <img src={thumbnail} alt={title} loading="lazy" />
+        <ResponsiveImage src={thumbnail} alt={title} sizes="(max-width: 760px) 100vw, (max-width: 1100px) 50vw, 33vw" />
         {youtubeVideoId && (
           <button
             type="button"

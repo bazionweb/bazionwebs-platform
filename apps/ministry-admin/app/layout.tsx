@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Plus_Jakarta_Sans, Inter, Outfit, Fraunces } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 import "./recovery.css";
 import "./admin-shell.css";
@@ -10,28 +10,45 @@ import "@bazion/ui/church.css";
 import "@bazion/ui/pulse.css";
 import { PulseHost } from "@bazion/ui";
 
-const plusJakartaSans = Plus_Jakarta_Sans({
+const plusJakartaSans = localFont({
+  src: "../../../packages/ui/assets/fonts/plus-jakarta-sans-latin.woff2",
   variable: "--font-jakarta",
-  subsets: ["latin"],
+  weight: "200 800",
   display: "swap",
 });
 
-const inter = Inter({
+const inter = localFont({
+  src: "../../../packages/ui/assets/fonts/inter-latin.woff2",
   variable: "--font-inter",
-  subsets: ["latin"],
+  weight: "100 900",
   display: "swap",
+  preload: false,
 });
 
-const outfit = Outfit({
+const outfit = localFont({
+  src: "../../../packages/ui/assets/fonts/outfit-latin.woff2",
   variable: "--font-outfit",
-  subsets: ["latin"],
+  weight: "100 900",
   display: "swap",
+  preload: false,
 });
 
-const fraunces = Fraunces({
+const fraunces = localFont({
+  src: [
+    {
+      path: "../../../packages/ui/assets/fonts/fraunces-latin.woff2",
+      weight: "100 900",
+      style: "normal",
+    },
+    {
+      path: "../../../packages/ui/assets/fonts/fraunces-latin-italic.woff2",
+      weight: "100 900",
+      style: "italic",
+    },
+  ],
   variable: "--font-fraunces",
-  subsets: ["latin"],
   display: "swap",
+  preload: false,
 });
 
 export const metadata: Metadata = {
@@ -39,7 +56,8 @@ export const metadata: Metadata = {
     default: "Ministry Operations Console | Bazion Web",
     template: "%s | Ministry Operations Console",
   },
-  description: "Dedicated church staff administration for website publishing, departments, life groups, volunteer teams, and physical inventory.",
+  description:
+    "Dedicated church staff administration for website publishing, departments, life groups, volunteer teams, and physical inventory.",
 };
 
 export default function RootLayout({
@@ -59,4 +77,3 @@ export default function RootLayout({
     </html>
   );
 }
-

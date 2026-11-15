@@ -1,15 +1,15 @@
 /* ==========================================================================
    Bazion Web Platform — Church & Ministry Design System Tokens & Base Styles
    Target: Reusable across church/ministry tenants (Global Mission FC, etc.)
-   Typography: Trebuchet MS & Plus Jakarta Sans
+   Typography: font variables supplied by each application layout
    ========================================================================== */
 
 :root {
-  --font-sans: var(--font-jakarta, "Plus Jakarta Sans", "Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif);
-  --font-serif: "Trebuchet MS", "Lucida Grande", "Lucida Sans Unicode", "Lucida Sans", Tahoma, sans-serif;
-  --font-outfit: var(--font-outfit, "Outfit", sans-serif);
-  --font-inter: var(--font-inter, "Inter", sans-serif);
-  --font-fraunces: var(--font-fraunces, "Fraunces", Georgia, serif);
+  --font-sans: var(--font-plus-jakarta, var(--font-jakarta, "Plus Jakarta Sans")), var(--font-inter), ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-serif: var(--font-fraunces, "Trebuchet MS", "Lucida Grande", "Lucida Sans Unicode", "Lucida Sans", Tahoma, sans-serif);
+  --church-font-outfit: var(--font-outfit, "Outfit", sans-serif);
+  --church-font-inter: var(--font-inter, var(--font-inter-fallback, Arial), sans-serif);
+  --church-font-fraunces: var(--font-fraunces, Georgia, serif);
   --church-gold: #D9A857;
   --church-gold-light: #F59E0B;
   --church-maroon: #4A1110;
@@ -208,9 +208,21 @@ body { background: var(--church-bg); color: var(--church-text); font-family: var
   overflow: hidden;
 }
 
+.ch-hero-image,
+.ch-hero-image-overlay {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.ch-hero-image { object-fit: cover; object-position: center; }
+.ch-hero-image-overlay { background: linear-gradient(rgba(10, 25, 47, 0.85), rgba(10, 25, 47, 0.95)); }
+
 .ch-hero-particles {
   position: absolute;
-  z-index: 1;
+  z-index: 2;
   inset: 0;
   overflow: hidden;
   contain: paint;
@@ -257,7 +269,7 @@ body { background: var(--church-bg); color: var(--church-text); font-family: var
 
 .ch-hero-content {
   position: relative;
-  z-index: 2;
+  z-index: 3;
   max-width: 800px;
 }
 
@@ -1243,22 +1255,22 @@ body.theme-sanctuary-charcoal,
 :root.font-pairing-outfit-inter,
 body.font-pairing-outfit-inter,
 [data-font-pairing="outfit-inter"] {
-  --church-font: var(--font-inter);
-  --church-serif: var(--font-outfit);
+  --church-font: var(--church-font-inter);
+  --church-serif: var(--church-font-outfit);
 }
 
 :root.font-pairing-jakarta-inter,
 body.font-pairing-jakarta-inter,
 [data-font-pairing="jakarta-inter"] {
-  --church-font: var(--font-inter);
+  --church-font: var(--church-font-inter);
   --church-serif: var(--font-sans);
 }
 
 :root.font-pairing-serif-classic,
 body.font-pairing-serif-classic,
 [data-font-pairing="serif-classic"] {
-  --church-font: var(--font-inter);
-  --church-serif: var(--font-fraunces);
+  --church-font: var(--church-font-inter);
+  --church-serif: var(--church-font-fraunces);
 }
 
 /* ── Card Styles ──────────────────────────────────────────────── */
@@ -1605,4 +1617,3 @@ body.font-pairing-serif-classic,
   color: var(--church-primary);
   border-bottom-color: var(--church-accent);
 }
-

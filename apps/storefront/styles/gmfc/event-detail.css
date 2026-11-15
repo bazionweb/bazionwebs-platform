@@ -27,7 +27,7 @@
   top: 32px;
 }
 
-/* 
+/*
  * ASPECT RATIO BEST PRACTICE:
  * We use `aspect-ratio: auto` with a max-height so the image expands
  * naturally to fill its intrinsic ratio (portrait or landscape).

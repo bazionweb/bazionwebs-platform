@@ -117,4 +117,3 @@ export function EventBanner() {
 }
 
 export default EventBanner;
-

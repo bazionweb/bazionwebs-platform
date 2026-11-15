@@ -130,4 +130,3 @@ export function Navbar({ currentPath }: { currentPath?: string }) {
 }
 
 export default Navbar;
-

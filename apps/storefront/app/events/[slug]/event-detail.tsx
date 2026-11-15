@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { ResponsiveImage } from "@bazion/ui";
 import { SiteChrome } from "../../../components/gmfc/SiteChrome";
 import { PageHero } from "../../../components/gmfc/PageHero";
 import { EventCalendarButton } from "../event-calendar-button";
@@ -172,10 +173,11 @@ export function EventDetail({ slug }: { slug: string }) {
               {event.posterUrl && (
                 <div className="gmfci-evd-image-col">
                   <div className="gmfci-evd-image-wrap">
-                    <img
+                    <ResponsiveImage
                       src={event.posterUrl}
                       alt={event.title}
                       className="gmfci-evd-image"
+                      sizes="(max-width: 760px) 100vw, 50vw"
                       style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}
                     />
                   </div>

@@ -147,4 +147,3 @@
 .ministry-content-list{display:grid;gap:12px}
 .ministry-content-entry{display:grid;gap:14px;padding:15px;border:1px solid var(--church-border);border-radius:12px;background:#fff}
 @media(max-width:500px){.ministry-media-input-row{flex-wrap:wrap}.ministry-media-input-row>input[type=text]{flex-basis:100%}.ministry-media-library-heading,.ministry-content-list-heading{align-items:flex-start}.ministry-media-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
-

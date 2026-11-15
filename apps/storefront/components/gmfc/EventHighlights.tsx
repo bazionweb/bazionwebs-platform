@@ -163,4 +163,3 @@ export function EventHighlights() {
 }
 
 export default EventHighlights;
-

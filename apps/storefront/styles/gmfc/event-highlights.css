@@ -199,11 +199,11 @@
     align-items: flex-start;
     gap: 20px;
   }
-  
+
   .gmfci-eh-card {
     flex-direction: column;
   }
-  
+
   .gmfci-eh-img-wrap {
     flex: none;
     height: 250px;

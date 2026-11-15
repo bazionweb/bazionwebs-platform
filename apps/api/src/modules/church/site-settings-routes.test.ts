@@ -93,4 +93,3 @@ describe("Church Site Settings Versions & Rollback Routes", () => {
     expect(res.json().success).toBe(true);
   });
 });
-

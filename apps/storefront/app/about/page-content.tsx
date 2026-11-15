@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { SiteChrome } from "../../components/gmfc/SiteChrome";
 import { PageHero } from "../../components/gmfc/PageHero";
+import { ResponsiveImage } from "@bazion/ui";
 import { useMinistrySite } from "../../lib/use-ministry-site";
 
 const DEFAULT_DIRECTOR_MESSAGE =
@@ -135,9 +136,10 @@ export default function AboutPage() {
               <div className="gmfci-director-grid">
                 <div className="gmfci-director-photo-wrap">
                   <div className="gmfci-director-photo-frame">
-                    <img
+                    <ResponsiveImage
                       src={directorImg}
                       alt={directorDisplay}
+                      sizes="(max-width: 760px) 100vw, 40vw"
                       style={{
                         width: "300px",
                         height: "400px",
@@ -206,10 +208,11 @@ export default function AboutPage() {
                       return (
                         <article key={leader.id} className="gmfci-leader-card ch-card">
                           <div className="gmfci-leader-media">
-                            <img
+                            <ResponsiveImage
                               src={leader.photoUrl || "/images/anthony-githui.jpg"}
                               alt={leader.name}
                               loading="lazy"
+                              sizes="(max-width: 700px) 100vw, (max-width: 1100px) 50vw, 33vw"
                               style={isShadrach ? { objectPosition: "center 24%" } : undefined}
                             />
                             <span className="gmfci-leader-badge">{leader.role}</span>

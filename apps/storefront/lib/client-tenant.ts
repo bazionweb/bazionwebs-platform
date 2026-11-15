@@ -39,4 +39,3 @@ export function getClientTenantHeaders(): Record<string, string> {
   const slug = detectClientTenantSlug();
   return slug ? { "x-bazion-tenant": slug } : {};
 }
-

@@ -73,4 +73,3 @@ export async function rollbackSiteSettingsVersionUseCase(
   }
   return repository.rollbackToVersion(tenantId, versionNumber, rolledBackBy, note);
 }
-

@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
-import { Plus_Jakarta_Sans, Inter, Outfit, Fraunces } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 import "./recovery.css";
+import "./font-fallbacks.css";
 import "@bazion/ui/tokens.css";
 import "@bazion/ui/primitives.css";
 import "@bazion/ui/navigation.css";
@@ -10,37 +11,63 @@ import "@bazion/ui/pulse.css";
 import "../styles/gmfc/index.css";
 import { PulseHost } from "@bazion/ui";
 import { SiteThemeProvider } from "../lib/site-theme-provider";
-import { fetchTenantPublicData, getTenantRequestContext } from "../lib/server-tenant-api";
+import { ResponsiveImageProvider } from "@bazion/ui";
+import {
+  fetchTenantPublicData,
+  getTenantRequestContext,
+} from "../lib/server-tenant-api";
 
-const plusJakartaSans = Plus_Jakarta_Sans({
-  variable: "--font-jakarta",
-  subsets: ["latin"],
+const plusJakartaSans = localFont({
+  src: "../../../packages/ui/assets/fonts/plus-jakarta-sans-latin.woff2",
+  variable: "--font-plus-jakarta",
+  weight: "200 800",
   display: "swap",
 });
 
-const inter = Inter({
+const inter = localFont({
+  src: "../../../packages/ui/assets/fonts/inter-latin.woff2",
   variable: "--font-inter",
-  subsets: ["latin"],
+  weight: "100 900",
   display: "swap",
+  preload: false,
 });
 
-const outfit = Outfit({
+const outfit = localFont({
+  src: "../../../packages/ui/assets/fonts/outfit-latin.woff2",
   variable: "--font-outfit",
-  subsets: ["latin"],
+  weight: "100 900",
   display: "swap",
+  preload: false,
 });
 
-const fraunces = Fraunces({
+const fraunces = localFont({
+  src: [
+    {
+      path: "../../../packages/ui/assets/fonts/fraunces-latin.woff2",
+      weight: "100 900",
+      style: "normal",
+    },
+    {
+      path: "../../../packages/ui/assets/fonts/fraunces-latin-italic.woff2",
+      weight: "100 900",
+      style: "italic",
+    },
+  ],
   variable: "--font-fraunces",
-  subsets: ["latin"],
-  style: ["normal", "italic"],
   display: "swap",
+  preload: false,
 });
 
 interface PublicSiteMetadataResponse {
   tenant?: { name?: string | null } | null;
-  profile?: { ministryName?: string | null; description?: string | null } | null;
-  siteSettings?: { metadata?: { title?: string; description?: string }; branding?: { heroImageUrl?: string } } | null;
+  profile?: {
+    ministryName?: string | null;
+    description?: string | null;
+  } | null;
+  siteSettings?: {
+    metadata?: { title?: string; description?: string };
+    branding?: { heroImageUrl?: string };
+  } | null;
 }
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -48,10 +75,16 @@ export async function generateMetadata(): Promise<Metadata> {
     fetchTenantPublicData<PublicSiteMetadataResponse>("/v1/public/church/site"),
     getTenantRequestContext(),
   ]);
-  const ministryName = site?.profile?.ministryName?.trim() || site?.tenant?.name?.trim() || "Church & Ministry";
+  const ministryName =
+    site?.profile?.ministryName?.trim() ||
+    site?.tenant?.name?.trim() ||
+    "Church & Ministry";
   const title = site?.siteSettings?.metadata?.title?.trim() || ministryName;
-  const description = (site?.siteSettings?.metadata?.description?.trim() ||
-    site?.profile?.description?.trim() || "Service information, community, events, sermons and giving.").slice(0, 320);
+  const description = (
+    site?.siteSettings?.metadata?.description?.trim() ||
+    site?.profile?.description?.trim() ||
+    "Service information, community, events, sermons and giving."
+  ).slice(0, 320);
   const image = site?.siteSettings?.branding?.heroImageUrl;
 
   return {
@@ -86,7 +119,17 @@ export default function RootLayout({
       className={`${plusJakartaSans.variable} ${inter.variable} ${outfit.variable} ${fraunces.variable}`}
     >
       <body>
-        <SiteThemeProvider>{children}</SiteThemeProvider>
+        <ResponsiveImageProvider
+          publicMediaBaseUrl={process.env.MEDIA_STORAGE_PUBLIC_BASE_URL ?? ""}
+          imageTransformsEnabled={
+            process.env.MEDIA_IMAGE_TRANSFORMS_ENABLED === "true"
+          }
+          siteImageTransformsEnabled={
+            process.env.SITE_IMAGE_TRANSFORMS_ENABLED === "true"
+          }
+        >
+          <SiteThemeProvider>{children}</SiteThemeProvider>
+        </ResponsiveImageProvider>
         <PulseHost position="top-right" />
       </body>
     </html>

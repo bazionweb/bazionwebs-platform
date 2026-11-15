@@ -1,3 +1,5 @@
+import { ResponsiveImage } from "./responsive-image.js";
+
 export interface LeadershipCardProps {
   id: string;
   name: string;
@@ -10,10 +12,10 @@ export function LeadershipCard({ name, role, bio, photoUrl }: LeadershipCardProp
   return (
     <article className="ch-card ch-leadership-card">
       <div className="ch-card-media ch-leadership-card-media">
-        <img
+        <ResponsiveImage
           src={photoUrl || "/images/leader-placeholder.jpg"}
           alt={name}
-          loading="lazy"
+          sizes="(max-width: 760px) 100vw, 33vw"
         />
       </div>
       <div className="ch-card-body ch-leadership-card-body">
