@@ -67,7 +67,7 @@ export async function buildApp(config: AppConfig) {
     },
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization", "Idempotency-Key", "X-Donation-Status-Token", "X-Payment-Status-Token", "X-Requested-With"],
+    allowedHeaders: ["Content-Type", "Authorization", "Idempotency-Key", "X-Donation-Status-Token", "X-Payment-Status-Token", "X-Requested-With", "x-bazion-tenant", "X-Bazion-Tenant"],
   });
   await app.register(rateLimit, { max: 120, timeWindow: "1 minute" });
 

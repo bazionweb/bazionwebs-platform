@@ -98,3 +98,104 @@ export const FINANCE_EMAIL = 'finance@bmiuniversities.org' as const;
 
 /** The alumni network contact email address. */
 export const ALUMNI_EMAIL = 'alumni@bmiuniversities.org' as const;
+
+/** Canonical Tenant IDs for education organizations */
+export const BMI_UNIVERSITY_TENANT_ID = '00000000-0000-4000-8000-000000000055' as const;
+export const BEMI_INSTITUTE_TENANT_ID = '00000000-0000-4000-8000-000000000056' as const;
+export const BMI_LEGACY_TENANT_ID = 'b1000000-0000-4000-8000-000000000001' as const;
+export const BEMI_LEGACY_TENANT_ID = 'b2000000-0000-4000-8000-000000000002' as const;
+
+/** Production domains for BMI University */
+export const BMI_PRODUCTION_DOMAINS: readonly string[] = [
+  'bmi.ac.ke',
+  'www.bmi.ac.ke',
+  'university.bmi.ac.ke',
+  'portal.bmi.ac.ke',
+  'ums.bmi.ac.ke',
+  'verify.bmi.ac.ke',
+  'apply.bmi.ac.ke',
+  'admin.bmi.ac.ke',
+  'bmiuniversities.org',
+  'www.bmiuniversities.org',
+  'portal.bmiuniversities.org',
+  'ums.bmiuniversities.org',
+  'verify.bmiuniversities.org',
+  'admin.bmiuniversities.org',
+  'apply.bmiuniversities.org',
+  'api.bmiuniversities.org',
+  'bmi-university.pages.dev',
+  'bmi-portal.pages.dev',
+  'bmi-ums.pages.dev',
+  'portal.bmi-university.pages.dev',
+  'ums.bmi-university.pages.dev',
+  'main.bmi-university.pages.dev',
+] as const;
+
+/** Production domains for BEMI Institute */
+export const BEMI_PRODUCTION_DOMAINS: readonly string[] = [
+  'bemi.org',
+  'www.bemi.org',
+  'institute.bemi.org',
+  'portal.bemi.org',
+  'bemi.ac.ke',
+  'www.bemi.ac.ke',
+  'bemi-institute.pages.dev',
+] as const;
+
+/** Local development subdomains for BMI University (resolves to 127.0.0.1 in modern browsers) */
+export const BMI_DEV_DOMAINS: readonly string[] = [
+  'bmi.localhost',
+  'bmi-university.localhost',
+  'university.localhost',
+  'portal.bmi.localhost',
+  'ums.bmi.localhost',
+] as const;
+
+/** Local development subdomains for BEMI Institute (resolves to 127.0.0.1 in modern browsers) */
+export const BEMI_DEV_DOMAINS: readonly string[] = [
+  'bemi.localhost',
+  'bemi-institute.localhost',
+  'institute.localhost',
+  'portal.bemi.localhost',
+] as const;
+
+/** Helper to extract bare hostname without port or scheme */
+export function cleanHostname(host: string): string {
+  const trimmed = (host || '').trim().toLowerCase();
+  const withoutPort = trimmed.split(':', 1)[0] ?? trimmed;
+  return withoutPort.replace(/^https?:\/\//, '').split('/', 1)[0] ?? withoutPort;
+}
+
+/** Check if host corresponds to BMI University */
+export function isBmiHost(hostname: string): boolean {
+  const clean = cleanHostname(hostname);
+  if (!clean) return false;
+  if ((BMI_PRODUCTION_DOMAINS as readonly string[]).includes(clean)) return true;
+  if ((BMI_DEV_DOMAINS as readonly string[]).includes(clean)) return true;
+  if (clean.endsWith('.localhost')) {
+    const sub = clean.slice(0, -'.localhost'.length);
+    if (sub === 'bmi' || sub.startsWith('bmi-') || sub.endsWith('-bmi')) return true;
+  }
+  if (clean.includes('bmiuniversities') || clean.includes('bmi-university')) return true;
+  return false;
+}
+
+/** Check if host corresponds to BEMI Institute */
+export function isBemiHost(hostname: string): boolean {
+  const clean = cleanHostname(hostname);
+  if (!clean) return false;
+  if ((BEMI_PRODUCTION_DOMAINS as readonly string[]).includes(clean)) return true;
+  if ((BEMI_DEV_DOMAINS as readonly string[]).includes(clean)) return true;
+  if (clean.endsWith('.localhost')) {
+    const sub = clean.slice(0, -'.localhost'.length);
+    if (sub === 'bemi' || sub.startsWith('bemi-') || sub.endsWith('-bemi')) return true;
+  }
+  if (clean.includes('bemi.org') || clean.includes('bemi-institute')) return true;
+  return false;
+}
+
+/** Check if host corresponds to an education tenant */
+export function isEducationHost(hostname: string): boolean {
+  return isBmiHost(hostname) || isBemiHost(hostname);
+}
+

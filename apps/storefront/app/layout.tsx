@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { Plus_Jakarta_Sans, Inter, Outfit, Fraunces } from "next/font/google";
 import "./globals.css";
 import "./recovery.css";
 import "@bazion/ui/tokens.css";
@@ -11,31 +10,6 @@ import "../styles/gmfc/index.css";
 import { PulseHost } from "@bazion/ui";
 import { SiteThemeProvider } from "../lib/site-theme-provider";
 import { fetchTenantPublicData, getTenantRequestContext } from "../lib/server-tenant-api";
-
-const plusJakartaSans = Plus_Jakarta_Sans({
-  variable: "--font-jakarta",
-  subsets: ["latin"],
-  display: "swap",
-});
-
-const inter = Inter({
-  variable: "--font-inter",
-  subsets: ["latin"],
-  display: "swap",
-});
-
-const outfit = Outfit({
-  variable: "--font-outfit",
-  subsets: ["latin"],
-  display: "swap",
-});
-
-const fraunces = Fraunces({
-  variable: "--font-fraunces",
-  subsets: ["latin"],
-  style: ["normal", "italic"],
-  display: "swap",
-});
 
 interface PublicSiteMetadataResponse {
   tenant?: { name?: string | null } | null;
@@ -81,10 +55,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html
-      lang="en"
-      className={`${plusJakartaSans.variable} ${inter.variable} ${outfit.variable} ${fraunces.variable}`}
-    >
+    <html lang="en">
       <body>
         <SiteThemeProvider>{children}</SiteThemeProvider>
         <PulseHost position="top-right" />

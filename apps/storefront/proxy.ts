@@ -3,9 +3,11 @@ import type { NextRequest } from "next/server";
 import { extractTenantSlugFromHost } from "@bazion/auth";
 
 /**
- * The storefront proxies /v1/* and /api/auth/* to the shared Fastify API.
- * Replace client-supplied forwarding metadata using the incoming request host
- * and resolve tenant context from subdomain or local dev override.
+ * Next.js 16 Proxy:
+ * - Normalizes forwarding metadata (x-forwarded-host, x-forwarded-proto).
+ * - Intercepts tenant context from subdomain, query parameter (?tenant=...), or cookie.
+ * - Injects x-bazion-tenant header into request for downstream server components and API calls.
+ * - Persists bazion_tenant cookie for dev preview switching.
  */
 export function proxy(request: NextRequest) {
   const requestHeaders = new Headers(request.headers);
@@ -43,6 +45,8 @@ export function proxy(request: NextRequest) {
   return response;
 }
 
+export default proxy;
+
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|images|favicon.ico).*)"],
+  matcher: ["/((?!_next/static|_next/image|images|styles|favicon.ico).*)"],
 };

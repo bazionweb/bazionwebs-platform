@@ -32,6 +32,18 @@ export {
   SECURITY_EMAIL,
   FINANCE_EMAIL,
   ALUMNI_EMAIL,
+  BMI_UNIVERSITY_TENANT_ID,
+  BEMI_INSTITUTE_TENANT_ID,
+  BMI_LEGACY_TENANT_ID,
+  BEMI_LEGACY_TENANT_ID,
+  BMI_PRODUCTION_DOMAINS,
+  BEMI_PRODUCTION_DOMAINS,
+  BMI_DEV_DOMAINS,
+  BEMI_DEV_DOMAINS,
+  cleanHostname,
+  isBmiHost,
+  isBemiHost,
+  isEducationHost,
 } from './domains.js';
 
 // Brand design tokens
@@ -108,8 +120,6 @@ export type { DegreeLevel, LevelPricingConfig } from './finance.js';
 // White-label tenant configuration helpers
 export {
   EDUCATION_CONFIGURATION_VERSION,
-  BMI_UNIVERSITY_TENANT_ID,
-  BEMI_INSTITUTE_TENANT_ID,
   schoolPortalConfigSchema,
   schoolEducationConfigInputSchema,
   bmiUniversityTenantConfig,

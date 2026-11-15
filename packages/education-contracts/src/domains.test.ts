@@ -17,6 +17,13 @@ import {
   SECURITY_EMAIL,
   FINANCE_EMAIL,
   ALUMNI_EMAIL,
+  BMI_UNIVERSITY_TENANT_ID,
+  BEMI_INSTITUTE_TENANT_ID,
+  BMI_LEGACY_TENANT_ID,
+  BEMI_LEGACY_TENANT_ID,
+  isBmiHost,
+  isBemiHost,
+  isEducationHost,
 } from '../src/domains.js';
 
 describe('@bmi/shared — domains', () => {
@@ -89,5 +96,38 @@ describe('@bmi/shared — domains', () => {
 
   it('snapshot — allowed origins list has not changed (domain drift guard)', () => {
     expect(ALLOWED_ORIGINS).toMatchSnapshot();
+  });
+
+  it('correctly matches BMI hosts across production and dev domains', () => {
+    expect(isBmiHost('bmi.ac.ke')).toBe(true);
+    expect(isBmiHost('www.bmi.ac.ke')).toBe(true);
+    expect(isBmiHost('university.bmi.ac.ke')).toBe(true);
+    expect(isBmiHost('portal.bmi.ac.ke')).toBe(true);
+    expect(isBmiHost('bmiuniversities.org')).toBe(true);
+    expect(isBmiHost('bmi.localhost:3100')).toBe(true);
+    expect(isBmiHost('bmi-university.localhost')).toBe(true);
+    expect(isBmiHost('bemi.org')).toBe(false);
+    expect(isBmiHost('bemi.localhost:3100')).toBe(false);
+    expect(isBmiHost('localhost:3100')).toBe(false);
+    expect(isBmiHost('church.bazion.com')).toBe(false);
+  });
+
+  it('correctly matches BEMI hosts across production and dev domains', () => {
+    expect(isBemiHost('bemi.org')).toBe(true);
+    expect(isBemiHost('www.bemi.org')).toBe(true);
+    expect(isBemiHost('institute.bemi.org')).toBe(true);
+    expect(isBemiHost('bemi.ac.ke')).toBe(true);
+    expect(isBemiHost('bemi.localhost:3100')).toBe(true);
+    expect(isBemiHost('bemi-institute.localhost')).toBe(true);
+    expect(isBemiHost('bmi.ac.ke')).toBe(false);
+    expect(isBemiHost('bmi.localhost:3100')).toBe(false);
+    expect(isBemiHost('localhost:3100')).toBe(false);
+  });
+
+  it('exports canonical tenant IDs for BMI and BEMI', () => {
+    expect(BMI_UNIVERSITY_TENANT_ID).toBe('00000000-0000-4000-8000-000000000055');
+    expect(BEMI_INSTITUTE_TENANT_ID).toBe('00000000-0000-4000-8000-000000000056');
+    expect(BMI_LEGACY_TENANT_ID).toBe('b1000000-0000-4000-8000-000000000001');
+    expect(BEMI_LEGACY_TENANT_ID).toBe('b2000000-0000-4000-8000-000000000002');
   });
 });
