@@ -10,8 +10,12 @@ const adminConfig = await readFile(new URL("../apps/admin/next.config.ts", impor
 const storefrontConfig = await readFile(new URL("../apps/storefront/next.config.ts", import.meta.url), "utf8");
 const adminLayout = await readFile(new URL("../apps/admin/app/layout.tsx", import.meta.url), "utf8");
 const storefrontLayout = await readFile(new URL("../apps/storefront/app/layout.tsx", import.meta.url), "utf8");
+const ministryAdminLayout = await readFile(new URL("../apps/ministry-admin/app/layout.tsx", import.meta.url), "utf8");
 const adminFontFallbacks = await readFile(new URL("../apps/admin/app/font-fallbacks.css", import.meta.url), "utf8");
 const storefrontFontFallbacks = await readFile(new URL("../apps/storefront/app/font-fallbacks.css", import.meta.url), "utf8");
+const fontAssetsDirectory = new URL("../packages/ui/assets/fonts/", import.meta.url);
+const fontAssets = await Promise.all(["fraunces-latin.woff2", "fraunces-latin-italic.woff2", "inter-latin.woff2", "outfit-latin.woff2", "plus-jakarta-sans-latin.woff2"].map(async (name) => [name, await readFile(new URL(name, fontAssetsDirectory))]));
+const fontLicenses = await Promise.all(["Fraunces-OFL.txt", "Inter-OFL.txt", "Outfit-OFL.txt", "Plus-Jakarta-Sans-OFL.txt"].map((name) => readFile(new URL(name, fontAssetsDirectory), "utf8")));
 const ciWorkflow = await readFile(new URL("../.github/workflows/ci.yml", import.meta.url), "utf8");
 const bazionwebImageWorkflow = await readFile(new URL("../.github/workflows/build-bazionweb-staging.yml", import.meta.url), "utf8");
 const stagingCompose = await readFile(new URL("../deploy/dokploy/platform-staging.compose.yml", import.meta.url), "utf8");
@@ -60,13 +64,22 @@ test("Next.js apps emit standalone output with the workspace root traced", () =>
   }
 });
 
-test("Next.js builds need no external font fetch and disable build telemetry", () => {
+test("Next.js builds use bundled brand fonts without external font fetches", () => {
   assert.match(dockerfile, /ENV NEXT_TELEMETRY_DISABLED=1/);
-  for (const [name, layout, fontFallbacks] of [["admin", adminLayout, adminFontFallbacks], ["storefront", storefrontLayout, storefrontFontFallbacks]]) {
-    assert.doesNotMatch(layout, /next\/font\/(google|local)/, `${name} build must not fetch fonts from external services`);
-    assert.match(layout, /font-fallbacks\.css/, `${name} must load its local system font stack`);
-    assert.match(fontFallbacks, /--font-plus-jakarta:\s*["']Segoe UI["']/);
-    assert.match(fontFallbacks, /--font-inter:\s*Arial/);
+  for (const [name, layout] of [["admin", adminLayout], ["storefront", storefrontLayout], ["ministry admin", ministryAdminLayout]]) {
+    assert.doesNotMatch(layout, /next\/font\/google/, `${name} must not fetch fonts from Google during builds`);
+    assert.match(layout, /next\/font\/local/, `${name} must use fonts bundled with the repository`);
+    assert.match(layout, /plus-jakarta-sans-latin\.woff2/, `${name} must use the branded primary font`);
+  }
+  for (const fontFallbacks of [adminFontFallbacks, storefrontFontFallbacks]) {
+    assert.match(fontFallbacks, /--font-plus-jakarta-fallback:\s*["']Segoe UI["']/);
+    assert.match(fontFallbacks, /--font-inter-fallback:\s*Arial/);
+  }
+  for (const [name, asset] of fontAssets) {
+    assert.equal(asset.toString("ascii", 0, 4), "wOF2", `${name} must be a valid WOFF2 asset`);
+  }
+  for (const license of fontLicenses) {
+    assert.match(license, /SIL OPEN FONT LICENSE/i);
   }
 });
 

@@ -114,7 +114,7 @@ test("storefront and shared UI images use the centralized responsive image compo
 test("church typography does not reintroduce a browser-side Google Fonts request", async () => {
   const css = await readFile(path.join(process.cwd(), "packages", "ui", "src", "church.css"), "utf8");
   assert.doesNotMatch(css, /@import\s+url\([^)]*fonts\.googleapis\.com/i);
-  assert.match(css, /var\(--font-plus-jakarta\)/);
+  assert.match(css, /var\(--font-plus-jakarta(?:\)|,)/);
 });
 
 test("Cloudflare transforms stay opt-in until the media zone is explicitly enabled", async () => {

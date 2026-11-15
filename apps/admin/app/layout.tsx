@@ -1,20 +1,22 @@
 import type { Metadata } from "next";
-import { Plus_Jakarta_Sans, Inter } from "next/font/google";
+import localFont from "next/font/local";
 import { PulseHost } from "@bazion/ui";
 import "@bazion/ui/pulse.css";
 import "./globals.css";
 import "./recovery.css";
 import "./font-fallbacks.css";
 
-const plusJakartaSans = Plus_Jakarta_Sans({
+const plusJakartaSans = localFont({
+  src: "../../../packages/ui/assets/fonts/plus-jakarta-sans-latin.woff2",
   variable: "--font-plus-jakarta",
-  subsets: ["latin"],
+  weight: "200 800",
   display: "swap",
 });
 
-const inter = Inter({
+const inter = localFont({
+  src: "../../../packages/ui/assets/fonts/inter-latin.woff2",
   variable: "--font-inter",
-  subsets: ["latin"],
+  weight: "100 900",
   display: "swap",
   preload: false,
 });
