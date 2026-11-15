@@ -32,6 +32,7 @@ test("Dockerfile provides a production target for each platform app and a one-sh
   assert.match(dockerfile, /pnpm --filter @bazion\/api --prod deploy \/out/);
   assert.match(dockerfile, /pnpm install --frozen-lockfile --filter @bazion\/api\.\.\./);
   assert.match(dockerfile, /pnpm install --frozen-lockfile --filter @bazion\/database\.\.\. --filter @bazion\/auth\.\.\./);
+  assert.match(dockerfile, /FROM workspace AS migrate\r?\n[\s\S]*?COPY --chown=node:node \. \.\r?\nENV NODE_ENV=production\r?\nUSER node/);
   assert.match(dockerfile, /pnpm --filter @bazion\/database migrate && pnpm --filter @bazion\/auth migrate/);
   assert.match(stagingCompose, /AUTH_MIGRATION_DATABASE_URL: postgres:\/\/bazion_migrator:/);
 });
