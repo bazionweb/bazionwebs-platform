@@ -12,3 +12,4 @@ export function EducationShell({ children }: { children: React.ReactNode }) {
     </div>
   );
 }
+

@@ -12,3 +12,4 @@ export default async function InstitutesPageRoute() {
     </EducationShell>
   );
 }
+

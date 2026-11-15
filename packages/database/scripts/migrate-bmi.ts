@@ -32,3 +32,4 @@ run().catch((err) => {
   console.error("[bmi-migrate] Failed:", err);
   process.exit(1);
 });
+

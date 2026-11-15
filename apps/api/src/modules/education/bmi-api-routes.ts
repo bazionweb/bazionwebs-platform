@@ -166,8 +166,6 @@ export async function bmiApiRoutes(app: FastifyInstance) {
   app.post("/api/public/verify", handleVerify);
   app.get("/api/v1/documents/verify", handleVerify);
   app.post("/api/v1/documents/verify", handleVerify);
-  app.get("/v1/documents/verify", handleVerify);
-  app.post("/v1/documents/verify", handleVerify);
 
   // Marketing Stats
   app.get("/api/public/stats", async () => ({
@@ -217,7 +215,6 @@ export async function bmiApiRoutes(app: FastifyInstance) {
 
   app.post("/api/auth/login", handleLogin);
   app.post("/api/v1/auth/login", handleLogin);
-  app.post("/v1/auth/login", handleLogin);
 
   const handleRegister = async (request: FastifyRequest) => {
     const body = (request.body as Record<string, string>) || {};
@@ -233,7 +230,6 @@ export async function bmiApiRoutes(app: FastifyInstance) {
 
   app.post("/api/auth/register", handleRegister);
   app.post("/api/v1/auth/register", handleRegister);
-  app.post("/v1/auth/register", handleRegister);
 
   const handleMe = async (request: FastifyRequest) => {
     const authHeader = request.headers.authorization || "";
@@ -261,13 +257,11 @@ export async function bmiApiRoutes(app: FastifyInstance) {
 
   app.get("/api/auth/me", handleMe);
   app.get("/api/v1/auth/me", handleMe);
-  app.get("/v1/auth/me", handleMe);
 
   const handleLogout = async () => ({ success: true, message: "Logged out successfully" });
   app.delete("/api/auth/logout", handleLogout);
   app.post("/api/auth/logout", handleLogout);
   app.post("/api/v1/auth/logout", handleLogout);
-  app.post("/v1/auth/logout", handleLogout);
 
   app.post("/api/auth/refresh", async () => ({
     success: true,
@@ -587,5 +581,5 @@ export async function bmiApiRoutes(app: FastifyInstance) {
   };
 
   registerUmsEndpoints("/api/v1");
-  registerUmsEndpoints("/v1");
 }
+

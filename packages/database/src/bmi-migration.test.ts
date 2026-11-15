@@ -51,3 +51,4 @@ describe("bmi-migration", () => {
     expect(students[0]?.gpa).toBe(3.8);
   });
 });
+
