@@ -1,0 +1,11 @@
+{
+  "dashboard": "Dashboard",
+  "student_portal": "Student Portal",
+  "faculty_portal": "Faculty Portal",
+  "finance": "Finance",
+  "settings": "Settings",
+  "logout": "Logout",
+  "notifications": "Notifications",
+  "search_placeholder": "Search anything...",
+  "welcome": "Welcome back, {{name}}"
+}

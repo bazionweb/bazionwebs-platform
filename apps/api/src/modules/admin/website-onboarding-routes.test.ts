@@ -185,4 +185,75 @@ describe("websiteOnboardingRoutes", () => {
     expect(JSON.stringify(body.packageSettings).toLowerCase()).not.toContain("old medicare");
     expect(JSON.stringify(body.packageSettings).toLowerCase()).not.toContain("999111");
   });
+
+  it("applies school-education oxford-imperial-university template cleanly without BMI/BEMI brand leakage", async () => {
+    const tx = buildMockTx();
+    mocks.withTenantTransaction.mockImplementation(async (_tenantId: string, fn: (t: unknown) => Promise<unknown>) =>
+      fn(tx),
+    );
+
+    const app = Fastify();
+    await app.register(websiteOnboardingRoutes);
+
+    const res = await app.inject({
+      method: "POST",
+      url: `/admin/platform/tenants/${TENANT_ID}/website-onboarding/apply-template`,
+      payload: {
+        packageId: "school-education",
+        templateId: "oxford-imperial-university",
+        brandName: "St. Jude University",
+        tagline: "Academic Excellence & Research",
+      },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.applied).toBe(true);
+    expect(body.packageId).toBe("school-education");
+    expect(body.packageSettings.organization.name).toBe("St. Jude University");
+    expect(body.packageSettings.organization.tagline).toBe("Academic Excellence & Research");
+    const serialized = JSON.stringify(body).toLowerCase();
+    expect(serialized).not.toContain("bmi");
+    expect(serialized).not.toContain("bemi");
+    expect(serialized).not.toContain("bible missionary");
+  });
+
+  it("infers school-education when importing @bmi/shared source and strips BMI/BEMI branding", async () => {
+    const tx = buildMockTx();
+    mocks.withTenantTransaction.mockImplementation(async (_tenantId: string, fn: (t: unknown) => Promise<unknown>) =>
+      fn(tx),
+    );
+
+    const app = Fastify();
+    await app.register(websiteOnboardingRoutes);
+
+    const res = await app.inject({
+      method: "POST",
+      url: `/admin/platform/tenants/${TENANT_ID}/website-onboarding/import-repo`,
+      payload: {
+        repoUrl: "https://github.com/custom-tenant/campus-portal",
+        branch: "main",
+        packageId: "auto",
+        mode: "byow-compose",
+        framework: "nextjs",
+        primaryDomain: "campus.example.ac.ke",
+        configTs:
+          'export const SITE = { fullName: "Bible Missionary Institute", shortName: "BMI", studentPortal: true, contactEmail: "admissions@bmi.ac.ke" };',
+        tokensCss: ":root { --color-primary: #1A365D; --color-accent: #C5A059; }",
+        packageJson: JSON.stringify({
+          name: "bmi-portal",
+          dependencies: { "@bmi/shared": "workspace:*" },
+        }),
+      },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.packageId).toBe("school-education");
+    expect(body.detectedSourceBrand.brandName).toBe("Bible Missionary Institute");
+    expect(body.byowCompose.composePath).toBe("tenants/savanna-enterprise/docker-compose.yml");
+    expect(body.byowCompose.composeYaml).toContain("com.bazion.package.id=school-education");
+    expect(JSON.stringify(body.packageSettings).toLowerCase()).not.toContain("bible missionary");
+    expect(JSON.stringify(body.packageSettings).toLowerCase()).not.toContain("admissions@bmi.ac.ke");
+  });
 });

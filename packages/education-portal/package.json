@@ -1,0 +1,36 @@
+{
+  "name": "@bazion/education-portal",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json && node -e \"const fs=require('fs');fs.mkdirSync('dist/pages',{recursive:true});for(const f of ['Apply.module.css','Login.module.css','ResetPassword.module.css'])fs.copyFileSync('src/pages/'+f,'dist/pages/'+f);\"",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run src/index.test.tsx --fsModuleCachePath .vitest-cache"
+  },
+  "dependencies": {
+    "@bazion/education-contracts": "workspace:*",
+    "zod": "^4.6.7"
+  },
+  "peerDependencies": {
+    "react": ">=19",
+    "react-dom": ">=19"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.2",
+    "@types/react-dom": "^19.3.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.3.1",
+    "typescript": "^5.9.3",
+    "vitest": "^5.1.0"
+  }
+}
+

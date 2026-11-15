@@ -21,6 +21,8 @@
     "@bazion/church-ministry-domain": "workspace:*",
     "@bazion/church-ministry-contracts": "workspace:*",
     "@bazion/church-ministry-template": "workspace:*",
+    "@bazion/education-contracts": "workspace:*",
+    "@bazion/education-domain": "workspace:*",
     "@bazion/sme-website-template": "workspace:*",
     "@bazion/website-contracts": "workspace:*",
     "@bazion/commerce-domain": "workspace:*",

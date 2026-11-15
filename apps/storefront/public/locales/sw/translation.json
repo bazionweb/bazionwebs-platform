@@ -1,0 +1,11 @@
+{
+  "dashboard": "Dhibiti",
+  "student_portal": "Tovuti ya Wanafunzi",
+  "faculty_portal": "Tovuti ya Walimu",
+  "finance": "Fedha",
+  "settings": "Mipangilio",
+  "logout": "Ondoka",
+  "notifications": "Taarifa",
+  "search_placeholder": "Tafuta chochote...",
+  "welcome": "Karibu tena, {{name}}"
+}

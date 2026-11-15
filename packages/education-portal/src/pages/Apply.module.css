@@ -1,0 +1,456 @@
+/* Apply Page - Enhanced Modern Styling */
+
+.pageContainer {
+  padding: 3rem 1.5rem 4rem;
+  background: var(--bg, #f8fafc);
+  min-height: 100vh;
+}
+
+.wrapper {
+  max-width: 780px;
+  margin: 0 auto;
+}
+
+.header {
+  margin-bottom: 2rem;
+}
+
+.title {
+  font-family: var(--font-heading, 'Outfit', sans-serif);
+  font-size: clamp(1.8rem, 3.5vw, 2.3rem);
+  font-weight: 800;
+  color: var(--navy, #0f172a);
+  letter-spacing: -0.02em;
+}
+
+.subHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 0.5rem;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.welcomeText {
+  color: var(--text-muted, #64748b);
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.stepMeta {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.draftPill {
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  background: rgba(100, 116, 139, 0.1);
+  color: var(--text-muted, #64748b);
+}
+
+.draftPill.saving {
+  color: var(--navy, #0f172a);
+  background: rgba(15, 23, 42, 0.08);
+}
+
+.draftPill.saved {
+  color: var(--success, #10b981);
+  background: rgba(16, 185, 129, 0.1);
+}
+
+.draftPill.error {
+  color: var(--danger, #ef4444);
+  background: rgba(239, 68, 68, 0.1);
+}
+
+/* ─── Step 0: Program Selection ─── */
+.searchFilterBar {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+
+.searchBox {
+  position: relative;
+  width: 100%;
+}
+
+.searchIcon {
+  position: absolute;
+  left: 1rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--slate, #94a3b8);
+  pointer-events: none;
+  font-size: 0.95rem;
+}
+
+.searchInput {
+  width: 100%;
+  padding: 0.75rem 1rem 0.75rem 2.6rem;
+  border-radius: 10px;
+  border: 1.5px solid var(--border, #e2e8f0);
+  background: white;
+  font-size: 0.92rem;
+  font-family: inherit;
+  transition: all 0.2s ease;
+  outline: none;
+}
+
+.searchInput:focus {
+  border-color: var(--gold, #d4af37);
+  box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.15);
+}
+
+.clearSearchBtn {
+  position: absolute;
+  right: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: var(--slate, #94a3b8);
+  cursor: pointer;
+  padding: 0.25rem;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.clearSearchBtn:hover {
+  color: var(--navy, #0f172a);
+}
+
+.levelTabs {
+  display: flex;
+  gap: 0.4rem;
+  overflow-x: auto;
+  padding-bottom: 0.25rem;
+  scrollbar-width: thin;
+}
+
+.levelTab {
+  padding: 0.45rem 0.85rem;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  border: 1px solid var(--border, #e2e8f0);
+  background: white;
+  color: var(--slate, #64748b);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.levelTab:hover {
+  border-color: #cbd5e1;
+  background: #f8fafc;
+  color: var(--navy, #0f172a);
+}
+
+.levelTab.active {
+  background: var(--navy, #0f172a);
+  color: white;
+  border-color: var(--navy, #0f172a);
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.15);
+}
+
+.tabCount {
+  font-size: 0.72rem;
+  padding: 0.1rem 0.4rem;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.08);
+}
+
+.levelTab.active .tabCount {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.programGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 0.85rem;
+  max-height: 420px;
+  overflow-y: auto;
+  padding: 0.25rem 0.25rem 0.5rem 0.25rem;
+  scrollbar-width: thin;
+}
+
+.programCard {
+  border-radius: 12px;
+  border: 2px solid var(--border, #e2e8f0);
+  background: white;
+  padding: 1.1rem 1.25rem;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  position: relative;
+  text-align: left;
+}
+
+.programCard:hover {
+  border-color: #cbd5e1;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.05);
+}
+
+.programCard.selected {
+  border-color: var(--gold, #d4af37);
+  background: linear-gradient(135deg, rgba(212, 175, 55, 0.06) 0%, rgba(255, 255, 255, 1) 100%);
+  box-shadow: 0 4px 16px rgba(212, 175, 55, 0.18);
+  transform: translateY(-2px);
+}
+
+.cardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.levelBadge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0.2rem 0.55rem;
+  border-radius: 6px;
+}
+
+.levelBadge.undergraduate {
+  background: #ede9fe;
+  color: #6d28d9;
+}
+
+.levelBadge.graduate {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.levelBadge.doctorate {
+  background: #ecfdf5;
+  color: #065f46;
+}
+
+.levelBadge.certificate {
+  background: #e0f2fe;
+  color: #0369a1;
+}
+
+.levelBadge.diploma {
+  background: #fdf2f8;
+  color: #9d174d;
+}
+
+.checkIndicator {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1.5px solid var(--border, #cbd5e1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  color: transparent;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.programCard.selected .checkIndicator {
+  background: var(--gold, #d4af37);
+  border-color: var(--gold, #d4af37);
+  color: white;
+  font-weight: 800;
+}
+
+.programTitle {
+  font-family: var(--font-heading, sans-serif);
+  font-size: 0.98rem;
+  font-weight: 700;
+  color: var(--navy, #0f172a);
+  margin-bottom: 0.35rem;
+  line-height: 1.35;
+}
+
+.programDesc {
+  font-size: 0.82rem;
+  color: var(--slate, #64748b);
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  margin: 0;
+}
+
+.selectedBanner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  background: rgba(212, 175, 55, 0.09);
+  border: 1px solid rgba(212, 175, 55, 0.3);
+  border-radius: 10px;
+  margin-top: 1rem;
+}
+
+.selectedBannerText {
+  font-size: 0.88rem;
+  color: #854d0e;
+  font-weight: 600;
+}
+
+.emptyPrograms {
+  text-align: center;
+  padding: 2.5rem 1rem;
+  color: var(--slate, #64748b);
+}
+
+/* ─── Step 1: Searchable Country Combobox ─── */
+.comboboxContainer {
+  position: relative;
+  width: 100%;
+}
+
+.comboboxInputWrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.comboboxDropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  max-height: 220px;
+  overflow-y: auto;
+  background: white;
+  border-radius: 10px;
+  border: 1px solid var(--border, #e2e8f0);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  z-index: 50;
+  padding: 0.4rem;
+  scrollbar-width: thin;
+}
+
+.comboboxItem {
+  padding: 0.6rem 0.85rem;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.88rem;
+  transition: all 0.15s ease;
+}
+
+.comboboxItem:hover,
+.comboboxItem.highlighted {
+  background: #f1f5f9;
+  color: var(--navy, #0f172a);
+}
+
+.comboboxItem.selected {
+  background: rgba(212, 175, 55, 0.1);
+  color: #854d0e;
+  font-weight: 700;
+}
+
+.countryFlag {
+  font-size: 1.1rem;
+  margin-right: 0.5rem;
+}
+
+.quickChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.5rem;
+}
+
+.quickChip {
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 0.25rem 0.6rem;
+  border-radius: 999px;
+  border: 1px solid var(--border, #e2e8f0);
+  background: white;
+  color: var(--slate, #475569);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.quickChip:hover {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+  color: var(--navy, #0f172a);
+}
+
+.quickChip.active {
+  background: var(--navy, #0f172a);
+  color: white;
+  border-color: var(--navy, #0f172a);
+}
+
+/* ─── Mobile Responsiveness Enhancements ─── */
+@media (max-width: 640px) {
+  .pageContainer {
+    padding: 1.25rem 0.75rem 3.5rem;
+  }
+
+  .title {
+    font-size: 1.65rem;
+  }
+
+  .subHeader {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+
+  .stepMeta {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .programGrid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .quickChips {
+    gap: 0.35rem;
+  }
+
+  .quickChip {
+    padding: 0.35rem 0.7rem;
+    font-size: 0.78rem;
+    min-height: 36px;
+  }
+
+  .comboboxDropdown {
+    max-height: 180px;
+  }
+
+  .comboboxItem {
+    min-height: 44px;
+    padding: 0.75rem 0.85rem;
+  }
+}
+

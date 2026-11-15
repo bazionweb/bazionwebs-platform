@@ -3,7 +3,14 @@ import type { NextConfig } from "next";
 const apiBaseUrl = (process.env.API_BASE_URL ?? "http://localhost:4000").replace(/\/$/, "");
 
 const nextConfig: NextConfig = {
-  transpilePackages: ["@bazion/ui", "@bazion/auth"],
+  transpilePackages: [
+    "@bazion/ui",
+    "@bazion/auth",
+    "@bazion/education-contracts",
+    "@bazion/education-template",
+    "@bazion/education-portal",
+    "@bazion/education-ums",
+  ],
   // Allow an isolated tenant preview to run beside the generic storefront.
   distDir: process.env.NEXT_DIST_DIR ?? ".next",
   // Keep the guest-cart HttpOnly cookie first-party on each client storefront
@@ -11,6 +18,8 @@ const nextConfig: NextConfig = {
   async rewrites() {
     return [
       { source: "/api/auth/:path*", destination: `${apiBaseUrl}/api/auth/:path*` },
+      { source: "/api/:path*", destination: `${apiBaseUrl}/api/:path*` },
+      { source: "/v1/:path*", destination: `${apiBaseUrl}/v1/:path*` },
     ];
   },
   async headers() {

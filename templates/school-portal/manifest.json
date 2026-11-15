@@ -1,0 +1,17 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "school-portal",
+  "name": "School, University & LMS Portal Website",
+  "version": "1.0.0",
+  "status": "partial",
+  "implementation": {
+    "packageName": "@bazion/education-template",
+    "entrypoint": "packages/education-template/src/index.ts"
+  },
+  "configuration": {
+    "schemaVersion": "1.0.0",
+    "sourcePath": "packages/education-contracts/src/index.ts",
+    "schemaNames": ["schoolPortalConfigSchema", "schoolEducationConfigInputSchema"]
+  }
+}
+

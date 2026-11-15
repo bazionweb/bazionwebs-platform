@@ -20,6 +20,7 @@ import { createHostingProvisioningRuntime } from "./modules/hosting/runtime.js";
 import { commercialProvisioningRoutes } from "./modules/commercial-provisioning/routes.js";
 import { fastifySensitiveRedactionPaths } from "./modules/commercial-provisioning/observability.js";
 import { createCommercialProvisioningRuntime } from "./modules/commercial-provisioning/runtime.js";
+import { bmiApiRoutes } from "./modules/education/bmi-api-routes.js";
 
 const MEDIA_UPLOAD_LIMIT_BYTES = 8 * 1024 * 1024;
 
@@ -225,6 +226,7 @@ export async function buildApp(config: AppConfig) {
   await app.register(commerceAdminRoutes, { prefix: "/v1" });
   await app.register(churchRoutes, { prefix: "/v1", config });
   await app.register(formsLeadsRoutes, { prefix: "/v1", config });
+  await app.register(bmiApiRoutes);
   const hostingRuntime = createHostingProvisioningRuntime(config.hosting);
   await app.register(hostingRoutes, {
     prefix: "/v1",
