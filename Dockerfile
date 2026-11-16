@@ -19,7 +19,7 @@ COPY packages/database/init/001-create-roles.sh /docker-entrypoint-initdb.d/001-
 FROM workspace AS migrate
 RUN --mount=type=cache,id=bazion-pnpm-store,target=/root/.local/share/pnpm/store/v11 \
     pnpm install --frozen-lockfile --filter @bazion/database... --filter @bazion/auth...
-COPY . .
+COPY --chown=node:node . .
 ENV NODE_ENV=production
 USER node
 CMD ["sh", "-ec", "pnpm --filter @bazion/database migrate && pnpm --filter @bazion/auth migrate"]
