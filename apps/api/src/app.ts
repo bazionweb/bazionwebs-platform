@@ -217,6 +217,15 @@ export async function buildApp(config: AppConfig) {
 
   const releaseId = process.env.APP_RELEASE_ID?.trim() || process.env.GITHUB_SHA?.trim() || "local";
   app.get("/health", async () => ({ status: "ok", service: "bazion-api", environment: config.NODE_ENV, releaseId }));
+  app.get("/", async () => ({
+    service: "bazion-api",
+    status: "ok",
+    environment: config.NODE_ENV,
+    releaseId,
+    health: "/health",
+    storefrontUrl: config.PUBLIC_STOREFRONT_URL || "http://localhost:3100",
+    message: "Bazion Platform API Gateway is active. Access the user-facing website on the storefront port.",
+  }));
   await app.register(oidcDiscoveryRoutes, { config });
   await app.register(authRoutes, { prefix: "/v1", config });
   await app.register(oidcRoutes, { prefix: "/v1", config });
