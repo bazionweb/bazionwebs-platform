@@ -213,6 +213,9 @@ services:
     image: ghcr.io/bazionweb/bazionwebs-platform-api:${PLATFORM_IMAGE_TAG:?Set a validated sha- image tag}
     command: ["node", "dist/commercial-status-worker.js"]
     restart: unless-stopped
+    # This background worker doesn't serve the API image's /health endpoint.
+    healthcheck:
+      disable: true
     environment:
       NODE_ENV: production
       COMMERCIAL_PROVISIONING_WORKER_ENABLED: "false"
