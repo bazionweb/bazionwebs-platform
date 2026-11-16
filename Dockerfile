@@ -92,6 +92,7 @@ ENV HOSTNAME=0.0.0.0
 WORKDIR /app
 COPY --from=storefront-build --chown=node:node /repo/apps/storefront/.next/standalone/ ./
 COPY --from=storefront-build --chown=node:node /repo/apps/storefront/.next/static/ ./apps/storefront/.next/static/
+COPY --from=storefront-build --chown=node:node /repo/apps/storefront/public/ ./apps/storefront/public/
 USER node
 EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 CMD ["node", "-e", "fetch('http://127.0.0.1:3000/').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]

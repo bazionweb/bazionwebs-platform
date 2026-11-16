@@ -15,6 +15,7 @@ x-runtime-security: &runtime-security
 x-api-environment: &api-environment
   NODE_ENV: production
   APP_ENV: staging
+  APP_RELEASE_ID: ${PLATFORM_IMAGE_TAG:?Set a validated sha- image tag}
   PORT: "4000"
   LOG_LEVEL: info
   TENANT_DATABASE_SECRET_BACKEND: docker
