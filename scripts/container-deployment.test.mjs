@@ -30,6 +30,7 @@ test("Dockerfile provides a production target for each platform app and a one-sh
   assert.match(dockerfile, /postgres:18\.7-alpine3\.24 AS database/);
   assert.match(dockerfile, /CMD \["node", "dist\/worker\.js"\]/);
   assert.match(dockerfile, /pnpm --filter @bazion\/api --prod deploy \/out/);
+  assert.match(dockerfile, /COPY --from=storefront-build --chown=node:node \/repo\/apps\/storefront\/public\/ \.\/apps\/storefront\/public\//);
   assert.match(dockerfile, /pnpm install --frozen-lockfile --filter @bazion\/api\.\.\./);
   assert.match(dockerfile, /pnpm install --frozen-lockfile --filter @bazion\/database\.\.\. --filter @bazion\/auth\.\.\./);
   assert.match(dockerfile, /FROM workspace AS migrate\r?\n[\s\S]*?COPY --chown=node:node \. \.\r?\nENV NODE_ENV=production\r?\nUSER node/);
@@ -162,6 +163,7 @@ test("Dokploy staging stack isolates the database, runs migrations before app se
   assert.match(stagingCompose, /name: bazion_platform_staging_pgdata/);
   assert.match(stagingCompose, /com\.bazion\.backup-target: platform-staging/);
   assert.match(stagingCompose, /APP_ENV: staging/);
+  assert.match(stagingCompose, /APP_RELEASE_ID: \$\{PLATFORM_IMAGE_TAG:\?Set a validated sha-/);
   assert.match(stagingCompose, /PAYMENT_PROVIDER: mock/);
   assert.match(stagingCompose, /COMMERCIAL_PROVISIONING_WORKER_ENABLED: "false"/);
   assert.match(stagingCompose, /MEDIA_IMAGE_TRANSFORMS_ENABLED: "true"/);

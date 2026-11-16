@@ -215,7 +215,7 @@ export async function buildApp(config: AppConfig) {
   app.route({ method: ["GET", "POST"], url: "/api/auth", handler: authHandler });
 
   const releaseId = process.env.APP_RELEASE_ID?.trim() || process.env.GITHUB_SHA?.trim() || "local";
-  app.get("/health", async () => ({ status: "ok", service: "bazion-api", environment: config.NODE_ENV, releaseId }));
+  app.get("/health", async () => ({ status: "ok", service: "bazion-api", environment: config.APP_ENV, releaseId }));
   await app.register(oidcDiscoveryRoutes, { config });
   await app.register(authRoutes, { prefix: "/v1", config });
   await app.register(oidcRoutes, { prefix: "/v1", config });
