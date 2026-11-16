@@ -154,6 +154,10 @@ test("Dokploy staging stack isolates the database, runs migrations before app se
   assert.ok(!stagingCompose.includes("ghcr.io/bazionwebs/"), "Compose image owner must match the repository owner used by CI");
   assert.match(stagingCompose, /PLATFORM_IMAGE_TAG:\?Set a validated sha-/);
   assert.match(stagingCompose, /condition: service_completed_successfully/);
+  const statusWorkerStart = stagingCompose.indexOf("\n  status-worker:");
+  const nextService = stagingCompose.indexOf("\n  notification-worker:", statusWorkerStart);
+  const statusWorker = stagingCompose.slice(statusWorkerStart, nextService);
+  assert.match(statusWorker, /healthcheck:\r?\n\s+disable: true/);
   assert.match(stagingCompose, /name: bazion-platform-staging-data\n    internal: true/);
   assert.match(stagingCompose, /name: bazion_platform_staging_pgdata/);
   assert.match(stagingCompose, /com\.bazion\.backup-target: platform-staging/);
