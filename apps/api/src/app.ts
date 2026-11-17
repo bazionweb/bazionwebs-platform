@@ -216,11 +216,11 @@ export async function buildApp(config: AppConfig) {
   app.route({ method: ["GET", "POST"], url: "/api/auth", handler: authHandler });
 
   const releaseId = process.env.APP_RELEASE_ID?.trim() || process.env.GITHUB_SHA?.trim() || "local";
-  app.get("/health", async () => ({ status: "ok", service: "bazion-api", environment: config.NODE_ENV, releaseId }));
+  app.get("/health", async () => ({ status: "ok", service: "bazion-api", environment: config.APP_ENV, releaseId }));
   app.get("/", async () => ({
     service: "bazion-api",
     status: "ok",
-    environment: config.NODE_ENV,
+    environment: config.APP_ENV,
     releaseId,
     health: "/health",
     storefrontUrl: config.PUBLIC_STOREFRONT_URL || "http://localhost:3100",

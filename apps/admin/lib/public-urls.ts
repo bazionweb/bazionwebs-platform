@@ -16,7 +16,11 @@ export function getPublicStorefrontBaseUrl(): string {
 }
 
 export function getTenantStorefrontUrl(tenantSlug: string): string {
-  return buildTenantStorefrontUrl(getPublicStorefrontBaseUrl(), tenantSlug);
+  return buildTenantStorefrontUrl(
+    getPublicStorefrontBaseUrl(),
+    tenantSlug,
+    process.env.NEXT_PUBLIC_TENANT_PREVIEW_BASE_DOMAIN || process.env.TENANT_PREVIEW_BASE_DOMAIN,
+  );
 }
 
 export function getTenantDomainUrl(hostname: string): string {

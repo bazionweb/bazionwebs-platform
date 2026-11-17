@@ -165,4 +165,3 @@ export const ministrySiteSettingsVersions = pgTable("ministry_site_settings_vers
   uniqueIndex("ministry_site_settings_versions_tenant_version_uq").on(table.tenantId, table.versionNumber),
   index("ministry_site_settings_versions_tenant_status_idx").on(table.tenantId, table.status),
 ]);
-

@@ -146,4 +146,3 @@ export const publicChurchDirectorySchema = z.object({
   })),
 });
 export type PublicChurchDirectory = z.infer<typeof publicChurchDirectorySchema>;
-

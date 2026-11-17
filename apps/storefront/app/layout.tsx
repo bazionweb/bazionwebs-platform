@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import "./recovery.css";
+import "./font-fallbacks.css";
 import "@bazion/ui/tokens.css";
 import "@bazion/ui/primitives.css";
 import "@bazion/ui/navigation.css";
@@ -9,12 +10,22 @@ import "@bazion/ui/pulse.css";
 import "../styles/gmfc/index.css";
 import { PulseHost } from "@bazion/ui";
 import { SiteThemeProvider } from "../lib/site-theme-provider";
-import { fetchTenantPublicData, getTenantRequestContext } from "../lib/server-tenant-api";
+import { ResponsiveImageProvider } from "@bazion/ui";
+import {
+  fetchTenantPublicData,
+  getTenantRequestContext,
+} from "../lib/server-tenant-api";
 
 interface PublicSiteMetadataResponse {
   tenant?: { name?: string | null } | null;
-  profile?: { ministryName?: string | null; description?: string | null } | null;
-  siteSettings?: { metadata?: { title?: string; description?: string }; branding?: { heroImageUrl?: string } } | null;
+  profile?: {
+    ministryName?: string | null;
+    description?: string | null;
+  } | null;
+  siteSettings?: {
+    metadata?: { title?: string; description?: string };
+    branding?: { heroImageUrl?: string };
+  } | null;
 }
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -22,10 +33,16 @@ export async function generateMetadata(): Promise<Metadata> {
     fetchTenantPublicData<PublicSiteMetadataResponse>("/v1/public/church/site"),
     getTenantRequestContext(),
   ]);
-  const ministryName = site?.profile?.ministryName?.trim() || site?.tenant?.name?.trim() || "Church & Ministry";
+  const ministryName =
+    site?.profile?.ministryName?.trim() ||
+    site?.tenant?.name?.trim() ||
+    "Church & Ministry";
   const title = site?.siteSettings?.metadata?.title?.trim() || ministryName;
-  const description = (site?.siteSettings?.metadata?.description?.trim() ||
-    site?.profile?.description?.trim() || "Service information, community, events, sermons and giving.").slice(0, 320);
+  const description = (
+    site?.siteSettings?.metadata?.description?.trim() ||
+    site?.profile?.description?.trim() ||
+    "Service information, community, events, sermons and giving."
+  ).slice(0, 320);
   const image = site?.siteSettings?.branding?.heroImageUrl;
 
   return {
@@ -57,7 +74,17 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        <SiteThemeProvider>{children}</SiteThemeProvider>
+        <ResponsiveImageProvider
+          publicMediaBaseUrl={process.env.MEDIA_STORAGE_PUBLIC_BASE_URL ?? ""}
+          imageTransformsEnabled={
+            process.env.MEDIA_IMAGE_TRANSFORMS_ENABLED === "true"
+          }
+          siteImageTransformsEnabled={
+            process.env.SITE_IMAGE_TRANSFORMS_ENABLED === "true"
+          }
+        >
+          <SiteThemeProvider>{children}</SiteThemeProvider>
+        </ResponsiveImageProvider>
         <PulseHost position="top-right" />
       </body>
     </html>

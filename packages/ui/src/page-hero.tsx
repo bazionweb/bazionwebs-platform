@@ -1,4 +1,5 @@
 import type { CSSProperties, ReactNode } from "react";
+import { ResponsiveImage } from "./responsive-image.js";
 import { AnimatedWordRotator } from "./animated-word-rotator.js";
 
 const PARTICLE_SHAPES = ["circle", "diamond", "triangle", "sparkle", "ring", "square"] as const;
@@ -50,18 +51,19 @@ export function PageHero({
   bgImageUrl,
 }: PageHeroProps) {
   return (
-    <section
-      className="ch-hero-wrap"
-      style={
-        bgImageUrl
-          ? {
-              backgroundImage: `linear-gradient(rgba(10, 25, 47, 0.85), rgba(10, 25, 47, 0.95)), url(${bgImageUrl})`,
-              backgroundSize: "cover",
-              backgroundPosition: "center",
-            }
-          : undefined
-      }
-    >
+    <section className="ch-hero-wrap">
+      {bgImageUrl && <>
+        <ResponsiveImage
+          src={bgImageUrl}
+          alt=""
+          aria-hidden="true"
+          className="ch-hero-image"
+          sizes="100vw"
+          loading="eager"
+          fetchPriority="high"
+        />
+        <div className="ch-hero-image-overlay" aria-hidden="true" />
+      </>}
       <div className="ch-hero-particles" aria-hidden="true">
         {HERO_PARTICLES.map((particle, index) => (
           <span

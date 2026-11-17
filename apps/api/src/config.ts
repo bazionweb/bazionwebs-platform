@@ -5,6 +5,22 @@ import { z } from "zod";
 import type { DarajaConfig } from "@bazion/payments";
 
 const optionalEnv = z.preprocess((value) => value === "" ? undefined : value, z.string().trim().min(1).optional());
+const previewBaseDomainEnv = optionalEnv.refine((value) => {
+  if (!value) return true;
+  try {
+    const parsed = new URL(value.includes("://") ? value : `https://${value}`);
+    return !parsed.username
+      && !parsed.password
+      && parsed.pathname === "/"
+      && !parsed.search
+      && !parsed.hash
+      && !parsed.port
+      && isIP(parsed.hostname) === 0
+      && parsed.hostname.split(".").every((label) => /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/i.test(label));
+  } catch {
+    return false;
+  }
+}, "TENANT_PREVIEW_BASE_DOMAIN must be a public DNS hostname, such as bazionweb.com.");
 const defaultHostingTemplateDirectory = resolve(dirname(fileURLToPath(import.meta.url)), "../../../deploy/client-templates");
 const defaultPrivateArchiveDirectory = resolve(dirname(fileURLToPath(import.meta.url)), "../../../.private-archives");
 
@@ -23,6 +39,12 @@ function validateCallbackUrl(value: string, production: boolean): void {
 
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
+  APP_ENV: z.preprocess(
+    (value) => value === undefined
+      ? (process.env.NODE_ENV === "production" ? "production" : "development")
+      : value,
+    z.enum(["development", "staging", "production"]),
+  ),
   PORT: z.coerce.number().int().min(1).max(65535).default(4000),
   LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"]).default("info"),
   DATABASE_URL: z.string().min(1),
@@ -43,6 +65,7 @@ const envSchema = z.object({
   TENANT_RESOLUTION_MODE: z.enum(["static", "verified_domain"]).default("static"),
   CORS_ORIGINS: z.string().default("http://localhost:3000,http://localhost:4000"),
   PUBLIC_STOREFRONT_URL: z.string().url().default("http://localhost:3000"),
+  TENANT_PREVIEW_BASE_DOMAIN: previewBaseDomainEnv,
   MEDIA_STORAGE_DRIVER: z.enum(["local", "s3"]).default("local"),
   MEDIA_STORAGE_LOCAL_DIRECTORY: optionalEnv,
   MEDIA_STORAGE_ENDPOINT: optionalEnv,
@@ -104,7 +127,10 @@ const envSchema = z.object({
   PLATFORM_CONSOLE_URL: z.string().url().default("http://localhost:3001"),
   COMMERCIAL_PORTAL_URL: z.string().url().optional(),
   OIDC_ISSUER: z.string().url().optional(),
-  OIDC_SIGNING_PRIVATE_KEY_PEM: z.string().min(100).optional(),
+  OIDC_SIGNING_PRIVATE_KEY_PEM: z.preprocess(
+    (value) => typeof value === "string" ? value.replaceAll("\\n", "\n") : value,
+    z.string().min(100).optional(),
+  ),
   OIDC_SIGNING_KEY_ID: z.string().trim().min(1).max(64).optional(),
   OIDC_BFF_CLIENT_ID: z.string().trim().min(1).max(128).default("bazion-bff-platform"),
   OIDC_BFF_CLIENT_SECRET: z.string().min(32).optional(),
@@ -164,17 +190,17 @@ export function loadConfig() {
   if (darajaConfiguredCount !== 0 && darajaConfiguredCount !== darajaValues.length) {
     throw new Error("Configure all MPESA_CONSUMER_KEY, MPESA_CONSUMER_SECRET, MPESA_BUSINESS_SHORT_CODE, MPESA_PASSKEY and MPESA_CALLBACK_URL values together.");
   }
-  if (config.MPESA_ENVIRONMENT === "production" && config.NODE_ENV !== "production") {
-    throw new Error("Production Daraja credentials cannot be used by a non-production API process.");
+  if (config.MPESA_ENVIRONMENT === "production" && (config.NODE_ENV !== "production" || config.APP_ENV !== "production")) {
+    throw new Error("Production Daraja credentials cannot be used outside the production application environment.");
   }
   if (config.MPESA_CALLBACK_URL) validateCallbackUrl(config.MPESA_CALLBACK_URL, config.NODE_ENV === "production");
-  if (config.NODE_ENV === "production" && config.PAYMENT_PROVIDER === "mock") {
-    throw new Error("Production startup blocked: configure the M-Pesa payment adapter; mock payments are development-only.");
+  if (config.NODE_ENV === "production" && config.PAYMENT_PROVIDER === "mock" && config.APP_ENV !== "staging") {
+    throw new Error("Production startup blocked: configure the M-Pesa payment adapter; mock payments are staging-only.");
   }
   if (config.PAYMENT_PROVIDER === "mpesa" && darajaConfiguredCount !== darajaValues.length) {
     throw new Error("PAYMENT_PROVIDER=mpesa requires all MPESA_* credentials and callback settings.");
   }
-  if (config.NODE_ENV === "production" && config.PAYMENT_PROVIDER === "mpesa" && config.MPESA_ENVIRONMENT !== "production") {
+  if (config.APP_ENV === "production" && config.PAYMENT_PROVIDER === "mpesa" && config.MPESA_ENVIRONMENT !== "production") {
     throw new Error("Production checkout requires MPESA_ENVIRONMENT=production.");
   }
   if (config.NODE_ENV === "production" && config.TENANT_RESOLUTION_MODE === "static") {

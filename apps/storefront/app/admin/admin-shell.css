@@ -2,7 +2,7 @@
   min-height: 100vh;
   background: #f6f4ef;
   color: #19392f;
-  font-family: var(--church-font, var(--font-sans, "Plus Jakarta Sans", Inter, ui-sans-serif, system-ui, sans-serif));
+  font-family: var(--church-font, var(--font-sans, var(--font-plus-jakarta), var(--font-inter), ui-sans-serif, system-ui, sans-serif));
 }
 
 .tenant-admin-header {

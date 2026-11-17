@@ -119,4 +119,3 @@ export function ParticlesCanvas() {
 }
 
 export default ParticlesCanvas;
-

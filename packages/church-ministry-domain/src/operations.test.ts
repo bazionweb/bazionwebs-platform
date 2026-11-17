@@ -100,4 +100,3 @@ describe("site settings versioning domain use cases", () => {
     expect(mockVersionsRepo.rollbackToVersion).toHaveBeenCalledWith("t-1", 1, "admin@church.org", "Undo changes");
   });
 });
-

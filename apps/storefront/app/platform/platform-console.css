@@ -2,7 +2,7 @@
   min-height: 100vh;
   background: #f2f4f1;
   color: #1b2923;
-  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
 }
 
 .platform-console-inner { max-width: 1160px; margin: 0 auto; padding: 0 28px 64px; }

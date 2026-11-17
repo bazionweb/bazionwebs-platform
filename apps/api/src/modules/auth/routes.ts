@@ -269,6 +269,7 @@ export async function authRoutes(app: FastifyInstance, options: AuthRoutesOption
           commercialPortalUrl: options.config?.commercialPortalUrl ?? process.env.COMMERCIAL_PORTAL_URL ?? null,
           platformConsoleUrl: options.config?.platformConsoleUrl ?? process.env.PLATFORM_CONSOLE_URL ?? "http://localhost:3001",
           publicStorefrontUrl: options.config?.PUBLIC_STOREFRONT_URL ?? process.env.PUBLIC_STOREFRONT_URL ?? "http://localhost:3000",
+          tenantPreviewBaseDomain: options.config?.TENANT_PREVIEW_BASE_DOMAIN ?? process.env.TENANT_PREVIEW_BASE_DOMAIN ?? null,
         },
       });
 

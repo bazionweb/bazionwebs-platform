@@ -71,4 +71,3 @@ export function sanitizeRichEventHtml(raw: string): string {
     .replace(/\son[a-z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, "")
     .replace(/javascript:/gi, "");
 }
-

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { ResponsiveImage } from "@bazion/ui";
 import { SiteChrome } from "../../components/gmfc/SiteChrome";
 import { PageHero } from "../../components/gmfc/PageHero";
 import { getClientTenantHeaders } from "../../lib/client-tenant";
@@ -98,10 +99,11 @@ function EventGridSection({
             <div className="gmfci-el-img-wrap">
               {event.posterUrl ? (
                 <>
-                  <img
+                  <ResponsiveImage
                     src={event.posterUrl}
                     alt={event.title}
                     className="gmfci-el-img"
+                    sizes="(max-width: 700px) 100vw, (max-width: 1100px) 50vw, 33vw"
                     style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}
                   />
                   <div className="gmfci-el-img-overlay" />

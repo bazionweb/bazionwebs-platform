@@ -3,7 +3,9 @@ import { extractTenantSlugFromHost } from "@bazion/auth";
 
 export const dynamic = "force-dynamic";
 
-const PRIMARY_API_BASE_URL = (process.env.API_BASE_URL ?? "http://localhost:4000").replace(/\/$/, "");
+const PRIMARY_API_BASE_URL = (
+  process.env.API_BASE_URL ?? "http://localhost:4000"
+).replace(/\/$/, "");
 const DEV_FALLBACK_API_BASE_URL = "http://localhost:4000";
 
 const FORWARDED_REQUEST_HEADERS = [
@@ -24,45 +26,79 @@ function extractTenantFromReferer(refererHeader: string | null): string | null {
   if (!refererHeader) return null;
   try {
     const refererUrl = new URL(refererHeader);
-    const fromQuery = refererUrl.searchParams.get("tenant")?.trim().toLowerCase();
+    const fromQuery = refererUrl.searchParams
+      .get("tenant")
+      ?.trim()
+      .toLowerCase();
     if (fromQuery) return fromQuery;
-    return extractTenantSlugFromHost(refererUrl.hostname, process.env.PUBLIC_STOREFRONT_URL);
+    return extractTenantSlugFromHost(
+      refererUrl.hostname,
+      process.env.PUBLIC_STOREFRONT_URL,
+      process.env.TENANT_PREVIEW_BASE_DOMAIN,
+    );
   } catch {
     return null;
   }
 }
 
-function resolveProxyTenantSlug(request: NextRequest, incomingHost: string): string | null {
-  const fromHost = extractTenantSlugFromHost(incomingHost, process.env.PUBLIC_STOREFRONT_URL);
+function resolveProxyTenantSlug(
+  request: NextRequest,
+  incomingHost: string,
+): string | null {
+  const fromHost = extractTenantSlugFromHost(
+    incomingHost,
+    process.env.PUBLIC_STOREFRONT_URL,
+    process.env.TENANT_PREVIEW_BASE_DOMAIN,
+  );
   if (fromHost) return fromHost;
 
-  const fromQuery = request.nextUrl.searchParams.get("tenant")?.trim().toLowerCase();
+  const fromQuery = request.nextUrl.searchParams
+    .get("tenant")
+    ?.trim()
+    .toLowerCase();
   if (fromQuery) return fromQuery;
 
-  const fromHeader = request.headers.get("x-bazion-tenant")?.trim().toLowerCase();
+  const fromHeader = request.headers
+    .get("x-bazion-tenant")
+    ?.trim()
+    .toLowerCase();
   if (fromHeader) return fromHeader;
 
   const fromReferer = extractTenantFromReferer(request.headers.get("referer"));
   if (fromReferer) return fromReferer;
 
-  const fromCookie = request.cookies.get("bazion_tenant")?.value?.trim().toLowerCase();
+  const fromCookie = request.cookies
+    .get("bazion_tenant")
+    ?.value?.trim()
+    .toLowerCase();
   return fromCookie || null;
 }
 
 async function handleProxy(
   request: NextRequest,
-  context: { params: Promise<{ path: string[] }> },
+  context: { params: Promise<unknown> },
 ): Promise<Response> {
-  const { path } = await context.params;
+  const routeParams = await context.params;
+  const path =
+    typeof routeParams === "object" &&
+    routeParams !== null &&
+    "path" in routeParams &&
+    Array.isArray(routeParams.path) &&
+    routeParams.path.every((segment: unknown) => typeof segment === "string")
+      ? (routeParams.path as string[])
+      : null;
+  if (!path) {
+    return Response.json({ error: "INVALID_ROUTE_PARAMS" }, { status: 400 });
+  }
   const targetPath = `/v1/${path.map(encodeURIComponent).join("/")}${request.nextUrl.search}`;
 
   const incomingHost =
-    request.headers.get("x-forwarded-host")?.split(",", 1)[0]?.trim()
-    || request.headers.get("host")?.trim()
-    || request.nextUrl.host;
+    request.headers.get("x-forwarded-host")?.split(",", 1)[0]?.trim() ||
+    request.headers.get("host")?.trim() ||
+    request.nextUrl.host;
   const rawProto =
-    request.headers.get("x-forwarded-proto")?.split(",", 1)[0]?.trim()
-    || request.nextUrl.protocol.replace(/:$/, "");
+    request.headers.get("x-forwarded-proto")?.split(",", 1)[0]?.trim() ||
+    request.nextUrl.protocol.replace(/:$/, "");
 
   const forwardHeaders = new Headers();
   for (const name of FORWARDED_REQUEST_HEADERS) {
@@ -84,7 +120,9 @@ async function handleProxy(
     fetch(`${baseUrl}${targetPath}`, {
       method: request.method,
       headers: forwardHeaders,
-      ...(hasBody && bodyBuffer && bodyBuffer.byteLength > 0 ? { body: bodyBuffer } : {}),
+      ...(hasBody && bodyBuffer && bodyBuffer.byteLength > 0
+        ? { body: bodyBuffer }
+        : {}),
       cache: "no-store",
       redirect: "manual",
     });
@@ -93,11 +131,18 @@ async function handleProxy(
   try {
     upstream = await forwardOnce(PRIMARY_API_BASE_URL);
   } catch (error) {
-    if (process.env.NODE_ENV !== "production" && PRIMARY_API_BASE_URL !== DEV_FALLBACK_API_BASE_URL) {
+    if (
+      process.env.NODE_ENV !== "production" &&
+      PRIMARY_API_BASE_URL !== DEV_FALLBACK_API_BASE_URL
+    ) {
       upstream = await forwardOnce(DEV_FALLBACK_API_BASE_URL);
     } else {
-      const message = error instanceof Error ? error.message : "Upstream API request failed.";
-      return Response.json({ error: "API_UNREACHABLE", message }, { status: 502 });
+      const message =
+        error instanceof Error ? error.message : "Upstream API request failed.";
+      return Response.json(
+        { error: "API_UNREACHABLE", message },
+        { status: 502 },
+      );
     }
   }
 
@@ -129,4 +174,3 @@ export const PUT = handleProxy;
 export const PATCH = handleProxy;
 export const DELETE = handleProxy;
 export const OPTIONS = handleProxy;
-

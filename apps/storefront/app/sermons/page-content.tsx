@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { CategoryFilter, SermonCard, Modal } from "@bazion/ui";
+import { CategoryFilter, SermonCard, Modal, ResponsiveImage } from "@bazion/ui";
 import { SiteChrome } from "../../components/gmfc/SiteChrome";
 import { PageHero } from "../../components/gmfc/PageHero";
 import { getClientTenantHeaders } from "../../lib/client-tenant";
@@ -156,7 +156,7 @@ export default function SermonsPage() {
                           })
                         }
                       >
-                        <img
+                        <ResponsiveImage
                           src={
                             featuredSermon.thumbnailUrl ||
                             `https://img.youtube.com/vi/${encodeURIComponent(featuredSermon.youtubeVideoId)}/hqdefault.jpg`
@@ -164,6 +164,7 @@ export default function SermonsPage() {
                           alt=""
                           loading="lazy"
                           decoding="async"
+                          sizes="(max-width: 800px) 100vw, 800px"
                         />
                         <span className="ch-sermon-featured-play" aria-hidden="true">▶</span>
                         <span className="ch-sermon-featured-label" aria-hidden="true">

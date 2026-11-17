@@ -20,7 +20,11 @@ async function responseData(response: Response): Promise<Record<string, unknown>
   return response.json().catch(() => ({})) as Promise<Record<string, unknown>>;
 }
 function LoadError({ status, label }: { status: number; label: string }) {
-  return <p className="muted">{status === 403 ? `Your platform role cannot view ${label}.` : `Could not load ${label} (HTTP ${status}).`}</p>;
+  if (status === 403) return <p className="muted">Your platform role cannot view {label}.</p>;
+  if (status === 404 && label === "custom domains") {
+    return <p className="muted">The Platform API image is missing the tenant domains route. Deploy the latest Platform API, then reload this page.</p>;
+  }
+  return <p className="muted">Could not load {label} (HTTP {status}).</p>;
 }
 
 export function TenantControlPanel(props: {

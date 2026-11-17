@@ -24,7 +24,11 @@ export function proxy(request: NextRequest) {
   requestHeaders.set("x-forwarded-host", incomingHost);
   requestHeaders.set("x-forwarded-proto", request.nextUrl.protocol.replace(/:$/, ""));
 
-  const subdomainSlug = extractTenantSlugFromHost(incomingHost, process.env.PUBLIC_STOREFRONT_URL);
+  const subdomainSlug = extractTenantSlugFromHost(
+    incomingHost,
+    process.env.PUBLIC_STOREFRONT_URL,
+    process.env.TENANT_PREVIEW_BASE_DOMAIN,
+  );
   const explicitQueryTenant = request.nextUrl.searchParams.get("tenant")?.trim().toLowerCase() || null;
   const cookieTenant = request.cookies.get("bazion_tenant")?.value?.trim().toLowerCase() || null;
   const resolvedTenant = subdomainSlug || explicitQueryTenant || cookieTenant;

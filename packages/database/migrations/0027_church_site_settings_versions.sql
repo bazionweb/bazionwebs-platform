@@ -34,4 +34,3 @@ BEGIN
     TO bazion_app;
   END IF;
 END $$;
-

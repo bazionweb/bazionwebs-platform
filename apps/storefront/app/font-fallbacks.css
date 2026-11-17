@@ -1,0 +1,5 @@
+:root {
+  --font-jakarta: var(--font-plus-jakarta);
+  --font-plus-jakarta-fallback: "Segoe UI";
+  --font-inter-fallback: Arial;
+}

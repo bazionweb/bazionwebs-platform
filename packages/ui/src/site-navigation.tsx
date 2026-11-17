@@ -1,6 +1,7 @@
 "use client";
 
 import { useId, useRef, useState } from "react";
+import { ResponsiveImage } from "./responsive-image.js";
 
 export interface SiteNavigationLink {
   id?: string;
@@ -87,7 +88,7 @@ export function SiteNavigation({
       <div className="bw-container">
         <div className="bw-site-nav-inner">
           <a href={safeBrandHref} className="bw-site-nav-brand">
-            {safeLogoUrl && <img src={safeLogoUrl} alt="" aria-hidden="true" className="bw-site-nav-logo" />}
+            {safeLogoUrl && <ResponsiveImage src={safeLogoUrl} alt="" aria-hidden="true" className="bw-site-nav-logo" sizes="48px" loading="eager" />}
             <span className="bw-site-nav-title">{brandName}</span>
           </a>
 

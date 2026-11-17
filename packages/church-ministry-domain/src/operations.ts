@@ -228,4 +228,3 @@ export async function recordAssetEventUseCase(
   const parsed = inventoryAssetEventInputSchema.parse(rawInput);
   return repository.createAssetEvent(tenantId, assetId, parsed);
 }
-
