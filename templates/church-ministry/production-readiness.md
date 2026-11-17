@@ -21,6 +21,7 @@ Record the tenant, production hostname, release/commit, reviewer, date, and evid
 - [ ] Populate ministries, departments, small groups, volunteer teams, FAQs, testimonies, gallery, and giving copy only with reviewed tenant content.
 - [ ] Remove all sample/demo content and unsupported statistics. Do not allow an empty saved field to silently resurrect old fallback/demo values.
 - [ ] Confirm every image/video is tenant-approved, loads on the production domain, has useful alternative text, and is not hot-linked from an unstable source.
+- [ ] Use the shared tenant media library for approved image sets. Review suggested metadata, add context-appropriate alt text, and confirm image usage before making the assets public.
 - [ ] Review every page's title, description, social preview, canonical URL, links, and contact/giving calls to action.
 
 ## 3. Admin-to-public synchronization
@@ -68,3 +69,5 @@ Record the tenant, production hostname, release/commit, reviewer, date, and evid
 - [ ] Add observable failure/retry states for storefront settings and each admin data source.
 - [ ] Give operations, event, and sermon records complete edit workflows; add CMS coverage for all content the template renders or mark it explicitly code-managed.
 - [ ] Define explicit clear/empty semantics so empty tenant content never falls back to stale content.
+- [ ] Replace single-file-only image inputs with the shared batch/folder media-import workflow; preserve per-file validation, progress, retry, and review.
+- [ ] Release template updates through a versioned preview/rebase flow that updates inherited fields while preserving tenant overrides and providing conflict review and rollback.
