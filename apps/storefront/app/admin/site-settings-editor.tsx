@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { pulse } from "@bazion/ui";
+import { pulse, UniversalBatchUploader } from "@bazion/ui";
 import {
   churchPublicSiteSettingsSchema,
   type ChurchPublicSiteSettings,
@@ -160,6 +160,7 @@ export function SiteSettingsEditor() {
   const [showVersions, setShowVersions] = useState(false);
   const [changelogNote, setChangelogNote] = useState("");
   const [hasDraft, setHasDraft] = useState(false);
+  const [batchUploaderOpen, setBatchUploaderOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -870,7 +871,31 @@ export function SiteSettingsEditor() {
             {!settings.leadership.length && <p className="admin-muted">No leaders have been added yet.</p>}
           </div>
           <div className="ministry-content-list">
-            <div className="ministry-content-list-heading"><div><strong>Photo gallery</strong><small>Upload a photo, write meaningful alt text, and add an optional caption.</small></div><button type="button" className="ministry-media-button" disabled={settings.galleryImages.length >= 60} onClick={() => setSettings({ ...settings, galleryImages: [...settings.galleryImages, { imageUrl: "", alt: "", caption: "" }] })}>Add photo</button></div>
+            <div className="ministry-content-list-heading">
+              <div>
+                <strong>Photo gallery</strong>
+                <small>Upload individual photos or import an entire folder with auto-inferred alt text and captions.</small>
+              </div>
+              <div style={{ display: "flex", gap: "8px" }}>
+                <button
+                  type="button"
+                  className="ministry-media-button"
+                  disabled={settings.galleryImages.length >= 60}
+                  onClick={() => setBatchUploaderOpen(true)}
+                  style={{ background: "#0284c7", color: "#ffffff" }}
+                >
+                  📁 Batch / Folder Import
+                </button>
+                <button
+                  type="button"
+                  className="ministry-media-button"
+                  disabled={settings.galleryImages.length >= 60}
+                  onClick={() => setSettings({ ...settings, galleryImages: [...settings.galleryImages, { imageUrl: "", alt: "", caption: "" }] })}
+                >
+                  Add photo
+                </button>
+              </div>
+            </div>
             {settings.galleryImages.map((image, index) => <article className="ministry-content-entry" key={`gallery-${index}`}>
               <MediaUploadField label={`Gallery photo ${index + 1}`} value={image.imageUrl} onChange={(value) => setSettings({ ...settings, galleryImages: settings.galleryImages.map((item, itemIndex) => itemIndex === index ? { ...item, imageUrl: value } : item) })} />
               <label style={labelStyle}>Descriptive alt text<input maxLength={240} minLength={3} style={fieldStyle} value={image.alt} onChange={(event) => setSettings({ ...settings, galleryImages: settings.galleryImages.map((item, itemIndex) => itemIndex === index ? { ...item, alt: event.target.value } : item) })} placeholder="Describe what is happening in this image" /></label>
@@ -879,6 +904,43 @@ export function SiteSettingsEditor() {
             </article>)}
             {!settings.galleryImages.length && <p className="admin-muted">No gallery photos have been added yet.</p>}
           </div>
+
+          {batchUploaderOpen && (
+            <div
+              style={{
+                position: "fixed",
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                backgroundColor: "rgba(15, 23, 42, 0.65)",
+                backdropFilter: "blur(4px)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                zIndex: 9999,
+                padding: "20px",
+              }}
+            >
+              <UniversalBatchUploader
+                maxFiles={60 - settings.galleryImages.length}
+                onClose={() => setBatchUploaderOpen(false)}
+                onComplete={(uploadedBatch) => {
+                  const newImages = uploadedBatch.map((item) => ({
+                    imageUrl: item.imageUrl,
+                    alt: item.alt || "Sanctuary photo",
+                    caption: item.caption || "",
+                  }));
+                  setSettings((prev) => ({
+                    ...prev,
+                    galleryImages: [...prev.galleryImages, ...newImages].slice(0, 60),
+                  }));
+                  setBatchUploaderOpen(false);
+                  pulse.success(`Imported ${newImages.length} photos into gallery.`);
+                }}
+              />
+            </div>
+          )}
         </div>
       </section>
 
