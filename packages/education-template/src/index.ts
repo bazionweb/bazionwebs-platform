@@ -1,5 +1,10 @@
 export * from "@bazion/education-contracts";
 export * from "./ui/index.js";
+export {
+  EducationTenantProvider,
+  useEducationTenant,
+  type EducationTenantProviderProps,
+} from "./website/context/EducationTenantContext.js";
 
 export { default as BmiNavbar } from "./website/components/Navbar.js";
 export { default as BmiFooter } from "./website/components/Footer.js";

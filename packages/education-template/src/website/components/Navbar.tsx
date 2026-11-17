@@ -3,6 +3,8 @@
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import type { SchoolPortalConfig } from "@bazion/education-contracts";
+import { useEducationTenant } from "../context/EducationTenantContext";
 
 const navLinks = [
   { name: "Academics", href: "/academics" },
@@ -33,7 +35,28 @@ const navLinks = [
   { name: "Contact", href: "/contact" },
 ];
 
-export default function Navbar() {
+export interface NavbarProps {
+  tenantConfig?: SchoolPortalConfig;
+}
+
+export default function Navbar({ tenantConfig }: NavbarProps = {}) {
+  const config = useEducationTenant(tenantConfig);
+  const isBmiDefault =
+    config.shortName === "BMI University" ||
+    config.institutionName === "Bethel Ministries International University";
+  const brandTitle = isBmiDefault ? "BMI UNIVERSITY" : config.shortName.toUpperCase();
+  const brandSubtitle = isBmiDefault
+    ? "Bethel Ministries International"
+    : config.legalEntityName || config.institutionName;
+  const logoSrc =
+    isBmiDefault && config.branding.logoUrl === "/images/bmi-logo.png"
+      ? "/images/bmi-logo-2.png"
+      : config.branding.logoUrl;
+  const admissionsEmail = config.contact.admissionsEmail;
+  const accreditationLabel =
+    config.accreditationLabel || "QAHE Accredited Higher Education";
+  const portalHref = config.portalPath || "/portal";
+
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [institutesDropdownOpen, setInstitutesDropdownOpen] = useState(false);
@@ -100,36 +123,40 @@ export default function Navbar() {
                 fontWeight: 700,
               }}
             >
-              <span>✦</span> QAHE Accredited Higher Education
+              <span>✦</span> {accreditationLabel}
             </span>
             <span className="hide-mobile" style={{ color: "rgba(255,255,255,0.3)" }}>
               |
             </span>
-            <span className="hide-mobile">admissions@bmiuniversities.org</span>
+            <span className="hide-mobile">{admissionsEmail}</span>
           </div>
 
           <div style={{ display: "flex", alignItems: "center", gap: "1.25rem" }}>
-            {/* Direct High-Visibility BEMI Institute Utility Link */}
-            <Link
-              href="/institutes/bemi"
-              className="hide-mobile"
-              style={{
-                color: "#e5c578",
-                fontWeight: 700,
-                display: "flex",
-                alignItems: "center",
-                gap: "0.35rem",
-                transition: "color 0.2s",
-                textDecoration: "none",
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.color = "#ffffff")}
-              onMouseLeave={(e) => (e.currentTarget.style.color = "#e5c578")}
-            >
-              <span>🌍</span> BEMI Training Institute (Africa Hub)
-            </Link>
-            <span className="hide-mobile" style={{ color: "rgba(255,255,255,0.3)" }}>
-              |
-            </span>
+            {isBmiDefault && (
+              <>
+                {/* Direct High-Visibility BEMI Institute Utility Link */}
+                <Link
+                  href="/institutes/bemi"
+                  className="hide-mobile"
+                  style={{
+                    color: "#e5c578",
+                    fontWeight: 700,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.35rem",
+                    transition: "color 0.2s",
+                    textDecoration: "none",
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.color = "#ffffff")}
+                  onMouseLeave={(e) => (e.currentTarget.style.color = "#e5c578")}
+                >
+                  <span>🌍</span> BEMI Training Institute (Africa Hub)
+                </Link>
+                <span className="hide-mobile" style={{ color: "rgba(255,255,255,0.3)" }}>
+                  |
+                </span>
+              </>
+            )}
 
             <Link
               href="/verify"
@@ -147,7 +174,7 @@ export default function Navbar() {
             </Link>
             <span style={{ color: "rgba(255,255,255,0.3)" }}>|</span>
             <a
-              href="/portal"
+              href={portalHref}
               style={{
                 color: "var(--color-gold, #c5a048)",
                 fontWeight: 700,
@@ -190,7 +217,7 @@ export default function Navbar() {
           >
             <Link
               href="/"
-              aria-label="BMI University — Home"
+              aria-label={`${config.shortName} — Home`}
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -199,8 +226,8 @@ export default function Navbar() {
               }}
             >
               <img
-                src="/images/bmi-logo-2.png"
-                alt="BMI University Crest"
+                src={logoSrc}
+                alt={`${config.shortName} Crest`}
                 style={{
                   height: "58px",
                   width: "auto",
@@ -219,7 +246,7 @@ export default function Navbar() {
                     lineHeight: 1,
                   }}
                 >
-                  BMI UNIVERSITY
+                  {brandTitle}
                 </span>
                 <span
                   style={{
@@ -232,7 +259,7 @@ export default function Navbar() {
                     marginTop: "4px",
                   }}
                 >
-                  Bethel Ministries International
+                  {brandSubtitle}
                 </span>
               </div>
             </Link>

@@ -3,7 +3,7 @@
   "id": "school-portal",
   "name": "School, University & LMS Portal Website",
   "version": "1.0.0",
-  "status": "partial",
+  "status": "stable",
   "implementation": {
     "packageName": "@bazion/education-template",
     "entrypoint": "packages/education-template/src/index.ts"

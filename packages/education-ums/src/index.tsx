@@ -8,6 +8,7 @@ import { AccessibilityProvider } from "./components/AccessibilityProvider";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { QueryClient, QueryClientProvider } from "./shims/tanstack-react-query";
 import { useUIStore } from "./stores/uiStore";
+import { TenantProvider } from "./context/TenantContext";
 import type { SchoolPortalConfig } from "@bazion/education-contracts";
 
 const PRINT_PROTOCOL_CSS = `
@@ -94,21 +95,27 @@ export function UmsApp({ basename = "/ums", tenantConfig }: UmsAppProps) {
       style.textContent = PRINT_PROTOCOL_CSS;
       document.head.appendChild(style);
     }
-    if (tenantConfig?.branding?.logoUrl) {
-      useUIStore.getState().setLogo(tenantConfig.branding.logoUrl);
+    if (tenantConfig) {
+      useUIStore.getState().setInstitutionBranding({
+        logo: tenantConfig.branding?.logoUrl,
+        institutionName: tenantConfig.institutionName,
+        shortName: tenantConfig.shortName,
+      });
     }
   }, [tenantConfig]);
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <AccessibilityProvider>
-        <BrowserRouter basename={basename}>
-          <ErrorBoundary>
-            <App />
-          </ErrorBoundary>
-        </BrowserRouter>
-      </AccessibilityProvider>
-    </QueryClientProvider>
+    <TenantProvider config={tenantConfig}>
+      <QueryClientProvider client={queryClient}>
+        <AccessibilityProvider>
+          <BrowserRouter basename={basename}>
+            <ErrorBoundary>
+              <App />
+            </ErrorBoundary>
+          </BrowserRouter>
+        </AccessibilityProvider>
+      </QueryClientProvider>
+    </TenantProvider>
   );
 }
 
@@ -116,4 +123,5 @@ export default UmsApp;
 export { useAuthStore } from "./stores/authStore";
 export { useDataStore } from "./stores/dataStore";
 export { useUIStore } from "./stores/uiStore";
+export { TenantProvider, useTenantConfig } from "./context/TenantContext";
 export { BrowserRouter, MemoryRouter } from "./shims/react-router-dom";

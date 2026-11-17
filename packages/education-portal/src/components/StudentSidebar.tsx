@@ -1,4 +1,5 @@
 import { Link, useLocation } from '../shims/react-router-dom';
+import { useTenantConfig } from '../context/TenantContext';
 
 interface StudentSidebarProps {
   user?: any;
@@ -6,6 +7,11 @@ interface StudentSidebarProps {
 
 export function StudentSidebar({ user }: StudentSidebarProps) {
   const location = useLocation();
+  const tenantConfig = useTenantConfig();
+  const isBmiDefault = tenantConfig.shortName === 'BMI University';
+  const logoSrc = isBmiDefault && tenantConfig.branding.logoUrl === '/images/bmi-logo.png'
+    ? '/bmi-logo.png'
+    : tenantConfig.branding.logoUrl;
 
   const navItems = [
     { label: 'Dashboard', path: '/student/dashboard', icon: '🏠' },
@@ -23,7 +29,7 @@ export function StudentSidebar({ user }: StudentSidebarProps) {
     <aside className="student-sidebar">
       <div className="student-sidebar-brand" style={{ display: 'flex', alignItems: 'center', gap: '0.85rem', padding: '1.25rem 1.5rem', borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>
         <div style={{ background: 'white', padding: '5px 10px', borderRadius: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <img src="/bmi-logo.png" alt="BMI University Logo" style={{ height: 32, width: 'auto', objectFit: 'contain' }} />
+          <img src={logoSrc} alt={`${tenantConfig.shortName} Logo`} style={{ height: 32, width: 'auto', objectFit: 'contain' }} />
         </div>
         <div>
           <div style={{ fontSize: '0.78rem', color: 'var(--gold)', fontWeight: 800, letterSpacing: '0.12em' }}>

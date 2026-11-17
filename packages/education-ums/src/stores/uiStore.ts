@@ -28,6 +28,8 @@ function persist(key: string, partial: any) {
 interface UIState {
   theme: 'light' | 'dark';
   logo: string;
+  institutionName: string;
+  shortName: string;
   isSidebarOpen: boolean;
   isSidebarCollapsed: boolean;
   expandedGroups: string[];
@@ -37,6 +39,7 @@ interface UIState {
   setTheme: (theme: 'light' | 'dark') => void;
   toggleTheme: () => void;
   setLogo: (logo: string) => void;
+  setInstitutionBranding: (branding: { logo?: string; institutionName?: string; shortName?: string }) => void;
   openSidebar: () => void;
   closeSidebar: () => void;
   toggleSidebar: () => void;
@@ -53,6 +56,8 @@ interface UIState {
 export const useUIStore = create<UIState>((set, get) => ({
   theme: loadPersisted<'light' | 'dark'>(STORAGE_KEY, 'light'),
   logo: '/BMI.svg',
+  institutionName: 'Bethel Ministries International University',
+  shortName: 'BMI University',
   isSidebarOpen: false,
   isSidebarCollapsed: loadPersisted<boolean>(STORAGE_KEY, false),
   expandedGroups: loadPersisted<string[]>(STORAGE_KEY, []),
@@ -75,6 +80,12 @@ export const useUIStore = create<UIState>((set, get) => ({
   },
 
   setLogo: (logo) => set({ logo }),
+  setInstitutionBranding: (branding) =>
+    set((state) => ({
+      logo: branding.logo ?? state.logo,
+      institutionName: branding.institutionName ?? state.institutionName,
+      shortName: branding.shortName ?? state.shortName,
+    })),
 
   openSidebar: () => set({ isSidebarOpen: true }),
   closeSidebar: () => set({ isSidebarOpen: false }),

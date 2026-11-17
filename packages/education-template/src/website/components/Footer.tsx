@@ -2,15 +2,8 @@
 
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-
-const quickLinks = [
-  { label: "Academic Programs", href: "/academics" },
-  { label: "Admissions & Aid", href: "/admissions" },
-  { label: "QAHE Accreditation", href: "/accreditation" },
-  { label: "About BMI University", href: "/about" },
-  { label: "Contact & Campus", href: "/contact" },
-  { label: "Online Application", href: "/apply" },
-];
+import type { SchoolPortalConfig } from "@bazion/education-contracts";
+import { useEducationTenant } from "../context/EducationTenantContext";
 
 const programCategories = [
   { label: "Bachelor's Degrees", href: "/academics#undergraduate" },
@@ -19,17 +12,38 @@ const programCategories = [
   { label: "Graduate Certificates", href: "/academics#certificate" },
 ];
 
-const institutionalPortals = [
-  { label: "BEMI Training Institute (Africa Hub)", href: "/institutes/bemi", external: false },
-  { label: "All BMI Institutes & Campuses", href: "/institutes", external: false },
-  { label: "Student Portal Login ↗", href: "/portal", external: false },
-  { label: "Document Verification Engine", href: "/verify", external: false },
-  { label: "University Management System (UMS) ↗", href: "/ums", external: false },
-  { label: "Terms & Student Refund Policy", href: "/terms", external: false },
-  { label: "Privacy Policy & FERPA", href: "/privacy", external: false },
-];
+export interface FooterProps {
+  tenantConfig?: SchoolPortalConfig;
+}
 
-export default function Footer() {
+export default function Footer({ tenantConfig }: FooterProps = {}) {
+  const config = useEducationTenant(tenantConfig);
+  const isBmiDefault =
+    config.shortName === "BMI University" ||
+    config.institutionName === "Bethel Ministries International University";
+  const logoSrc =
+    isBmiDefault && config.branding.logoUrl === "/images/bmi-logo.png"
+      ? "/images/bmi-crest-270.png"
+      : config.branding.logoUrl;
+  const institutionalPortals = isBmiDefault
+    ? [
+        { label: "BEMI Training Institute (Africa Hub)", href: "/institutes/bemi", external: false },
+        { label: "All BMI Institutes & Campuses", href: "/institutes", external: false },
+        { label: "Student Portal Login ↗", href: config.portalPath || "/portal", external: false },
+        { label: "Document Verification Engine", href: "/verify", external: false },
+        { label: "University Management System (UMS) ↗", href: config.umsPath || "/ums", external: false },
+        { label: "Terms & Student Refund Policy", href: "/terms", external: false },
+        { label: "Privacy Policy & FERPA", href: "/privacy", external: false },
+      ]
+    : [
+        { label: "Institutes & Campuses", href: "/institutes", external: false },
+        { label: "Student Portal Login ↗", href: config.portalPath || "/portal", external: false },
+        { label: "Document Verification Engine", href: "/verify", external: false },
+        { label: "University Management System (UMS) ↗", href: config.umsPath || "/ums", external: false },
+        { label: "Terms & Student Refund Policy", href: "/terms", external: false },
+        { label: "Privacy Policy & FERPA", href: "/privacy", external: false },
+      ];
+
   const [email, setEmail] = useState("");
   const [subscribed, setSubscribed] = useState(false);
   const canvasRef = useRef(null);
@@ -155,16 +169,22 @@ export default function Footer() {
       >
         {/* Column 1 — Brand & Accreditation */}
         <div style={{ display: "flex", flexDirection: "column", gap: "18px" }}>
-          <Link href="/" aria-label="BMI University — Home" style={{ display: "flex", alignItems: "center", gap: "12px", textDecoration: "none" }}>
-            <img src="/images/bmi-crest-270.png" alt="BMI University Crest" style={{ height: "54px", width: "auto", objectFit: "contain", filter: "drop-shadow(0 2px 8px rgba(197, 160, 72, 0.3))" }} />
+          <Link href="/" aria-label={`${config.shortName} — Home`} style={{ display: "flex", alignItems: "center", gap: "12px", textDecoration: "none" }}>
+            <img src={logoSrc} alt={`${config.shortName} Crest`} style={{ height: "54px", width: "auto", objectFit: "contain", filter: "drop-shadow(0 2px 8px rgba(197, 160, 72, 0.3))" }} />
             <div style={{ display: "flex", flexDirection: "column", lineHeight: 1 }}>
-              <span style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 900, fontSize: "1.5rem", color: "#ffffff", letterSpacing: "-0.01em", lineHeight: 0.95 }}>BMI</span>
-              <span style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 800, fontSize: "0.58rem", color: "#e5c578", letterSpacing: "0.22em", textTransform: "uppercase", marginTop: "3px" }}>University</span>
+              <span style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 900, fontSize: "1.5rem", color: "#ffffff", letterSpacing: "-0.01em", lineHeight: 0.95 }}>
+                {isBmiDefault ? "BMI" : config.shortName}
+              </span>
+              <span style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 800, fontSize: "0.58rem", color: "#e5c578", letterSpacing: "0.22em", textTransform: "uppercase", marginTop: "3px" }}>
+                {isBmiDefault ? "University" : config.institutionName}
+              </span>
             </div>
           </Link>
 
           <p style={{ color: "rgba(255,255,255,0.75)", fontSize: "0.88rem", lineHeight: 1.7, margin: 0 }}>
-            Bethel Ministries International University is dedicated to empowering Christ-centered scholars with biblical truth, academic excellence, and servant leadership.
+            {isBmiDefault
+              ? "Bethel Ministries International University is dedicated to empowering Christ-centered scholars with biblical truth, academic excellence, and servant leadership."
+              : config.description || config.tagline}
           </p>
 
           <div style={{ display: "flex", alignItems: "center", gap: "1rem", marginTop: "0.5rem" }}>
@@ -249,10 +269,18 @@ export default function Footer() {
           </h3>
           <p style={{ color: "rgba(255,255,255,0.8)", fontSize: "0.88rem", lineHeight: 1.6, margin: 0 }}>
             Office of Admissions & Student Records<br />
-            Bethel Ministries International University<br />
-            <strong>Africa Regional Hub:</strong> BEMI Training Institute, Mukurweini Campus, Kenya<br />
-            <strong>Email:</strong> admin@bmiuniversities.org<br />
-            <strong>Admissions:</strong> admissions@bmiuniversities.org
+            {config.institutionName}<br />
+            {isBmiDefault ? (
+              <>
+                <strong>Africa Regional Hub:</strong> BEMI Training Institute, Mukurweini Campus, Kenya<br />
+              </>
+            ) : (
+              <>
+                <strong>Campus:</strong> {config.contact.address}<br />
+              </>
+            )}
+            <strong>Email:</strong> {config.contact.adminEmail}<br />
+            <strong>Admissions:</strong> {config.contact.admissionsEmail}
           </p>
 
           <form onSubmit={handleSubscribe} style={{ marginTop: "0.5rem", display: "flex", flexDirection: "column", gap: "0.5rem" }}>
@@ -297,14 +325,23 @@ export default function Footer() {
         <div style={{ maxWidth: "1280px", margin: "0 auto", display: "flex", flexDirection: "column", gap: "0.6rem" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "1rem" }}>
             <div>
-              © {new Date().getFullYear()} Bethel Ministries International University (BMI University). All rights reserved.
+              © {new Date().getFullYear()} {config.institutionName} ({config.shortName}). All rights reserved.
             </div>
             <div>
-              Exempt from licensure under N.C.G.S. 116-15(d) for religious education • QAHE Accredited
+              {isBmiDefault
+                ? "Exempt from licensure under N.C.G.S. 116-15(d) for religious education • QAHE Accredited"
+                : config.accreditationLabel || "Accredited Higher Education Institution"}
             </div>
           </div>
           <div style={{ fontSize: "0.72rem", color: "rgba(255,255,255,0.45)", lineHeight: 1.5, borderTop: "1px solid rgba(255,255,255,0.05)", paddingTop: "0.5rem" }}>
-            In Africa, Bethel Ministries International operates through <strong>BEMI Training Institute</strong> (registered in Kenya, Mukurweini Campus). All continental tuition payments and IntaSend / Paystack / M-Pesa settlements are legally receipted by BEMI Training Institute (trading as BMI University).
+            {isBmiDefault ? (
+              <>
+                In Africa, Bethel Ministries International operates through <strong>BEMI Training Institute</strong> (registered in Kenya, Mukurweini Campus). All continental tuition payments and IntaSend / Paystack / M-Pesa settlements are legally receipted by BEMI Training Institute (trading as BMI University).
+              </>
+            ) : (
+              config.legalDisclaimer ||
+              `All academic programs, tuition settlements, and credentials are issued under the authority of ${config.legalEntityName || config.institutionName}.`
+            )}
           </div>
         </div>
       </div>

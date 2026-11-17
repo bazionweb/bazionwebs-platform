@@ -114,7 +114,6 @@ describe("platform provisioning offer bindings", () => {
       expect.arrayContaining([
         "PRODUCT_MANIFEST_NOT_STABLE:partial",
         "SOLUTION_MANIFEST_NOT_STABLE:partial",
-        "TEMPLATE_MANIFEST_NOT_STABLE:partial",
       ]),
     );
     expect(() => promoteApprovedProductionOfferBindings()).toThrowError(OfferBindingPromotionError);

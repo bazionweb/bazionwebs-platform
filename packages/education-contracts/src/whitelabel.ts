@@ -26,6 +26,14 @@ export {
   BEMI_LEGACY_TENANT_ID,
 };
 
+export const schoolLeadershipMemberSchema = z.object({
+  name: z.string().trim().min(1).max(160),
+  role: z.string().trim().min(1).max(160),
+  img: z.string().optional(),
+});
+
+export type SchoolLeadershipMember = z.infer<typeof schoolLeadershipMemberSchema>;
+
 export const schoolPortalConfigSchema = z.object({
   schemaVersion: z.literal(EDUCATION_CONFIGURATION_VERSION).default(EDUCATION_CONFIGURATION_VERSION),
   institutionName: z.string().trim().min(2).max(180),
@@ -35,6 +43,16 @@ export const schoolPortalConfigSchema = z.object({
   description: z.string().trim().max(4000).default(""),
   portalPath: z.string().default("/portal"),
   umsPath: z.string().default("/ums"),
+  founderName: z.string().trim().max(180).optional(),
+  missionStatement: z.string().trim().max(2000).optional(),
+  visionStatement: z.string().trim().max(2000).optional(),
+  valuesStatement: z.string().trim().max(2000).optional(),
+  accreditationLabel: z.string().trim().max(240).optional(),
+  legalDisclaimer: z.string().trim().max(1000).optional(),
+  regionalHubNote: z.string().trim().max(1000).optional(),
+  leadership: z.array(schoolLeadershipMemberSchema).optional(),
+  trustees: z.array(z.string()).optional(),
+  faculty: z.array(z.string()).optional(),
   branding: z.object({
     primaryColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).default("#0E1D38"),
     secondaryColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).default("#172A4D"),
@@ -115,6 +133,7 @@ export interface CreateWhiteLabeledEducationInput {
   tenantSlug: string;
   institutionName: string;
   shortName?: string;
+  legalEntityName?: string;
   tagline?: string;
   description?: string;
   email?: string;
@@ -122,6 +141,16 @@ export interface CreateWhiteLabeledEducationInput {
   address?: string;
   primaryColor?: string;
   accentColor?: string;
+  logoUrl?: string;
+  founderName?: string;
+  missionStatement?: string;
+  visionStatement?: string;
+  valuesStatement?: string;
+  accreditationLabel?: string;
+  legalDisclaimer?: string;
+  leadership?: SchoolLeadershipMember[];
+  trustees?: string[];
+  faculty?: string[];
   programs?: Program[];
 }
 
@@ -157,15 +186,33 @@ export function createWhiteLabeledEducationConfig(input: CreateWhiteLabeledEduca
       schemaVersion: EDUCATION_CONFIGURATION_VERSION,
       institutionName: input.institutionName,
       shortName: input.shortName ?? input.institutionName,
+      legalEntityName: input.legalEntityName ?? input.institutionName,
       tagline: input.tagline ?? pkg.packageSettings.organization.tagline,
       description: input.description ?? pkg.packageSettings.organization.introduction,
       portalPath: "/portal",
       umsPath: "/ums",
+      founderName: input.founderName,
+      missionStatement:
+        input.missionStatement ??
+        `${input.institutionName} develops scholars and leaders with the values, knowledge, and skills essential to impact the world.`,
+      visionStatement:
+        input.visionStatement ??
+        `Through residential and online programs, ${input.institutionName} educates students to make meaningful contributions to their workplaces and communities.`,
+      valuesStatement:
+        input.valuesStatement ??
+        `The educational philosophy of ${input.institutionName} centers on academic excellence, ethical integrity, and transformative leadership.`,
+      accreditationLabel: input.accreditationLabel ?? "Accredited Higher Education Institution",
+      legalDisclaimer:
+        input.legalDisclaimer ??
+        `All academic programs, tuition settlements, and credentials are issued under the authority of ${input.legalEntityName ?? input.institutionName}.`,
+      leadership: input.leadership ?? [],
+      trustees: input.trustees ?? [],
+      faculty: input.faculty ?? [],
       branding: {
         primaryColor: pkg.website.branding.primaryColor,
         secondaryColor: pkg.website.branding.secondaryColor,
         accentColor: "#C5A048",
-        logoUrl: pkg.packageSettings.branding.logoUrl,
+        logoUrl: input.logoUrl ?? pkg.packageSettings.branding.logoUrl,
       },
       contact: {
         admissionsEmail: input.email ?? `admissions@${input.tenantSlug}.org`,

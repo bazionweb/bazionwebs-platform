@@ -1,12 +1,19 @@
 "use client";
 
 import { useState } from "react";
+import type { SchoolPortalConfig } from "@bazion/education-contracts";
 import PageHero from "../components/PageHero";
 import { API_WORKER_URL } from "../lib/contracts-bridge";
+import { useEducationTenant } from "../context/EducationTenantContext";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || API_WORKER_URL;
 
-export default function Contact() {
+export interface ContactPageProps {
+  tenantConfig?: SchoolPortalConfig;
+}
+
+export default function Contact({ tenantConfig }: ContactPageProps = {}) {
+  const config = useEducationTenant(tenantConfig);
   const [form, setForm] = useState({ name: "", email: "", subject: "", message: "" });
   const [submitted, setSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -41,20 +48,20 @@ export default function Contact() {
     {
       icon: "✉️",
       label: "General Inquiries",
-      value: "admin@bmiuniversities.org",
-      href: "mailto:admin@bmiuniversities.org",
+      value: config.contact.adminEmail,
+      href: `mailto:${config.contact.adminEmail}`,
     },
     {
       icon: "🎓",
       label: "Admissions Office",
-      value: "admissions@bmiuniversities.org",
-      href: "mailto:admissions@bmiuniversities.org",
+      value: config.contact.admissionsEmail,
+      href: `mailto:${config.contact.admissionsEmail}`,
     },
     {
       icon: "🛡️",
       label: "Registrar & Records",
-      value: "registrar@bmiuniversities.org",
-      href: "mailto:registrar@bmiuniversities.org",
+      value: config.contact.registrarEmail,
+      href: `mailto:${config.contact.registrarEmail}`,
     },
     {
       icon: "🕐",
@@ -84,7 +91,7 @@ export default function Contact() {
               Get in Touch
             </h2>
             <p style={{ color: "#64748b", fontSize: "1rem", lineHeight: 1.8, marginBottom: "2.5rem" }}>
-              Bethel Ministries International University serves a worldwide body of students. Contact our central admissions office or send us a message below.
+              {config.institutionName} serves a worldwide body of students. Contact our central admissions office or send us a message below.
             </p>
 
             <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem", marginBottom: "2.5rem" }}>

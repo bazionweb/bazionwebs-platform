@@ -10,10 +10,23 @@ interface CacheEntry {
 export class QueryClient {
   private cache = new Map<string, CacheEntry>();
   private listeners = new Set<(keyPrefix?: QueryKey) => void>();
+  private channel: BroadcastChannel | null = null;
   public defaultOptions: Record<string, unknown>;
 
   constructor(config?: { defaultOptions?: Record<string, unknown> }) {
     this.defaultOptions = config?.defaultOptions ?? {};
+    if (typeof window !== "undefined" && typeof BroadcastChannel !== "undefined") {
+      try {
+        this.channel = new BroadcastChannel("bazion-education-query-sync");
+        this.channel.onmessage = (event: MessageEvent<{ type?: string; queryKey?: QueryKey }>) => {
+          if (event.data?.type === "INVALIDATE") {
+            void this.invalidateLocal(event.data.queryKey);
+          }
+        };
+      } catch {
+        this.channel = null;
+      }
+    }
   }
 
   private serialize(key: QueryKey): string {
@@ -37,19 +50,28 @@ export class QueryClient {
     this.setQueryData(filters.queryKey, updater);
   }
 
-  async invalidateQueries(filters?: { queryKey?: QueryKey }) {
-    if (!filters?.queryKey) {
+  private async invalidateLocal(queryKey?: QueryKey) {
+    if (!queryKey) {
       this.cache.clear();
       this.listeners.forEach((l) => l(undefined));
       return;
     }
-    const prefix = JSON.stringify(filters.queryKey).slice(0, -1);
+    const prefix = JSON.stringify(queryKey).slice(0, -1);
     for (const k of this.cache.keys()) {
       if (k.startsWith(prefix)) {
         this.cache.delete(k);
       }
     }
-    this.listeners.forEach((l) => l(filters.queryKey));
+    this.listeners.forEach((l) => l(queryKey));
+  }
+
+  async invalidateQueries(filters?: { queryKey?: QueryKey }) {
+    await this.invalidateLocal(filters?.queryKey);
+    try {
+      this.channel?.postMessage({ type: "INVALIDATE", queryKey: filters?.queryKey });
+    } catch {
+      // Ignore broadcast errors in restricted contexts
+    }
   }
 
   async refetchQueries(filters?: { queryKey?: QueryKey }) {

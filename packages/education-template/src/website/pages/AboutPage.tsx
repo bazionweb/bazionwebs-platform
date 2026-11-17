@@ -1,47 +1,91 @@
+"use client";
+
 import Link from "next/link";
+import type { SchoolPortalConfig } from "@bazion/education-contracts";
 import PageHero from "../components/PageHero";
+import { useEducationTenant } from "../context/EducationTenantContext";
 
-export default function About() {
-  const leadership = [
-    { name: "Dr. Christopher Cookhorne", role: "President, BMI University",     img: "/images/cookhorne.png" },
-    { name: "Dr. George Githinji",       role: "Vice-President, BMI University", img: "/images/george-githinji.png" },
-    { name: "Dr. Joseph Kiai",           role: "Dean of Academics",              img: "/images/dr-joseph.png" },
-    { name: "Dr. Melba Layne",           role: "Chief Registrar",                img: "/images/melba.png" },
-    { name: "Dr. Lilian Young",          role: "Dean of Students",               img: "/images/dr-young.png" },
-  ];
+const DEFAULT_BMI_LEADERSHIP = [
+  { name: "Dr. Christopher Cookhorne", role: "President, BMI University",     img: "/images/cookhorne.png" },
+  { name: "Dr. George Githinji",       role: "Vice-President, BMI University", img: "/images/george-githinji.png" },
+  { name: "Dr. Joseph Kiai",           role: "Dean of Academics",              img: "/images/dr-joseph.png" },
+  { name: "Dr. Melba Layne",           role: "Chief Registrar",                img: "/images/melba.png" },
+  { name: "Dr. Lilian Young",          role: "Dean of Students",               img: "/images/dr-young.png" },
+];
 
-  const trustees = [
-    "Dr. Christopher Cookhorne, President",
-    "Dr. George Githinji, Vice-President",
-    "Dr. Melba Layne, Board Member",
-    "Dr. Lilian Young, Board Member",
-    "Dr. Joseph Kiai, Board Member",
-  ];
+const DEFAULT_BMI_TRUSTEES = [
+  "Dr. Christopher Cookhorne, President",
+  "Dr. George Githinji, Vice-President",
+  "Dr. Melba Layne, Board Member",
+  "Dr. Lilian Young, Board Member",
+  "Dr. Joseph Kiai, Board Member",
+];
 
-  const faculty = [
-    "Dr. Christopher Cookhorne, Professor",
-    "Dr. Melba Layne, Professor",
-    "Dr. Paul, Professor",
-    "Dr. Lilian Young, Professor",
-    "Dr. George Githinji, Professor",
-    "Dr. Joseph Kiai, Professor",
-  ];
+const DEFAULT_BMI_FACULTY = [
+  "Dr. Christopher Cookhorne, Professor",
+  "Dr. Melba Layne, Professor",
+  "Dr. Paul, Professor",
+  "Dr. Lilian Young, Professor",
+  "Dr. George Githinji, Professor",
+  "Dr. Joseph Kiai, Professor",
+];
+
+export interface AboutPageProps {
+  tenantConfig?: SchoolPortalConfig;
+}
+
+export default function About({ tenantConfig }: AboutPageProps = {}) {
+  const config = useEducationTenant(tenantConfig);
+  const isBmiDefault =
+    config.shortName === "BMI University" ||
+    config.institutionName === "Bethel Ministries International University";
+
+  const leadership =
+    config.leadership && config.leadership.length > 0
+      ? config.leadership.map((l) => ({ ...l, img: l.img || "/images/cookhorne.png" }))
+      : isBmiDefault
+        ? DEFAULT_BMI_LEADERSHIP
+        : [
+            { name: config.founderName || "Office of the Chancellor", role: `President, ${config.shortName}`, img: config.branding.logoUrl },
+          ];
+
+  const trustees =
+    config.trustees && config.trustees.length > 0
+      ? config.trustees
+      : isBmiDefault
+        ? DEFAULT_BMI_TRUSTEES
+        : [`${config.founderName || "Chancellor"}, Board Chair`, `Academic Senate, ${config.shortName}`];
+
+  const faculty =
+    config.faculty && config.faculty.length > 0
+      ? config.faculty
+      : isBmiDefault
+        ? DEFAULT_BMI_FACULTY
+        : [`Senior Academic Faculty, ${config.shortName}`];
 
   const pillars = [
     {
       icon: "🎯",
       title: "Mission",
-      body: "Maintaining the vision of the founder, Dr. Christopher L. Cookhorne, BMI University develops Christ-centered men and women with the values, knowledge, and skills essential to impact the world.",
+      body:
+        config.missionStatement ||
+        (isBmiDefault
+          ? "Maintaining the vision of the founder, Dr. Christopher L. Cookhorne, BMI University develops Christ-centered men and women with the values, knowledge, and skills essential to impact the world."
+          : `${config.institutionName} develops leaders and scholars with the values, knowledge, and skills essential to impact the world.`),
     },
     {
       icon: "👁️",
       title: "Vision",
-      body: "Through its residential and online programs, services, facilities, and collaborations, the Seminary educates men and women who will make important contributions to their workplaces and communities, follow their chosen vocations as callings to glorify God, and fulfill the Great Commission.",
+      body:
+        config.visionStatement ||
+        "Through its residential and online programs, services, facilities, and collaborations, the Seminary educates men and women who will make important contributions to their workplaces and communities, follow their chosen vocations as callings to glorify God, and fulfill the Great Commission.",
     },
     {
       icon: "✝️",
       title: "Values",
-      body: "The educational philosophy of BMI University is based on the authority of the Word of God and the Lordship of Jesus Christ. Education involves the whole person by developing the knowledge, values, and skills which enable each individual to change freely — most effectively when both instructor and student are properly related to God through Christ.",
+      body:
+        config.valuesStatement ||
+        `The educational philosophy of ${config.shortName} is based on the authority of the Word of God and the Lordship of Jesus Christ. Education involves the whole person by developing the knowledge, values, and skills which enable each individual to change freely — most effectively when both instructor and student are properly related to God through Christ.`,
     },
   ];
 
@@ -50,7 +94,7 @@ export default function About() {
       <PageHero
         image="/images/about-hero/about-hero-4-community.jpg"
         eyebrow="Our Heritage & Vision"
-        title="About BMI University"
+        title={`About ${config.shortName}`}
         subtitle="A legacy of Christ-centered education, faith, and global impact since our founding."
       />
 
@@ -63,8 +107,14 @@ export default function About() {
               Statement of Mission & Purpose
             </h2>
             <p style={{ color: "#334155", fontSize: "1.05rem", lineHeight: 1.85, marginBottom: "1.25rem" }}>
-              Maintaining the vision of the founder, <strong>Dr. Christopher L. Cookhorne</strong>, Bethel Ministries International University develops
-              Christ-centered men and women with the values, knowledge, and skills essential to impact the world.
+              {isBmiDefault ? (
+                <>
+                  Maintaining the vision of the founder, <strong>Dr. Christopher L. Cookhorne</strong>, Bethel Ministries International University develops
+                  Christ-centered men and women with the values, knowledge, and skills essential to impact the world.
+                </>
+              ) : (
+                config.missionStatement || config.description || config.tagline
+              )}
             </p>
             <p style={{ color: "#64748b", fontSize: "1rem", lineHeight: 1.85, marginBottom: "1.25rem" }}>
               Through its residential and online programs, services, facilities, and collaborations, the Seminary educates
@@ -80,7 +130,7 @@ export default function About() {
           <div style={{ borderRadius: "20px", overflow: "hidden", boxShadow: "0 20px 60px rgba(0,0,0,0.12)", aspectRatio: "4/3" }}>
             <img
               src="/images/about-hero/about-hero-3-faculty.jpg"
-              alt="Faculty and students at BMI University"
+              alt={`Faculty and students at ${config.shortName}`}
               style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
               loading="lazy"
             />
@@ -97,7 +147,7 @@ export default function About() {
               Our Philosophy of Education
             </h2>
             <p style={{ color: "#64748b", fontSize: "1.05rem", maxWidth: "700px", margin: "0 auto", lineHeight: 1.7 }}>
-              BMI University is a distinctively Christian academic community that continues the philosophy of education
+              {config.shortName} is a distinctively Christian academic community that continues the philosophy of education
               which first gave rise to the seminary.
             </p>
           </div>
@@ -121,7 +171,7 @@ export default function About() {
             Doctrinal Position
           </h2>
           <p style={{ color: "rgba(255,255,255,0.85)", fontSize: "1.1rem", lineHeight: 1.85 }}>
-            BMI University stands firmly on the authority of Scripture and historic Christian orthodoxy. We are committed
+            {config.shortName} stands firmly on the authority of Scripture and historic Christian orthodoxy. We are committed
             to equipping students with a biblical worldview that integrates faith and learning across all disciplines,
             preparing them to serve the Church and impact the world for Christ.
           </p>

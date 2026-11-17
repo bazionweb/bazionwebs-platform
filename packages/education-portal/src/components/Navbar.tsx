@@ -1,10 +1,16 @@
 // src/components/Navbar.tsx
 import { Link, useNavigate, useLocation } from '../shims/react-router-dom';
 import { useAuth } from '../hooks/useAuth';
+import { useTenantConfig } from '../context/TenantContext';
 import { useState, useEffect, useRef } from 'react';
 
 export default function Navbar() {
   const { user, logout } = useAuth();
+  const tenantConfig = useTenantConfig();
+  const isBmiDefault = tenantConfig.shortName === 'BMI University';
+  const logoSrc = isBmiDefault && tenantConfig.branding.logoUrl === '/images/bmi-logo.png'
+    ? '/bmi-logo.png'
+    : tenantConfig.branding.logoUrl;
   const navigate = useNavigate();
   const location = useLocation();
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -41,7 +47,7 @@ export default function Navbar() {
     <>
       <nav className="navbar">
         <Link to="/" className="navbar-brand" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <img src="/bmi-logo.png" alt="BMI University Logo" style={{ height: '32px', width: 'auto' }} /> 
+          <img src={logoSrc} alt={`${tenantConfig.shortName} Logo`} style={{ height: '32px', width: 'auto' }} /> 
           <span className="navbar-brand-badge" style={{ fontSize: '0.72rem', background: 'var(--gold)', color: 'var(--navy)', fontWeight: 800, padding: '3px 8px', borderRadius: '6px', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
             Student Portal
           </span>
@@ -143,8 +149,8 @@ export default function Navbar() {
       <div className={`mobile-nav-drawer ${mobileMenuOpen ? 'open' : ''}`}>
         <div className="mobile-drawer-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <img src="/bmi-logo.png" alt="BMI Logo" style={{ height: 28 }} />
-            <span style={{ fontWeight: 800, color: 'var(--navy)', fontSize: '1rem' }}>BMI Portal</span>
+            <img src={logoSrc} alt={`${tenantConfig.shortName} Logo`} style={{ height: 28 }} />
+            <span style={{ fontWeight: 800, color: 'var(--navy)', fontSize: '1rem' }}>{tenantConfig.shortName} Portal</span>
           </div>
           <button className="mobile-drawer-close" onClick={() => setMobileMenuOpen(false)}>✕</button>
         </div>

@@ -3,7 +3,7 @@
   "id": "church-ministry",
   "name": "Church and ministry website",
   "version": "1.0.0",
-  "status": "partial",
+  "status": "stable",
   "implementation": {
     "packageName": "@bazion/storefront",
     "entrypoint": "apps/storefront/app/church-home.tsx"
