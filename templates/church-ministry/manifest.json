@@ -8,6 +8,7 @@
     "packageName": "@bazion/storefront",
     "entrypoint": "apps/storefront/app/church-home.tsx"
   },
+  "readinessChecklist": "templates/church-ministry/production-readiness.md",
   "configuration": {
     "schemaVersion": "1.0.0",
     "sourcePath": "packages/church-ministry-contracts/src/index.ts",
