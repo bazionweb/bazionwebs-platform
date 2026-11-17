@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import localFont from "next/font/local";
 import "./globals.css";
 import "./recovery.css";
 import "./font-fallbacks.css";
@@ -15,6 +16,47 @@ import {
   fetchTenantPublicData,
   getTenantRequestContext,
 } from "../lib/server-tenant-api";
+
+const plusJakartaSans = localFont({
+  src: "../../../packages/ui/assets/fonts/plus-jakarta-sans-latin.woff2",
+  variable: "--font-plus-jakarta",
+  weight: "200 800",
+  display: "swap",
+});
+
+const inter = localFont({
+  src: "../../../packages/ui/assets/fonts/inter-latin.woff2",
+  variable: "--font-inter",
+  weight: "100 900",
+  display: "swap",
+  preload: false,
+});
+
+const outfit = localFont({
+  src: "../../../packages/ui/assets/fonts/outfit-latin.woff2",
+  variable: "--font-outfit",
+  weight: "100 900",
+  display: "swap",
+  preload: false,
+});
+
+const fraunces = localFont({
+  src: [
+    {
+      path: "../../../packages/ui/assets/fonts/fraunces-latin.woff2",
+      weight: "100 900",
+      style: "normal",
+    },
+    {
+      path: "../../../packages/ui/assets/fonts/fraunces-latin-italic.woff2",
+      weight: "100 900",
+      style: "italic",
+    },
+  ],
+  variable: "--font-fraunces",
+  display: "swap",
+  preload: false,
+});
 
 interface PublicSiteMetadataResponse {
   tenant?: { name?: string | null } | null;
@@ -72,7 +114,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html
+      lang="en"
+      className={`${plusJakartaSans.variable} ${inter.variable} ${outfit.variable} ${fraunces.variable}`}
+    >
       <body>
         <ResponsiveImageProvider
           publicMediaBaseUrl={process.env.MEDIA_STORAGE_PUBLIC_BASE_URL ?? ""}

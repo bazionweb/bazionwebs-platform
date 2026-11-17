@@ -48,11 +48,12 @@ test("workspace manifests are copied before source to preserve dependency-instal
 });
 
 test("runtime app targets use non-root users and production mode", () => {
+  const normalizedDockerfile = dockerfile.replace(/\r\n/g, "\n");
   for (const target of ["api", "admin", "storefront"]) {
-    const start = dockerfile.indexOf(` AS ${target}\n`);
+    const start = normalizedDockerfile.indexOf(` AS ${target}\n`);
     assert.notEqual(start, -1, `missing ${target} runtime stage`);
-    const nextStage = dockerfile.indexOf("\nFROM ", start + 1);
-    const section = dockerfile.slice(start, nextStage === -1 ? undefined : nextStage);
+    const nextStage = normalizedDockerfile.indexOf("\nFROM ", start + 1);
+    const section = normalizedDockerfile.slice(start, nextStage === -1 ? undefined : nextStage);
     assert.match(section, /ENV NODE_ENV=production/);
     assert.match(section, /USER node/);
     assert.match(section, /HEALTHCHECK/);
@@ -159,7 +160,7 @@ test("Dokploy staging stack isolates the database, runs migrations before app se
   const nextService = stagingCompose.indexOf("\n  notification-worker:", statusWorkerStart);
   const statusWorker = stagingCompose.slice(statusWorkerStart, nextService);
   assert.match(statusWorker, /healthcheck:\r?\n\s+disable: true/);
-  assert.match(stagingCompose, /name: bazion-platform-staging-data\n    internal: true/);
+  assert.match(stagingCompose, /name: bazion-platform-staging-data\r?\n    internal: true/);
   assert.match(stagingCompose, /name: bazion_platform_staging_pgdata/);
   assert.match(stagingCompose, /com\.bazion\.backup-target: platform-staging/);
   assert.match(stagingCompose, /APP_ENV: staging/);
@@ -174,7 +175,7 @@ test("Dokploy staging stack isolates the database, runs migrations before app se
   assert.doesNotMatch(stagingCompose, /DOKPLOY_API_KEY/);
   assert.match(stagingCompose, /MEDIA_STORAGE_SECRET_ACCESS_KEY: \$\{R2_SECRET_ACCESS_KEY:/);
   assert.match(stagingCompose, /PLATFORM_CALLBACK_SIGNING_SECRET:\?Set the shared staging callback signing secret/);
-  assert.match(stagingCompose, /profiles:\n      - operator-bootstrap/);
+  assert.match(stagingCompose, /profiles:\r?\n      - operator-bootstrap/);
   assert.match(stagingCompose, /PLATFORM_ADMIN_CONFIRM_EMAIL: \$\{PLATFORM_ADMIN_CONFIRM_EMAIL:-\}/);
   assert.match(stagingCompose, /MIGRATION_DATABASE_URL: postgres:\/\/bazion_migrator:/);
 });
@@ -207,7 +208,7 @@ test("PostgreSQL backup helper selects exactly one labelled DB and validates a r
   assert.match(postgresDumpScript, /label=com\.bazion\.backup-target=\$target_label/);
   assert.match(postgresDumpScript, /\$\{#containers\[@\]\} -ne 1/);
   assert.match(postgresDumpScript, /pg_dump[\s\S]*--format=custom/);
-  assert.match(postgresDumpScript, /pg_restore --list -/);
+  assert.match(postgresDumpScript, /pg_restore --list(?:\s+-)?\s*</);
   assert.match(postgresDumpScript, /umask 077/);
   assert.doesNotMatch(postgresDumpScript, /PGPASSWORD|--password|echo .*secret/i);
   assert.match(stagingCompose, /com\.bazion\.backup-target: platform-staging/);
