@@ -576,6 +576,31 @@ export const platformWhiteLabelPackageCatalog: readonly WhiteLabelPackageDescrip
         ],
         features: ["Leadership Council Grid", "Teaching Library", "Stewardship & Giving Portal"],
       },
+      {
+        id: "hkm-kingdom-cms",
+        name: "HKM Kingdom CMS & Member Portal",
+        tagline: "Dual Church Administration CMS and Self-Service Member Portal with PIN/Password authentication",
+        defaultPalette: "forest-bronze",
+        defaultNavigation: [
+          { id: "home", label: "Home", href: "/" },
+          { id: "portal", label: "Member Portal", href: "/portal" },
+          { id: "visit", label: "Visit", href: "/visit" },
+          { id: "ministries", label: "Ministries", href: "/ministries" },
+          { id: "giving", label: "Giving", href: "/give" },
+          { id: "contact", label: "Contact", href: "/contact" },
+        ],
+        defaultPages: buildStandardPages("Church Operations & Ministries", [
+          { id: "portal", path: "/portal", title: "Member Portal", enabled: true, sections: ["hero", "card-grid"] },
+          { id: "visit", path: "/visit", title: "Plan a Visit", enabled: true, sections: ["hero", "text", "feature-list"] },
+          { id: "ministries", path: "/ministries", title: "Ministries & Departments", enabled: true, sections: ["hero", "card-grid"] },
+          { id: "giving", path: "/give", title: "Tithe & Giving", enabled: true, sections: ["hero", "text", "call-to-action"] },
+        ]),
+        defaultOfferings: [
+          { id: "sunday-worship", name: "Sunday Kingdom Celebration", description: "In-person praise, fellowship, and expository Word of God." },
+          { id: "member-discipleship", name: "Member Care & Discipleship", description: "Self-service member portal, small groups, and pastoral counseling." },
+        ],
+        features: ["Church Management CMS", "PIN/Password Member Portal", "Giving Statements & Attendance", "Multi-Branch Management"],
+      },
     ],
   },
 ];

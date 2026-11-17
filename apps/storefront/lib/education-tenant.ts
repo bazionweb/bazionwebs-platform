@@ -25,6 +25,7 @@ export interface EducationTenantContext {
 
 export interface EducationTenantResult {
   isEducation: boolean;
+  /** Selects BEMI's site branding; BMI and BEMI share the same platform tenant. */
   isBemi: boolean;
   tenantConfig: SchoolPortalConfig;
 }

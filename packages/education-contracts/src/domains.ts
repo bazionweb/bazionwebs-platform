@@ -99,8 +99,13 @@ export const FINANCE_EMAIL = 'finance@bmiuniversities.org' as const;
 /** The alumni network contact email address. */
 export const ALUMNI_EMAIL = 'alumni@bmiuniversities.org' as const;
 
-/** Canonical Tenant IDs for education organizations */
+/** Canonical platform tenant ID shared by BMI University and BEMI Institute. */
 export const BMI_UNIVERSITY_TENANT_ID = '00000000-0000-4000-8000-000000000055' as const;
+/**
+ * Pre-consolidation ID retained only as a BEMI branding selector for legacy
+ * preview/session values. It is not an active tenant registry ID.
+ * @deprecated Use BMI_UNIVERSITY_TENANT_ID for tenant routing.
+ */
 export const BEMI_INSTITUTE_TENANT_ID = '00000000-0000-4000-8000-000000000056' as const;
 export const BMI_LEGACY_TENANT_ID = 'b1000000-0000-4000-8000-000000000001' as const;
 export const BEMI_LEGACY_TENANT_ID = 'b2000000-0000-4000-8000-000000000002' as const;

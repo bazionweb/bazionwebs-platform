@@ -1,0 +1,34 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "rootDir": "./src",
+    "outDir": "./dist",
+    "strict": false,
+    "noUncheckedIndexedAccess": false,
+    "exactOptionalPropertyTypes": false,
+    "verbatimModuleSyntax": false,
+    "noImplicitOverride": false,
+    "skipLibCheck": true,
+    "baseUrl": ".",
+    "paths": {
+      "@apollo/client": ["src/shims/apollo.tsx"],
+      "@apollo/client/*": ["src/shims/apollo.tsx"],
+      "@clerk/clerk-react": ["src/shims/clerk.tsx"],
+      "@clerk/themes": ["src/shims/clerk-themes.ts"],
+      "react-router-dom": ["src/shims/react-router-dom.tsx"],
+      "lucide-react": ["src/shims/lucide-react.tsx"],
+      "recharts": ["src/shims/recharts.tsx"],
+      "jspdf": ["src/shims/jspdf.ts"],
+      "jspdf-autotable": ["src/shims/jspdf-autotable.ts"],
+      "react-image-crop": ["src/shims/react-image-crop.tsx"],
+      "idb": ["src/shims/idb.ts"],
+      "google-auth-library": ["src/shims/google-auth-library.ts"],
+      "@google/genai": ["src/shims/google-genai.ts"]
+    }
+  },
+  "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.d.ts"],
+  "exclude": ["node_modules", "dist", "src/test/**", "src/**/*.test.*", "src/**/*.a11y.*"]
+}

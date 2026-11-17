@@ -1,0 +1,293 @@
+/* Day/Night Mode Styles - Pure Standard CSS */
+
+/* Night Mode General Styles */
+.dark-mode {
+  color-scheme: dark;
+  background-color: #0f172a; /* slate-900 */
+  color: #f1f5f9; /* slate-50 */
+}
+
+.dark-mode * {
+  --tw-bg-opacity: 1;
+  --tw-text-opacity: 1;
+}
+
+/* Cards and Containers in Night Mode */
+.dark-mode .bg-white {
+  background-color: #1e293b !important; /* slate-800 */
+}
+
+.dark-mode .text-gray-900,
+.dark-mode .text-gray-800 {
+  color: #f8fafc !important; /* slate-50 */
+}
+
+.dark-mode .text-gray-700 {
+  color: #f1f5f9 !important; /* slate-100 */
+}
+
+.dark-mode .text-gray-600 {
+  color: #e2e8f0 !important; /* slate-200 */
+}
+
+.dark-mode .text-gray-500 {
+  color: #cbd5e1 !important; /* slate-300 */
+}
+
+.dark-mode .text-gray-400 {
+  color: #94a3b8 !important; /* slate-400 */
+}
+
+.dark-mode .bg-gray-50 {
+  background-color: #1e293b !important; /* slate-800 */
+}
+
+.dark-mode .bg-gray-100 {
+  background-color: #334155 !important; /* slate-700 */
+}
+
+.dark-mode .bg-gray-200 {
+  background-color: #475569 !important; /* slate-600 */
+}
+
+.dark-mode .bg-gray-300 {
+  background-color: #64748b !important; /* slate-500 */
+}
+
+.dark-mode .border-gray-200 {
+  border-color: #475569 !important; /* slate-600 */
+}
+
+.dark-mode .border-gray-300 {
+  border-color: #64748b !important; /* slate-500 */
+}
+
+.dark-mode .border-gray-400 {
+  border-color: #94a3b8 !important; /* slate-400 */
+}
+
+.dark-mode .hover\:bg-gray-50:hover,
+.dark-mode .hover\:bg-gray-100:hover {
+  background-color: #334155 !important; /* slate-700 */
+}
+
+/* Tables in Night Mode */
+.dark-mode table {
+  border-color: #475569;
+}
+
+.dark-mode thead {
+  background-color: #334155 !important;
+  color: #f8fafc !important;
+}
+
+.dark-mode tbody tr {
+  border-color: #475569 !important;
+}
+
+.dark-mode tbody tr:hover {
+  background-color: #334155 !important;
+}
+
+/* Forms in Night Mode */
+.dark-mode input,
+.dark-mode select,
+.dark-mode textarea {
+  background-color: #334155 !important;
+  color: #f8fafc !important;
+  border-color: #475569 !important;
+}
+
+.dark-mode input:focus,
+.dark-mode select:focus,
+.dark-mode textarea:focus {
+  border-color: #64748b !important;
+  outline-color: #94a3b8 !important;
+}
+
+.dark-mode input::placeholder,
+.dark-mode textarea::placeholder {
+  color: #94a3b8 !important;
+}
+
+/* Modals and Dropdowns in Night Mode */
+.dark-mode .shadow-lg {
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25) !important;
+}
+
+/* Buttons in Night Mode - Better contrast */
+.dark-mode .hover\:bg-red-50:hover {
+  background-color: rgba(127, 29, 29, 0.4) !important;
+}
+
+.dark-mode .hover\:bg-green-50:hover {
+  background-color: rgba(20, 83, 45, 0.4) !important;
+}
+
+.dark-mode .hover\:bg-blue-50:hover {
+  background-color: rgba(30, 58, 138, 0.4) !important;
+}
+
+/* Badges and Pills - Better contrast */
+.dark-mode .bg-blue-100 {
+  background-color: rgba(30, 58, 138, 0.5) !important;
+}
+
+.dark-mode .bg-green-100 {
+  background-color: rgba(20, 83, 45, 0.5) !important;
+}
+
+.dark-mode .bg-cyan-100 {
+  background-color: rgba(22, 78, 99, 0.5) !important;
+}
+
+.dark-mode .bg-purple-100 {
+  background-color: rgba(88, 28, 135, 0.5) !important;
+}
+
+.dark-mode .bg-red-100 {
+  background-color: rgba(127, 29, 29, 0.5) !important;
+}
+
+.dark-mode .bg-yellow-100 {
+  background-color: rgba(113, 63, 18, 0.5) !important;
+}
+
+/* Badge text - Improved contrast */
+.dark-mode .text-blue-800 {
+  color: #dbeafe !important;
+}
+
+.dark-mode .text-green-800 {
+  color: #dcfce7 !important;
+}
+
+.dark-mode .text-cyan-800 {
+  color: #cffafe !important;
+}
+
+.dark-mode .text-purple-800 {
+  color: #f3e8ff !important;
+}
+
+.dark-mode .text-red-800 {
+  color: #fee2e2 !important;
+}
+
+.dark-mode .text-yellow-800 {
+  color: #fef9c3 !important;
+}
+
+/* Scrollbar in Night Mode - Better visibility */
+.dark-mode::-webkit-scrollbar {
+  width: 10px;
+}
+
+.dark-mode::-webkit-scrollbar-track {
+  background-color: #1e293b !important;
+}
+
+.dark-mode::-webkit-scrollbar-thumb {
+  background-color: #64748b !important;
+  border-radius: 5px;
+}
+
+.dark-mode::-webkit-scrollbar-thumb:hover {
+  background-color: #94a3b8 !important;
+}
+
+/* Focus states in Night Mode - Better visibility */
+.dark-mode *:focus-visible {
+  outline-color: #94a3b8 !important;
+  outline-width: 2px;
+}
+
+/* Links in Night Mode - Better contrast */
+.dark-mode a,
+.dark-mode .text-blue-600,
+.dark-mode .text-green-600 {
+  filter: brightness(1.25) !important;
+}
+
+.dark-mode a:hover {
+  filter: brightness(1.5) !important;
+}
+
+/* Success/Warning/Error colors in Night Mode - Better contrast */
+.dark-mode .text-red-600 {
+  color: #fca5a5 !important;
+}
+
+.dark-mode .text-green-600 {
+  color: #86efac !important;
+}
+
+.dark-mode .text-yellow-600 {
+  color: #fde047 !important;
+}
+
+.dark-mode .text-blue-600 {
+  color: #93c5fd !important;
+}
+
+/* Alert/Message backgrounds - Better contrast */
+.dark-mode .bg-red-50 {
+  background-color: rgba(127, 29, 29, 0.4) !important;
+}
+
+.dark-mode .bg-green-50 {
+  background-color: rgba(20, 83, 45, 0.4) !important;
+}
+
+.dark-mode .bg-yellow-50 {
+  background-color: rgba(113, 63, 18, 0.4) !important;
+}
+
+.dark-mode .bg-blue-50 {
+  background-color: rgba(30, 58, 138, 0.4) !important;
+}
+
+/* Dividers and lines in Night Mode */
+.dark-mode hr {
+  border-color: #475569 !important;
+}
+
+.dark-mode .divide-gray-200 {
+  border-color: #475569 !important;
+}
+
+/* Disabled elements */
+.dark-mode .disabled,
+.dark-mode [disabled] {
+  opacity: 0.5 !important;
+}
+
+/* Heading elements - Good contrast */
+.dark-mode h1,
+.dark-mode h2,
+.dark-mode h3,
+.dark-mode h4,
+.dark-mode h5,
+.dark-mode h6 {
+  color: #f8fafc !important;
+}
+
+/* Paragraph text */
+.dark-mode p,
+.dark-mode li {
+  color: #f1f5f9 !important;
+}
+
+/* Code blocks */
+.dark-mode code,
+.dark-mode pre {
+  background-color: #020617 !important;
+  color: #e2e8f0 !important;
+  border-color: #334155 !important;
+}
+
+/* Tooltip and hint text */
+.dark-mode .tooltip,
+.dark-mode [title] {
+  color: #f8fafc !important;
+}

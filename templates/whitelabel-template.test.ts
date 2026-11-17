@@ -48,11 +48,12 @@ const GMFC_SAMPLE_PACKAGE_JSON = JSON.stringify({
 });
 
 describe("white-label church templates", () => {
-  it("exposes three white-labeled templates including the GMFC revival signature", () => {
+  it("exposes white-labeled templates including the GMFC revival signature and HKM kingdom CMS", () => {
     expect(churchTemplateCatalog.map((t) => t.id)).toEqual([
       "gmfc-revival-signature",
       "church-ministry",
       "royal-cathedral",
+      "hkm-kingdom-cms",
     ]);
   });
 
@@ -98,6 +99,25 @@ describe("white-label church templates", () => {
     expect(output.config.ministryName).toBe("Grace Chapel Nairobi");
     expect(output.siteSettingsInput.profile.ministryName).toBe("Grace Chapel Nairobi");
     expect(output.siteSettingsInput.settings.giving.mpesaPaybill).toBe("522522");
+  });
+
+  it("generates a valid white-labeled HKM Kingdom CMS template output", () => {
+    const output = createWhiteLabeledChurchConfig({
+      tenantSlug: "hkm-church",
+      ministryName: "Heavenly God Kingdom Churches",
+      templateId: "hkm-kingdom-cms",
+      tagline: "Advancing the Kingdom of God across communities",
+      contact: {
+        email: "office@hkmministries.org",
+        phones: ["+254 700 000000"],
+      },
+    });
+
+    expect(output.template.id).toBe("hkm-kingdom-cms");
+    expect(output.config.ministryName).toBe("Heavenly God Kingdom Churches");
+    expect(output.siteSettingsInput.profile.ministryName).toBe("Heavenly God Kingdom Churches");
+    const validated = churchSiteSettingsInputSchema.safeParse(output.siteSettingsInput);
+    expect(validated.success).toBe(true);
   });
 
   it("extracts and scrubs brand literals from an imported GitHub repo into a clean target tenant config", () => {

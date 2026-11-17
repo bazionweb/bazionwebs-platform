@@ -21,6 +21,7 @@ import { commercialProvisioningRoutes } from "./modules/commercial-provisioning/
 import { fastifySensitiveRedactionPaths } from "./modules/commercial-provisioning/observability.js";
 import { createCommercialProvisioningRuntime } from "./modules/commercial-provisioning/runtime.js";
 import { bmiApiRoutes } from "./modules/education/bmi-api-routes.js";
+import { hkmApiRoutes } from "./modules/church/hkm-api-routes.js";
 
 const MEDIA_UPLOAD_LIMIT_BYTES = 8 * 1024 * 1024;
 
@@ -235,7 +236,13 @@ export async function buildApp(config: AppConfig) {
   await app.register(commerceAdminRoutes, { prefix: "/v1" });
   await app.register(churchRoutes, { prefix: "/v1", config });
   await app.register(formsLeadsRoutes, { prefix: "/v1", config });
-  await app.register(bmiApiRoutes);
+  // These tenant APIs currently serve in-memory demo data and use demo-only
+  // authentication. Do not expose them in production until persistent,
+  // authenticated, tenant-scoped replacements are implemented.
+  if (config.NODE_ENV !== "production" && config.APP_ENV === "development") {
+    await app.register(bmiApiRoutes);
+    await app.register(hkmApiRoutes);
+  }
   const hostingRuntime = createHostingProvisioningRuntime(config.hosting);
   await app.register(hostingRoutes, {
     prefix: "/v1",
