@@ -22,9 +22,9 @@ const programCategories = [
 const institutionalPortals = [
   { label: "BEMI Training Institute (Africa Hub)", href: "/institutes/bemi", external: false },
   { label: "All BMI Institutes & Campuses", href: "/institutes", external: false },
-  { label: "Student Portal Login", href: "/portal", external: false },
+  { label: "Student Portal Login ↗", href: "/portal", external: false },
   { label: "Document Verification Engine", href: "/verify", external: false },
-  { label: "University Management System (UMS)", href: "/ums", external: false },
+  { label: "University Management System (UMS) ↗", href: "/ums", external: false },
   { label: "Terms & Student Refund Policy", href: "/terms", external: false },
   { label: "Privacy Policy & FERPA", href: "/privacy", external: false },
 ];
@@ -105,12 +105,19 @@ export default function Footer() {
 
   return (
     <footer
+      className="bmi-footer"
       style={{
+        display: "block",
+        width: "100%",
+        boxSizing: "border-box",
         position: "relative",
         background: "linear-gradient(135deg, rgba(85, 12, 24, 0.95) 0%, rgba(35, 10, 20, 0.96) 35%, #091223 75%, #040812 100%)",
         color: "#ffffff",
         fontFamily: "'Plus Jakarta Sans', sans-serif",
         overflow: "hidden",
+        borderTop: "none",
+        padding: 0,
+        margin: 0,
       }}
     >
       {/* ── Background Particle Canvas ── */}
@@ -128,7 +135,7 @@ export default function Footer() {
       />
 
       {/* ── Gold Accent Top Border ── */}
-      <div style={{ height: "4px", background: "linear-gradient(90deg, #c5a048 0%, #e5c578 50%, #c5a048 100%)", position: "relative", zIndex: 2 }} />
+      <div style={{ height: "4px", width: "100%", background: "linear-gradient(90deg, #c5a048 0%, #e5c578 50%, #c5a048 100%)", position: "relative", zIndex: 2 }} />
 
       {/* ── Main Footer Grid ── */}
       <div
@@ -136,6 +143,8 @@ export default function Footer() {
           position: "relative",
           zIndex: 2,
           maxWidth: "1280px",
+          width: "100%",
+          boxSizing: "border-box",
           margin: "0 auto",
           padding: "64px 32px 48px",
           display: "grid",
@@ -271,6 +280,7 @@ export default function Footer() {
 
       {/* ── Bottom Bar ── */}
       <div
+        className="footer-bottom-bar"
         style={{
           position: "relative",
           zIndex: 2,
@@ -280,6 +290,8 @@ export default function Footer() {
           fontSize: "0.78rem",
           color: "rgba(255,255,255,0.6)",
           textAlign: "center",
+          width: "100%",
+          boxSizing: "border-box",
         }}
       >
         <div style={{ maxWidth: "1280px", margin: "0 auto", display: "flex", flexDirection: "column", gap: "0.6rem" }}>
