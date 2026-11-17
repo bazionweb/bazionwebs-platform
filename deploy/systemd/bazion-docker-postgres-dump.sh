@@ -43,7 +43,7 @@ docker exec "$container_id" pg_dump \
   --username="$database_user" \
   --dbname="$database_name" > "$temporary_path"
 [[ -s "$temporary_path" ]] || { echo "PostgreSQL dump is empty." >&2; exit 1; }
-docker exec --interactive "$container_id" pg_restore --list - < "$temporary_path" > /dev/null
+docker exec --interactive "$container_id" pg_restore --list < "$temporary_path" > /dev/null
 chmod 0600 -- "$temporary_path"
 mv -- "$temporary_path" "$dump_path"
 trap - EXIT
