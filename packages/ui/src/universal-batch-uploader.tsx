@@ -14,6 +14,7 @@ export interface BatchUploadedImage {
 
 export interface UniversalBatchUploaderProps {
   uploadEndpoint?: string | undefined;
+  autoDescribeEndpoint?: string | undefined;
   headers?: Record<string, string> | undefined;
   maxConcurrency?: number | undefined;
   maxFiles?: number | undefined;
@@ -25,6 +26,7 @@ export interface UniversalBatchUploaderProps {
 
 export function UniversalBatchUploader({
   uploadEndpoint = "/v1/admin/church/media",
+  autoDescribeEndpoint = "/v1/admin/church/media/batch-auto-describe",
   headers = {},
   maxConcurrency = 3,
   maxFiles = 60,
@@ -36,6 +38,7 @@ export function UniversalBatchUploader({
   const [items, setItems] = useState<QueueItem[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [isAutoDescribing, setIsAutoDescribing] = useState(false);
   const [progressSummary, setProgressSummary] = useState({ completed: 0, total: 0, percentage: 0 });
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -169,6 +172,63 @@ export function UniversalBatchUploader({
   const removeItem = (id: string) => {
     if (isUploading) return;
     setItems((prev) => prev.filter((item) => item.id !== id));
+  };
+
+  const updateItemMetadata = (id: string, altText: string, caption?: string) => {
+    setItems((prev) =>
+      prev.map((item) =>
+        item.id === id
+          ? { ...item, inferredAltText: altText, inferredCaption: caption }
+          : item,
+      ),
+    );
+  };
+
+  const autoDescribeAll = async () => {
+    if (items.length === 0 || isAutoDescribing) return;
+    setIsAutoDescribing(true);
+    setErrorMsg(null);
+
+    try {
+      const payload = {
+        items: items.map((i) => ({ filename: i.file.name, context: "gallery" })),
+      };
+      const res = await fetch(autoDescribeEndpoint, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json", ...headers },
+        body: JSON.stringify(payload),
+      });
+
+      if (res.ok) {
+        const body = (await res.json()) as {
+          items?: Array<{ filename: string; altText: string; caption?: string }>;
+        };
+        if (body.items && body.items.length > 0) {
+          const descMap = new Map<string, { altText: string; caption?: string }>();
+          for (const desc of body.items) {
+            descMap.set(desc.filename, desc);
+          }
+          setItems((prev) =>
+            prev.map((item) => {
+              const matched = descMap.get(item.file.name);
+              if (matched) {
+                return {
+                  ...item,
+                  inferredAltText: matched.altText,
+                  inferredCaption: matched.caption || item.inferredCaption,
+                };
+              }
+              return item;
+            }),
+          );
+        }
+      }
+    } catch {
+      // Heuristic titles remain in place if endpoint is unavailable
+    } finally {
+      setIsAutoDescribing(false);
+    }
   };
 
   return (
@@ -327,40 +387,94 @@ export function UniversalBatchUploader({
         </div>
       )}
 
-      {/* Queue items review list */}
+      {/* Bulk Review Sheet & Metadata Inference */}
       {items.length > 0 && (
-        <div style={{ maxHeight: "260px", overflowY: "auto", border: "1px solid #e2e8f0", borderRadius: "8px", marginBottom: "16px" }}>
-          <div style={{ padding: "8px 12px", background: "#f8fafc", borderBottom: "1px solid #e2e8f0", fontSize: "0.8125rem", fontWeight: 600, color: "#475569" }}>
-            Queued for Import ({items.length} files)
+        <div style={{ maxHeight: "280px", overflowY: "auto", border: "1px solid #e2e8f0", borderRadius: "8px", marginBottom: "16px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px", background: "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>
+            <span style={{ fontSize: "0.8125rem", fontWeight: 600, color: "#334155" }}>
+              Bulk Review Sheet ({items.length} files)
+            </span>
+            <button
+              type="button"
+              onClick={autoDescribeAll}
+              disabled={isUploading || isAutoDescribing}
+              style={{
+                background: "#f0f9ff",
+                border: "1px solid #bae6fd",
+                borderRadius: "6px",
+                padding: "4px 10px",
+                fontSize: "0.75rem",
+                fontWeight: 600,
+                color: "#0369a1",
+                cursor: isUploading || isAutoDescribing ? "not-allowed" : "pointer",
+              }}
+            >
+              {isAutoDescribing ? "✨ Generating Descriptions…" : "✨ Auto-Describe All (Vision AI)"}
+            </button>
           </div>
           {items.map((item) => (
             <div
               key={item.id}
               style={{
-                display: "flex",
+                display: "grid",
+                gridTemplateColumns: "1.2fr 1.3fr 1.1fr auto",
+                gap: "10px",
                 alignItems: "center",
-                justifyContent: "space-between",
                 padding: "8px 12px",
                 borderBottom: "1px solid #f1f5f9",
                 fontSize: "0.8125rem",
               }}
             >
-              <div style={{ display: "flex", alignItems: "center", gap: "10px", overflow: "hidden" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", overflow: "hidden" }}>
                 <span style={{ fontSize: "1.2rem" }}>🖼️</span>
                 <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   <div style={{ fontWeight: 500, color: "#1e293b", overflow: "hidden", textOverflow: "ellipsis" }}>
-                    {item.inferredAltText}
+                    {item.file.name}
                   </div>
-                  <div style={{ color: "#94a3b8", fontSize: "0.75rem" }}>
-                    {item.relativePath} · {(item.file.size / 1024).toFixed(0)} KB
+                  <div style={{ color: "#94a3b8", fontSize: "0.7rem" }}>
+                    {(item.file.size / 1024).toFixed(0)} KB
                   </div>
                 </div>
               </div>
+              <div>
+                <input
+                  type="text"
+                  value={item.inferredAltText ?? ""}
+                  disabled={isUploading}
+                  placeholder="Alt text (required)"
+                  onChange={(e) => updateItemMetadata(item.id, e.target.value, item.inferredCaption)}
+                  style={{
+                    width: "100%",
+                    fontSize: "0.75rem",
+                    padding: "6px 8px",
+                    borderRadius: "4px",
+                    border: "1px solid #cbd5e1",
+                    boxSizing: "border-box",
+                  }}
+                />
+              </div>
+              <div>
+                <input
+                  type="text"
+                  value={item.inferredCaption ?? ""}
+                  disabled={isUploading}
+                  placeholder="Caption (optional)"
+                  onChange={(e) => updateItemMetadata(item.id, item.inferredAltText ?? "", e.target.value)}
+                  style={{
+                    width: "100%",
+                    fontSize: "0.75rem",
+                    padding: "6px 8px",
+                    borderRadius: "4px",
+                    border: "1px solid #cbd5e1",
+                    boxSizing: "border-box",
+                  }}
+                />
+              </div>
               <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 }}>
-                {item.status === "queued" && <span style={{ color: "#64748b" }}>Queued</span>}
-                {item.status === "uploading" && <span style={{ color: "#0284c7" }}>Uploading…</span>}
-                {item.status === "success" && <span style={{ color: "#16a34a", fontWeight: 600 }}>✓ Uploaded</span>}
-                {item.status === "error" && <span style={{ color: "#dc2626" }}>Error</span>}
+                {item.status === "queued" && <span style={{ color: "#64748b", fontSize: "0.75rem" }}>Queued</span>}
+                {item.status === "uploading" && <span style={{ color: "#0284c7", fontSize: "0.75rem" }}>Uploading…</span>}
+                {item.status === "success" && <span style={{ color: "#16a34a", fontWeight: 600, fontSize: "0.75rem" }}>✓ Ready</span>}
+                {item.status === "error" && <span style={{ color: "#dc2626", fontSize: "0.75rem" }}>Error</span>}
                 {!isUploading && item.status === "queued" && (
                   <button
                     type="button"

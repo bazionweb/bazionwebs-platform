@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { and, desc, eq, getTableColumns, ilike, max, or, sql } from "drizzle-orm";
+import { z } from "zod";
 import {
   churchPublicSiteSettingsSchema,
   contactMessageSchema,
@@ -890,6 +891,141 @@ export async function churchRoutes(app: FastifyInstance, options: RouteOptions) 
         lastModified: new Date().toISOString(),
       },
     });
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // MEDIA VISION & HEURISTIC AUTO-INFERENCE ROUTES
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  const mediaAutoDescribeInputSchema = z.object({
+    filename: z.string().trim().min(1).max(255),
+    key: z.string().trim().optional(),
+    context: z.string().trim().max(100).optional(),
+  });
+
+  const mediaBatchAutoDescribeInputSchema = z.object({
+    items: z.array(mediaAutoDescribeInputSchema).min(1).max(60),
+    context: z.string().trim().max(100).optional(),
+  });
+
+  function inferMediaMetadataFromFilename(filename: string, context?: string) {
+    const stem = filename.replace(/\.[a-zA-Z0-9]+$/, "");
+    const cleanTitle = stem
+      .replace(/^\d{4}[-_]\d{2}[-_]\d{2}[-_]?/, "")
+      .replace(/[-_]+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+      .replace(/\b\w/g, (c) => c.toUpperCase());
+
+    const lower = stem.toLowerCase();
+    let category = "General";
+    const tags: string[] = [];
+
+    if (lower.includes("worship") || lower.includes("praise") || lower.includes("choir") || lower.includes("sing")) {
+      category = "Praise & Worship";
+      tags.push("worship", "choir");
+    } else if (lower.includes("youth") || lower.includes("camp") || lower.includes("teens")) {
+      category = "Youth Ministry";
+      tags.push("youth", "fellowship");
+    } else if (lower.includes("outreach") || lower.includes("mission") || lower.includes("charity") || lower.includes("community")) {
+      category = "Community Outreach";
+      tags.push("outreach", "community");
+    } else if (lower.includes("sunday") || lower.includes("service") || lower.includes("sermon")) {
+      category = "Sunday Service";
+      tags.push("sunday", "service");
+    } else if (lower.includes("pastor") || lower.includes("elder") || lower.includes("leadership") || lower.includes("bishop")) {
+      category = "Leadership";
+      tags.push("pastoral", "leadership");
+    }
+
+    const titleOrFallback = cleanTitle.length >= 3 ? cleanTitle : "Sanctuary photo";
+    const altText = `${titleOrFallback} in sanctuary`;
+    const caption = `${titleOrFallback} · ${category}`;
+
+    return {
+      altText,
+      caption,
+      category,
+      tags,
+    };
+  }
+
+  async function queryGeminiAutoDescribe(filename: string, context?: string): Promise<{ altText?: string; caption?: string } | null> {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) return null;
+
+    try {
+      const prompt = `You are an accessibility and content assistant for church and community websites. Generate concise, high-quality accessibility alt text (1 sentence, max 160 characters) and a short caption for a photo named "${filename}" in category "${context || "gallery"}". Respond ONLY with a valid JSON object: {"altText": "...", "caption": "..."}`;
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { temperature: 0.2, responseMimeType: "application/json" },
+        }),
+      });
+      if (!res.ok) return null;
+      const data = (await res.json()) as {
+        candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+      };
+      const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (!text) return null;
+      return JSON.parse(text) as { altText?: string; caption?: string };
+    } catch {
+      return null;
+    }
+  }
+
+  // POST /v1/admin/church/media/auto-describe
+  app.post("/admin/church/media/auto-describe", async (request, reply) => {
+    const context = await requireActiveTenantPermission(request.raw.headers, { store: ["read"] });
+    await assertChurchEnabled(context.tenantId);
+    const parsed = mediaAutoDescribeInputSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.code(400).send({ error: "VALIDATION_ERROR", details: parsed.error.issues });
+    }
+
+    const { filename, context: mediaContext } = parsed.data;
+    const heuristic = inferMediaMetadataFromFilename(filename, mediaContext);
+    const geminiResult = await queryGeminiAutoDescribe(filename, mediaContext);
+
+    return reply.send({
+      altText: geminiResult?.altText || heuristic.altText,
+      caption: geminiResult?.caption || heuristic.caption,
+      category: heuristic.category,
+      tags: heuristic.tags,
+      engine: geminiResult ? "gemini-2.5-flash" : "heuristic-stem-v1",
+    });
+  });
+
+  // POST /v1/admin/church/media/batch-auto-describe
+  app.post("/admin/church/media/batch-auto-describe", async (request, reply) => {
+    const context = await requireActiveTenantPermission(request.raw.headers, { store: ["read"] });
+    await assertChurchEnabled(context.tenantId);
+    const parsed = mediaBatchAutoDescribeInputSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.code(400).send({ error: "VALIDATION_ERROR", details: parsed.error.issues });
+    }
+
+    const { items, context: batchContext } = parsed.data;
+    const results = await Promise.all(
+      items.map(async (item) => {
+        const itemCtx = item.context || batchContext;
+        const heuristic = inferMediaMetadataFromFilename(item.filename, itemCtx);
+        const geminiResult = await queryGeminiAutoDescribe(item.filename, itemCtx);
+        return {
+          filename: item.filename,
+          key: item.key,
+          altText: geminiResult?.altText || heuristic.altText,
+          caption: geminiResult?.caption || heuristic.caption,
+          category: heuristic.category,
+          tags: heuristic.tags,
+          engine: geminiResult ? "gemini-2.5-flash" : "heuristic-stem-v1",
+        };
+      })
+    );
+
+    return reply.send({ items: results });
   });
 
   // GET /v1/admin/church/site-settings

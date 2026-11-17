@@ -413,6 +413,51 @@ describe("Church & Ministry Module Routes", () => {
       expect(storage.listObjects).toHaveBeenCalledWith({ tenantId, limit: 100 });
     });
 
+    it("auto-describes an uploaded photo using heuristic and vision inference", async () => {
+      const storage = createTestStorage();
+      const app = await buildTestApp(storage);
+      const response = await app.inject({
+        method: "POST",
+        url: "/v1/admin/church/media/auto-describe",
+        headers: { host: "gmfc.test" },
+        payload: {
+          filename: "2026-11-15_sunday_service_worship_choir.jpg",
+          context: "gallery",
+        },
+      });
+
+      expect(response.statusCode).toBe(200);
+      const body = response.json();
+      expect(body.altText).toContain("Sunday Service Worship Choir in sanctuary");
+      expect(body.category).toBe("Praise & Worship");
+      expect(body.tags).toContain("worship");
+      expect(body.engine).toBeDefined();
+    });
+
+    it("batch auto-describes an array of photos for bulk review", async () => {
+      const storage = createTestStorage();
+      const app = await buildTestApp(storage);
+      const response = await app.inject({
+        method: "POST",
+        url: "/v1/admin/church/media/batch-auto-describe",
+        headers: { host: "gmfc.test" },
+        payload: {
+          items: [
+            { filename: "youth_camp_retreat_2026.png" },
+            { filename: "community_food_outreach.webp" },
+          ],
+        },
+      });
+
+      expect(response.statusCode).toBe(200);
+      const body = response.json();
+      expect(body.items).toHaveLength(2);
+      expect(body.items[0].altText).toContain("Youth Camp Retreat 2026");
+      expect(body.items[0].category).toBe("Youth Ministry");
+      expect(body.items[1].altText).toContain("Community Food Outreach");
+      expect(body.items[1].category).toBe("Community Outreach");
+    });
+
     it("does not serve a local asset through a different tenant host", async () => {
       const storage = createTestStorage();
       const app = await buildTestApp(storage);
