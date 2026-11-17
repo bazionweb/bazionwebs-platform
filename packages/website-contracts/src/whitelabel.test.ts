@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { websiteColorSchema } from "./index.js";
 import {
   createWhiteLabeledPackageConfig,
+  deepMergeCascade,
   ensureAccessibleHexColor,
   extractWhiteLabelFromRepoSource,
   generateByowDokployCompose,
@@ -111,5 +112,101 @@ describe("universal multi-package white-labeling engine", () => {
     expect(blueprint.internalPort).toBe(80);
     expect(blueprint.composeYaml).toContain('com.bazion.package.id=professional-services');
     expect(blueprint.composeYaml).toContain('GIT_REPO_URL: "https://github.com/apex/website"');
+  });
+
+  describe("deepMergeCascade (Sparse Delta Prototype Inheritance)", () => {
+    it("merges keyed arrays by id, inheriting new template items and preserving custom tenant items", () => {
+      const templateBasePages = [
+        { id: "home", path: "/", title: "Template Home", enabled: true, sections: ["hero", "text"] },
+        { id: "about", path: "/about", title: "Template About", enabled: true, sections: ["hero", "team"] },
+        { id: "live", path: "/live", title: "Template Live Broadcast", enabled: true, sections: ["hero", "media"] }, // NEWLY ADDED TO TEMPLATE
+      ];
+
+      const tenantOverrides = [
+        { id: "home", title: "Custom Tenant Sanctuary Home" },
+        { id: "custom-page", path: "/giving-drive", title: "Giving Drive", enabled: true, sections: ["text"] }, // TENANT CUSTOM
+      ];
+
+      const result = deepMergeCascade(templateBasePages, tenantOverrides);
+
+      expect(result).toHaveLength(4);
+      // Home has tenant title but preserved template path, enabled, and sections
+      expect(result.find((p) => p.id === "home")).toEqual({
+        id: "home",
+        path: "/",
+        title: "Custom Tenant Sanctuary Home",
+        enabled: true,
+        sections: ["hero", "text"],
+      });
+      // About is untouched from template
+      expect(result.find((p) => p.id === "about")).toEqual(templateBasePages[1]);
+      // Live is automatically inherited from template without touching tenant DB
+      expect(result.find((p) => p.id === "live")).toEqual(templateBasePages[2]);
+      // Tenant's custom page is preserved
+      expect(result.find((p) => p.id === "custom-page")).toEqual(tenantOverrides[1]);
+    });
+
+    it("deeply merges nested objects, preserving template defaults when tenant overrides are sparse", () => {
+      const baseTheme = {
+        preset: "maroon-gold",
+        headerStyle: "classic",
+        heroStyle: "rotator",
+        cardStyle: "rounded",
+        fontPairing: "outfit-inter",
+        branding: {
+          primaryColor: "#4A1110",
+          secondaryColor: "#6B1A18",
+          accentColor: "#B45E14",
+        },
+      };
+
+      const tenantSparseOverrides = {
+        heroStyle: "centered-bold",
+        branding: {
+          primaryColor: "#16A34A",
+        },
+      };
+
+      const result = deepMergeCascade(baseTheme, tenantSparseOverrides);
+
+      expect(result).toEqual({
+        preset: "maroon-gold",
+        headerStyle: "classic",
+        heroStyle: "centered-bold", // Overridden
+        cardStyle: "rounded",
+        fontPairing: "outfit-inter",
+        branding: {
+          primaryColor: "#16A34A", // Overridden
+          secondaryColor: "#6B1A18", // Inherited from template
+          accentColor: "#B45E14", // Inherited from template
+        },
+      });
+    });
+
+    it("replaces non-keyed arrays when tenant provides an explicit list, and preserves base when omitted", () => {
+      const baseConfig = {
+        rotatorWords: ["Worship", "Community", "Discipleship"],
+        sampleTags: ["faith", "prayer"],
+      };
+
+      const withCustomRotator = deepMergeCascade(baseConfig, {
+        rotatorWords: ["Faith", "Victory"],
+      });
+      expect(withCustomRotator.rotatorWords).toEqual(["Faith", "Victory"]);
+      expect(withCustomRotator.sampleTags).toEqual(["faith", "prayer"]);
+
+      const withOmittedRotator = deepMergeCascade(baseConfig, {
+        sampleTags: ["missions"],
+      });
+      // Omitted array preserves template defaults
+      expect(withOmittedRotator.rotatorWords).toEqual(["Worship", "Community", "Discipleship"]);
+      expect(withOmittedRotator.sampleTags).toEqual(["missions"]);
+
+      const withEmptyRotator = deepMergeCascade(baseConfig, {
+        rotatorWords: [],
+      });
+      // Explicit empty array is honored
+      expect(withEmptyRotator.rotatorWords).toEqual([]);
+    });
   });
 });

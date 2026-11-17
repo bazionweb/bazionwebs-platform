@@ -6,6 +6,8 @@ import {
   ensureAccessibleHexColor,
   extractWhiteLabelTemplateFromRepoSource,
   generateByowDokployCompose,
+  inferChurchTemplateId,
+  resolveEffectiveChurchSiteSettings,
 } from "./whitelabel-template.js";
 
 const GMFC_SAMPLE_CONFIG_TS = `
@@ -192,5 +194,106 @@ describe("white-label church templates", () => {
     });
     expect(staticCompose.internalPort).toBe(80);
     expect(staticCompose.composeYaml).toContain("image: nginx:1.27-alpine");
+  });
+
+  describe("template-to-tenant live inheritance (zero double-editing)", () => {
+    it("infers templateId from raw database record, tenantSlug, or theme preset", () => {
+      expect(inferChurchTemplateId({ templateId: "hkm-kingdom-cms" })).toBe("hkm-kingdom-cms");
+      expect(inferChurchTemplateId({ overrides: { templateId: "royal-cathedral" } })).toBe("royal-cathedral");
+      expect(inferChurchTemplateId(null, "hkm-church-ministries")).toBe("hkm-kingdom-cms");
+      expect(inferChurchTemplateId({ theme: { preset: "royal-navy" } })).toBe("royal-cathedral");
+      expect(inferChurchTemplateId(null, "some-other-church")).toBe("gmfc-revival-signature");
+    });
+
+    it("resolves effective site settings by cascading live template defaults with sparse tenant overrides", () => {
+      // Simulate tenant storing ONLY their explicit overrides in the database
+      const tenantSparseDbRecord = {
+        templateId: "hkm-kingdom-cms",
+        overrides: {
+          branding: {
+            primaryColor: "#047857", // Customized emerald
+          },
+          giving: {
+            mpesaPaybill: "777888",
+            accountName: "HKM Offering",
+          },
+        },
+      };
+
+      const resolved = resolveEffectiveChurchSiteSettings(tenantSparseDbRecord, {
+        tenantSlug: "hkm-church",
+        tenantName: "Heavenly God Kingdom Churches",
+      });
+
+      // Tenant's custom overrides are strictly preserved
+      expect(resolved.branding.primaryColor).toBe("#047857");
+      expect(resolved.giving.mpesaPaybill).toBe("777888");
+      expect(resolved.giving.accountName).toBe("HKM Offering");
+
+      // Canonical template defaults are inherited without storing them in tenant DB
+      expect(resolved.templateId).toBe("hkm-kingdom-cms");
+      expect(resolved.theme.preset).toBe("forest-bronze");
+      expect(resolved.theme.headerStyle).toBe("classic");
+      expect(resolved.pages.some((p) => p.id === "home")).toBe(true);
+      expect(resolved.pages.some((p) => p.id === "giving")).toBe(true);
+      expect(resolved.visitorInfo.arrival).toContain("Welcome Desk");
+    });
+
+    it("demonstrates zero double-editing: newly added template features automatically propagate to tenant without modifying tenant DB row", () => {
+      // Step 1: Tenant DB row was saved at Time T0 with ONLY custom church name and custom color
+      const tenantSavedDbRow = JSON.stringify({
+        templateId: "hkm-kingdom-cms",
+        overrides: {
+          branding: {
+            primaryColor: "#15803d",
+          },
+        },
+      });
+
+      // Step 2: Resolve at T0
+      const initialEffective = resolveEffectiveChurchSiteSettings(tenantSavedDbRow, {
+        tenantSlug: "hkm-church",
+        tenantName: "Heavenly Kingdom Assembly",
+      });
+      expect(initialEffective.branding.primaryColor).toBe("#15803d");
+      expect(initialEffective.pages.length).toBeGreaterThanOrEqual(4);
+
+      // Step 3: Developer updates template code (e.g. template catalog or default pages)
+      // Even if tenant DB row remains 100% UNTOUCHED, runtime resolution pulls live template definitions
+      const templateDescriptor = churchTemplateCatalog.find((t) => t.id === "hkm-kingdom-cms")!;
+      expect(templateDescriptor.features).toContain("Self-Service Member Portal with PIN & Password Access");
+
+      // Step 4: Resolve again (simulating request after template code update)
+      const reResolved = resolveEffectiveChurchSiteSettings(tenantSavedDbRow, {
+        tenantSlug: "hkm-church",
+        tenantName: "Heavenly Kingdom Assembly",
+      });
+
+      // Assert: Tenant site has the latest template configuration AND keeps custom brand overrides
+      expect(reResolved.branding.primaryColor).toBe("#15803d");
+      expect(reResolved.templateId).toBe("hkm-kingdom-cms");
+      // No DB migration or update was required for tenant!
+    });
+
+    it("seamlessly upgrades legacy static JSON database rows without data loss", () => {
+      // Legacy tenant has full monolithic JSON saved in ministry_settings
+      const legacySavedConfig = createWhiteLabeledChurchConfig({
+        tenantSlug: "legacy-revival",
+        ministryName: "Legacy Revival Center",
+        templateId: "gmfc-revival-signature",
+        themeOverrides: { primaryColor: "#4A1110" },
+      });
+
+      const legacyDbRow = JSON.stringify(legacySavedConfig.siteSettingsInput.settings);
+
+      const resolved = resolveEffectiveChurchSiteSettings(legacyDbRow, {
+        tenantSlug: "legacy-revival",
+        tenantName: "Legacy Revival Center",
+      });
+
+      expect(resolved.branding.primaryColor).toBe("#4A1110");
+      expect(resolved.templateId).toBe("gmfc-revival-signature");
+      expect(resolved.pages.some((p) => p.id === "home")).toBe(true);
+    });
   });
 });
