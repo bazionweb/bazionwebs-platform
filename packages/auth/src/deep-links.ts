@@ -26,6 +26,7 @@ export interface ScopedDeepLinkResolutionInput {
     commercialPortalUrl?: string | null;
     platformConsoleUrl: string;
     publicStorefrontUrl: string;
+    tenantPreviewBaseDomain?: string | null;
   };
 }
 
@@ -77,10 +78,36 @@ function isLoopbackHostForUrl(hostname: string): boolean {
 }
 
 /**
- * Derive the canonical preview subdomain hostname for a tenant from the configured
- * storefront origin (e.g. `grace.localhost` in dev or `grace.sites.bazion.example` in production).
+ * Derive the canonical preview hostname from a tenant slug and the configured
+ * preview base domain. Local development continues to use `<slug>.localhost`.
  */
-export function buildTenantSubdomainHostname(storefrontOrigin: string, tenantSlug: string): string {
+function normalizePreviewBaseDomain(previewBaseDomain?: string | null): string | null {
+  const raw = previewBaseDomain?.trim();
+  if (!raw) return null;
+  try {
+    const parsed = new URL(raw.includes("://") ? raw : `https://${raw}`);
+    const hostname = parsed.hostname.toLowerCase().replace(/^www\./, "");
+    if (
+      !["http:", "https:"].includes(parsed.protocol)
+      || parsed.username
+      || parsed.password
+      || parsed.pathname !== "/"
+      || parsed.search
+      || parsed.hash
+      || parsed.port
+      || !/^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/i.test(hostname)
+    ) return null;
+    return hostname;
+  } catch {
+    return null;
+  }
+}
+
+export function buildTenantSubdomainHostname(
+  storefrontOrigin: string,
+  tenantSlug: string,
+  previewBaseDomain?: string | null,
+): string {
   const cleanSlug = tenantSlug.trim().toLowerCase();
   if (!cleanSlug) {
     throw new DeepLinkPolicyError(400, "DEEP_LINK_TENANT_REQUIRED", "tenantSlug is required to build a subdomain hostname.");
@@ -89,7 +116,8 @@ export function buildTenantSubdomainHostname(storefrontOrigin: string, tenantSlu
   if (isLoopbackHostForUrl(base.hostname)) {
     return `${cleanSlug}.localhost`;
   }
-  const rootHost = base.hostname.toLowerCase().replace(/^www\./, "");
+  const rootHost = normalizePreviewBaseDomain(previewBaseDomain)
+    ?? base.hostname.toLowerCase().replace(/^www\./, "");
   return `${cleanSlug}.${rootHost}`;
 }
 
@@ -101,15 +129,23 @@ export function resolveConfiguredWorkspaceBaseUrl(storefrontOrigin: string): str
   return normalizeBaseUrl(storefrontOrigin, "PUBLIC_STOREFRONT_URL").origin;
 }
 
-export function buildTenantStorefrontUrl(storefrontOrigin: string, tenantSlug: string): string {
+export function buildTenantStorefrontUrl(
+  storefrontOrigin: string,
+  tenantSlug: string,
+  previewBaseDomain?: string | null,
+): string {
   const base = normalizeBaseUrl(storefrontOrigin, "PUBLIC_STOREFRONT_URL");
-  base.hostname = buildTenantSubdomainHostname(storefrontOrigin, tenantSlug);
+  base.hostname = buildTenantSubdomainHostname(storefrontOrigin, tenantSlug, previewBaseDomain);
   base.pathname = "/";
   base.search = "";
   return base.toString();
 }
 
-export function extractTenantSlugFromHost(hostname: string, storefrontOrigin?: string | null): string | null {
+export function extractTenantSlugFromHost(
+  hostname: string,
+  storefrontOrigin?: string | null,
+  previewBaseDomain?: string | null,
+): string | null {
   const rawHost = (hostname || "").trim().toLowerCase();
   if (!rawHost) return null;
   const hostWithoutPort = rawHost.startsWith("[") && rawHost.includes("]")
@@ -126,18 +162,24 @@ export function extractTenantSlugFromHost(hostname: string, storefrontOrigin?: s
     return null;
   }
 
+  const roots = new Set<string>();
+  const configuredPreviewRoot = normalizePreviewBaseDomain(previewBaseDomain);
+  if (configuredPreviewRoot) roots.add(configuredPreviewRoot);
   if (storefrontOrigin) {
     try {
       const base = normalizeBaseUrl(storefrontOrigin, "PUBLIC_STOREFRONT_URL");
-      const rootHost = base.hostname.toLowerCase().replace(/^www\./, "");
-      if (!isLoopbackHostForUrl(rootHost) && cleanHost.endsWith(`.${rootHost}`)) {
-        const label = cleanHost.slice(0, -(`.${rootHost}`.length));
-        if (SINGLE_DNS_LABEL_REGEX.test(label) && !RESERVED_SUBDOMAINS.has(label)) {
-          return label;
-        }
-      }
+      roots.add(base.hostname.toLowerCase().replace(/^www\./, ""));
     } catch {
       return null;
+    }
+  }
+
+  for (const rootHost of roots) {
+    if (!isLoopbackHostForUrl(rootHost) && cleanHost.endsWith(`.${rootHost}`)) {
+      const label = cleanHost.slice(0, -(`.${rootHost}`.length));
+      if (SINGLE_DNS_LABEL_REGEX.test(label) && !RESERVED_SUBDOMAINS.has(label)) {
+        return label;
+      }
     }
   }
 
@@ -233,7 +275,11 @@ export function resolveScopedDeepLink(input: ScopedDeepLinkResolutionInput): Sco
     }
     const targetUrl =
       input.area === "tenant_storefront"
-        ? buildTenantStorefrontUrl(input.origins.publicStorefrontUrl, input.targetTenantSlug)
+        ? buildTenantStorefrontUrl(
+            input.origins.publicStorefrontUrl,
+            input.targetTenantSlug,
+            input.origins.tenantPreviewBaseDomain,
+          )
         : buildTenantWorkspacePickerUrl(input.origins.publicStorefrontUrl, {
             tenantSlug: input.targetTenantSlug,
             next: "/admin",

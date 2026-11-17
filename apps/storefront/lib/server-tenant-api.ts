@@ -15,7 +15,11 @@ export async function getTenantRequestContext(): Promise<{ origin: string; heade
     const protocol = rawProtocol === "http" ? "http" : "https";
     if (!host) return null;
     const url = new URL(`${protocol}://${host}`);
-    const subdomainSlug = extractTenantSlugFromHost(url.hostname, process.env.PUBLIC_STOREFRONT_URL);
+    const subdomainSlug = extractTenantSlugFromHost(
+      url.hostname,
+      process.env.PUBLIC_STOREFRONT_URL,
+      process.env.TENANT_PREVIEW_BASE_DOMAIN,
+    );
     const tenantCookie = cookieStore.get("bazion_tenant")?.value?.trim().toLowerCase();
     const tenantSlug = subdomainSlug || tenantCookie;
     const extraHeaders: Record<string, string> = {};

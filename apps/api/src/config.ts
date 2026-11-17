@@ -5,6 +5,22 @@ import { z } from "zod";
 import type { DarajaConfig } from "@bazion/payments";
 
 const optionalEnv = z.preprocess((value) => value === "" ? undefined : value, z.string().trim().min(1).optional());
+const previewBaseDomainEnv = optionalEnv.refine((value) => {
+  if (!value) return true;
+  try {
+    const parsed = new URL(value.includes("://") ? value : `https://${value}`);
+    return !parsed.username
+      && !parsed.password
+      && parsed.pathname === "/"
+      && !parsed.search
+      && !parsed.hash
+      && !parsed.port
+      && isIP(parsed.hostname) === 0
+      && parsed.hostname.split(".").every((label) => /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/i.test(label));
+  } catch {
+    return false;
+  }
+}, "TENANT_PREVIEW_BASE_DOMAIN must be a public DNS hostname, such as bazionweb.com.");
 const defaultHostingTemplateDirectory = resolve(dirname(fileURLToPath(import.meta.url)), "../../../deploy/client-templates");
 const defaultPrivateArchiveDirectory = resolve(dirname(fileURLToPath(import.meta.url)), "../../../.private-archives");
 
@@ -49,6 +65,7 @@ const envSchema = z.object({
   TENANT_RESOLUTION_MODE: z.enum(["static", "verified_domain"]).default("static"),
   CORS_ORIGINS: z.string().default("http://localhost:3000,http://localhost:4000"),
   PUBLIC_STOREFRONT_URL: z.string().url().default("http://localhost:3000"),
+  TENANT_PREVIEW_BASE_DOMAIN: previewBaseDomainEnv,
   MEDIA_STORAGE_DRIVER: z.enum(["local", "s3"]).default("local"),
   MEDIA_STORAGE_LOCAL_DIRECTORY: optionalEnv,
   MEDIA_STORAGE_ENDPOINT: optionalEnv,

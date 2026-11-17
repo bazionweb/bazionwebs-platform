@@ -26,6 +26,14 @@ The hostname becomes active only after the API resolves the TXT record and confi
 
 DNS verification requires a publicly resolvable TXT record and may take time to propagate. The tenant must be active to create or activate a domain. Configure the verified hostname with your hosting or ingress provider separately; this feature verifies ownership and enables tenant resolution, but does not provision DNS records, TLS certificates, or reverse-proxy routing automatically.
 
+## Automatic preview hostnames
+
+Tenant storefront previews are generated from the tenant slug. Set `TENANT_PREVIEW_BASE_DOMAIN` on the API and storefront/admin applications to the hostname suffix, without a tenant label (for example, `bazionweb.com` produces `church-name.bazionweb.com`). Keep `PUBLIC_STOREFRONT_URL` set to the normal public storefront origin; it is also used for checkout and other public links. In staging, the Compose file sets `TENANT_PREVIEW_BASE_DOMAIN=bazionweb.com`.
+
+The preview hostname is predictable and stable for each tenant. Before using it, configure wildcard DNS for `*.bazionweb.com` to reach the Dokploy server, and configure the storefront ingress and TLS certificate to accept that wildcard. Exact DNS records for existing services should remain in place. A tenant slug alone does not create DNS, TLS, or a Dokploy route. Existing tenants can still resolve through previously registered active domains while the preview domain is rolled out.
+
+In the Platform Console, open **Overview & Workspaces → tenant → Manage → Tenant domains** to add or verify a tenant-owned custom hostname. That is separate from the globally configured automatic preview suffix.
+
 ## Audit history
 
 Platform audit events remain append-only. The new tenant audit endpoint only reads events scoped to the requested tenant and requires `audit.read`. The migration grants SELECT to the API database role; authorization remains enforced on every API request. Do not expose raw request bodies, credentials, message payloads or personal contact details through audit metadata.

@@ -25,6 +25,7 @@ export function detectClientTenantSlug(): string | null {
   const fromHost = extractTenantSlugFromHost(
     window.location.hostname,
     process.env.NEXT_PUBLIC_PUBLIC_STOREFRONT_URL,
+    process.env.NEXT_PUBLIC_TENANT_PREVIEW_BASE_DOMAIN,
   );
   if (fromHost) return fromHost;
 

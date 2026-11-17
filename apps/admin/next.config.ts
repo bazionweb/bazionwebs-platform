@@ -11,6 +11,9 @@ const nextConfig: NextConfig = {
     ...(process.env.PUBLIC_STOREFRONT_URL && !process.env.NEXT_PUBLIC_PUBLIC_STOREFRONT_URL
       ? { NEXT_PUBLIC_PUBLIC_STOREFRONT_URL: process.env.PUBLIC_STOREFRONT_URL }
       : {}),
+    ...(process.env.TENANT_PREVIEW_BASE_DOMAIN && !process.env.NEXT_PUBLIC_TENANT_PREVIEW_BASE_DOMAIN
+      ? { NEXT_PUBLIC_TENANT_PREVIEW_BASE_DOMAIN: process.env.TENANT_PREVIEW_BASE_DOMAIN }
+      : {}),
   },
   async rewrites() {
     return [

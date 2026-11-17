@@ -34,6 +34,7 @@ function extractTenantFromReferer(refererHeader: string | null): string | null {
     return extractTenantSlugFromHost(
       refererUrl.hostname,
       process.env.PUBLIC_STOREFRONT_URL,
+      process.env.TENANT_PREVIEW_BASE_DOMAIN,
     );
   } catch {
     return null;
@@ -47,6 +48,7 @@ function resolveProxyTenantSlug(
   const fromHost = extractTenantSlugFromHost(
     incomingHost,
     process.env.PUBLIC_STOREFRONT_URL,
+    process.env.TENANT_PREVIEW_BASE_DOMAIN,
   );
   if (fromHost) return fromHost;
 
