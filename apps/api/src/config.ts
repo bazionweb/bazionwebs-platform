@@ -20,7 +20,7 @@ const previewBaseDomainEnv = optionalEnv.refine((value) => {
   } catch {
     return false;
   }
-}, "TENANT_PREVIEW_BASE_DOMAIN must be a public DNS hostname, such as bazionweb.com.");
+}, "TENANT_PREVIEW_BASE_DOMAIN must be a public DNS hostname, such as preview.bazionweb.com.");
 const defaultHostingTemplateDirectory = resolve(dirname(fileURLToPath(import.meta.url)), "../../../deploy/client-templates");
 const defaultPrivateArchiveDirectory = resolve(dirname(fileURLToPath(import.meta.url)), "../../../.private-archives");
 

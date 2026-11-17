@@ -54,7 +54,7 @@ CMD ["node", "--experimental-strip-types", "scripts/create-platform-admin.ts"]
 FROM workspace AS admin-build
 ARG API_BASE_URL=http://platform-api:4000
 ARG PUBLIC_STOREFRONT_URL=https://church-staging.bazionweb.com
-ARG TENANT_PREVIEW_BASE_DOMAIN=bazionweb.com
+ARG TENANT_PREVIEW_BASE_DOMAIN=preview.bazionweb.com
 ENV API_BASE_URL=${API_BASE_URL}
 ENV PUBLIC_STOREFRONT_URL=${PUBLIC_STOREFRONT_URL}
 ENV TENANT_PREVIEW_BASE_DOMAIN=${TENANT_PREVIEW_BASE_DOMAIN}
@@ -78,7 +78,7 @@ CMD ["node", "apps/admin/server.js"]
 FROM workspace AS storefront-build
 ARG API_BASE_URL=http://platform-api:4000
 ARG PUBLIC_STOREFRONT_URL=https://church-staging.bazionweb.com
-ARG TENANT_PREVIEW_BASE_DOMAIN=bazionweb.com
+ARG TENANT_PREVIEW_BASE_DOMAIN=preview.bazionweb.com
 ENV API_BASE_URL=${API_BASE_URL}
 ENV PUBLIC_STOREFRONT_URL=${PUBLIC_STOREFRONT_URL}
 ENV TENANT_PREVIEW_BASE_DOMAIN=${TENANT_PREVIEW_BASE_DOMAIN}
