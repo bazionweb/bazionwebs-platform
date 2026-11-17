@@ -147,7 +147,11 @@ export async function resolveTenantRouting(
   }
 
   if (config.PUBLIC_STOREFRONT_URL) {
-    const previewSlug = extractTenantSlugFromHost(cleanHost, config.PUBLIC_STOREFRONT_URL);
+    const previewSlug = extractTenantSlugFromHost(
+      cleanHost,
+      config.PUBLIC_STOREFRONT_URL,
+      config.TENANT_PREVIEW_BASE_DOMAIN,
+    );
     if (previewSlug) {
       const previewTenant = await resolvePublicTenantBySlug(previewSlug);
       if (previewTenant) return { tenantId: previewTenant.id, installationId: null };
@@ -181,7 +185,11 @@ export async function resolveTenantId(
   if (tenant) return tenant.id;
 
   if (config.PUBLIC_STOREFRONT_URL) {
-    const previewSlug = extractTenantSlugFromHost(cleanHost, config.PUBLIC_STOREFRONT_URL);
+    const previewSlug = extractTenantSlugFromHost(
+      cleanHost,
+      config.PUBLIC_STOREFRONT_URL,
+      config.TENANT_PREVIEW_BASE_DOMAIN,
+    );
     if (previewSlug) {
       const previewTenant = await resolvePublicTenantBySlug(previewSlug);
       if (previewTenant) return previewTenant.id;

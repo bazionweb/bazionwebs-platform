@@ -54,8 +54,10 @@ CMD ["node", "--experimental-strip-types", "scripts/create-platform-admin.ts"]
 FROM workspace AS admin-build
 ARG API_BASE_URL=http://api:4000
 ARG PUBLIC_STOREFRONT_URL=https://church-staging.bazionweb.com
+ARG TENANT_PREVIEW_BASE_DOMAIN=bazionweb.com
 ENV API_BASE_URL=${API_BASE_URL}
 ENV PUBLIC_STOREFRONT_URL=${PUBLIC_STOREFRONT_URL}
+ENV TENANT_PREVIEW_BASE_DOMAIN=${TENANT_PREVIEW_BASE_DOMAIN}
 RUN --mount=type=cache,id=bazion-pnpm-store,target=/root/.local/share/pnpm/store/v11 \
     pnpm install --frozen-lockfile --filter @bazion/admin...
 COPY . .
@@ -75,7 +77,11 @@ CMD ["node", "apps/admin/server.js"]
 
 FROM workspace AS storefront-build
 ARG API_BASE_URL=http://api:4000
+ARG PUBLIC_STOREFRONT_URL=https://church-staging.bazionweb.com
+ARG TENANT_PREVIEW_BASE_DOMAIN=bazionweb.com
 ENV API_BASE_URL=${API_BASE_URL}
+ENV PUBLIC_STOREFRONT_URL=${PUBLIC_STOREFRONT_URL}
+ENV TENANT_PREVIEW_BASE_DOMAIN=${TENANT_PREVIEW_BASE_DOMAIN}
 RUN --mount=type=cache,id=bazion-pnpm-store,target=/root/.local/share/pnpm/store/v11 \
     pnpm install --frozen-lockfile --filter @bazion/storefront...
 COPY . .

@@ -45,6 +45,7 @@ function resolvePreviewHostname(
   slug: string,
   environment: string,
   publicStorefrontUrl?: string,
+  previewBaseDomain?: string,
 ): string | null {
   if (!slug) return null;
   if (environment !== "production") {
@@ -57,7 +58,7 @@ function resolvePreviewHostname(
     if (host === "localhost" || host === "127.0.0.1" || host === "::1" || host.endsWith(".localhost")) {
       return null;
     }
-    return buildTenantSubdomainHostname(publicStorefrontUrl, slug);
+    return buildTenantSubdomainHostname(publicStorefrontUrl, slug, previewBaseDomain);
   } catch {
     return null;
   }
@@ -67,12 +68,13 @@ export function createAfterCreateOrganizationHook(
   pool: OrganizationTenantLinkQuery,
   environment: string,
   publicStorefrontUrl?: string,
+  previewBaseDomain?: string,
 ): (input: { organization: AuthOrganization }) => Promise<void> {
   return async ({ organization }) => {
     const slug = organization.slug?.trim();
     const tenantId = await linkOrganizationToTenant(pool, organization);
 
-    const hostname = slug ? resolvePreviewHostname(slug, environment, publicStorefrontUrl) : null;
+    const hostname = slug ? resolvePreviewHostname(slug, environment, publicStorefrontUrl, previewBaseDomain) : null;
     if (hostname) {
       const result = await pool.query(
         `INSERT INTO public.tenant_domains (tenant_id, hostname, status, verified_at)

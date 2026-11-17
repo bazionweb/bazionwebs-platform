@@ -30,6 +30,7 @@ x-api-environment: &api-environment
   PLATFORM_CONSOLE_URL: https://platform-staging.bazionweb.com
   COMMERCIAL_PORTAL_URL: https://staging.bazionweb.com
   PUBLIC_STOREFRONT_URL: https://church-staging.bazionweb.com
+  TENANT_PREVIEW_BASE_DOMAIN: bazionweb.com
   AUTH_REQUIRE_EMAIL_VERIFICATION: "true"
   DEFAULT_TENANT_CURRENCY: KES
   TRUSTED_PROXY_ADDRESSES: ${TRUSTED_PROXY_ADDRESSES:?Set the exact Dokploy/Traefik proxy subnet}
@@ -170,6 +171,7 @@ services:
       HOSTNAME: 0.0.0.0
       API_BASE_URL: http://api:4000
       PUBLIC_STOREFRONT_URL: https://church-staging.bazionweb.com
+      TENANT_PREVIEW_BASE_DOMAIN: bazionweb.com
       MEDIA_STORAGE_PUBLIC_BASE_URL: https://media.bazionweb.com
       MEDIA_IMAGE_TRANSFORMS_ENABLED: "true"
       SITE_IMAGE_TRANSFORMS_ENABLED: "false"
@@ -194,6 +196,8 @@ services:
       PORT: "3000"
       HOSTNAME: 0.0.0.0
       API_BASE_URL: http://api:4000
+      PUBLIC_STOREFRONT_URL: https://church-staging.bazionweb.com
+      TENANT_PREVIEW_BASE_DOMAIN: bazionweb.com
       MEDIA_STORAGE_PUBLIC_BASE_URL: https://media.bazionweb.com
       MEDIA_IMAGE_TRANSFORMS_ENABLED: "true"
       SITE_IMAGE_TRANSFORMS_ENABLED: "false"

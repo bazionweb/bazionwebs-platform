@@ -88,7 +88,11 @@ export async function isVerifiedTenantHost(hostname: string): Promise<boolean> {
     [host],
   );
   if (result.rowCount === 1) return true;
-  const previewSlug = extractTenantSlugFromHost(host, process.env.PUBLIC_STOREFRONT_URL);
+  const previewSlug = extractTenantSlugFromHost(
+    host,
+    process.env.PUBLIC_STOREFRONT_URL,
+    process.env.TENANT_PREVIEW_BASE_DOMAIN,
+  );
   if (previewSlug) {
     const tenant = await resolvePublicTenantBySlug(previewSlug);
     if (tenant) return true;
@@ -164,6 +168,7 @@ const afterCreateOrganization = createAfterCreateOrganizationHook(
   { query: (sql, values) => tenantProvisionerPool.query(sql, values) },
   nodeEnv,
   process.env.PUBLIC_STOREFRONT_URL,
+  process.env.TENANT_PREVIEW_BASE_DOMAIN,
 );
 
 export const auth = betterAuth({
