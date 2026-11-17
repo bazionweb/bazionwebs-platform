@@ -3,7 +3,7 @@
   "id": "sme-website",
   "name": "Small business website",
   "version": "1.0.0",
-  "status": "partial",
+  "status": "stable",
   "implementation": {
     "packageName": "@bazion/sme-website-template",
     "entrypoint": "packages/sme-website-template/src/index.ts"

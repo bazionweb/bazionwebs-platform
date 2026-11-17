@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "dev:gmfc": "tsx watch src/server.ts",
+    "dev:bmi": "tsx watch src/server.ts",
+    "dev:bemi": "tsx watch src/server.ts",
     "db:expire-site-enquiries": "tsx scripts/expire-site-enquiries.ts",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/server.js",
@@ -21,6 +23,8 @@
     "@bazion/church-ministry-domain": "workspace:*",
     "@bazion/church-ministry-contracts": "workspace:*",
     "@bazion/church-ministry-template": "workspace:*",
+    "@bazion/education-contracts": "workspace:*",
+    "@bazion/education-domain": "workspace:*",
     "@bazion/sme-website-template": "workspace:*",
     "@bazion/website-contracts": "workspace:*",
     "@bazion/commerce-domain": "workspace:*",

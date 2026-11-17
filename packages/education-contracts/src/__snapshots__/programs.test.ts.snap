@@ -1,0 +1,70 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`@bmi/shared — programs > snapshot — program catalog shape has not changed (drift guard) 1`] = `
+[
+  {
+    "label": "BA in Biblical Studies",
+    "level": "undergraduate",
+  },
+  {
+    "label": "BA in Christian Education",
+    "level": "undergraduate",
+  },
+  {
+    "label": "BA in Ministry Leadership",
+    "level": "undergraduate",
+  },
+  {
+    "label": "BA in Theological Studies",
+    "level": "undergraduate",
+  },
+  {
+    "label": "BA in Worship Leadership",
+    "level": "undergraduate",
+  },
+  {
+    "label": "Master of Divinity (MDiv)",
+    "level": "graduate",
+  },
+  {
+    "label": "MA in Christian Counseling",
+    "level": "graduate",
+  },
+  {
+    "label": "MA in Theological Studies",
+    "level": "graduate",
+  },
+  {
+    "label": "MA in Christian Education",
+    "level": "graduate",
+  },
+  {
+    "label": "MA in Christian Apologetics",
+    "level": "graduate",
+  },
+  {
+    "label": "MA in Christian Leadership",
+    "level": "graduate",
+  },
+  {
+    "label": "Doctor of Ministry (DMin)",
+    "level": "doctorate",
+  },
+  {
+    "label": "Doctor of Christian Education",
+    "level": "doctorate",
+  },
+  {
+    "label": "Graduate Certificate in Christian Studies",
+    "level": "certificate",
+  },
+  {
+    "label": "Graduate Certificate in Spiritual Formation",
+    "level": "certificate",
+  },
+  {
+    "label": "Diploma in Christian Ministry and Theology",
+    "level": "diploma",
+  },
+]
+`;

@@ -1,0 +1,11 @@
+{
+  "dashboard": "Tablero",
+  "student_portal": "Portal del Estudiante",
+  "faculty_portal": "Portal de la Facultad",
+  "finance": "Finanzas",
+  "settings": "Configuración",
+  "logout": "Cerrar sesión",
+  "notifications": "Notificaciones",
+  "search_placeholder": "Buscar algo...",
+  "welcome": "Bienvenido de nuevo, {{name}}"
+}

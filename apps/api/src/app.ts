@@ -20,6 +20,7 @@ import { createHostingProvisioningRuntime } from "./modules/hosting/runtime.js";
 import { commercialProvisioningRoutes } from "./modules/commercial-provisioning/routes.js";
 import { fastifySensitiveRedactionPaths } from "./modules/commercial-provisioning/observability.js";
 import { createCommercialProvisioningRuntime } from "./modules/commercial-provisioning/runtime.js";
+import { bmiApiRoutes } from "./modules/education/bmi-api-routes.js";
 
 const MEDIA_UPLOAD_LIMIT_BYTES = 8 * 1024 * 1024;
 
@@ -66,7 +67,7 @@ export async function buildApp(config: AppConfig) {
     },
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization", "Idempotency-Key", "X-Donation-Status-Token", "X-Payment-Status-Token", "X-Requested-With"],
+    allowedHeaders: ["Content-Type", "Authorization", "Idempotency-Key", "X-Donation-Status-Token", "X-Payment-Status-Token", "X-Requested-With", "x-bazion-tenant", "X-Bazion-Tenant"],
   });
   await app.register(rateLimit, { max: 120, timeWindow: "1 minute" });
 
@@ -216,6 +217,15 @@ export async function buildApp(config: AppConfig) {
 
   const releaseId = process.env.APP_RELEASE_ID?.trim() || process.env.GITHUB_SHA?.trim() || "local";
   app.get("/health", async () => ({ status: "ok", service: "bazion-api", environment: config.APP_ENV, releaseId }));
+  app.get("/", async () => ({
+    service: "bazion-api",
+    status: "ok",
+    environment: config.APP_ENV,
+    releaseId,
+    health: "/health",
+    storefrontUrl: config.PUBLIC_STOREFRONT_URL || "http://localhost:3100",
+    message: "Bazion Platform API Gateway is active. Access the user-facing website on the storefront port.",
+  }));
   await app.register(oidcDiscoveryRoutes, { config });
   await app.register(authRoutes, { prefix: "/v1", config });
   await app.register(oidcRoutes, { prefix: "/v1", config });
@@ -225,6 +235,7 @@ export async function buildApp(config: AppConfig) {
   await app.register(commerceAdminRoutes, { prefix: "/v1" });
   await app.register(churchRoutes, { prefix: "/v1", config });
   await app.register(formsLeadsRoutes, { prefix: "/v1", config });
+  await app.register(bmiApiRoutes);
   const hostingRuntime = createHostingProvisioningRuntime(config.hosting);
   await app.register(hostingRoutes, {
     prefix: "/v1",

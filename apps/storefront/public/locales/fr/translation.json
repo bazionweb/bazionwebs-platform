@@ -1,0 +1,11 @@
+{
+  "dashboard": "Tableau de bord",
+  "student_portal": "Portail étudiant",
+  "faculty_portal": "Portail de la faculté",
+  "finance": "Finances",
+  "settings": "Paramètres",
+  "logout": "Déconnexion",
+  "notifications": "Notifications",
+  "search_placeholder": "Rechercher...",
+  "welcome": "Bon retour, {{name}}"
+}

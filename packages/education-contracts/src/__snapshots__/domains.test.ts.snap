@@ -1,0 +1,25 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`@bmi/shared — domains > snapshot — allowed origins list has not changed (domain drift guard) 1`] = `
+[
+  "https://bmiuniversities.org",
+  "https://www.bmiuniversities.org",
+  "https://portal.bmiuniversities.org",
+  "https://ums.bmiuniversities.org",
+  "https://api.bmiuniversities.org",
+  "https://verify.bmiuniversities.org",
+  "https://admin.bmiuniversities.org",
+  "https://apply.bmiuniversities.org",
+  "https://bmi-portal.pages.dev",
+  "https://bmi-ums.pages.dev",
+  "https://bmi-university.pages.dev",
+  "https://portal.bmi-university.pages.dev",
+  "https://ums.bmi-university.pages.dev",
+  "https://main.bmi-university.pages.dev",
+  "http://localhost:5173",
+  "http://localhost:3000",
+  "http://localhost:4173",
+  "http://localhost:5174",
+  "http://127.0.0.1:8787",
+]
+`;

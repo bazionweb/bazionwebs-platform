@@ -5,3 +5,4 @@ export * from "./schema/commercial-delivery.js";
 export * from "./schema/identity.js";
 export * from "./schema/church-operations.js";
 export * from "./migration-registry.js";
+export * from "./bmi-migration.js";

@@ -376,6 +376,32 @@ export const platformWhiteLabelPackageCatalog: readonly WhiteLabelPackageDescrip
         ],
         features: ["Academic Programs Grid", "Term Calendar Showcase", "Admissions Enquiry Pipeline"],
       },
+      {
+        id: "oxford-imperial-university",
+        name: "Higher Education & University Campus",
+        tagline: "Faculty departments, research, international admissions & campus life",
+        defaultPalette: "royal-navy",
+        defaultNavigation: [
+          { id: "home", label: "Home", href: "/" },
+          { id: "academics", label: "Academics", href: "/academics" },
+          { id: "admissions", label: "Admissions", href: "/admissions" },
+          { id: "institutes", label: "Institutes", href: "/institutes" },
+          { id: "verify", label: "Verify", href: "/verify" },
+          { id: "contact", label: "Contact", href: "/contact" },
+        ],
+        defaultPages: buildStandardPages("Academic Programs", [
+          { id: "academics", path: "/academics", title: "Academics & Faculty", enabled: true, sections: ["hero", "card-grid"] },
+          { id: "admissions", path: "/admissions", title: "Admissions & Intake", enabled: true, sections: ["hero", "contact-form"] },
+          { id: "institutes", path: "/institutes", title: "Colleges & Institutes", enabled: true, sections: ["hero", "feature-list"] },
+          { id: "verify", path: "/verify", title: "Credential Verification", enabled: true, sections: ["hero", "call-to-action"] },
+        ]),
+        defaultOfferings: [
+          { id: "undergraduate", name: "Undergraduate Degree Programs", description: "Rigorous bachelor degrees accredited internationally across multiple faculties." },
+          { id: "postgraduate", name: "Postgraduate & Masters Programs", description: "Specialized executive masters and advanced doctoral research pathways." },
+          { id: "professional-cert", name: "Professional Certifications", description: "Industry-aligned executive credentials and continuing education modules." },
+        ],
+        features: ["Multi-Faculty Academic Catalog", "Student Admissions Pipeline", "Credential Verification Gateway"],
+      },
     ],
   },
   {
@@ -1068,7 +1094,10 @@ function inferPackageIdFromSource(combinedText: string): WhiteLabelPackageId {
   if (/\b(clinic|patient|doctor|medical|hospital|pharmacy|triage|dental)\b/.test(lower)) {
     return "clinic-management";
   }
-  if (/\b(school|student|tuition|admissions|campus|curriculum|faculty|academy)\b/.test(lower)) {
+  if (
+    /\b(school|student|tuition|admissions|campus|curriculum|faculty|academy|university|institute|bemi|bmi)\b/.test(lower) ||
+    lower.includes("@bmi/")
+  ) {
     return "school-education";
   }
   if (/\b(ngo|nonprofit|foundation|donor|humanitarian|charity)\b/.test(lower)) {

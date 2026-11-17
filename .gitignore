@@ -3,6 +3,8 @@ node_modules
 dist
 .next
 .next-gmfc
+.next-bmi
+.next-bemi
 out
 .turbo
 *.tsbuildinfo

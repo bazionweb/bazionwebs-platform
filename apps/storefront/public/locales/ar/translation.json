@@ -1,0 +1,11 @@
+{
+  "dashboard": "لوحة القيادة",
+  "student_portal": "بوابة الطالب",
+  "faculty_portal": "بوابة أعضاء هيئة التدريس",
+  "finance": "المالية",
+  "settings": "الإعدادات",
+  "logout": "تسجيل الخروج",
+  "notifications": "الإشعارات",
+  "search_placeholder": "البحث عن أي شيء...",
+  "welcome": "مرحباً بك مجدداً، {{name}}"
+}

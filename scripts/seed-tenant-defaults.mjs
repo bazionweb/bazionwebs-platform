@@ -1,14 +1,95 @@
 import pg from "../apps/api/node_modules/pg/lib/index.js";
 
 const client = new pg.Client({
-  connectionString: "postgres://postgres:postgres@localhost:5432/bazion_platform",
+  connectionString:
+    process.env.MIGRATION_DATABASE_URL ||
+    process.env.DATABASE_URL ||
+    "postgres://postgres:postgres@localhost:5432/bazion_platform",
 });
+
+const EDUCATION_TENANTS = [
+  {
+    id: "00000000-0000-4000-8000-000000000055",
+    slug: "bmi",
+    name: "Bethel Ministries International University (BMI University)",
+    domains: [
+      "bmi.localhost",
+      "bmi-university.localhost",
+      "bmiuniversities.org",
+      "www.bmiuniversities.org",
+      "bmi.ac.ke",
+      "www.bmi.ac.ke",
+      "portal.bmi.ac.ke",
+      "ums.bmi.ac.ke",
+    ],
+  },
+  {
+    id: "00000000-0000-4000-8000-000000000056",
+    slug: "bemi",
+    name: "BEMI Training Institute (Africa Regional Hub)",
+    domains: [
+      "bemi.localhost",
+      "bemi-institute.localhost",
+      "bemi.org",
+      "www.bemi.org",
+      "bemi.ac.ke",
+      "www.bemi.ac.ke",
+    ],
+  },
+];
 
 async function main() {
   await client.connect();
-  const res = await client.query("SELECT id, slug, name FROM public.tenants WHERE status = 'active'");
+
+  // 1. Ensure BMI University & BEMI Training Institute exist as active tenants with verified domains
+  for (const edu of EDUCATION_TENANTS) {
+    console.log(`Seeding education tenant ${edu.name} (${edu.id})...`);
+    await client.query(
+      `INSERT INTO public.tenants (id, slug, name, status)
+       VALUES ($1, $2, $3, 'active')
+       ON CONFLICT (id) DO UPDATE
+       SET name = EXCLUDED.name, status = 'active'`,
+      [edu.id, edu.slug, edu.name],
+    );
+
+    await client.query("BEGIN");
+    await client.query("SELECT set_config($1, $2, true)", ["app.tenant_id", edu.id]);
+
+    for (const domain of edu.domains) {
+      await client.query(
+        `DELETE FROM public.tenant_domains WHERE hostname = $1 AND tenant_id <> $2`,
+        [domain, edu.id],
+      );
+      await client.query(
+        `INSERT INTO public.tenant_domains (tenant_id, hostname, status, verified_at)
+         VALUES ($1, $2, 'active', now())
+         ON CONFLICT (hostname) DO UPDATE
+         SET tenant_id = EXCLUDED.tenant_id, status = 'active', verified_at = COALESCE(public.tenant_domains.verified_at, now())`,
+        [edu.id, domain],
+      );
+    }
+
+    for (const moduleId of ["forms-leads", "media-storage", "analytics"]) {
+      await client.query(
+        `INSERT INTO public.tenant_module_entitlements (tenant_id, module_id, enabled, updated_by)
+         VALUES ($1, $2, true, 'system:bmi-seed')
+         ON CONFLICT (tenant_id, module_id) DO UPDATE
+         SET enabled = true, updated_by = 'system:bmi-seed'`,
+        [edu.id, moduleId],
+      );
+    }
+    await client.query("COMMIT");
+  }
+
+  // 2. Seed baseline ministry data for non-education active tenants
+  const res = await client.query(
+    `SELECT id, slug, name FROM public.tenants
+     WHERE status = 'active'
+       AND id NOT IN ('00000000-0000-4000-8000-000000000055', '00000000-0000-4000-8000-000000000056')`,
+  );
   for (const tenant of res.rows) {
-    console.log(`Seeding baseline data for tenant ${tenant.name} (${tenant.slug})...`);
+    await client.query("BEGIN");
+    await client.query("SELECT set_config($1, $2, true)", ["app.tenant_id", tenant.id]);
 
     await client.query(
       `INSERT INTO public.ministry_profiles (tenant_id, ministry_name, description, vision, mission, outreach, telephone_numbers, social_links)
@@ -38,8 +119,10 @@ async function main() {
        ON CONFLICT (hostname) DO NOTHING`,
       [tenant.id, `${tenant.slug}.localhost`],
     );
+
+    await client.query("COMMIT");
   }
-  console.log("Baseline data seeded successfully for all active tenants!");
+  console.log("BMI University, BEMI Institute, and active tenant defaults seeded successfully!");
   await client.end();
 }
 

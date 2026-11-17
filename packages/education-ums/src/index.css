@@ -1,0 +1,218 @@
+/* ── Tailwind v4 (PostCSS) ─────────────────────────────────────────
+   @import "tailwindcss" activates the installed @tailwindcss/postcss
+   plugin so ALL utility classes are generated at build time.
+   The CDN <script> in index.html has been removed.
+   ─────────────────────────────────────────────────────────────── */
+@import "tailwindcss";
+
+/* Class-based dark mode: App.tsx adds class="dark" on <html> */
+@variant dark (&:is(.dark *));
+
+/* Custom font families matching the previous tailwind.config in index.html */
+@theme {
+    --font-sans:
+        "Inter", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue",
+        Arial, sans-serif;
+    --font-montserrat: "Montserrat", sans-serif;
+    --font-playfair: "Playfair Display", serif;
+}
+
+/* Animation utilities */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes slideUp {
+    from {
+        transform: translateY(20px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+.animate-fade-in {
+    animation: fadeIn 0.4s ease-out forwards;
+}
+
+.animate-slide-up {
+    animation: slideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* ── Sidebar Animations ───────────────────────────────────────────── */
+
+@keyframes sidebarItemIn {
+  from { opacity: 0; transform: translateX(-8px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+.sidebar-submenu-enter {
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  transition: max-height 0.3s ease-out, opacity 0.25s ease-out;
+}
+
+.sidebar-submenu-enter-active {
+  max-height: 500px;
+  opacity: 1;
+}
+
+.sidebar-submenu-exit {
+  max-height: 500px;
+  opacity: 1;
+  overflow: hidden;
+  transition: max-height 0.2s ease-in, opacity 0.15s ease-in;
+}
+
+.sidebar-submenu-exit-active {
+  max-height: 0;
+  opacity: 0;
+}
+
+/* ── Accessibility Styles ──────────────────────────────────────────── */
+
+/* Screen reader only - visually hidden but available to assistive tech */
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border-width: 0;
+}
+
+/* Focus indicators for keyboard users */
+.keyboard-user *:focus {
+    outline: 3px solid #ffd700 !important;
+    outline-offset: 2px !important;
+}
+
+.keyboard-user *:focus:not(:focus-visible) {
+    outline: none !important;
+}
+
+.keyboard-user *:focus-visible {
+    outline: 3px solid #ffd700 !important;
+    outline-offset: 2px !important;
+}
+
+/* Reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+    .animate-fade-in,
+    .animate-slide-up {
+        animation: none !important;
+    }
+
+    * {
+        transition-duration: 0.01ms !important;
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+    }
+}
+
+/* High contrast mode support */
+@media (forced-colors: active) {
+    .border-\[\#FFD700\] {
+        border-color: Highlight;
+    }
+}
+
+/* Ensure minimum touch target size (44x44px per WCAG 2.5.5) */
+button,
+[role="button"],
+a {
+    min-height: 32px;
+    min-width: 32px;
+}
+
+/* Better focus styles for interactive elements */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+    outline: 2px solid #4b0082;
+    outline-offset: 2px;
+    border-radius: 4px;
+}
+
+/* ── Accessibility Styles ──────────────────────────────────────────── */
+
+/* Screen reader only - visually hidden but available to assistive tech */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* Focus indicators for keyboard users */
+.keyboard-user *:focus {
+  outline: 3px solid #FFD700 !important;
+  outline-offset: 2px !important;
+}
+
+.keyboard-user *:focus:not(:focus-visible) {
+  outline: none !important;
+}
+
+.keyboard-user *:focus-visible {
+  outline: 3px solid #FFD700 !important;
+  outline-offset: 2px !important;
+}
+
+/* Reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-in,
+  .animate-slide-up {
+    animation: none !important;
+  }
+
+  * {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
+/* High contrast mode support */
+@media (forced-colors: active) {
+  .border-\[\#FFD700\] {
+    border-color: Highlight;
+  }
+}
+
+/* Ensure minimum touch target size (44x44px per WCAG 2.5.5) */
+button,
+[role="button"],
+a {
+  min-height: 32px;
+  min-width: 32px;
+}
+
+/* Better focus styles for interactive elements */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid #4B0082;
+  outline-offset: 2px;
+  border-radius: 4px;
+}

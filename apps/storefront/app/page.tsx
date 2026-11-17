@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 import ChurchHomePage from "./church-home";
 import { fetchTenantPublicData } from "../lib/server-tenant-api";
+import { resolveEducationTenant } from "../lib/education-tenant";
+import { EducationShell } from "../components/education/education-shell";
+import { BmiHomePage, BemiInstitutePage } from "@bazion/education-template";
 import { ShopStorefront } from "./shop/shop-storefront";
 import "./shop/shop.css";
 
@@ -18,12 +21,35 @@ type Product = {
 };
 
 export async function generateMetadata(): Promise<Metadata> {
+  const education = await resolveEducationTenant();
+  if (education.isEducation) {
+    return {
+      title: education.tenantConfig.institutionName,
+      description: education.tenantConfig.description,
+    };
+  }
   const response = await fetchTenantPublicData<{ store: Store }>("/v1/storefront");
   if (response?.store?.isHomePage) return { title: response.store.storeName, description: response.store.tagline };
   return {};
 }
 
 export default async function HomePage() {
+  const education = await resolveEducationTenant();
+  if (education.isEducation) {
+    if (education.isBemi) {
+      return (
+        <EducationShell>
+          <BemiInstitutePage />
+        </EducationShell>
+      );
+    }
+    return (
+      <EducationShell>
+        <BmiHomePage />
+      </EducationShell>
+    );
+  }
+
   const response = await fetchTenantPublicData<{ store: Omit<Store, "paymentProvider">; paymentProvider: Store["paymentProvider"] }>("/v1/storefront");
   if (!response?.store?.isHomePage) return <ChurchHomePage />;
   const store = { ...response.store, paymentProvider: response.paymentProvider };
