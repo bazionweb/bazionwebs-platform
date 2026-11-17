@@ -52,7 +52,7 @@ HEALTHCHECK NONE
 CMD ["node", "--experimental-strip-types", "scripts/create-platform-admin.ts"]
 
 FROM workspace AS admin-build
-ARG API_BASE_URL=http://api:4000
+ARG API_BASE_URL=http://platform-api:4000
 ARG PUBLIC_STOREFRONT_URL=https://church-staging.bazionweb.com
 ARG TENANT_PREVIEW_BASE_DOMAIN=bazionweb.com
 ENV API_BASE_URL=${API_BASE_URL}
@@ -76,7 +76,7 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 CMD ["nod
 CMD ["node", "apps/admin/server.js"]
 
 FROM workspace AS storefront-build
-ARG API_BASE_URL=http://api:4000
+ARG API_BASE_URL=http://platform-api:4000
 ARG PUBLIC_STOREFRONT_URL=https://church-staging.bazionweb.com
 ARG TENANT_PREVIEW_BASE_DOMAIN=bazionweb.com
 ENV API_BASE_URL=${API_BASE_URL}

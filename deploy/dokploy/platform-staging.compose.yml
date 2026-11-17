@@ -159,8 +159,10 @@ services:
     logging: *default-logging
     <<: *runtime-security
     networks:
-      - platform-app
-      - platform-data
+      platform-app:
+        aliases:
+          - platform-api
+      platform-data: {}
 
   admin:
     image: ghcr.io/bazionweb/bazionwebs-platform-admin:${PLATFORM_IMAGE_TAG:?Set a validated sha- image tag}
@@ -169,7 +171,7 @@ services:
       NODE_ENV: production
       PORT: "3001"
       HOSTNAME: 0.0.0.0
-      API_BASE_URL: http://api:4000
+      API_BASE_URL: http://platform-api:4000
       PUBLIC_STOREFRONT_URL: https://church-staging.bazionweb.com
       TENANT_PREVIEW_BASE_DOMAIN: bazionweb.com
       MEDIA_STORAGE_PUBLIC_BASE_URL: https://media.bazionweb.com
@@ -195,7 +197,7 @@ services:
       NODE_ENV: production
       PORT: "3000"
       HOSTNAME: 0.0.0.0
-      API_BASE_URL: http://api:4000
+      API_BASE_URL: http://platform-api:4000
       PUBLIC_STOREFRONT_URL: https://church-staging.bazionweb.com
       TENANT_PREVIEW_BASE_DOMAIN: bazionweb.com
       MEDIA_STORAGE_PUBLIC_BASE_URL: https://media.bazionweb.com
