@@ -18,6 +18,8 @@
     "migrate:global-mission": "tsx scripts/migrate-global-mission.ts",
     "migrate:bmi": "tsx scripts/migrate-bmi.ts",
     "migrate:bmi:apply": "tsx scripts/migrate-bmi.ts --apply",
+    "migrate:hkm": "tsx scripts/migrate-hkm.ts",
+    "migrate:hkm:apply": "tsx scripts/migrate-hkm.ts --apply",
     "seed": "tsx scripts/seed.ts",
     "test": "node --env-file-if-exists=../../.env ./node_modules/vitest/vitest.mjs run src --fsModuleCachePath .vitest-cache",
     "preflight": "tsx src/production-preflight.ts"

@@ -1,0 +1,221 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Dynamic theme variables - controlled by ThemeContext */
+:root {
+  --church-green: #10b981;
+  --church-green-dark: #059669;
+}
+
+/* Green theme */
+[data-theme="green"] {
+  --church-green: #16a34a;
+  --church-green-dark: #15803d;
+}
+
+/* Blue theme */
+[data-theme="blue"] {
+  --church-green: #3b82f6;
+  --church-green-dark: #2563eb;
+}
+
+/* Purple theme */
+[data-theme="purple"] {
+  --church-green: #a855f7;
+  --church-green-dark: #9333ea;
+}
+
+/* Orange theme */
+[data-theme="orange"] {
+  --church-green: #fb923c;
+  --church-green-dark: #ea580c;
+}
+
+/* Dark theme */
+[data-theme="dark"] {
+  --church-green: #6b7280;
+  --church-green-dark: #4b5563;
+}
+
+/* Mobile Optimizations */
+@media (max-width: 768px) {
+  /* Touch-friendly interactive elements */
+  button, a[role="button"], input[type="button"], input[type="submit"] {
+    min-height: 44px;
+    min-width: 44px;
+    padding: 12px 16px;
+  }
+  
+  /* Form inputs */
+  input, select, textarea {
+    min-height: 44px;
+    font-size: 16px; /* Prevents zoom on iOS */
+    padding: 12px 16px;
+  }
+  
+  /* Table responsiveness */
+  .table-responsive {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  /* Card spacing */
+  .card-mobile {
+    margin: 8px;
+    padding: 16px;
+  }
+  
+  /* Text sizing for mobile */
+  .text-mobile-sm {
+    font-size: 14px;
+  }
+  
+  .text-mobile-base {
+    font-size: 16px;
+  }
+  
+  /* Modal adjustments */
+  .modal-mobile {
+    margin: 16px;
+    max-height: calc(100vh - 32px);
+    overflow-y: auto;
+  }
+}
+
+/* Tablet optimizations */
+@media (min-width: 769px) and (max-width: 1024px) {
+  /* Adjust spacing for tablet */
+  .container-tablet {
+    padding: 24px;
+  }
+  
+  /* Grid adjustments */
+  .grid-tablet-2 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* Desktop optimizations */
+@media (min-width: 1025px) {
+  /* Full desktop experience */
+  .container-desktop {
+    padding: 32px;
+  }
+  
+  .grid-desktop-3 {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  
+  .grid-desktop-4 {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+/* Scrollbar styling */
+.scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(156, 163, 175, 0.5) transparent;
+}
+
+.scrollbar-thin::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background-color: rgba(156, 163, 175, 0.5);
+  border-radius: 3px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(156, 163, 175, 0.7);
+}
+
+/* Hide scrollbar but keep functionality */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* Safe area support for notched devices */
+.safe-area-inset-top {
+  padding-top: env(safe-area-inset-top);
+}
+
+.safe-area-inset-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.safe-area-inset-left {
+  padding-left: env(safe-area-inset-left);
+}
+
+.safe-area-inset-right {
+  padding-right: env(safe-area-inset-right);
+}
+
+/* Print styles */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  
+  body {
+    background: white !important;
+    color: black !important;
+  }
+}
+
+/* Focus styles for accessibility */
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--church-green);
+  outline-offset: 2px;
+}
+
+/* Loading animations */
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.animate-pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Mobile-first responsive utilities */
+.mobile-hidden {
+  display: none;
+}
+
+@media (min-width: 640px) {
+  .mobile-hidden {
+    display: block;
+  }
+}
+
+.desktop-hidden {
+  display: block;
+}
+
+@media (min-width: 1024px) {
+  .desktop-hidden {
+    display: none;
+  }
+}

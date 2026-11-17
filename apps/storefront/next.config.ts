@@ -13,6 +13,7 @@ const nextConfig: NextConfig = {
     "@bazion/education-template",
     "@bazion/education-portal",
     "@bazion/education-ums",
+    "@bazion/church-management",
   ],
   // Allow an isolated tenant preview to run beside the generic storefront.
   distDir: process.env.NEXT_DIST_DIR ?? ".next",

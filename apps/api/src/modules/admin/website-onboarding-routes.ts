@@ -67,6 +67,7 @@ const churchTemplateIds = new Set<string>([
   "gmfc-revival-signature",
   "church-ministry",
   "royal-cathedral",
+  "hkm-kingdom-cms",
 ]);
 
 const optionalHttpsUrl = z
@@ -566,7 +567,7 @@ export async function websiteOnboardingRoutes(app: FastifyInstance): Promise<voi
 
       if (universal.packageDescriptor.packageId === "church-ministry") {
         const churchTemplateId = churchTemplateIds.has(body.templateId)
-          ? (body.templateId as "gmfc-revival-signature" | "church-ministry" | "royal-cathedral")
+          ? (body.templateId as "gmfc-revival-signature" | "church-ministry" | "royal-cathedral" | "hkm-kingdom-cms")
           : "gmfc-revival-signature";
         const preset = toChurchPreset(paletteId);
         const generatedChurch = createWhiteLabeledChurchConfig({

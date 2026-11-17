@@ -42,7 +42,8 @@ export {
 export type WhiteLabelTemplateId =
   | "gmfc-revival-signature"
   | "church-ministry"
-  | "royal-cathedral";
+  | "royal-cathedral"
+  | "hkm-kingdom-cms";
 
 export interface WhiteLabelTemplateDescriptor {
   id: WhiteLabelTemplateId;
@@ -111,6 +112,25 @@ export const churchTemplateCatalog: WhiteLabelTemplateDescriptor[] = [
       "Multi-Campus Locations & Maps",
       "Teaching & Media Library",
       "Stewardship & Benevolence Portal",
+    ],
+  },
+  {
+    id: "hkm-kingdom-cms",
+    name: "HKM Kingdom CMS & Member Portal",
+    tagline: "Integrated Church Administration CMS and Self-Service Member Portal with PIN/Password authentication",
+    description:
+      "Dual-interface kingdom church system featuring full pastoral administrative oversight (attendance, tithing, equipment, multi-branch, visitors) paired with an authentic self-service member portal.",
+    preset: "forest-bronze",
+    headerStyle: "classic",
+    heroStyle: "rotator",
+    cardStyle: "rounded",
+    fontPairing: "outfit-inter",
+    features: [
+      "Church Administration CMS with Clerk / Supabase Backend",
+      "Self-Service Member Portal with PIN & Password Access",
+      "Annual Giving Statements & Transaction Ledger (PDF)",
+      "Multi-Branch & Fellowship Group Governance",
+      "Equipment Inventory & Service Attendance Tracking",
     ],
   },
 ];
