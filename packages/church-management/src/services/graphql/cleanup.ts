@@ -1,4 +1,4 @@
-import { gql } from '@apollo/client';
+import { gql } from '../../shims/apollo';
 
 // ─── Recycle Bin ────────────────────────────────────────────────
 export const GET_RECYCLE_BIN_QUERY = gql`

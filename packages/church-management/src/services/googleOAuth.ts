@@ -1,4 +1,4 @@
-import { OAuth2Client, Credentials } from 'google-auth-library';
+import { OAuth2Client, Credentials } from '../shims/google-auth-library';
 import { logAuditEvent, sanitizeInput } from './security';
 
 // Define OAuth-specific audit actions since they don't exist in the base AuditActions

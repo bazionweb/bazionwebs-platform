@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { useMutation, useQuery } from '@apollo/client';
+import { useMutation, useQuery } from '../shims/apollo';
 import { toTitleCase } from '../utils/stringFormatter';
 import { Equipment, EquipmentCondition } from '../components/equipmentData';
 import { MaintenanceRecord, MaintenanceStatus, MaintenanceType } from '../components/maintenanceData';

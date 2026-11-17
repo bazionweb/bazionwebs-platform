@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Lock, User, AlertCircle, CheckCircle, ArrowRight, Shield, KeyRound } from 'lucide-react';
+import { useNavigate } from '../../shims/react-router-dom';
+import { Lock, User, AlertCircle, CheckCircle, ArrowRight, Shield, KeyRound } from '../../shims/lucide-react';
 import { portalAuthService } from '../services/portalAuth';
 import '../portal.css';
 

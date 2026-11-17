@@ -1,6 +1,6 @@
 import React from 'react';
 import { PencilIcon } from './Icons';
-import { Edit, Lock } from 'lucide-react';
+import { Edit, Lock } from '../shims/lucide-react';
 import { User } from './userData';
 import { PermissionRequest, PermissionRequestModal } from './PermissionRequest';
 import { usePermissionRequest } from '../hooks/usePermissionRequest';

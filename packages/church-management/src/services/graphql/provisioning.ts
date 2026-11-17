@@ -1,4 +1,4 @@
-import { gql } from '@apollo/client';
+import { gql } from '../../shims/apollo';
 
 export const GET_PROVISIONING_QUEUE_QUERY = gql`
   query GetProvisioningQueue {

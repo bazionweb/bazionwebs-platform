@@ -1,5 +1,5 @@
 import { useCallback, useMemo } from 'react';
-import { useMutation, useQuery } from '@apollo/client';
+import { useMutation, useQuery } from '../shims/apollo';
 import { toTitleCase } from '../utils/stringFormatter';
 import { Group } from '../components/GroupsManagementPage';
 import {

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { User } from './userData';
 import { PaperAirplaneIcon, XCircleIcon, ClockIcon } from './Icons';
-import { AlertTriangle, Lock, Send, Clock } from 'lucide-react';
+import { AlertTriangle, Lock, Send, Clock } from '../shims/lucide-react';
 
 export interface PermissionRequest {
   id: string;

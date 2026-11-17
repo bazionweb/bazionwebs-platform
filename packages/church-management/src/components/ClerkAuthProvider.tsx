@@ -1,6 +1,6 @@
 import React from 'react';
-import { ClerkProvider } from '@clerk/clerk-react';
-import { dark } from '@clerk/themes';
+import { ClerkProvider } from '../shims/clerk';
+import { dark } from '../shims/clerk-themes';
 
 const PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
 

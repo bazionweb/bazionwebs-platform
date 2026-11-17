@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Lock, AlertCircle, CheckCircle, Shield, Eye, EyeOff } from 'lucide-react';
+import { useNavigate } from '../../shims/react-router-dom';
+import { Lock, AlertCircle, CheckCircle, Shield, Eye, EyeOff } from '../../shims/lucide-react';
 import { portalAuthService } from '../services/portalAuth';
 
 const MIN_PASSWORD_LENGTH = 8;

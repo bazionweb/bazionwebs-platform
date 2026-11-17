@@ -1,7 +1,7 @@
 import React from 'react';
 import { Member } from '../memberData';
 import { Transaction, IncomeCategory } from '../financeData';
-import { CheckCircle, AlertTriangle, DollarSign, Loader2 } from 'lucide-react';
+import { CheckCircle, AlertTriangle, DollarSign, Loader2 } from '../../shims/lucide-react';
 
 export interface PendingTransaction extends Omit<Transaction, 'id'> {
   id?: number;

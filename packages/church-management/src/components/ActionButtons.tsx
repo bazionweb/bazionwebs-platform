@@ -1,5 +1,5 @@
 import React from 'react';
-import { Edit, Trash2, Eye } from 'lucide-react';
+import { Edit, Trash2, Eye } from '../shims/lucide-react';
 import ConfirmationModal from './ConfirmationModal';
 import { useConfirmation } from '../hooks/useConfirmation';
 

@@ -1,5 +1,5 @@
 import React from 'react';
-import { DollarSign } from 'lucide-react';
+import { DollarSign } from '../shims/lucide-react';
 
 interface TransactionTypeSelectorProps {
   type: 'Income' | 'Expense';

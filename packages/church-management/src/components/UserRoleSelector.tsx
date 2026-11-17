@@ -1,6 +1,6 @@
 import React from 'react';
 import { UserRole, AccessibleSection, PermissionLevel } from './userData';
-import { Settings2, CheckCircle, XCircle } from 'lucide-react';
+import { Settings2, CheckCircle, XCircle } from '../shims/lucide-react';
 
 interface UserRoleSelectorProps {
   role: UserRole;

@@ -3,7 +3,7 @@ import { MaintenanceRecord, MaintenanceStatus, MaintenanceType } from './mainten
 import { Equipment } from './equipmentData';
 import { ArrowLeftIcon, WrenchIcon } from './Icons';
 import { InputField, SelectField, TextAreaField } from './FormControls';
-import { CheckCircle, AlertTriangle, Wrench } from 'lucide-react';
+import { CheckCircle, AlertTriangle, Wrench } from '../shims/lucide-react';
 
 interface AddMaintenancePageProps {
   onBack: () => void;

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Equipment, EquipmentCondition, equipmentCategories } from './equipmentData';
 import { ArrowLeftIcon, EquipmentIcon } from './Icons';
 import { InputField, SelectField, TextAreaField } from './FormControls';
-import { CheckCircle, AlertTriangle } from 'lucide-react';
+import { CheckCircle, AlertTriangle } from '../shims/lucide-react';
 
 interface AddEquipmentPageProps {
   onBack: () => void;

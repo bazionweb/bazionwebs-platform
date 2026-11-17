@@ -1,4 +1,4 @@
-/* Day/Night Mode Styles */
+/* Day/Night Mode Styles - Pure Standard CSS */
 
 /* Night Mode General Styles */
 .dark-mode {
@@ -14,174 +14,168 @@
 
 /* Cards and Containers in Night Mode */
 .dark-mode .bg-white {
-  @apply bg-slate-800 !important;
+  background-color: #1e293b !important; /* slate-800 */
 }
 
-.dark-mode .text-gray-900 {
-  @apply text-slate-50 !important;
-}
-
+.dark-mode .text-gray-900,
 .dark-mode .text-gray-800 {
-  @apply text-slate-50 !important;
+  color: #f8fafc !important; /* slate-50 */
 }
 
 .dark-mode .text-gray-700 {
-  @apply text-slate-100 !important;
+  color: #f1f5f9 !important; /* slate-100 */
 }
 
 .dark-mode .text-gray-600 {
-  @apply text-slate-200 !important;
+  color: #e2e8f0 !important; /* slate-200 */
 }
 
 .dark-mode .text-gray-500 {
-  @apply text-slate-300 !important;
+  color: #cbd5e1 !important; /* slate-300 */
 }
 
 .dark-mode .text-gray-400 {
-  @apply text-slate-400 !important;
+  color: #94a3b8 !important; /* slate-400 */
 }
 
 .dark-mode .bg-gray-50 {
-  @apply bg-slate-800 !important;
+  background-color: #1e293b !important; /* slate-800 */
 }
 
 .dark-mode .bg-gray-100 {
-  @apply bg-slate-700 !important;
+  background-color: #334155 !important; /* slate-700 */
 }
 
 .dark-mode .bg-gray-200 {
-  @apply bg-slate-600 !important;
+  background-color: #475569 !important; /* slate-600 */
 }
 
 .dark-mode .bg-gray-300 {
-  @apply bg-slate-500 !important;
+  background-color: #64748b !important; /* slate-500 */
 }
 
 .dark-mode .border-gray-200 {
-  @apply border-slate-600 !important;
+  border-color: #475569 !important; /* slate-600 */
 }
 
 .dark-mode .border-gray-300 {
-  @apply border-slate-500 !important;
+  border-color: #64748b !important; /* slate-500 */
 }
 
 .dark-mode .border-gray-400 {
-  @apply border-slate-400 !important;
+  border-color: #94a3b8 !important; /* slate-400 */
 }
 
-.dark-mode .hover\:bg-gray-50:hover {
-  @apply bg-slate-700 !important;
-}
-
+.dark-mode .hover\:bg-gray-50:hover,
 .dark-mode .hover\:bg-gray-100:hover {
-  @apply bg-slate-700 !important;
+  background-color: #334155 !important; /* slate-700 */
 }
 
 /* Tables in Night Mode */
 .dark-mode table {
-  @apply border-slate-600;
+  border-color: #475569;
 }
 
 .dark-mode thead {
-  @apply bg-slate-700 !important;
-  @apply text-slate-50 !important;
+  background-color: #334155 !important;
+  color: #f8fafc !important;
 }
 
 .dark-mode tbody tr {
-  @apply border-slate-600 !important;
+  border-color: #475569 !important;
 }
 
 .dark-mode tbody tr:hover {
-  @apply bg-slate-700 !important;
+  background-color: #334155 !important;
 }
 
 /* Forms in Night Mode */
 .dark-mode input,
 .dark-mode select,
 .dark-mode textarea {
-  @apply bg-slate-700 !important;
-  @apply text-slate-50 !important;
-  @apply border-slate-600 !important;
+  background-color: #334155 !important;
+  color: #f8fafc !important;
+  border-color: #475569 !important;
 }
 
 .dark-mode input:focus,
 .dark-mode select:focus,
 .dark-mode textarea:focus {
-  @apply border-slate-500 !important;
-  @apply ring-slate-400 !important;
+  border-color: #64748b !important;
+  outline-color: #94a3b8 !important;
 }
 
 .dark-mode input::placeholder,
 .dark-mode textarea::placeholder {
-  @apply text-slate-400 !important;
+  color: #94a3b8 !important;
 }
 
 /* Modals and Dropdowns in Night Mode */
 .dark-mode .shadow-lg {
-  @apply shadow-2xl !important;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25) !important;
 }
 
 /* Buttons in Night Mode - Better contrast */
 .dark-mode .hover\:bg-red-50:hover {
-  @apply bg-red-900/40 !important;
+  background-color: rgba(127, 29, 29, 0.4) !important;
 }
 
 .dark-mode .hover\:bg-green-50:hover {
-  @apply bg-green-900/40 !important;
+  background-color: rgba(20, 83, 45, 0.4) !important;
 }
 
 .dark-mode .hover\:bg-blue-50:hover {
-  @apply bg-blue-900/40 !important;
+  background-color: rgba(30, 58, 138, 0.4) !important;
 }
 
 /* Badges and Pills - Better contrast */
 .dark-mode .bg-blue-100 {
-  @apply bg-blue-900/50 !important;
+  background-color: rgba(30, 58, 138, 0.5) !important;
 }
 
 .dark-mode .bg-green-100 {
-  @apply bg-green-900/50 !important;
+  background-color: rgba(20, 83, 45, 0.5) !important;
 }
 
 .dark-mode .bg-cyan-100 {
-  @apply bg-cyan-900/50 !important;
+  background-color: rgba(22, 78, 99, 0.5) !important;
 }
 
 .dark-mode .bg-purple-100 {
-  @apply bg-purple-900/50 !important;
+  background-color: rgba(88, 28, 135, 0.5) !important;
 }
 
 .dark-mode .bg-red-100 {
-  @apply bg-red-900/50 !important;
+  background-color: rgba(127, 29, 29, 0.5) !important;
 }
 
 .dark-mode .bg-yellow-100 {
-  @apply bg-yellow-900/50 !important;
+  background-color: rgba(113, 63, 18, 0.5) !important;
 }
 
 /* Badge text - Improved contrast */
 .dark-mode .text-blue-800 {
-  @apply text-blue-100 !important;
+  color: #dbeafe !important;
 }
 
 .dark-mode .text-green-800 {
-  @apply text-green-100 !important;
+  color: #dcfce7 !important;
 }
 
 .dark-mode .text-cyan-800 {
-  @apply text-cyan-100 !important;
+  color: #cffafe !important;
 }
 
 .dark-mode .text-purple-800 {
-  @apply text-purple-100 !important;
+  color: #f3e8ff !important;
 }
 
 .dark-mode .text-red-800 {
-  @apply text-red-100 !important;
+  color: #fee2e2 !important;
 }
 
 .dark-mode .text-yellow-800 {
-  @apply text-yellow-100 !important;
+  color: #fef9c3 !important;
 }
 
 /* Scrollbar in Night Mode - Better visibility */
@@ -190,21 +184,21 @@
 }
 
 .dark-mode::-webkit-scrollbar-track {
-  @apply bg-slate-800 !important;
+  background-color: #1e293b !important;
 }
 
 .dark-mode::-webkit-scrollbar-thumb {
-  @apply bg-slate-500 !important;
+  background-color: #64748b !important;
   border-radius: 5px;
 }
 
 .dark-mode::-webkit-scrollbar-thumb:hover {
-  @apply bg-slate-400 !important;
+  background-color: #94a3b8 !important;
 }
 
 /* Focus states in Night Mode - Better visibility */
 .dark-mode *:focus-visible {
-  @apply outline-slate-400 !important;
+  outline-color: #94a3b8 !important;
   outline-width: 2px;
 }
 
@@ -212,60 +206,60 @@
 .dark-mode a,
 .dark-mode .text-blue-600,
 .dark-mode .text-green-600 {
-  @apply brightness-125 !important;
+  filter: brightness(1.25) !important;
 }
 
 .dark-mode a:hover {
-  @apply brightness-150 !important;
+  filter: brightness(1.5) !important;
 }
 
 /* Success/Warning/Error colors in Night Mode - Better contrast */
 .dark-mode .text-red-600 {
-  @apply text-red-300 !important;
+  color: #fca5a5 !important;
 }
 
 .dark-mode .text-green-600 {
-  @apply text-green-300 !important;
+  color: #86efac !important;
 }
 
 .dark-mode .text-yellow-600 {
-  @apply text-yellow-300 !important;
+  color: #fde047 !important;
 }
 
 .dark-mode .text-blue-600 {
-  @apply text-blue-300 !important;
+  color: #93c5fd !important;
 }
 
 /* Alert/Message backgrounds - Better contrast */
 .dark-mode .bg-red-50 {
-  @apply bg-red-900/40 !important;
+  background-color: rgba(127, 29, 29, 0.4) !important;
 }
 
 .dark-mode .bg-green-50 {
-  @apply bg-green-900/40 !important;
+  background-color: rgba(20, 83, 45, 0.4) !important;
 }
 
 .dark-mode .bg-yellow-50 {
-  @apply bg-yellow-900/40 !important;
+  background-color: rgba(113, 63, 18, 0.4) !important;
 }
 
 .dark-mode .bg-blue-50 {
-  @apply bg-blue-900/40 !important;
+  background-color: rgba(30, 58, 138, 0.4) !important;
 }
 
 /* Dividers and lines in Night Mode */
 .dark-mode hr {
-  @apply border-slate-600 !important;
+  border-color: #475569 !important;
 }
 
 .dark-mode .divide-gray-200 {
-  @apply divide-slate-600 !important;
+  border-color: #475569 !important;
 }
 
 /* Disabled elements */
 .dark-mode .disabled,
 .dark-mode [disabled] {
-  @apply opacity-50 !important;
+  opacity: 0.5 !important;
 }
 
 /* Heading elements - Good contrast */
@@ -275,29 +269,25 @@
 .dark-mode h4,
 .dark-mode h5,
 .dark-mode h6 {
-  @apply text-slate-50 !important;
+  color: #f8fafc !important;
 }
 
 /* Paragraph text */
-.dark-mode p {
-  @apply text-slate-100 !important;
-}
-
-/* List items */
+.dark-mode p,
 .dark-mode li {
-  @apply text-slate-100 !important;
+  color: #f1f5f9 !important;
 }
 
 /* Code blocks */
 .dark-mode code,
 .dark-mode pre {
-  @apply bg-slate-950 !important;
-  @apply text-slate-200 !important;
-  @apply border-slate-700 !important;
+  background-color: #020617 !important;
+  color: #e2e8f0 !important;
+  border-color: #334155 !important;
 }
 
 /* Tooltip and hint text */
 .dark-mode .tooltip,
 .dark-mode [title] {
-  @apply text-slate-50 !important;
+  color: #f8fafc !important;
 }

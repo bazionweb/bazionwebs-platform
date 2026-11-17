@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { useUser, useAuth as useClerkAuth, useSignIn, useSignUp } from '@clerk/clerk-react';
+import { useUser, useAuth as useClerkAuth, useSignIn, useSignUp } from '../shims/clerk';
 import { User, UserRole } from './userData';
 import { client } from './AuthorizedApolloProvider';
 import { UPSERT_USER_MUTATION, GET_USER_QUERY } from '../services/graphql/users';

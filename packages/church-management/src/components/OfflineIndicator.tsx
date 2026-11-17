@@ -1,5 +1,5 @@
 import React from 'react';
-import { Wifi, WifiOff, RefreshCw } from 'lucide-react';
+import { Wifi, WifiOff, RefreshCw } from '../shims/lucide-react';
 import { useOfflineSync } from '../hooks/useOfflineSync';
 
 const OfflineIndicator: React.FC = () => {

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { User } from './userData';
 import { FaceIdIcon, FingerprintIcon, ShieldCheckIcon } from './Icons';
-import { Shield, ShieldCheck, ShieldOff } from 'lucide-react';
+import { Shield, ShieldCheck, ShieldOff } from '../shims/lucide-react';
 import { storage } from '../services/storage';
 import { is2FAEnabled } from '../services/security';
 import TwoFactorSetup from './TwoFactorSetup';

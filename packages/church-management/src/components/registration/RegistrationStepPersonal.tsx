@@ -1,5 +1,5 @@
 import React from 'react';
-import { User, Camera, Mail, CheckCircle, XCircle } from 'lucide-react';
+import { User, Camera, Mail, CheckCircle, XCircle } from '../../shims/lucide-react';
 import { RegistrationData } from '../EnterpriseRegistration';
 
 interface RegistrationStepPersonalProps {

@@ -13,7 +13,7 @@ import {
   Pie,
   Cell,
   Legend,
-} from 'recharts';
+} from '../shims/recharts';
 
 interface EquipmentReportsPageProps {
   onBack: () => void;

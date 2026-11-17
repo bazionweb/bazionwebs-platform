@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useApolloClient } from '@apollo/client';
+import { useMutation, useQuery, useApolloClient } from '../shims/apollo';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   GET_PROVISIONING_QUEUE_QUERY,

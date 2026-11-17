@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { RecycleBinItem, User } from './userData';
 import { SearchIcon, TrashIcon, CalendarIcon, UserIcon, UsersIcon, CurrencyDollarIcon } from './Icons';
-import { Trash2, RotateCcw, Eye, AlertTriangle } from 'lucide-react';
+import { Trash2, RotateCcw, Eye, AlertTriangle } from '../shims/lucide-react';
 import { useToast } from './ToastContext';
 
 interface RecycleBinPageProps {

@@ -18,9 +18,9 @@ import {
   Shield,
   Menu,
   Settings2,
-} from 'lucide-react';
+} from '../../shims/lucide-react';
 import AvatarEditor from '../../components/AvatarEditor';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from '../../shims/react-router-dom';
 import { portalAuthService } from '../services/portalAuth';
 import { portalApolloClient } from '../services/portalApollo';
 import {
@@ -29,8 +29,8 @@ import {
   SUBMIT_HELPDESK_TICKET_MUTATION,
   GET_CHURCH_SETTINGS_QUERY,
 } from '../services/portalQueries';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
+import jsPDF from '../../shims/jspdf';
+import autoTable from '../../shims/jspdf-autotable';
 import { compressImage } from '../../utils/imageUtils';
 // ─── Types ───────────────────────────────────────────────────────────────────
 interface MemberData {

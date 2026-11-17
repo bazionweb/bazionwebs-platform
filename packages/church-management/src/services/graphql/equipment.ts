@@ -1,4 +1,4 @@
-import { gql } from '@apollo/client';
+import { gql } from '../../shims/apollo';
 
 export const GET_EQUIPMENT_QUERY = gql`
   query GetEquipment {

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Shield } from 'lucide-react';
+import { Shield } from '../shims/lucide-react';
 import Sidebar from './Sidebar';
 import Header from './Header';
 import AppRouter from './layout/AppRouter';

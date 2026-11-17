@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { User, UserRole, AccessibleSection } from './userData';
 import { TransformedAvatar } from './AvatarEditor';
 import { SearchIcon, PencilIcon, TrashIcon, CheckCircleIcon, XCircleIcon } from './Icons';
-import { Shield, ShieldCheck, Users, Save, X } from 'lucide-react';
+import { Shield, ShieldCheck, Users, Save, X } from '../shims/lucide-react';
 import { useUserSessions } from '../hooks/useUserSessions';
 
 interface DataPersonnelManagementPageProps {

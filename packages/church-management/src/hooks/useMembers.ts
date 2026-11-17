@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useMutation, useQuery } from '@apollo/client';
-import { useAuth } from '@clerk/clerk-react';
+import { useMutation, useQuery } from '../shims/apollo';
+import { useAuth } from '../shims/clerk';
 import { toTitleCase, formatEmail } from '../utils/stringFormatter';
 import { Member, EmailTier } from '../components/memberData';
 import {

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Shield, Loader2, XCircle } from 'lucide-react';
+import { Shield, Loader2, XCircle } from '../shims/lucide-react';
 import { verifyTOTP, get2FASecret, logAuditEvent, AuditActions } from '../services/security';
 
 interface TwoFactorVerifyProps {

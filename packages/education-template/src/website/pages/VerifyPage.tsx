@@ -6,32 +6,6 @@ import Link from "next/link";
 import PageHero from "../components/PageHero";
 import { API_WORKER_URL } from "../lib/contracts-bridge";
 
-function buildFallbackResult(targetCode) {
-  const normalized = targetCode.toUpperCase().trim();
-  let docType = "Official Academic Credential";
-  if (normalized.includes("ADM")) docType = "Official Admission Letter";
-  else if (normalized.includes("TRN") || normalized.includes("TRANS")) docType = "Official Academic Transcript";
-  else if (normalized.includes("DIP") || normalized.includes("DEG")) docType = "Degree Certificate / Diploma";
-  else if (normalized.includes("ENR") || normalized.includes("CERT")) docType = "Certificate of Enrollment";
-
-  return {
-    code: normalized,
-    status: "AUTHENTIC_AND_VERIFIED",
-    institution: "Bethel Ministries International University",
-    accreditation_status: "QAHE Accredited (International Association for Quality Assurance in Higher Education)",
-    state_status: "Exempt from licensure under N.C.G.S. 116-15(d) for religious education",
-    document_type: docType,
-    student_name: "Protected Institutional Record Holder",
-    program: "Accredited Theological / Ministry Program",
-    registration_number: normalized,
-    academic_status: "Good Standing",
-    registrar_signature: "Dr. Melba Layne, Ph.D. (Chief Registrar)",
-    chancellor_signature: "Dr. Christopher Cookhorne, Ph.D. (President & Chancellor)",
-    verified_at: new Date().toISOString(),
-    cryptographic_fingerprint: `SHA256:7f83b1657ff1fc53b92dc18148a1d65dfc2d4b1fa3d677284addd200126d9069`,
-  };
-}
-
 function VerificationForm() {
   const searchParams = useSearchParams();
   const initialCode = searchParams.get("code") || searchParams.get("serial") || "";
@@ -58,10 +32,10 @@ function VerificationForm() {
       if (body?.success && body?.data) {
         setResult(body.data);
       } else {
-        setResult(buildFallbackResult(targetCode));
+        setError(body?.message || "No verified record was returned for that code.");
       }
     } catch {
-      setResult(buildFallbackResult(targetCode));
+      setError("The verification service is unavailable. Please try again later.");
     } finally {
       setLoading(false);
     }
@@ -77,11 +51,11 @@ function VerificationForm() {
         if (cancelled) return;
         if (body?.success && body?.data) {
           setResult(body.data);
-        } else {
-          setResult(buildFallbackResult(initialCode));
+        } else if (!cancelled) {
+          setError(body?.message || "No verified record was returned for that code.");
         }
       } catch {
-        if (!cancelled) setResult(buildFallbackResult(initialCode));
+        if (!cancelled) setError("The verification service is unavailable. Please try again later.");
       }
     })();
     return () => { cancelled = true; };
@@ -283,7 +257,7 @@ function VerificationForm() {
                   Accreditation Standing
                 </div>
                 <div style={{ fontSize: "0.9rem", color: "#e5c578", fontWeight: 600 }}>
-                  QAHE Accredited Institution
+                  {result.accreditation_status || "Not provided"}
                 </div>
               </div>
 

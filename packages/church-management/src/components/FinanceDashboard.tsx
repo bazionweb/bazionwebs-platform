@@ -11,7 +11,7 @@ import {
   Pie,
   Cell,
   Legend,
-} from 'recharts';
+} from '../shims/recharts';
 import { CurrencyDollarIcon } from './Icons';
 import { Transaction } from './financeData';
 import { Member } from './memberData';

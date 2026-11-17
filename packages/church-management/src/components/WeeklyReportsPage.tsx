@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { ReportsIcon, CalendarIcon, UsersIcon, CheckCircleIcon, ClockIcon, XCircleIcon } from './Icons';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from '../shims/recharts';
 import { attendanceData } from './attendanceData';
 
 // Helper to get week start (Sunday) and end (Saturday)

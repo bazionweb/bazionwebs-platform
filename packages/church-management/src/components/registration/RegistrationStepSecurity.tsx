@@ -1,5 +1,5 @@
 import React from 'react';
-import { Lock, Eye, EyeOff, CheckCircle, XCircle } from 'lucide-react';
+import { Lock, Eye, EyeOff, CheckCircle, XCircle } from '../../shims/lucide-react';
 import { RegistrationData } from '../EnterpriseRegistration';
 import { PasswordCriteria, getPasswordStrength, getPasswordStrengthInfo } from '../../utils/registrationValidation';
 

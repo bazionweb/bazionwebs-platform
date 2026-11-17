@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Shield, ShieldCheck, ShieldOff, Copy, CheckCircle, XCircle, Loader2 } from 'lucide-react';
+import { Shield, ShieldCheck, ShieldOff, Copy, CheckCircle, XCircle, Loader2 } from '../shims/lucide-react';
 import {
   generate2FASecret,
   get2FAQRCodeURL,

@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { useMutation, useQuery } from '@apollo/client';
+import { useMutation, useQuery } from '../shims/apollo';
 import { toTitleCase, formatEmail } from '../utils/stringFormatter';
 import { Visitor, FollowUp, VisitorStatus } from '../components/visitorData';
 import {

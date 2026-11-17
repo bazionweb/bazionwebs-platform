@@ -236,8 +236,13 @@ export async function buildApp(config: AppConfig) {
   await app.register(commerceAdminRoutes, { prefix: "/v1" });
   await app.register(churchRoutes, { prefix: "/v1", config });
   await app.register(formsLeadsRoutes, { prefix: "/v1", config });
-  await app.register(bmiApiRoutes);
-  await app.register(hkmApiRoutes);
+  // These tenant APIs currently serve in-memory demo data and use demo-only
+  // authentication. Do not expose them in production until persistent,
+  // authenticated, tenant-scoped replacements are implemented.
+  if (config.NODE_ENV !== "production" && config.APP_ENV === "development") {
+    await app.register(bmiApiRoutes);
+    await app.register(hkmApiRoutes);
+  }
   const hostingRuntime = createHostingProvisioningRuntime(config.hosting);
   await app.register(hostingRoutes, {
     prefix: "/v1",

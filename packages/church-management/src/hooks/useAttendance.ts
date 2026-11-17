@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { useMutation, useQuery } from '@apollo/client';
+import { useMutation, useQuery } from '../shims/apollo';
 import { AttendanceRecord, AttendanceStatus } from '../components/attendanceData';
 import {
   GET_ATTENDANCE_QUERY,

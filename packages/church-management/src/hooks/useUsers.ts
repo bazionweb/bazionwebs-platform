@@ -1,4 +1,4 @@
-import { useMutation, useQuery } from '@apollo/client';
+import { useMutation, useQuery } from '../shims/apollo';
 import { useMemo } from 'react';
 import { User as AppUser } from '../components/userData';
 import {

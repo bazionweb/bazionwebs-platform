@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { SignIn, SignUp } from '@clerk/clerk-react';
-import { Shield, UserPlus, LogIn } from 'lucide-react';
+import { SignIn, SignUp } from '../shims/clerk';
+import { Shield, UserPlus, LogIn } from '../shims/lucide-react';
 
 const ClerkAuthPage: React.FC = () => {
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');

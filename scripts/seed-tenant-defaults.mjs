@@ -21,13 +21,6 @@ const EDUCATION_TENANTS = [
       "www.bmi.ac.ke",
       "portal.bmi.ac.ke",
       "ums.bmi.ac.ke",
-    ],
-  },
-  {
-    id: "00000000-0000-4000-8000-000000000056",
-    slug: "bemi",
-    name: "BEMI Training Institute (Africa Regional Hub)",
-    domains: [
       "bemi.localhost",
       "bemi-institute.localhost",
       "bemi.org",
@@ -54,12 +47,27 @@ const CHURCH_MANAGEMENT_TENANTS = [
   },
 ];
 
+async function seedVerifiedDomains(tenantId, domains) {
+  for (const hostname of domains) {
+    await client.query(
+      `INSERT INTO public.tenant_domains (tenant_id, hostname, status, verified_at)
+       VALUES ($1, $2, 'active', now())
+       ON CONFLICT (hostname) DO UPDATE
+       SET tenant_id = EXCLUDED.tenant_id,
+           status = 'active',
+           verified_at = COALESCE(public.tenant_domains.verified_at, now())`,
+      [tenantId, hostname],
+    );
+  }
+}
+
 async function main() {
   await client.connect();
 
-  // 1. Ensure BMI University & BEMI Training Institute exist as active tenants with verified domains
+  // 1. BMI University and BEMI Training Institute share one education tenant.
+  // Their verified domains map to the same tenant; hostname-based branding keeps their sites distinct.
   for (const edu of EDUCATION_TENANTS) {
-    console.log(`Seeding education tenant ${edu.name} (${edu.id})...`);
+    console.log(`Seeding shared education tenant ${edu.name} (${edu.id})...`);
     await client.query(
       `INSERT INTO public.tenants (id, slug, name, status)
        VALUES ($1, $2, $3, 'active')
@@ -71,19 +79,7 @@ async function main() {
     await client.query("BEGIN");
     await client.query("SELECT set_config($1, $2, true)", ["app.tenant_id", edu.id]);
 
-    for (const domain of edu.domains) {
-      await client.query(
-        `DELETE FROM public.tenant_domains WHERE hostname = $1 AND tenant_id <> $2`,
-        [domain, edu.id],
-      );
-      await client.query(
-        `INSERT INTO public.tenant_domains (tenant_id, hostname, status, verified_at)
-         VALUES ($1, $2, 'active', now())
-         ON CONFLICT (hostname) DO UPDATE
-         SET tenant_id = EXCLUDED.tenant_id, status = 'active', verified_at = COALESCE(public.tenant_domains.verified_at, now())`,
-        [edu.id, domain],
-      );
-    }
+    await seedVerifiedDomains(edu.id, edu.domains);
 
     for (const moduleId of ["forms-leads", "media-storage", "analytics"]) {
       await client.query(
@@ -97,7 +93,7 @@ async function main() {
     await client.query("COMMIT");
   }
 
-  // 2. Ensure HKM Church Management exists as active tenant with verified domains & entitlements
+  // 2. Ensure HKM Church Management exists with verified domains & entitlements.
   for (const church of CHURCH_MANAGEMENT_TENANTS) {
     console.log(`Seeding church management tenant ${church.name} (${church.id})...`);
     await client.query(
@@ -111,19 +107,7 @@ async function main() {
     await client.query("BEGIN");
     await client.query("SELECT set_config($1, $2, true)", ["app.tenant_id", church.id]);
 
-    for (const domain of church.domains) {
-      await client.query(
-        `DELETE FROM public.tenant_domains WHERE hostname = $1 AND tenant_id <> $2`,
-        [domain, church.id],
-      );
-      await client.query(
-        `INSERT INTO public.tenant_domains (tenant_id, hostname, status, verified_at)
-         VALUES ($1, $2, 'active', now())
-         ON CONFLICT (hostname) DO UPDATE
-         SET tenant_id = EXCLUDED.tenant_id, status = 'active', verified_at = COALESCE(public.tenant_domains.verified_at, now())`,
-        [church.id, domain],
-      );
-    }
+    await seedVerifiedDomains(church.id, church.domains);
 
     for (const moduleId of church.modules) {
       await client.query(

@@ -14,7 +14,7 @@ import {
 import { InputField, SelectField } from './FormControls';
 import { Member, AvatarTransform, EmailTier } from './memberData';
 import AvatarEditor, { TransformedAvatar } from './AvatarEditor';
-import { Settings2, CheckCircle, AlertTriangle } from 'lucide-react';
+import { Settings2, CheckCircle, AlertTriangle } from '../shims/lucide-react';
 import { compressImage } from '../utils/imageUtils';
 import { useTheme } from './ThemeContext';
 

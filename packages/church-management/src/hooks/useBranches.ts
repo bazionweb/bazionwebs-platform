@@ -1,4 +1,4 @@
-import { useMutation, useQuery } from '@apollo/client';
+import { useMutation, useQuery } from '../shims/apollo';
 import { toTitleCase, formatEmail } from '../utils/stringFormatter';
 import { useMemo } from 'react';
 import { Branch, BranchGivingRecord } from '../components/branchData';

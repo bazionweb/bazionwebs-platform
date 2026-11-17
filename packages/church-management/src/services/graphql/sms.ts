@@ -1,4 +1,4 @@
-import { gql } from '@apollo/client';
+import { gql } from '../../shims/apollo';
 
 export const GET_SMS_QUERY = gql`
   query GetSmsRecords($startDate: Date!) {

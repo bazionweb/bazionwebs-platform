@@ -17,8 +17,8 @@ import DatabaseManagement from './DatabaseManagement';
 import { User } from './userData';
 import { storage, AppSettings } from '../services/storage';
 import { useTheme, ThemeName } from './ThemeContext';
-import { Palette, AtSign } from 'lucide-react';
-import { useApolloClient, gql } from '@apollo/client';
+import { Palette, AtSign } from '../shims/lucide-react';
+import { useApolloClient, gql } from '../shims/apollo';
 
 const GET_CHURCH_SETTINGS = gql`
   query GetAdminChurchSettings {

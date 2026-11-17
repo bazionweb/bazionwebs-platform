@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { useMutation, useQuery } from '@apollo/client';
+import { useMutation, useQuery } from '../shims/apollo';
 import { UserSession, LoginAttempt } from '../components/userSessionData';
 import {
   GET_USER_SESSIONS_QUERY,

@@ -1,6 +1,6 @@
 import React from 'react';
 import { User } from '../userData';
-import { CheckCircle, AlertTriangle } from 'lucide-react';
+import { CheckCircle, AlertTriangle } from '../../shims/lucide-react';
 
 interface UserConfirmModalProps {
   pendingUserData: Partial<User>;

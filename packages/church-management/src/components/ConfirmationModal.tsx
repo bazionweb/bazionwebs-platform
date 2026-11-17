@@ -1,5 +1,5 @@
 import React from 'react';
-import { AlertTriangle, Trash2, Edit } from 'lucide-react';
+import { AlertTriangle, Trash2, Edit } from '../shims/lucide-react';
 
 export interface ConfirmationModalProps {
   isOpen: boolean;

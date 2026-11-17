@@ -1,4 +1,4 @@
-import { gql } from '@apollo/client';
+import { gql } from '../../shims/apollo';
 
 // Supabase pg_graphql uses Relay-style collections
 // pg_graphql defaults to 30 rows if no `first:` arg is given.

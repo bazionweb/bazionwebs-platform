@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate } from '../../shims/react-router-dom';
 import { portalAuthService } from '../services/portalAuth';
 
 interface AuthGuardProps {

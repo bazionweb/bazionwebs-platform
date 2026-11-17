@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { UserIcon, LogoutIcon, ChevronRightIcon } from './Icons';
 import { User } from './userData';
 import { useTheme, ThemeName } from './ThemeContext';
-import { Sun, Moon, ArrowLeft } from 'lucide-react';
+import { Sun, Moon, ArrowLeft } from '../shims/lucide-react';
 
 interface HeaderProps {
   activePage: string;

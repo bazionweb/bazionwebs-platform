@@ -21,6 +21,8 @@
     "db:down": "docker compose down",
     "db:migrate": "dotenv -e .env -- pnpm --filter @bazion/database migrate",
     "db:seed": "dotenv -e .env -- pnpm --filter @bazion/database seed",
+    "bmi:bemi:consolidate": "dotenv -e .env -- node scripts/consolidate-bmi-bemi-tenant.mjs",
+    "bmi:bemi:consolidate:apply": "dotenv -e .env -- node scripts/consolidate-bmi-bemi-tenant.mjs --apply",
     "db:auth:migrate": "dotenv -e .env -- pnpm --filter @bazion/auth migrate",
     "gmfc:migrate": "dotenv -e .env -o -v GMFC_TENANT_ID=7a80eaae-6f8c-44c1-b22a-3dca458f0ec1 -v DEFAULT_TENANT_ID=7a80eaae-6f8c-44c1-b22a-3dca458f0ec1 -- pnpm --filter @bazion/database migrate:global-mission",
     "gmfc:migrate:apply": "dotenv -e .env -o -v GMFC_TENANT_ID=7a80eaae-6f8c-44c1-b22a-3dca458f0ec1 -v DEFAULT_TENANT_ID=7a80eaae-6f8c-44c1-b22a-3dca458f0ec1 -- pnpm --filter @bazion/database migrate:global-mission --apply",

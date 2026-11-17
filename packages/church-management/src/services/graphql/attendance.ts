@@ -1,4 +1,4 @@
-import { gql } from '@apollo/client';
+import { gql } from '../../shims/apollo';
 
 export const GET_ATTENDANCE_QUERY = gql`
   query GetAttendance($first: Int = 10000, $after: Cursor) {

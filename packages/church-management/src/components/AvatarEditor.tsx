@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
-import ReactCrop, { Crop, PixelCrop, centerCrop, makeAspectCrop } from 'react-image-crop';
-import 'react-image-crop/dist/ReactCrop.css';
-import { X, Check } from 'lucide-react';
+import ReactCrop, { Crop, PixelCrop, centerCrop, makeAspectCrop } from '../shims/react-image-crop';
+import '../shims/empty.css';
+import { X, Check } from '../shims/lucide-react';
 import { AvatarTransform } from './memberData';
 
 interface AvatarEditorProps {

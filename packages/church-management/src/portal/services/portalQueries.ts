@@ -1,4 +1,4 @@
-import { gql } from '@apollo/client';
+import { gql } from '../../shims/apollo';
 
 // SECURITY NOTE: This query compares the PBKDF2 hash client-side generated hash
 // against the stored hash in the database. While hashing is now PBKDF2 with

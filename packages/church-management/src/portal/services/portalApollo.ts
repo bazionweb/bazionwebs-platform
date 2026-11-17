@@ -1,6 +1,6 @@
-import { ApolloClient, InMemoryCache, createHttpLink } from '@apollo/client';
+import { ApolloClient, InMemoryCache, createHttpLink } from '../../shims/apollo';
 
-import { setContext } from '@apollo/client/link/context';
+import { setContext } from '../../shims/apollo';
 import { MemberUser } from '../types';
 
 // Supabase pg_graphql endpoint

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { PermissionRequest, PermissionStatusBadge } from './PermissionRequest';
 import { User } from './userData';
 
-import { Shield, Search, CheckCircle, XCircle, Eye, Clock } from 'lucide-react';
+import { Shield, Search, CheckCircle, XCircle, Eye, Clock } from '../shims/lucide-react';
 import { useToast } from './ToastContext';
 
 interface PermissionRequestsPageProps {

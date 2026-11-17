@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Visitor } from './visitorData';
 import { ArrowLeftIcon, UserPlusIcon } from './Icons';
 import { InputField, SelectField } from './FormControls';
-import { CheckCircle, AlertTriangle, Users } from 'lucide-react';
+import { CheckCircle, AlertTriangle, Users } from '../shims/lucide-react';
 
 interface AddVisitorPageProps {
   onBack: () => void;

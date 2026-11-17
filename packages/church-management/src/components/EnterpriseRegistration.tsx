@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowLeftIcon, UserPlusIcon, ArrowRightIcon } from './Icons';
-import { AlertTriangle, CheckCircle } from 'lucide-react';
+import { AlertTriangle, CheckCircle } from '../shims/lucide-react';
 import { User as AppUser } from './userData';
 import {
   PasswordCriteria,

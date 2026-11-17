@@ -14,7 +14,7 @@ import {
   GiftIcon,
   TrashIcon,
 } from './Icons';
-import { Building2, Users2, Shield, Activity, MessageSquare } from 'lucide-react';
+import { Building2, Users2, Shield, Activity, MessageSquare } from '../shims/lucide-react';
 import { User, AccessibleSection } from './userData';
 import { useTheme } from './ThemeContext';
 import { canAccessSection } from './AccessControl';

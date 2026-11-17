@@ -11,7 +11,7 @@ import {
   ChevronDownIcon,
   ChevronUpIcon,
 } from './Icons';
-import { Building2, Users, TrendingUp } from 'lucide-react';
+import { Building2, Users, TrendingUp } from '../shims/lucide-react';
 import ActionButtons from './ActionButtons';
 
 interface BranchesPageProps {

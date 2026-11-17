@@ -1,5 +1,5 @@
 // Offline Sync Service for HKM Church Management System
-import { openDB, DBSchema, IDBPDatabase } from 'idb';
+import { openDB, DBSchema, IDBPDatabase } from '../shims/idb';
 
 interface HKMDatabase extends DBSchema {
   members: {

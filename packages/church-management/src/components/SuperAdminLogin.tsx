@@ -5,7 +5,7 @@
 
 import React, { useState } from 'react';
 import { EyeIcon, EyeOffIcon } from './Icons';
-import { Shield, AlertTriangle } from 'lucide-react';
+import { Shield, AlertTriangle } from '../shims/lucide-react';
 
 interface SuperAdminLoginProps {
   onLogin: (email: string, password: string, accessCode: string, secretKey: string) => Promise<boolean>;

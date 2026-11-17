@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from '../shims/recharts';
 import { ArrowLeftIcon, UsersIcon, CheckCircleIcon } from './Icons';
 import { attendanceData } from './attendanceData';
 import { Member } from './memberData';

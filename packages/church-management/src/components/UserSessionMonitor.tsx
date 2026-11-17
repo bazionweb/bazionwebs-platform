@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { calculateSessionDuration } from './userSessionData';
 import { User } from './userData';
 import { SearchIcon, UserIcon } from './Icons';
-import { Users, Activity, Shield, AlertCircle, CheckCircle, XCircle, Monitor, Smartphone, Plus } from 'lucide-react';
+import { Users, Activity, Shield, AlertCircle, CheckCircle, XCircle, Monitor, Smartphone, Plus } from '../shims/lucide-react';
 import { useUserSessions } from '../hooks/useUserSessions';
 import { useLoginAttempts } from '../hooks/useLoginAttempts';
 

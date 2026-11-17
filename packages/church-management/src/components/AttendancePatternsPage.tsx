@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { TrendingUpIcon, UsersIcon, CheckCircleIcon } from './Icons';
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from '../shims/recharts';
 import { attendanceData } from './attendanceData';
 
 const StatCard: React.FC<{ title: string; value: string; icon: React.ElementType }> = ({

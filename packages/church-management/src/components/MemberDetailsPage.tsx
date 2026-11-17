@@ -16,7 +16,7 @@ import {
   CurrencyDollarIcon,
   TrendingUpIcon,
 } from './Icons';
-import { Copy, Check, AtSign } from 'lucide-react';
+import { Copy, Check, AtSign } from '../shims/lucide-react';
 import { TransformedAvatar } from './AvatarEditor';
 import ActionButtons from './ActionButtons';
 

@@ -15,8 +15,8 @@ import {
   CalendarIcon,
 } from './Icons';
 import { InputField, SelectField } from './FormControls';
-import { Building2, Users, DollarSign, CheckCircle, AlertTriangle } from 'lucide-react';
-import { Settings2 } from 'lucide-react';
+import { Building2, Users, DollarSign, CheckCircle, AlertTriangle } from '../shims/lucide-react';
+import { Settings2 } from '../shims/lucide-react';
 
 interface AddBranchPageProps {
   onBack: () => void;

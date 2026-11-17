@@ -25,7 +25,7 @@ import {
   PieChart,
   Pie,
   Cell,
-} from 'recharts';
+} from '../shims/recharts';
 import { Transaction } from './financeData';
 import { AttendanceRecord } from './attendanceData';
 

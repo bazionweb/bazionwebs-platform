@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { useMutation, useQuery } from '@apollo/client';
+import { useMutation, useQuery } from '../shims/apollo';
 import { SmsRecord } from '../components/smsData';
 import { GET_SMS_QUERY, ADD_SMS_MUTATION, DELETE_SMS_MUTATION } from '../services/graphql/sms';
 

@@ -197,10 +197,10 @@ export default function Footer({ tenantConfig }: FooterProps = {}) {
                 alignItems: "center",
                 boxShadow: "0 2px 10px rgba(0,0,0,0.2)",
               }}>
-                <img 
-                  src="/images/qahe-logo.jpg" 
-                  alt="QAHE Accredited Institution" 
-                  style={{ height: "38px", width: "auto", objectFit: "contain", display: "block" }} 
+                <img
+                  src="/images/qahe-logo.jpg"
+                  alt="QAHE Accredited Institution"
+                  style={{ height: "38px", width: "auto", objectFit: "contain", display: "block" }}
                 />
               </span>
             </Link>

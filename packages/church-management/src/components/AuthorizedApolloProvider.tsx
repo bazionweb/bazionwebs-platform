@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
-import { ApolloClient, InMemoryCache, ApolloProvider, createHttpLink } from '@apollo/client';
-import { setContext } from '@apollo/client/link/context';
-import { useAuth } from '@clerk/clerk-react';
+import { ApolloClient, InMemoryCache, ApolloProvider, createHttpLink } from '../shims/apollo';
+import { setContext } from '../shims/apollo';
+import { useAuth } from '../shims/clerk';
 
 // Supabase pg_graphQL endpoint
 // VITE_SUPABASE_GRAPHQL_URL = https://<project-ref>.supabase.co/graphql/v1

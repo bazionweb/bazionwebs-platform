@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { useMutation, useQuery, useApolloClient } from '@apollo/client';
+import { useMutation, useQuery, useApolloClient } from '../shims/apollo';
 import { toTitleCase } from '../utils/stringFormatter';
 import { Transaction, TransactionCategory } from '../components/financeData';
 import {

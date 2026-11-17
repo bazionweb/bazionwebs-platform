@@ -16,7 +16,7 @@ import {
   XCircleIcon,
   CameraIcon,
 } from './Icons';
-import { Settings2 } from 'lucide-react';
+import { Settings2 } from '../shims/lucide-react';
 import UserConfirmModal from './user/UserConfirmModal';
 
 const allAccessibleSections: AccessibleSection[] = [

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Mail, CheckCircle, AlertCircle } from 'lucide-react';
+import { Mail, CheckCircle, AlertCircle } from '../../shims/lucide-react';
 import { ArrowLeftIcon } from '../Icons';
 
 interface VerificationScreenProps {

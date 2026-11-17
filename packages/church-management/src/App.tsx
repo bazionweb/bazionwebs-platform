@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { HashRouter, Routes, Route } from 'react-router-dom';
+import { HashRouter, Routes, Route } from './shims/react-router-dom';
 import MainLayout from './components/MainLayout';
 import { User } from './components/userData';
 import { ToastProvider } from './components/ToastContext';
 import { ThemeProvider } from './components/ThemeContext';
 import { useAuth } from './components/AuthContext';
-import { useUser } from '@clerk/clerk-react';
+import { useUser } from './shims/clerk';
 import { UserSession, createSessionId } from './components/userSessionData';
 import { useUserSessions } from './hooks/useUserSessions';
 import { useLoginAttempts } from './hooks/useLoginAttempts';
@@ -13,7 +13,7 @@ import ClerkAuthPage from './components/ClerkAuthPage';
 import OfflineIndicator from './components/OfflineIndicator';
 
 // Portal Pages (no Clerk auth needed — uses its own PIN-based auth)
-import { ApolloProvider } from '@apollo/client';
+import { ApolloProvider } from './shims/apollo';
 import { portalApolloClient } from './portal/services/portalApollo';
 import PortalLogin from './portal/pages/PortalLogin';
 import SetPassword from './portal/pages/SetPassword';
