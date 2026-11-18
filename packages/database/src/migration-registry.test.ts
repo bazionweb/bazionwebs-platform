@@ -14,7 +14,7 @@ describe("database migration registry", () => {
     expect(requiredDatabaseMigrations).toEqual(files);
   });
 
-  it("requires the current commerce, tenant-routing, forms-leads and hosting migrations", () => {
+  it("requires the current platform, hosting, education and HKM migrations", () => {
     expect(requiredDatabaseMigrations).toContain("0012_ecommerce_template.sql");
     expect(requiredDatabaseMigrations).toContain("0013_tenant_database_routing.sql");
     expect(requiredDatabaseMigrations).toContain("0014_global_mission_commerce_entitlement.sql");
@@ -34,8 +34,13 @@ describe("database migration registry", () => {
     expect(requiredDatabaseMigrations).toContain("0025_installation_changes.sql");
     expect(requiredDatabaseMigrations).toContain("0026_church_ministry_operations.sql");
     expect(requiredDatabaseMigrations).toContain("0027_church_site_settings_versions.sql");
+    expect(requiredDatabaseMigrations).toContain("0028_education_institution_records.sql");
+    expect(requiredDatabaseMigrations).toContain("0029_hkm_member_records.sql");
+    expect(requiredDatabaseMigrations).toContain("0030_education_institution_contacts_evidence.sql");
+    expect(requiredDatabaseMigrations).toContain("0031_hkm_member_profile_fields.sql");
+    expect(requiredDatabaseMigrations).toContain("0032_hkm_member_attendance.sql");
     expect(currentDatabaseSchemaVersion).toBe(requiredDatabaseMigrations.at(-1));
-    expect(currentDatabaseSchemaVersion).toBe("0027_church_site_settings_versions.sql");
+    expect(currentDatabaseSchemaVersion).toBe("0032_hkm_member_attendance.sql");
   });
 
   it("enforces immutable installation changes ledger in 0025", () => {
