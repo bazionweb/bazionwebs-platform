@@ -415,7 +415,7 @@ export const IDCard: React.FC<IDCardProps> = ({ students, logo }) => {
                       </div>
                       <div className="flex items-center gap-1 rounded-md bg-white px-1 py-0.5 text-[#0B2F75]">
                         <picture>
-                          <source type="image/webp" srcSet="/brand/bazion-platform-mark-320.webp 320w, /brand/bazion-platform-mark-640.webp 640w" sizes="30px" />
+                          <source type="image/webp" srcSet="/brand/bazion-platform-mark-64.webp 64w, /brand/bazion-platform-mark-128.webp 128w, /brand/bazion-platform-mark-256.webp 256w" sizes="30px" />
                           <img src={PLATFORM_BRAND_MARK_URL} alt="Bazion Web" width={30} height={25} className="h-[25px] w-[30px] object-contain" />
                         </picture>
                         <span className="text-[6px] font-bold leading-tight">Powered by<br />Bazion Web</span>
@@ -531,7 +531,13 @@ export const IDCard: React.FC<IDCardProps> = ({ students, logo }) => {
                           {securityFeatures.serialNumber}
                         </span>
                       </p>
-                      <div className="shrink-0 rounded-sm bg-white px-1 py-0.5 text-[#0B2F75] text-[6px] font-bold">Bazion Web</div>
+                      <div className="shrink-0 rounded-sm bg-white px-1 py-0.5 text-[#0B2F75] flex items-center gap-1">
+                        <picture>
+                          <source type="image/webp" srcSet="/brand/bazion-platform-mark-64.webp 64w, /brand/bazion-platform-mark-128.webp 128w, /brand/bazion-platform-mark-256.webp 256w" sizes="14px" />
+                          <img src={PLATFORM_BRAND_MARK_URL} alt="" aria-hidden="true" width={14} height={12} className="h-3 w-[14px] object-contain" />
+                        </picture>
+                        <span className="text-[5px] font-bold leading-tight">Bazion Web</span>
+                      </div>
                     </div>
                   </div>
                 </div>

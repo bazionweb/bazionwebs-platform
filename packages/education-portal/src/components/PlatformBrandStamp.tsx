@@ -21,7 +21,7 @@ export function PlatformBrandStamp({ compact = false }: { compact?: boolean }) {
       <picture>
         <source
           type="image/webp"
-          srcSet="/brand/bazion-platform-mark-320.webp 320w, /brand/bazion-platform-mark-640.webp 640w"
+          srcSet="/brand/bazion-platform-mark-64.webp 64w, /brand/bazion-platform-mark-128.webp 128w, /brand/bazion-platform-mark-256.webp 256w"
           sizes={`${width}px`}
         />
         <img

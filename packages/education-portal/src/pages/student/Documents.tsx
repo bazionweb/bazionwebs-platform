@@ -194,7 +194,7 @@ export default function Documents() {
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 6px', borderRadius: 6, background: '#fff' }}>
                       <picture>
-                        <source type="image/webp" srcSet="/brand/bazion-platform-mark-320.webp 320w, /brand/bazion-platform-mark-640.webp 640w" sizes="24px" />
+                        <source type="image/webp" srcSet="/brand/bazion-platform-mark-64.webp 64w, /brand/bazion-platform-mark-128.webp 128w, /brand/bazion-platform-mark-256.webp 256w" sizes="24px" />
                         <img src="/brand/bazion-platform-mark.png" alt="Bazion Web" width={24} height={20} style={{ width: 24, height: 20, objectFit: 'contain' }} />
                       </picture>
                       <span style={{ color: '#0B2F75', fontSize: '0.55rem', fontWeight: 800, lineHeight: 1.1 }}>Powered by<br />Bazion Web</span>

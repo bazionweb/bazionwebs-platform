@@ -6,7 +6,7 @@ function platformEmailBrandVariables(): Record<string, string> {
   let logoUrl = process.env.PLATFORM_BRAND_LOGO_URL?.trim() || "";
   if (!logoUrl && publicUrl) {
     try {
-      logoUrl = new URL("/brand/bazion-platform-logo.png", publicUrl).toString();
+      logoUrl = new URL("/brand/bazion-platform-email-logo.png", publicUrl).toString();
     } catch {
       // A missing base URL should not block text-only notification delivery.
     }

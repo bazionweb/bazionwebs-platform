@@ -37,7 +37,7 @@ let platformLogoUrl = process.env.PLATFORM_BRAND_LOGO_URL?.trim()
   || "";
 if (!platformLogoUrl) {
   try {
-    platformLogoUrl = new URL("/brand/bazion-platform-logo.png", platformBaseUrl).toString();
+    platformLogoUrl = new URL("/brand/bazion-platform-email-logo.png", platformBaseUrl).toString();
   } catch {
     // The email renderer keeps a text brand when the public asset URL is unavailable.
   }

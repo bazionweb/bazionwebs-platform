@@ -185,7 +185,7 @@ const ReportViewer: React.FC<ReportViewerProps> = ({ title, columns, data, onBac
           <span>{tenantConfig.contact?.email ? `${tenantConfig.contact.email} • ` : ''}{tenantConfig.websiteUrl || tenantConfig.shortName}</span>
           <span className="inline-flex items-center gap-1.5 shrink-0 font-semibold text-[#0B2F75]">
             <picture>
-              <source type="image/webp" srcSet="/brand/bazion-platform-mark-320.webp 320w, /brand/bazion-platform-mark-640.webp 640w" sizes="32px" />
+              <source type="image/webp" srcSet="/brand/bazion-platform-mark-64.webp 64w, /brand/bazion-platform-mark-128.webp 128w, /brand/bazion-platform-mark-256.webp 256w" sizes="32px" />
               <img src="/brand/bazion-platform-mark.png" alt="Bazion Web" width={32} height={26} style={{ width: 32, height: 26, objectFit: 'contain', background: '#fff' }} />
             </picture>
             Powered by Bazion Web

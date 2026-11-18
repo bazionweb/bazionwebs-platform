@@ -8,8 +8,8 @@ export function PlatformBrandBadge({ compact = false }: { compact?: boolean }) {
   const height = Math.round(width * (compact ? 1380 / 1680 : 2225 / 2497));
   const logoUrl = compact ? PLATFORM_BRAND_MARK_URL : PLATFORM_BRAND_LOGO_URL;
   const webpSources = compact
-    ? "/brand/bazion-platform-mark-320.webp 320w, /brand/bazion-platform-mark-640.webp 640w"
-    : "/brand/bazion-platform-logo-320.webp 320w, /brand/bazion-platform-logo-640.webp 640w, /brand/bazion-platform-logo.webp 960w";
+    ? "/brand/bazion-platform-mark-64.webp 64w, /brand/bazion-platform-mark-128.webp 128w, /brand/bazion-platform-mark-256.webp 256w"
+    : "/brand/bazion-platform-logo-128.webp 128w, /brand/bazion-platform-logo-256.webp 256w, /brand/bazion-platform-logo-320.webp 320w";
 
   return (
     <div

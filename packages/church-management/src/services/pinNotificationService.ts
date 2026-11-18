@@ -301,10 +301,10 @@ function buildPinEmailHtml(
   const platformSecondaryColor = safeColor(platformBranding.secondaryColor, "#17345E");
   const platformAccentColor = safeColor(platformBranding.accentColor, "#EF3024");
   const platformLogoUrl = safeEmailUrl(platformBranding.logoUrl, portalUrl)
-    || safeEmailUrl("/brand/bazion-platform-logo.png", portalUrl);
+    || safeEmailUrl("/brand/bazion-platform-email-logo.png", portalUrl);
   const safePlatformLogoUrl = platformLogoUrl ? escapeHtml(platformLogoUrl) : "";
   const platformMarkUrl = safeEmailUrl(platformBranding.markUrl, portalUrl)
-    || safeEmailUrl(platformBranding.logoUrl?.replace(/bazion-platform-logo\.png$/, "bazion-platform-mark.png"), portalUrl)
+    || safeEmailUrl(platformBranding.logoUrl?.replace(/bazion-platform-(?:email-logo|logo)\.png$/, "bazion-platform-mark.png"), portalUrl)
     || safeEmailUrl("/brand/bazion-platform-mark.png", portalUrl);
   const safePlatformMarkUrl = platformMarkUrl ? escapeHtml(platformMarkUrl) : "";
   const safePlatformWebsiteUrl = safeEmailUrl(platformBranding.websiteUrl, portalUrl);
@@ -568,7 +568,7 @@ async function sendEmailViaResend(
 
   const platformBranding = payload.platformBranding ?? {
     name: "Bazion Web",
-    logoUrl: safeEmailUrl("/brand/bazion-platform-logo.png", settings.portalUrl),
+    logoUrl: safeEmailUrl("/brand/bazion-platform-email-logo.png", settings.portalUrl),
     markUrl: safeEmailUrl("/brand/bazion-platform-mark.png", settings.portalUrl),
     tagline: "Build, Host n Grow",
     primaryColor: "#0B2F75",
