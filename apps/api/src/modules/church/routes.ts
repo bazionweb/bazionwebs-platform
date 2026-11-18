@@ -493,9 +493,15 @@ export async function churchRoutes(app: FastifyInstance, options: RouteOptions) 
         const now = new Date();
 
         if (filter === "upcoming") {
-          conditions.push(and(eq(churchEvents.status, "upcoming"), sql`${churchEvents.startsAt} >= ${now}`)!);
+          conditions.push(and(
+            sql`${churchEvents.status} <> 'completed'`,
+            sql`coalesce(${churchEvents.endsAt}, ${churchEvents.startsAt} + interval '1 day') >= ${now}`,
+          )!);
         } else if (filter === "past") {
-          conditions.push(or(eq(churchEvents.status, "completed"), sql`${churchEvents.startsAt} < ${now}`)!);
+          conditions.push(or(
+            eq(churchEvents.status, "completed"),
+            sql`coalesce(${churchEvents.endsAt}, ${churchEvents.startsAt} + interval '1 day') < ${now}`,
+          )!);
         }
 
         const events = await tx
