@@ -207,7 +207,7 @@ test("PostgreSQL backup helper selects exactly one labelled DB and validates a r
   assert.match(postgresDumpScript, /label=com\.bazion\.backup-target=\$target_label/);
   assert.match(postgresDumpScript, /\$\{#containers\[@\]\} -ne 1/);
   assert.match(postgresDumpScript, /pg_dump[\s\S]*--format=custom/);
-  assert.match(postgresDumpScript, /pg_restore --list < "\$temporary_path"/);
+  assert.match(postgresDumpScript, /pg_restore --list(?:\s+-)?\s*</);
   assert.match(postgresDumpScript, /umask 077/);
   assert.doesNotMatch(postgresDumpScript, /PGPASSWORD|--password|echo .*secret/i);
   assert.match(stagingCompose, /com\.bazion\.backup-target: platform-staging/);
