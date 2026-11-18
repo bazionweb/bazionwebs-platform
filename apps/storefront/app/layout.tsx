@@ -13,6 +13,7 @@ import "../styles/gmfc/index.css";
 import { PulseHost } from "@bazion/ui";
 import { SiteThemeProvider } from "../lib/site-theme-provider";
 import { ResponsiveImageProvider } from "@bazion/ui";
+import { AnalyticsTracker } from "../lib/analytics-tracker";
 import {
   fetchTenantPublicData,
   getTenantRequestContext,
@@ -120,6 +121,7 @@ export default function RootLayout({
       className={`${plusJakartaSans.variable} ${inter.variable} ${outfit.variable} ${fraunces.variable}`}
     >
       <body>
+        <AnalyticsTracker />
         <ResponsiveImageProvider
           publicMediaBaseUrl={process.env.MEDIA_STORAGE_PUBLIC_BASE_URL ?? ""}
           imageTransformsEnabled={

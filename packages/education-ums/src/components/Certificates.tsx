@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from "react";
+import { PlatformBrandBadge } from "./PlatformBrandBadge";
 import {
   Search,
   Printer,
@@ -53,12 +54,12 @@ const DEPT_CODE: Record<string, string> = {
   General: "GEN",
 };
 
-// ── Serial format: BMI/CER/YYYY/NNNNNN ───────────────────────────────────────
+// ── Serial format: ORG/CER/YYYY/NNNNNN ───────────────────────────────────────
 function formatSerial(raw: string): string {
-  // raw comes as BMI-YYYY-NNNNNN from backend; reformat to BMI/CER/YYYY/NNNNNN
-  const m = raw.match(/BMI-(\d{4})-(\d+)/);
+  // Reformat the tenant-prefixed serial as ORG/CER/YYYY/NNNNNN.
+  const m = raw.match(/^([A-Z0-9]+)-(\d{4})-(\d+)$/i);
   if (!m) return raw;
-  return `BMI/CER/${m[1]}/${m[2].padStart(6, "0")}`;
+  return `${m[1].toUpperCase()}/CER/${m[2]}/${m[3].padStart(6, "0")}`;
 }
 
 // ── Hash display: first 20 chars uppercase with dashes ────────────────────────
@@ -106,8 +107,8 @@ function formatDate(iso: string): string {
   });
 }
 
-// ── BMI University Seal (the provided seal image) ────────────────────────────
-// const _BMI_SEAL = "/BMI.svg"; // fallback logo
+// ── Institution seal ─────────────────────────────────────────────────────────
+// const _INSTITUTION_SEAL = "/logo.svg"; // fallback logo
 // We'll use the actual seal provided by the user as a CSS-rendered element
 
 // ── Micro-text security border ────────────────────────────────────────────────
@@ -522,6 +523,7 @@ const CertificateDocument: React.FC<CertDocProps> = ({
             <p className="text-[5.5px] mt-0.5 font-bold uppercase tracking-wide" style={{ color: accentColor }}>
               Any alteration renders this document void
             </p>
+            <div className="mt-1 rounded-sm bg-white px-1 py-0.5"><PlatformBrandBadge compact /></div>
           </div>
         </div>
       </div>
@@ -571,7 +573,7 @@ const Certificates: React.FC = () => {
     setQrData(null);
 
     try {
-      // Build a deterministic serial: BMI-YYYY-NNNNNN
+      // Build a deterministic serial using the tenant institution code.
       const year = new Date().getFullYear();
       const numericId = student.id
         .replace(/\D/g, "")

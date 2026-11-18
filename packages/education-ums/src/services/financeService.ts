@@ -34,7 +34,7 @@ export async function getTransactions(filters?: any): Promise<TransactionListRes
     if (filters?.search) params.append('search', filters.search);
 
     const queryString = params.toString();
-    const url = `${API_URL}/finance/transactions${queryString ? `?${queryString}` : ''}`;
+    const url = `${API_URL}/education/finance/transactions${queryString ? `?${queryString}` : ''}`;
     const response = await authFetch(url);
     const data = await parseJsonSafe<TransactionListResponse>(response);
     return data ?? { success: false, error: 'Failed to parse transactions response' };
@@ -49,7 +49,7 @@ export async function createTransaction(data: Partial<Transaction> & { student_i
     if (!body.student_id && (body as any).studentId) body.student_id = (body as any).studentId;
     if (body.amt !== undefined && body.amount === undefined) body.amount = body.amt;
     if (body.date && !body.due_date) body.due_date = body.date;
-    const response = await authFetch(`${API_URL}/finance/transactions`, {
+    const response = await authFetch(`${API_URL}/education/finance/transactions`, {
       method: 'POST',
       body: JSON.stringify(body),
     });
@@ -64,7 +64,7 @@ export async function updateTransaction(id: string, data: Partial<Transaction>):
     const body: any = { ...data };
     if (body.amt !== undefined && body.amount === undefined) body.amount = body.amt;
     if (body.date && !body.due_date) body.due_date = body.date;
-    const response = await authFetch(`${API_URL}/finance/transactions/${id}`, {
+    const response = await authFetch(`${API_URL}/education/finance/transactions/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(body),
     });
@@ -76,7 +76,7 @@ export async function updateTransaction(id: string, data: Partial<Transaction>):
 
 export async function deleteTransaction(id: string): Promise<TransactionResponse> {
   try {
-    const response = await authFetch(`${API_URL}/finance/transactions/${id}`, { method: 'DELETE' });
+    const response = await authFetch(`${API_URL}/education/finance/transactions/${id}`, { method: 'DELETE' });
     const result = await parseJsonSafe<TransactionResponse>(response);
     return result ?? { success: false, error: 'Failed to parse delete transaction response' };
   } catch { return { success: false, error: 'Failed to delete transaction'  };
@@ -86,7 +86,7 @@ export async function deleteTransaction(id: string): Promise<TransactionResponse
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function getFinanceStats(): Promise<any> {
   try {
-    const response = await authFetch(`${API_URL}/finance/stats`);
+    const response = await authFetch(`${API_URL}/education/finance/stats`);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const data = await parseJsonSafe<any>(response);
     return data ?? { success: false, error: 'Failed to parse finance statistics response' };

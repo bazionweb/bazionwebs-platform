@@ -4,6 +4,8 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import { PlatformBrandBadge } from '../PlatformBrandBadge';
+import { useUIStore } from '../../stores/uiStore';
 import { X, TrendingUp, TrendingDown, Minus, Award, AlertCircle } from '../../shims/lucide-react';
 import { Grade, SemesterGPA, AcademicStanding } from '../../grading/types';
 import { getStudentGrades } from '../../grading/services/GradeAPIService';
@@ -23,6 +25,8 @@ const StudentGradeReport: React.FC<StudentGradeReportProps> = ({
   isOpen,
   onClose,
 }) => {
+  const institutionName = useUIStore((state) => state.institutionName);
+  const institutionLogo = useUIStore((state) => state.logo);
   const [grades, setGrades] = useState<Grade[]>([]);
   const [semesterGPAs, setSemesterGPAs] = useState<SemesterGPA[]>([]);
   const [cumulativeGPA, setCumulativeGPA] = useState<number>(0);
@@ -125,9 +129,13 @@ const StudentGradeReport: React.FC<StudentGradeReportProps> = ({
       <div className="bg-white dark:bg-gray-800 w-full max-w-6xl max-h-[90vh] overflow-hidden border-4 border-[#4B0082] shadow-2xl flex flex-col">
         {/* Header */}
         <div className="bg-gray-900 text-white px-6 py-4 flex justify-between items-center">
-          <div>
-            <h2 className="text-xl font-black uppercase tracking-widest">Student Grade Report</h2>
-            <p className="text-xs text-gray-400 mt-1">{studentName}</p>
+          <div className="flex items-center gap-3">
+            {institutionLogo && <img src={institutionLogo} alt={`${institutionName} logo`} className="w-10 h-10 object-contain bg-white rounded p-1" />}
+            <div>
+              <p className="text-[10px] font-bold text-gray-300 uppercase tracking-wider">{institutionName}</p>
+              <h2 className="text-xl font-black uppercase tracking-widest">Student Grade Report</h2>
+              <p className="text-xs text-gray-400 mt-1">{studentName}</p>
+            </div>
           </div>
           <button
             onClick={onClose}
@@ -319,6 +327,7 @@ const StudentGradeReport: React.FC<StudentGradeReportProps> = ({
           <p className="text-xs text-gray-500 dark:text-gray-400">
             Generated on {new Date().toLocaleDateString()}
           </p>
+          <PlatformBrandBadge compact />
           <div className="flex gap-2">
             <button
               onClick={() => window.print()}

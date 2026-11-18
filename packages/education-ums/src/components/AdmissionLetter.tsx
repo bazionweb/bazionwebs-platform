@@ -5,6 +5,7 @@
  */
 
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import { PlatformBrandBadge } from "./PlatformBrandBadge";
 import {
   Search, Printer, Download, Mail, ShieldCheck,
   Sparkles, FileText,
@@ -440,6 +441,7 @@ export const AdmissionLetter: React.FC<AdmissionLetterProps> = ({ students, logo
                   </div>
                 </div>
 
+                <div className="flex justify-end px-10 py-2"><PlatformBrandBadge compact /></div>
                 <div className="h-2" style={{ background: `linear-gradient(90deg, ${primaryColor}, ${accentColor}, ${primaryColor})` }} />
               </div>
             </div>

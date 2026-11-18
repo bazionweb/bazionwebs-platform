@@ -154,6 +154,10 @@ export function renderEmailTemplate(
   const token = typeof variables.token === "string" ? variables.token.trim() : "";
   const intro = typeof variables.intro === "string" ? variables.intro : "";
   const safeTo = escapeHtml(to);
+  const tenantContextText = brand.tenantName
+    ? `For account: ${brand.tenantName}${brand.tenantWebsiteUrl ? ` (${brand.tenantWebsiteUrl})` : ""}`
+    : "";
+  const textBrandFooter = `\n\nPowered by ${brand.name}${tenantContextText ? `\n${tenantContextText}` : ""}`;
 
   switch (template) {
     case "auth.password-reset": {
@@ -164,7 +168,7 @@ export function renderEmailTemplate(
         ${token ? `<div style="background:#f1f5f9;border-radius:8px;padding:14px 18px;margin:20px 0;font-size:13px;color:${brand.secondary};"><p style="margin:0 0 7px;font-weight:700;">One-time reset token</p><code style="display:inline-block;font-family:monospace;font-size:14px;background:#ffffff;padding:6px 12px;border-radius:5px;border:1px solid #cbd5e1;word-break:break-all;color:${brand.primary};">${escapeHtml(token)}</code><p style="margin:7px 0 0;font-size:12px;color:#64748b;">Enter this token on the password reset page if your browser does not open the link.</p></div>` : ""}
         ${url ? `${paragraph("If the button does not work, copy and paste this link into your address bar:", "#64748b")}<p style="margin:0 0 22px;font-size:12px;line-height:1.5;word-break:break-all;"><a href="${escapeHtml(url)}" style="color:${brand.accent};text-decoration:underline;">${escapeHtml(url)}</a></p>` : ""}
         <div style="border-top:1px solid #e2e8f0;padding-top:18px;margin-top:24px;">${paragraph("⏱ <strong>Security notice:</strong> This single-use link expires in 60 minutes.", "#64748b")}${paragraph("🛡 <strong>Did not request this?</strong> Ignore this email. Your current password remains unchanged.", "#64748b")}</div>`;
-      const text = `Reset your ${brand.name} password\n\nWe received a request to reset the password for your account (${to}).\n\n${url ? `Choose a new password: ${url}\n` : ""}${token ? `One-time reset token: ${token}\n` : ""}\nThis single-use link expires in 60 minutes. If you did not request this change, you can ignore this email.\n\n${brand.name}`;
+      const text = `Reset your ${brand.name} password\n\nWe received a request to reset the password for your account (${to}).\n\n${url ? `Choose a new password: ${url}\n` : ""}${token ? `One-time reset token: ${token}\n` : ""}\nThis single-use link expires in 60 minutes. If you did not request this change, you can ignore this email.${textBrandFooter}`;
       return { subject, html: renderEmailShell(subject, brand, content, "Account security"), text };
     }
 
@@ -174,7 +178,7 @@ export function renderEmailTemplate(
         ${paragraph(`The password for your account (<strong>${safeTo}</strong>) was just updated.`)}
         <div style="background:#ecfdf5;border:1px solid #a7f3d0;border-radius:8px;padding:14px 18px;margin:20px 0;color:#166534;font-size:14px;line-height:1.6;">✓ If you made this change, no further action is required. You can now sign in using your new password.</div>
         <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:14px 18px;margin:20px 0;color:#991b1b;font-size:13.5px;line-height:1.6;">⚠ <strong>Did not make this change?</strong> Contact ${escapeHtml(brand.name)} support immediately to secure your account.${brand.supportEmail ? ` ${escapeHtml(brand.supportEmail)}` : ""}</div>`;
-      const text = `Password successfully changed\n\nThe password for your ${brand.name} account (${to}) was just updated.\n\nIf you made this change, you can sign in with your new password. If you did not make this change, contact support immediately.${brand.supportEmail ? ` ${brand.supportEmail}` : ""}`;
+      const text = `Password successfully changed\n\nThe password for your ${brand.name} account (${to}) was just updated.\n\nIf you made this change, you can sign in with your new password. If you did not make this change, contact support immediately.${brand.supportEmail ? ` ${brand.supportEmail}` : ""}${textBrandFooter}`;
       return { subject, html: renderEmailShell(subject, brand, content, "Security confirmation"), text };
     }
 
@@ -184,7 +188,7 @@ export function renderEmailTemplate(
         ${paragraph(`Please verify that <strong>${safeTo}</strong> belongs to you to activate your account.`)}
         ${button(url, "Verify Email", brand)}
         ${paragraph("This verification link expires in 60 minutes.", "#64748b")}`;
-      const text = `Verify your ${brand.name} email\n\nPlease verify that ${to} belongs to you:${url ? `\n${url}` : ""}\n\nThis link expires in 60 minutes.`;
+      const text = `Verify your ${brand.name} email\n\nPlease verify that ${to} belongs to you:${url ? `\n${url}` : ""}\n\nThis link expires in 60 minutes.${textBrandFooter}`;
       return { subject, html: renderEmailShell(subject, brand, content, "Email verification"), text };
     }
 
@@ -195,9 +199,9 @@ export function renderEmailTemplate(
       const content = `${paragraph(escapeHtml(messageIntro), brand.secondary)}
         ${button(url, actionLabel, brand)}
         ${paragraph("If you did not request this, you can ignore this email.", "#64748b")}`;
-      const text = url
+      const text = (url
         ? `${messageIntro}\n\n${actionLabel}: ${url}\n\nIf you did not request this, you can ignore this email.`
-        : `${messageIntro}\n\nIf you did not request this, you can ignore this email.`;
+        : `${messageIntro}\n\nIf you did not request this, you can ignore this email.`) + textBrandFooter;
       return { subject, html: renderEmailShell(subject, brand, content), text };
     }
   }

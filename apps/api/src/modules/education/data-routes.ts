@@ -951,6 +951,55 @@ export async function educationDataRoutes(app: FastifyInstance, options: RouteOp
     return reply.send({ success: true, data: items });
   });
 
+  app.get("/api/v1/education/courses/stats/overview", async (request, reply) => {
+    const { tenantId, key } = await resolveEducationContext(request, options.config);
+    await requireEducationPermission(request, tenantId, "read");
+    const stats = await withInstitution(tenantId, key, async (tx, institutionId) => {
+      const rows = await tx.select({ status: educationCourses.status, total: count() }).from(educationCourses)
+        .where(and(eq(educationCourses.tenantId, tenantId), eq(educationCourses.institutionId, institutionId)))
+        .groupBy(educationCourses.status);
+      const byStatus = Object.fromEntries(rows.map((r) => [r.status, r.total]));
+      const total = rows.reduce((s, r) => s + r.total, 0);
+      return { total, active: byStatus.active ?? total, byStatus };
+    });
+    return reply.send({ success: true, data: stats });
+  });
+
+  app.post("/api/v1/education/courses/batch", async (request, reply) => {
+    const batchSchema = z.object({ items: z.array(courseInput).min(1).max(500) });
+    const parsed = batchSchema.safeParse(request.body);
+    if (!parsed.success) return reply.code(400).send({ success: false, error: "INVALID_INPUT", details: parsed.error.flatten() });
+    const { tenantId, key } = await resolveEducationContext(request, options.config);
+    await requireEducationPermission(request, tenantId, "create");
+    const results = await withInstitution(tenantId, key, async (tx, institutionId) => {
+      const createdIds: string[] = [];
+      const errors: Array<{ index: number; error: string }> = [];
+      for (let i = 0; i < parsed.data.items.length; i++) {
+        const d = parsed.data.items[i]!;
+        try {
+          const [created] = await tx.insert(educationCourses).values({
+            tenantId,
+            institutionId,
+            programId: d.programId ?? d.program_id ?? null,
+            code: d.code.toUpperCase(),
+            title: d.title,
+            description: d.description ?? "",
+            credits: d.credits ?? 3,
+            level: d.level ?? "100",
+            department: d.department ?? "",
+            faculty: d.faculty ?? "",
+            status: d.status ?? "active",
+          }).returning({ id: educationCourses.id });
+          if (created) createdIds.push(created.id);
+        } catch (err) {
+          errors.push({ index: i, error: err instanceof Error ? err.message : "Insert failed" });
+        }
+      }
+      return { createdIds, successCount: createdIds.length, failureCount: errors.length, errors };
+    });
+    return reply.send({ success: true, data: results });
+  });
+
   app.post("/api/v1/education/courses", async (request, reply) => {
     const parsed = courseInput.safeParse(request.body);
     if (!parsed.success) return reply.code(400).send({ success: false, error: "INVALID_INPUT", details: parsed.error.flatten() });
@@ -1347,6 +1396,73 @@ export async function educationDataRoutes(app: FastifyInstance, options: RouteOp
     return reply.send({ success: true, data: items });
   });
 
+  app.get<{ Params: { id: string } }>("/api/v1/education/applications/:id", async (request, reply) => {
+    const { tenantId, key } = await resolveEducationContext(request, options.config);
+    await requireEducationPermission(request, tenantId, "read");
+    const item = await withInstitution(tenantId, key, async (tx, institutionId) => {
+      const [found] = await tx.select().from(educationApplications).where(and(
+        eq(educationApplications.tenantId, tenantId),
+        eq(educationApplications.institutionId, institutionId),
+        or(eq(educationApplications.id, request.params.id), eq(educationApplications.applicationNumber, request.params.id))!,
+      )).limit(1);
+      return found ?? null;
+    });
+    return item ? reply.send({ success: true, data: item }) : reply.code(404).send({ success: false, error: "APPLICATION_NOT_FOUND" });
+  });
+
+  app.get<{ Params: { id: string } }>("/api/v1/education/applications/:id/logs", async (request, reply) => {
+    const { tenantId, key } = await resolveEducationContext(request, options.config);
+    await requireEducationPermission(request, tenantId, "read");
+    const logs = await withInstitution(tenantId, key, (tx, institutionId) =>
+      tx.select().from(educationApplicationLogs).where(and(
+        eq(educationApplicationLogs.tenantId, tenantId),
+        eq(educationApplicationLogs.institutionId, institutionId),
+        eq(educationApplicationLogs.applicationId, request.params.id),
+      )).orderBy(desc(educationApplicationLogs.createdAt)),
+    );
+    return reply.send({ success: true, data: logs });
+  });
+
+  app.post("/api/v1/education/admissions/decide", async (request, reply) => {
+    const decideSchema = z.object({
+      application_id: z.string().trim().min(1).optional(),
+      applicationId: z.string().trim().min(1).optional(),
+      decision: z.enum(["accepted", "rejected", "waitlisted", "under_review", "admit", "deny", "waitlist"]),
+      notes: z.string().max(4000).optional(),
+    });
+    const parsed = decideSchema.safeParse(request.body);
+    if (!parsed.success) return reply.code(400).send({ success: false, error: "INVALID_INPUT", details: parsed.error.flatten() });
+    const appId = parsed.data.applicationId ?? parsed.data.application_id;
+    if (!appId) return reply.code(400).send({ success: false, error: "APPLICATION_ID_REQUIRED" });
+    const { tenantId, key } = await resolveEducationContext(request, options.config);
+    const context = await requireEducationPermission(request, tenantId, "update");
+    const rawDecision = parsed.data.decision;
+    const normalizedStatus = rawDecision === "admit" ? "accepted" : rawDecision === "deny" ? "rejected" : rawDecision === "waitlist" ? "waitlisted" : rawDecision;
+    const updated = await withInstitution(tenantId, key, async (tx, institutionId) => {
+      const [row] = await tx.update(educationApplications).set({
+        status: normalizedStatus,
+        reviewerNotes: parsed.data.notes ?? "",
+        decidedAt: new Date(),
+        updatedAt: new Date(),
+      }).where(and(
+        or(eq(educationApplications.id, appId), eq(educationApplications.applicationNumber, appId))!,
+        eq(educationApplications.tenantId, tenantId),
+        eq(educationApplications.institutionId, institutionId),
+      )).returning();
+      if (!row) return null;
+      await tx.insert(educationApplicationLogs).values({
+        tenantId,
+        institutionId,
+        applicationId: row.id,
+        action: `decision_${normalizedStatus}`,
+        actor: context.email,
+        note: parsed.data.notes ?? "",
+      });
+      return row;
+    });
+    return updated ? reply.send({ success: true, data: updated }) : reply.code(404).send({ success: false, error: "APPLICATION_NOT_FOUND" });
+  });
+
   app.patch<{ Params: { id: string } }>("/api/v1/education/applications/:id/status", async (request, reply) => {
     const statusSchema = z.object({
       status: z.enum(["draft", "submitted", "under_review", "accepted", "rejected", "waitlisted", "enrolled"]),
@@ -1412,20 +1528,21 @@ export async function educationDataRoutes(app: FastifyInstance, options: RouteOp
     return reply.send({ success: true, data: items });
   });
 
+  const gradeInput = z.object({
+    studentId: z.string().uuid(),
+    courseId: z.string().uuid(),
+    termId: z.string().uuid().optional().nullable(),
+    academicYear: z.string().trim().max(40).optional(),
+    semester: z.string().trim().max(40).optional(),
+    numericGrade: z.coerce.number().min(0).max(100),
+    letterGrade: z.string().trim().max(8).optional(),
+    gpaPoints: z.coerce.number().min(0).max(5).optional(),
+    credits: z.coerce.number().int().min(0).max(30).optional(),
+    componentsJson: z.record(z.string(), z.unknown()).optional(),
+    status: z.enum(["Provisional", "Verified", "Finalized"]).optional(),
+  });
+
   app.post("/api/v1/education/grades", async (request, reply) => {
-    const gradeInput = z.object({
-      studentId: z.string().uuid(),
-      courseId: z.string().uuid(),
-      termId: z.string().uuid().optional().nullable(),
-      academicYear: z.string().trim().max(40).optional(),
-      semester: z.string().trim().max(40).optional(),
-      numericGrade: z.coerce.number().min(0).max(100),
-      letterGrade: z.string().trim().max(8).optional(),
-      gpaPoints: z.coerce.number().min(0).max(5).optional(),
-      credits: z.coerce.number().int().min(0).max(30).optional(),
-      componentsJson: z.record(z.string(), z.unknown()).optional(),
-      status: z.enum(["Provisional", "Verified", "Finalized"]).optional(),
-    });
     const parsed = gradeInput.safeParse(request.body);
     if (!parsed.success) return reply.code(400).send({ success: false, error: "INVALID_INPUT", details: parsed.error.flatten() });
     const { tenantId, key } = await resolveEducationContext(request, options.config);
@@ -1450,6 +1567,46 @@ export async function educationDataRoutes(app: FastifyInstance, options: RouteOp
       }).returning(),
     );
     return reply.code(201).send({ success: true, data: created });
+  });
+
+  app.post("/api/v1/education/grades/batch", async (request, reply) => {
+    const gradeBatchSchema = z.object({
+      items: z.array(gradeInput).min(1).max(500),
+    });
+    const parsed = gradeBatchSchema.safeParse(request.body);
+    if (!parsed.success) return reply.code(400).send({ success: false, error: "INVALID_INPUT", details: parsed.error.flatten() });
+    const { tenantId, key } = await resolveEducationContext(request, options.config);
+    await requireEducationPermission(request, tenantId, "create");
+    const results = await withInstitution(tenantId, key, async (tx, institutionId) => {
+      const createdIds: string[] = [];
+      const errors: Array<{ index: number; error: string }> = [];
+      for (let i = 0; i < parsed.data.items.length; i++) {
+        const d = parsed.data.items[i]!;
+        try {
+          const { letter, points } = gradeLetterAndPoints(d.numericGrade);
+          const [created] = await tx.insert(educationGrades).values({
+            tenantId,
+            institutionId,
+            studentId: d.studentId,
+            courseId: d.courseId,
+            termId: d.termId ?? null,
+            academicYear: d.academicYear ?? "",
+            semester: d.semester ?? "",
+            numericGrade: d.numericGrade.toFixed(2),
+            letterGrade: d.letterGrade ?? letter,
+            gpaPoints: d.gpaPoints !== undefined ? d.gpaPoints.toFixed(2) : points,
+            credits: d.credits ?? 3,
+            componentsJson: d.componentsJson ?? {},
+            status: d.status ?? "Provisional",
+          }).returning({ id: educationGrades.id });
+          if (created) createdIds.push(created.id);
+        } catch (err) {
+          errors.push({ index: i, error: err instanceof Error ? err.message : "Grade insert failed" });
+        }
+      }
+      return { createdIds, successCount: createdIds.length, failureCount: errors.length, errors };
+    });
+    return reply.send({ success: true, data: results });
   });
 
   app.patch<{ Params: { id: string } }>("/api/v1/education/grades/:id", async (request, reply) => {
@@ -1565,18 +1722,59 @@ export async function educationDataRoutes(app: FastifyInstance, options: RouteOp
     return reply.send({ success: true, data: items });
   });
 
-  app.post("/api/v1/education/finance/transactions", async (request, reply) => {
-    const txSchema = z.object({
-      studentId: z.string().uuid().optional().nullable(),
-      termId: z.string().uuid().optional().nullable(),
-      reference: z.string().trim().min(2).max(80).optional(),
-      amountMinor: z.coerce.number().int(),
-      currency: z.string().trim().length(3).optional(),
-      transactionType: z.string().trim().min(2).max(40).optional(),
-      description: z.string().max(4000).optional(),
-      status: z.enum(["Paid", "Pending", "Failed", "Voided"]).optional(),
-      dueDate: z.string().date().optional().nullable(),
+  app.get("/api/v1/education/finance/stats", async (request, reply) => {
+    const { tenantId, key } = await resolveEducationContext(request, options.config);
+    await requireEducationPermission(request, tenantId, "read");
+    const stats = await withInstitution(tenantId, key, async (tx, institutionId) => {
+      const [totals] = await tx.select({
+        totalCount: count(),
+        totalAmountMinor: sql<number>`coalesce(sum(${educationFinanceTransactions.amountMinor}), 0)`,
+      }).from(educationFinanceTransactions).where(and(
+        eq(educationFinanceTransactions.tenantId, tenantId),
+        eq(educationFinanceTransactions.institutionId, institutionId),
+      ));
+      const [paid] = await tx.select({
+        paidCount: count(),
+        paidAmountMinor: sql<number>`coalesce(sum(${educationFinanceTransactions.amountMinor}), 0)`,
+      }).from(educationFinanceTransactions).where(and(
+        eq(educationFinanceTransactions.tenantId, tenantId),
+        eq(educationFinanceTransactions.institutionId, institutionId),
+        eq(educationFinanceTransactions.status, "Paid"),
+      ));
+      const [pending] = await tx.select({
+        pendingCount: count(),
+        pendingAmountMinor: sql<number>`coalesce(sum(${educationFinanceTransactions.amountMinor}), 0)`,
+      }).from(educationFinanceTransactions).where(and(
+        eq(educationFinanceTransactions.tenantId, tenantId),
+        eq(educationFinanceTransactions.institutionId, institutionId),
+        eq(educationFinanceTransactions.status, "Pending"),
+      ));
+      return {
+        totalTransactions: totals?.totalCount ?? 0,
+        totalAmount: Number((totals?.totalAmountMinor ?? 0) / 100),
+        paidCount: paid?.paidCount ?? 0,
+        paidAmount: Number((paid?.paidAmountMinor ?? 0) / 100),
+        pendingCount: pending?.pendingCount ?? 0,
+        pendingAmount: Number((pending?.pendingAmountMinor ?? 0) / 100),
+        currency: "USD",
+      };
     });
+    return reply.send({ success: true, data: stats });
+  });
+
+  const txSchema = z.object({
+    studentId: z.string().uuid().optional().nullable(),
+    termId: z.string().uuid().optional().nullable(),
+    reference: z.string().trim().min(2).max(80).optional(),
+    amountMinor: z.coerce.number().int(),
+    currency: z.string().trim().length(3).optional(),
+    transactionType: z.string().trim().min(2).max(40).optional(),
+    description: z.string().max(4000).optional(),
+    status: z.enum(["Paid", "Pending", "Failed", "Voided"]).optional(),
+    dueDate: z.string().date().optional().nullable(),
+  });
+
+  app.post("/api/v1/education/finance/transactions", async (request, reply) => {
     const parsed = txSchema.safeParse(request.body);
     if (!parsed.success) return reply.code(400).send({ success: false, error: "INVALID_INPUT", details: parsed.error.flatten() });
     const { tenantId, key } = await resolveEducationContext(request, options.config);
@@ -1600,6 +1798,45 @@ export async function educationDataRoutes(app: FastifyInstance, options: RouteOp
       }).returning(),
     );
     return reply.code(201).send({ success: true, data: created });
+  });
+
+  app.post("/api/v1/education/finance/transactions/batch", async (request, reply) => {
+    const txBatchSchema = z.object({
+      items: z.array(txSchema).min(1).max(500),
+    });
+    const parsed = txBatchSchema.safeParse(request.body);
+    if (!parsed.success) return reply.code(400).send({ success: false, error: "INVALID_INPUT", details: parsed.error.flatten() });
+    const { tenantId, key } = await resolveEducationContext(request, options.config);
+    await requireEducationPermission(request, tenantId, "create");
+    const results = await withInstitution(tenantId, key, async (tx, institutionId) => {
+      const createdIds: string[] = [];
+      const errors: Array<{ index: number; error: string }> = [];
+      for (let i = 0; i < parsed.data.items.length; i++) {
+        const d = parsed.data.items[i]!;
+        const status = d.status ?? "Pending";
+        try {
+          const [created] = await tx.insert(educationFinanceTransactions).values({
+            tenantId,
+            institutionId,
+            studentId: d.studentId ?? null,
+            termId: d.termId ?? null,
+            reference: d.reference ?? `EDU-TX-${Date.now()}-${randomUUID().slice(0, 6).toUpperCase()}`,
+            amountMinor: d.amountMinor,
+            currency: (d.currency ?? "USD").toUpperCase(),
+            transactionType: d.transactionType ?? "tuition_payment",
+            description: d.description ?? "",
+            status,
+            dueDate: d.dueDate ?? null,
+            paidAt: status === "Paid" ? new Date() : null,
+          }).returning({ id: educationFinanceTransactions.id });
+          if (created) createdIds.push(created.id);
+        } catch (err) {
+          errors.push({ index: i, error: err instanceof Error ? err.message : "Transaction insert failed" });
+        }
+      }
+      return { createdIds, successCount: createdIds.length, failureCount: errors.length, errors };
+    });
+    return reply.send({ success: true, data: results });
   });
 
   app.patch<{ Params: { id: string } }>("/api/v1/education/finance/transactions/:id", async (request, reply) => {
@@ -1646,6 +1883,20 @@ export async function educationDataRoutes(app: FastifyInstance, options: RouteOp
       tx.select().from(educationStaff).where(and(eq(educationStaff.tenantId, tenantId), eq(educationStaff.institutionId, institutionId))).orderBy(asc(educationStaff.lastName), asc(educationStaff.firstName)),
     );
     return reply.send({ success: true, data: items });
+  });
+
+  app.get("/api/v1/education/staff/stats/overview", async (request, reply) => {
+    const { tenantId, key } = await resolveEducationContext(request, options.config);
+    await requireEducationPermission(request, tenantId, "read");
+    const stats = await withInstitution(tenantId, key, async (tx, institutionId) => {
+      const rows = await tx.select({ status: educationStaff.status, total: count() }).from(educationStaff)
+        .where(and(eq(educationStaff.tenantId, tenantId), eq(educationStaff.institutionId, institutionId)))
+        .groupBy(educationStaff.status);
+      const byStatus = Object.fromEntries(rows.map((r) => [r.status, r.total]));
+      const total = rows.reduce((s, r) => s + r.total, 0);
+      return { total, active: byStatus.active ?? total, byStatus };
+    });
+    return reply.send({ success: true, data: stats });
   });
 
   app.post("/api/v1/education/staff", async (request, reply) => {
@@ -1730,6 +1981,41 @@ export async function educationDataRoutes(app: FastifyInstance, options: RouteOp
       tx.select().from(educationStudyCenters).where(and(eq(educationStudyCenters.tenantId, tenantId), eq(educationStudyCenters.institutionId, institutionId))).orderBy(asc(educationStudyCenters.name)),
     );
     return reply.send({ success: true, data: items });
+  });
+
+  app.get("/api/v1/education/study-centers/all", async (request, reply) => {
+    const { tenantId, key } = await resolveEducationContext(request, options.config);
+    await requireEducationPermission(request, tenantId, "read");
+    const items = await withInstitution(tenantId, key, (tx, institutionId) =>
+      tx.select().from(educationStudyCenters).where(and(eq(educationStudyCenters.tenantId, tenantId), eq(educationStudyCenters.institutionId, institutionId))).orderBy(asc(educationStudyCenters.name)),
+    );
+    return reply.send({ success: true, data: items });
+  });
+
+  app.get<{ Params: { id: string } }>("/api/v1/education/study-centers/:id/stats", async (request, reply) => {
+    const { tenantId, key } = await resolveEducationContext(request, options.config);
+    await requireEducationPermission(request, tenantId, "read");
+    const stats = await withInstitution(tenantId, key, async (tx, institutionId) => {
+      const [center] = await tx.select().from(educationStudyCenters).where(and(
+        eq(educationStudyCenters.id, request.params.id),
+        eq(educationStudyCenters.tenantId, tenantId),
+        eq(educationStudyCenters.institutionId, institutionId),
+      )).limit(1);
+      if (!center) return null;
+      const [studentCount] = await tx.select({ total: count() }).from(educationStudents).where(and(
+        eq(educationStudents.tenantId, tenantId),
+        eq(educationStudents.institutionId, institutionId),
+        eq(educationStudents.studyCenterId, center.id),
+      ));
+      return {
+        id: center.id,
+        name: center.name,
+        totalStudents: studentCount?.total ?? 0,
+        capacity: center.capacity ?? 100,
+        occupancyRate: center.capacity ? Math.round(((studentCount?.total ?? 0) / center.capacity) * 100) : 0,
+      };
+    });
+    return stats ? reply.send({ success: true, data: stats }) : reply.code(404).send({ success: false, error: "STUDY_CENTER_NOT_FOUND" });
   });
 
   app.post("/api/v1/education/study-centers", async (request, reply) => {

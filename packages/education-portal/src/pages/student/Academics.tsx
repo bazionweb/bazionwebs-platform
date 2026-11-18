@@ -1,7 +1,15 @@
 import { useState, useEffect } from 'react';
 import { api, Course } from '../../lib/api';
+import { useTenantConfig } from '../../context/TenantContext';
+import { PlatformBrandStamp } from '../../components/PlatformBrandStamp';
 
 export default function Academics() {
+  const tenantConfig = useTenantConfig();
+  const handlePrintTranscript = () => {
+    document.body.dataset.printTarget = 'transcript';
+    window.print();
+    window.setTimeout(() => delete document.body.dataset.printTarget, 1000);
+  };
   const [activeTab, setActiveTab] = useState<'registration' | 'schedule' | 'transcript' | 'audit' | 'calculator'>('registration');
   const [courses, setCourses] = useState<Course[]>([]);
   const [dashboardData, setDashboardData] = useState<any>(null);
@@ -99,7 +107,8 @@ export default function Academics() {
   ];
 
   return (
-    <div style={{ maxWidth: 1140, margin: '0 auto' }}>
+    <div style={{ maxWidth: 1140, margin: '0 auto', '--navy': tenantConfig.branding.primaryColor, '--gold': tenantConfig.branding.accentColor, '--gold-dark': tenantConfig.branding.accentColor } as React.CSSProperties}>
+      <style>{`@media print { body * { visibility: hidden !important; } body[data-print-target="transcript"] .printable-transcript, body[data-print-target="transcript"] .printable-transcript * { visibility: visible !important; } body[data-print-target="transcript"] .printable-transcript { position: fixed !important; inset: 0 auto auto 0 !important; width: 100% !important; overflow: visible !important; padding: 1rem !important; } }`}</style>
       
       {/* ─── Page Title Header ─── */}
       <div style={{ marginBottom: '1.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
@@ -496,7 +505,7 @@ export default function Academics() {
                 <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
                   <button
                     className="btn btn-gold btn-sm"
-                    onClick={() => window.print()}
+                    onClick={handlePrintTranscript}
                     style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
                   >
                     🖨️ Print / Save Official Transcript (PDF)
@@ -513,13 +522,17 @@ export default function Academics() {
               {/* Printable Official Transcript Document View */}
               <div className="printable-transcript" style={{ padding: '1rem 0' }}>
                 <div style={{ border: '2px solid var(--navy)', padding: '1.5rem', borderRadius: 'var(--radius-sm)', marginBottom: '1.5rem', background: '#fdfefe' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '2px solid var(--navy)', paddingBottom: '1rem', marginBottom: '1rem' }}>
-                    <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: `2px solid ${tenantConfig.branding.accentColor}`, paddingBottom: '1rem', marginBottom: '1rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                      {tenantConfig.branding.logoUrl && <img src={tenantConfig.branding.logoUrl} alt={`${tenantConfig.shortName} logo`} style={{ maxWidth: 100, maxHeight: 56, objectFit: 'contain' }} />}
+                      <div>
                       <h1 style={{ fontSize: '1.4rem', color: 'var(--navy)', margin: 0, fontWeight: 900, letterSpacing: '0.05em' }}>
-                        BMI UNIVERSITY • OFFICE OF THE REGISTRAR
+                        {tenantConfig.shortName.toUpperCase()} • OFFICE OF THE REGISTRAR
                       </h1>
+                      <div style={{ fontSize: '0.8rem', color: 'var(--slate)', marginTop: '0.2rem' }}>{tenantConfig.institutionName}</div>
                       <div style={{ fontSize: '0.8rem', color: 'var(--slate)', marginTop: '0.2rem' }}>
                         Official Student Academic Transcript • Document Ref: TR-2026-{(dashboardData?.id || '0000').substring(0, 6).toUpperCase()}
+                      </div>
                       </div>
                     </div>
                     <div style={{ textAlign: 'right', fontSize: '0.8rem', color: 'var(--slate)' }}>
@@ -570,9 +583,10 @@ export default function Academics() {
                 </div>
 
                 <div style={{ marginTop: '2rem', paddingTop: '1rem', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.8rem', color: 'var(--slate)' }}>
-                  <div>Security Seal: [BMI-DIGITAL-VERIFIED-AUTH-HASH-2026]</div>
+                  <div>Security Seal: [{tenantConfig.shortName.toUpperCase().replace(/[^A-Z0-9]+/g, '-')}-DIGITAL-VERIFIED-AUTH-HASH-2026]</div>
                   <div>Registrar Signature: <em>Office of Academic Certification</em></div>
                 </div>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.75rem' }}><PlatformBrandStamp compact /></div>
               </div>
             </div>
           )}

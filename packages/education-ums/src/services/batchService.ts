@@ -24,7 +24,7 @@ export async function postStudentBatch(items: unknown[]): Promise<BatchResult> {
 }
 
 export async function postGradeBatch(items: unknown[]): Promise<BatchResult> {
-  const res = await authFetch(`${API_URL}/batch/grades`, {
+  const res = await authFetch(`${API_URL}/education/grades/batch`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ items }),
@@ -34,7 +34,7 @@ export async function postGradeBatch(items: unknown[]): Promise<BatchResult> {
 }
 
 export async function postTransactionBatch(items: unknown[]): Promise<BatchResult> {
-  const res = await authFetch(`${API_URL}/batch/finance/transactions`, {
+  const res = await authFetch(`${API_URL}/education/finance/transactions/batch`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ items }),
@@ -44,7 +44,7 @@ export async function postTransactionBatch(items: unknown[]): Promise<BatchResul
 }
 
 export async function postCourseBatch(items: unknown[]): Promise<BatchResult> {
-  const res = await authFetch(`${API_URL}/batch/courses`, {
+  const res = await authFetch(`${API_URL}/education/courses/batch`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ items }),

@@ -5,6 +5,7 @@
  */
 
 import React, { useState, useMemo, useCallback } from "react";
+import { PlatformBrandBadge } from "./PlatformBrandBadge";
 import {
   Search,
   Printer,
@@ -573,6 +574,7 @@ export const RegistrationCard: React.FC<RegistrationCardProps> = ({
                   </div>
                 </div>
 
+                <div className="flex justify-end px-8 py-2"><PlatformBrandBadge compact /></div>
                 <div className="h-2" style={{ background: `linear-gradient(90deg, ${primaryColor}, ${accentColor}, ${primaryColor})` }} />
               </div>
             </div>

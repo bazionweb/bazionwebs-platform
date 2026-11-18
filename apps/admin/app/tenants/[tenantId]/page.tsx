@@ -56,6 +56,15 @@ export default async function TenantDetail({ params }: { params: Promise<{ tenan
     platformFetch<{ items: TenantInstallationItem[] }>(`tenants/${encodeURIComponent(tenantId)}/installations`),
     platformFetch<TenantWebsiteOnboardingData>(`tenants/${encodeURIComponent(tenantId)}/website-onboarding`),
   ]);
+  const hostingInstallationEligibility = installations.status !== 200
+    ? "unavailable"
+    : installations.data?.items.some(
+        (installation) =>
+          installation.distributionMode === "dedicated" &&
+          ["provisioning", "ready"].includes(installation.status),
+      )
+      ? "eligible"
+      : "missing";
 
   return <main className="detail-shell">
     <header className="topbar"><Link href="/">← All tenants</Link><span>Platform / Tenant detail</span></header>
@@ -100,6 +109,7 @@ export default async function TenantDetail({ params }: { params: Promise<{ tenan
       tenantStatus={tenant.status}
       initial={hosting.data}
       status={hosting.status}
+      installationEligibility={hostingInstallationEligibility}
     />
     <TenantWebsiteOnboardingPanel
       tenantId={tenant.id}

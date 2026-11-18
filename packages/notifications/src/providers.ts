@@ -5,7 +5,11 @@ function platformEmailBrandVariables(): Record<string, string> {
   const publicUrl = process.env.PUBLIC_STOREFRONT_URL?.trim() || process.env.AUTH_APP_URL?.trim() || "";
   let logoUrl = process.env.PLATFORM_BRAND_LOGO_URL?.trim() || "";
   if (!logoUrl && publicUrl) {
-    try { logoUrl = new URL("/brand/bazion-platform-logo.png", publicUrl).toString(); } catch {}
+    try {
+      logoUrl = new URL("/brand/bazion-platform-logo.png", publicUrl).toString();
+    } catch {
+      // A missing base URL should not block text-only notification delivery.
+    }
   }
   return {
     platformBrandName: process.env.PLATFORM_BRAND_NAME?.trim() || "Bazion Web",
@@ -27,6 +31,15 @@ export interface EmailTransportLike {
     text: string;
     html: string;
   }): Promise<{ messageId?: string }>;
+}
+
+function platformFromAddress(value: string): string {
+  const platformName = (process.env.PLATFORM_BRAND_NAME?.trim() || "Bazion Web").replace(/[<>\r\n]/g, "");
+  const address = value.trim();
+  const bracketed = address.match(/<([^<>\s]+)>/);
+  if (bracketed) return `${platformName} <${bracketed[1]}>`;
+  if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(address)) return `${platformName} <${address}>`;
+  return address;
 }
 
 export interface SmsHttpAdapterConfig {
@@ -58,7 +71,7 @@ export class SmtpEmailNotificationAdapter {
   async send(delivery: OutboxDelivery): Promise<{ providerMessageId: string }> {
     const rendered = renderNotificationContent(delivery);
     const info = await this.transport.sendMail({
-      from: this.emailFrom,
+      from: platformFromAddress(this.emailFrom),
       to: delivery.payload.to,
       subject: rendered.subject,
       text: rendered.text,

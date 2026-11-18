@@ -32,9 +32,16 @@ const appBaseUrl = process.env.AUTH_APP_URL ?? "http://localhost:3000";
 const platformBrandName = process.env.PLATFORM_BRAND_NAME?.trim() || process.env.AUTH_APP_NAME?.trim() || "Bazion Web";
 const authBrandName = platformBrandName;
 const platformBaseUrl = process.env.PUBLIC_STOREFRONT_URL || appBaseUrl;
-const platformLogoUrl = process.env.PLATFORM_BRAND_LOGO_URL?.trim()
+let platformLogoUrl = process.env.PLATFORM_BRAND_LOGO_URL?.trim()
   || process.env.AUTH_EMAIL_LOGO_URL?.trim()
-  || new URL("/brand/bazion-platform-logo.png", platformBaseUrl).toString();
+  || "";
+if (!platformLogoUrl) {
+  try {
+    platformLogoUrl = new URL("/brand/bazion-platform-logo.png", platformBaseUrl).toString();
+  } catch {
+    // The email renderer keeps a text brand when the public asset URL is unavailable.
+  }
+}
 const authBrandVariables: Record<string, string | number> = {
   platformBrandName,
   platformLogoUrl,

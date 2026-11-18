@@ -31,6 +31,22 @@ function escapeXml(value: string): string {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\"/g, "&quot;").replace(/'/g, "&apos;");
 }
 
+async function loadPlatformMarkDataUrl(): Promise<string> {
+  try {
+    const response = await fetch("/brand/bazion-platform-mark.png");
+    if (!response.ok) return "";
+    const blob = await response.blob();
+    return await new Promise<string>((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(typeof reader.result === "string" ? reader.result : "");
+      reader.onerror = () => resolve("");
+      reader.readAsDataURL(blob);
+    });
+  } catch {
+    return "";
+  }
+}
+
 export const downloadWord = async (context: ExportContext) => {
   const { selectedStudent, getAcademicRecommendation, fixedRows, stats, transcriptType, securityData, logo, selectedTerm } = context;
   const brand = exportBrand(context);
@@ -77,6 +93,7 @@ export const downloadWord = async (context: ExportContext) => {
         // eslint-disable-next-line no-console
         console.warn("Could not fetch logo:", error);
       }
+      const platformMarkBase64 = await loadPlatformMarkDataUrl();
 
       // Create table rows for performance records - matching preview layout
       const tableRows = [
@@ -1129,6 +1146,16 @@ export const downloadWord = async (context: ExportContext) => {
                   color: "999999",
                 },
               }),
+              new Paragraph({
+                alignment: AlignmentType.CENTER,
+                spacing: { before: 180 },
+                children: [
+                  ...(platformMarkBase64
+                    ? [new ImageRun({ type: "png", data: platformMarkBase64, transformation: { width: 28, height: 23 } })]
+                    : []),
+                  new TextRun({ text: "  Powered by Bazion Web", size: 13, bold: true, color: "0B2F75", font: "Arial" }),
+                ],
+              }),
             ],
           },
         ],
@@ -1159,6 +1186,7 @@ export const downloadSVG = async (context: ExportContext) => {
     try {
       const fileName =
         `${transcriptType}_TRANSCRIPT_${selectedStudent.id}_${selectedStudent.last_name}`.toUpperCase();
+      const platformMarkDataUrl = await loadPlatformMarkDataUrl();
 
       // A4 dimensions at 96 DPI
       const width = 794;
@@ -1257,6 +1285,11 @@ export const downloadSVG = async (context: ExportContext) => {
 
   <!-- Logo -->
   <image x="${width / 2 - 35}" y="50" width="70" height="70" xlink:href="${logo}" preserveAspectRatio="xMidYMid meet"/>
+
+  <!-- Separate platform brand mark -->
+  ${platformMarkDataUrl ? `<image x="${width - 125}" y="52" width="34" height="28" xlink:href="${platformMarkDataUrl}" preserveAspectRatio="xMidYMid meet"/>` : ""}
+  <text x="${width - 84}" y="63" font-family="Arial, sans-serif" font-size="7" font-weight="bold" fill="#0B2F75">Powered by</text>
+  <text x="${width - 84}" y="75" font-family="Arial, sans-serif" font-size="8" font-weight="bold" fill="#0B2F75">Bazion Web</text>
 
   <!-- University Name -->
   <text x="${width / 2}" y="145" font-family="Georgia, serif" font-size="26" font-weight="bold"

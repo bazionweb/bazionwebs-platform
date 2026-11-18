@@ -5,6 +5,7 @@
  */
 
 import React, { useState, useMemo, useCallback } from 'react';
+import { PlatformBrandBadge } from "./PlatformBrandBadge";
 import { 
   Search, Printer, Download, Shield, ShieldCheck, 
   Sparkles, Award
@@ -374,7 +375,7 @@ export const GoodStandingLetter: React.FC<GoodStandingLetterProps> = ({ students
                     </p>
                   </div>
                 </div>
-                
+                <div className="flex justify-end px-10 py-2"><PlatformBrandBadge compact /></div>
                 <div className="h-2" style={{ background: `linear-gradient(90deg, ${primaryColor}, ${accentColor}, ${primaryColor})` }} />
               </div>
             </div>

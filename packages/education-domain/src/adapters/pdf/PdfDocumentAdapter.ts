@@ -2,7 +2,6 @@ import { IDocumentGenerator, Document, DocumentRequest } from '../../ports';
 import { PDFDocument, rgb, StandardFonts, PDFFont, PDFImage } from '../../shims/external-adapters';
 
 const LOGO_URL = 'https://portal.bmiuniversities.org/bmi-logo.png';
-const VERIFY_BASE_URL = 'https://bmiuniversities.org/verify';
 
 function colorFromHex(input: unknown, fallback: string) {
   const value = typeof input === 'string' && /^#[0-9a-fA-F]{6}$/.test(input) ? input : fallback;
@@ -50,7 +49,7 @@ function institutionName(meta?: Record<string, any>): string {
 }
 
 function institutionShortName(meta?: Record<string, any>): string {
-  const configured = meta?.shortName ?? meta?.brandName;
+  const configured = meta?.shortName ?? meta?.brandName ?? (meta?.institutionName ? institutionName(meta) : undefined);
   return typeof configured === 'string' && configured.trim()
     ? configured.trim()
     : 'BMI University';
@@ -97,7 +96,7 @@ export class PdfDocumentAdapter implements IDocumentGenerator {
     return (pageW - font.widthOfTextAtSize(text, size)) / 2;
   }
 
-  private logoCache = new Map<string, Uint8Array>();
+  private logoCache = new Map<string, { bytes: Uint8Array; format: 'png' | 'jpg' }>();
 
   async generateDocument(request: DocumentRequest): Promise<Document> {
     const previous = pdfGenerationTail;
@@ -116,36 +115,48 @@ export class PdfDocumentAdapter implements IDocumentGenerator {
     const { type, userId, metadata } = request;
     const pdfDoc = await PDFDocument.create();
 
-    const websiteUrl = verifiedUrl(metadata?.websiteUrl, process.env.PUBLIC_STOREFRONT_URL);
+    const hasTenantIdentity = Boolean(metadata?.institutionName || metadata?.shortName || metadata?.brandName);
+    const configuredPublicUrl = verifiedUrl(metadata?.websiteUrl, process.env.PUBLIC_STOREFRONT_URL);
+    const websiteUrl = configuredPublicUrl || (!hasTenantIdentity ? (process.env.PUBLIC_STOREFRONT_URL || 'https://bmiuniversities.org') : '');
     const verificationBaseUrl = verifiedUrl(
       metadata?.verificationBaseUrl,
       websiteUrl || process.env.PUBLIC_STOREFRONT_URL,
-    ) || (websiteUrl ? `${websiteUrl.replace(/\/$/, '')}/verify` : VERIFY_BASE_URL);
+    ) || (websiteUrl ? `${websiteUrl.replace(/\/$/, '')}/verify` : '/verify');
     const customLogo = typeof metadata?.logoUrl === 'string' ? metadata.logoUrl.trim() : '';
     const logoUrl = customLogo
       ? verifiedUrl(customLogo, websiteUrl || process.env.PUBLIC_STOREFRONT_URL)
-      : (metadata?.institutionName || metadata?.brandName ? '' : LOGO_URL);
+      : (hasTenantIdentity ? '' : LOGO_URL);
+    const platformBrandBaseUrl = process.env.PUBLIC_STOREFRONT_URL || process.env.AUTH_APP_URL;
+    const platformLogoUrl = verifiedUrl(process.env.PLATFORM_BRAND_MARK_URL, platformBrandBaseUrl)
+      || verifiedUrl('/brand/bazion-platform-mark.png', platformBrandBaseUrl);
     const enrichedMeta: Record<string, any> = {
       ...metadata,
       institutionName: institutionName(metadata),
       shortName: institutionShortName(metadata),
       institutionCode: institutionCode(metadata),
-      admissionsEmail: metadata?.admissionsEmail || metadata?.contactEmail || 'admissions@bmiuniversities.org',
-      registrarEmail: metadata?.registrarEmail || metadata?.contactEmail || 'registrar@bmiuniversities.org',
-      phone: metadata?.phone || metadata?.contactPhone || '+254 721 341 793',
-      address: metadata?.address || 'Mukurwe-ini Plaza, Nyeri County, Kenya',
+      admissionsEmail: metadata?.admissionsEmail || metadata?.contactEmail || (hasTenantIdentity ? '' : 'admissions@bmiuniversities.org'),
+      registrarEmail: metadata?.registrarEmail || metadata?.contactEmail || (hasTenantIdentity ? '' : 'registrar@bmiuniversities.org'),
+      phone: metadata?.phone || metadata?.contactPhone || (hasTenantIdentity ? '' : '+254 721 341 793'),
+      address: metadata?.address || (hasTenantIdentity ? '' : 'Mukurwe-ini Plaza, Nyeri County, Kenya'),
       websiteUrl,
       verificationBaseUrl,
-      portalUrl: verifiedUrl(metadata?.portalUrl, websiteUrl) || (websiteUrl ? `${websiteUrl.replace(/\/$/, '')}/portal` : 'https://portal.bmiuniversities.org'),
+      portalUrl: verifiedUrl(metadata?.portalUrl, websiteUrl || process.env.PUBLIC_STOREFRONT_URL) || (websiteUrl ? `${websiteUrl.replace(/\/$/, '')}/portal` : '/portal'),
+      platformBrandName: process.env.PLATFORM_BRAND_NAME?.trim() || 'Bazion Web',
     };
 
     let logo: PDFImage | undefined;
     try {
       const logoData = logoUrl ? await this.getLogoBytes(logoUrl) : null;
-      if (logoData) logo = await pdfDoc.embedPng(logoData);
+      if (logoData) logo = logoData.format === 'jpg' ? await pdfDoc.embedJpg(logoData.bytes) : await pdfDoc.embedPng(logoData.bytes);
+    } catch {}
+    try {
+      const platformLogoData = platformLogoUrl ? await this.getLogoBytes(platformLogoUrl) : null;
+      if (platformLogoData) enrichedMeta.platformLogo = platformLogoData.format === 'jpg'
+        ? await pdfDoc.embedJpg(platformLogoData.bytes)
+        : await pdfDoc.embedPng(platformLogoData.bytes);
     } catch {}
 
-    const verificationCode = crypto.randomUUID().replace(/-/g, '').substring(0, 12).toUpperCase();
+    const verificationCode = `${institutionCode(enrichedMeta)}-VER-${crypto.randomUUID().replace(/-/g, '').substring(0, 12).toUpperCase()}`;
     enrichedMeta.verificationCode = metadata?.verificationCode || verificationCode;
     enrichedMeta.verificationUrl = `${verificationBaseUrl}?code=${encodeURIComponent(enrichedMeta.verificationCode)}`;
 
@@ -186,7 +197,7 @@ export class PdfDocumentAdapter implements IDocumentGenerator {
   async getDocumentsByUser(_userId: string): Promise<Document[]> { return []; }
   async verifyDocument(_verificationCode: string): Promise<Document | null> { return null; }
 
-  private async getLogoBytes(url: string): Promise<Uint8Array | null> {
+  private async getLogoBytes(url: string): Promise<{ bytes: Uint8Array; format: 'png' | 'jpg' } | null> {
     const cached = this.logoCache.get(url);
     if (cached) return cached;
     try {
@@ -194,8 +205,13 @@ export class PdfDocumentAdapter implements IDocumentGenerator {
       if (!res.ok) return null;
       const buf = await res.arrayBuffer();
       const bytes = new Uint8Array(buf);
-      this.logoCache.set(url, bytes);
-      return bytes;
+      const contentType = res.headers.get('content-type')?.split(';')[0].trim().toLowerCase();
+      const isPng = contentType === 'image/png' || (bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47);
+      const isJpg = contentType === 'image/jpeg' || contentType === 'image/jpg' || (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff);
+      if (!isPng && !isJpg) return null;
+      const image = { bytes, format: isJpg ? 'jpg' as const : 'png' as const };
+      this.logoCache.set(url, image);
+      return image;
     } catch { return null; }
   }
 
@@ -216,7 +232,7 @@ export class PdfDocumentAdapter implements IDocumentGenerator {
     const uid = meta?.uid || 'STD-2026-001';
     const date = meta?.date || new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
     const term = meta?.term || 'Fall Academic Term 2026';
-    const verificationCode = meta?.verificationCode || 'BMI-VER-88219';
+    const verificationCode = meta?.verificationCode || `${institutionCode(meta)}-VER-${crypto.randomUUID().replace(/-/g, '').slice(0, 12).toUpperCase()}`;
     const docRef = `${institutionCode(meta)}/ADM/${new Date().getFullYear()}/${verificationCode.slice(0, 6)}`;
 
     const page = pdf.addPage([PdfDocumentAdapter.PAGE_W, PdfDocumentAdapter.PAGE_H]);
@@ -305,7 +321,7 @@ export class PdfDocumentAdapter implements IDocumentGenerator {
     }
 
     y -= 6;
-    page.drawText('We warmly welcome you to the Bethel Ministries International University community and pray for your academic and spiritual growth.', { x: 55, y, size: 9.5, font: timesItalic, color: PdfDocumentAdapter.NAVY });
+    page.drawText(`We warmly welcome you to the ${institutionName(meta)} community and wish you success in your academic and personal growth.`, { x: 55, y, size: 9.5, font: timesItalic, color: PdfDocumentAdapter.NAVY });
 
     // Dual Signatures & Seal Section
     y -= 46;
@@ -318,7 +334,7 @@ export class PdfDocumentAdapter implements IDocumentGenerator {
     page.drawText(institutionShortName(meta), { x: 55, y: y - 43, size: 7.5, font: helvetica, color: PdfDocumentAdapter.LIGHT_GRAY });
 
     // Official Stamp Graphic / Seal Rosette Center
-    this.drawSealEmblem(page, 306, y - 20, bold, helvetica);
+    this.drawSealEmblem(page, 306, y - 20, bold, helvetica, meta);
 
     // Right Signature
     this.drawHLine(page, y - 10, PdfDocumentAdapter.CHARCOAL, 397, 160, 1);
@@ -345,7 +361,7 @@ export class PdfDocumentAdapter implements IDocumentGenerator {
     const regNo = meta?.regNo || `${institutionCode(meta)}/UG-CS/226/001`;
     const uid = meta?.uid || 'STD-2026-001';
     const date = meta?.date || new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-    const verificationCode = meta?.verificationCode || 'BMI-ENR-91823';
+    const verificationCode = meta?.verificationCode || `${institutionCode(meta)}-ENR-${crypto.randomUUID().replace(/-/g, '').slice(0, 12).toUpperCase()}`;
     const docRef = `${institutionCode(meta)}/ENR/${new Date().getFullYear()}/${verificationCode.slice(0, 6)}`;
 
     const page = pdf.addPage([PdfDocumentAdapter.PAGE_W, PdfDocumentAdapter.PAGE_H]);
@@ -411,7 +427,7 @@ export class PdfDocumentAdapter implements IDocumentGenerator {
     page.drawText(meta?.authorizedBy || 'Authorized Signatory', { x: 50, y: y - 12, size: 10, font: bold, color: PdfDocumentAdapter.NAVY });
     page.drawText(meta?.authorizedTitle || 'Registrar & Keeper of Records', { x: 50, y: y - 22, size: 8, font: helvetica, color: PdfDocumentAdapter.DARK_GRAY });
 
-    this.drawSealEmblem(page, 306, y - 10, bold, helvetica);
+    this.drawSealEmblem(page, 306, y - 10, bold, helvetica, meta);
 
     this.drawHLine(page, y, PdfDocumentAdapter.CHARCOAL, 392, 170, 1);
     page.drawText('Academic Records Directorate', { x: 392, y: y - 12, size: 10, font: bold, color: PdfDocumentAdapter.NAVY });
@@ -433,7 +449,7 @@ export class PdfDocumentAdapter implements IDocumentGenerator {
     const regNo = meta?.regNo || `${institutionCode(meta)}/UG-CS/226/001`;
     const program = meta?.program || 'Biblical Studies';
     const validThru = meta?.validThru || '08/2028';
-    const verificationCode = meta?.verificationCode || 'BMI-IDC-8821';
+    const verificationCode = meta?.verificationCode || `${institutionCode(meta)}-IDC-${crypto.randomUUID().replace(/-/g, '').slice(0, 12).toUpperCase()}`;
 
     const page = pdf.addPage([PdfDocumentAdapter.CARD_W, PdfDocumentAdapter.CARD_H]);
 
@@ -456,6 +472,12 @@ export class PdfDocumentAdapter implements IDocumentGenerator {
     // Student Badge Pill
     this.drawRect(page, PdfDocumentAdapter.CARD_W - 65, PdfDocumentAdapter.CARD_H - 30, 55, 16, PdfDocumentAdapter.GOLD);
     page.drawText('STUDENT', { x: PdfDocumentAdapter.CARD_W - 55, y: PdfDocumentAdapter.CARD_H - 23, size: 7.5, font: bold, color: PdfDocumentAdapter.NAVY_DARK });
+    if (meta?.platformLogo) {
+      const brandMark = meta.platformLogo.scale(0.075);
+      page.drawImage(meta.platformLogo, { x: 210, y: PdfDocumentAdapter.CARD_H - 33, width: brandMark.width, height: brandMark.height });
+      page.drawText('POWERED BY', { x: 236, y: PdfDocumentAdapter.CARD_H - 22, size: 3.8, font: helvetica, color: PdfDocumentAdapter.LIGHT_GRAY });
+      page.drawText(String(meta.platformBrandName || 'Bazion Web').toUpperCase(), { x: 236, y: PdfDocumentAdapter.CARD_H - 29, size: 4.4, font: bold, color: PdfDocumentAdapter.WHITE });
+    }
 
     // Photo Box with Gold Border & Shadow effect
     this.drawRect(page, 14, 46, 75, 95, PdfDocumentAdapter.GOLD);
@@ -515,7 +537,7 @@ export class PdfDocumentAdapter implements IDocumentGenerator {
     const gpa = meta?.gpa || '3.85';
     const courses = meta?.courses || [];
     const date = meta?.date || new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-    const verificationCode = meta?.verificationCode || 'BMI-TRN-10928';
+    const verificationCode = meta?.verificationCode || `${institutionCode(meta)}-TRN-${crypto.randomUUID().replace(/-/g, '').slice(0, 12).toUpperCase()}`;
 
     const page = pdf.addPage([PdfDocumentAdapter.PAGE_W, PdfDocumentAdapter.PAGE_H]);
 
@@ -632,7 +654,7 @@ export class PdfDocumentAdapter implements IDocumentGenerator {
     const regNo = meta?.regNo || `${institutionCode(meta)}/UG-CS/226/001`;
     const awardDate = meta?.awardDate || new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
     const classification = meta?.classification || 'First Class Honours';
-    const verificationCode = meta?.verificationCode || 'BMI-DIP-77312';
+    const verificationCode = meta?.verificationCode || `${institutionCode(meta)}-DIP-${crypto.randomUUID().replace(/-/g, '').slice(0, 12).toUpperCase()}`;
 
     const page = pdf.addPage([PdfDocumentAdapter.PAGE_W, PdfDocumentAdapter.PAGE_H]);
 
@@ -759,7 +781,7 @@ export class PdfDocumentAdapter implements IDocumentGenerator {
     page.drawText(meta?.authorizedBy || 'Authorized Signatory', { x: 95, y: y - 14, size: 9.5, font: bold, color: PdfDocumentAdapter.NAVY });
     page.drawText(meta?.authorizedTitle || 'Chief Registrar', { x: 110, y: y - 24, size: 8, font: helvetica, color: PdfDocumentAdapter.DARK_GRAY });
 
-    this.drawSealEmblem(page, 306, y - 5, bold, helvetica);
+    this.drawSealEmblem(page, 306, y - 5, bold, helvetica, meta);
 
     this.drawHLine(page, y, PdfDocumentAdapter.CHARCOAL, 392, 150, 1);
     page.drawText(meta?.secondaryAuthorizedBy || institutionName(meta), { x: 388, y: y - 14, size: 9.5, font: bold, color: PdfDocumentAdapter.NAVY });
@@ -816,19 +838,27 @@ export class PdfDocumentAdapter implements IDocumentGenerator {
 
   private drawFooter(_pdf: PDFDocument, page: any, font: PDFFont, _bold: PDFFont, verificationCode?: string, meta?: Record<string, any>): void {
     this.drawHLine(page, 44, PdfDocumentAdapter.BORDER_GRAY, 45, 522, 0.75);
+    const textWidth = meta?.platformLogo ? 392 : 522;
     page.drawText(`Official Document • ${institutionName(meta)} • ${meta?.accreditationLabel || 'Institutional Record'}`, {
-      x: 45, y: 32, size: 7, font, color: PdfDocumentAdapter.DARK_GRAY,
+      x: 45, y: 32, size: 6.6, maxWidth: textWidth, font, color: PdfDocumentAdapter.DARK_GRAY,
     });
     page.drawText(`Digital Verification Code: ${verificationCode || 'VERIFIED'} • Verify at ${meta?.verificationBaseUrl || '/verify'} • ${meta?.registrarEmail || ''}`, {
-      x: 45, y: 22, size: 7, font, color: PdfDocumentAdapter.LIGHT_GRAY,
+      x: 45, y: 22, size: 6.2, maxWidth: textWidth, font, color: PdfDocumentAdapter.LIGHT_GRAY,
     });
+    if (meta?.platformLogo) {
+      const dimensions = meta.platformLogo.scale(0.09);
+      page.drawImage(meta.platformLogo, { x: 523, y: 5, width: dimensions.width, height: dimensions.height });
+      page.drawText('POWERED BY', { x: 456, y: 22, size: 5.2, font, color: PdfDocumentAdapter.LIGHT_GRAY });
+      page.drawText(String(meta.platformBrandName || 'Bazion Web').toUpperCase(), { x: 456, y: 13, size: 5.6, font, color: PdfDocumentAdapter.NAVY });
+    }
   }
 
-  private drawSealEmblem(page: any, cx: number, cy: number, bold: PDFFont, helv: PDFFont): void {
+  private drawSealEmblem(page: any, cx: number, cy: number, bold: PDFFont, helv: PDFFont, meta?: Record<string, any>): void {
     this.drawRect(page, cx - 35, cy - 35, 70, 70, PdfDocumentAdapter.GOLD_LIGHT);
     this.drawRect(page, cx - 35, cy - 35, 70, 70, PdfDocumentAdapter.GOLD, true, 1.5);
     this.drawRect(page, cx - 31, cy - 31, 62, 62, PdfDocumentAdapter.NAVY, true, 0.75);
-    page.drawText('BMI', { x: cx - 12, y: cy + 4, size: 11, font: bold, color: PdfDocumentAdapter.GOLD });
+    const code = institutionCode(meta).slice(0, 6);
+    page.drawText(code, { x: cx - code.length * 3, y: cy + 4, size: 11, font: bold, color: PdfDocumentAdapter.GOLD });
     page.drawText('SEAL', { x: cx - 13, y: cy - 8, size: 8, font: bold, color: PdfDocumentAdapter.NAVY });
     page.drawText('OFFICIAL', { x: cx - 18, y: cy - 20, size: 6, font: helv, color: PdfDocumentAdapter.CHARCOAL });
   }

@@ -38,7 +38,7 @@ export async function getStaff(filters?: {
     if (filters?.category) params.append('category', filters.category);
 
     const queryString = params.toString();
-    const url = `${API_URL}/staff${queryString ? `?${queryString}` : ''}`;
+    const url = `${API_URL}/education/staff${queryString ? `?${queryString}` : ''}`;
     const response = await authFetch(url);
     const data = await parseJsonSafe<StaffListResponse>(response);
     return data ?? { success: false, error: 'Failed to parse staff response' };
@@ -48,7 +48,7 @@ export async function getStaff(filters?: {
 
 export async function createStaff(data: Partial<StaffMember>): Promise<StaffResponse> {
   try {
-    const response = await authFetch(`${API_URL}/staff`, {
+    const response = await authFetch(`${API_URL}/education/staff`, {
       method: 'POST',
       body: JSON.stringify(data),
     });
@@ -60,7 +60,7 @@ export async function createStaff(data: Partial<StaffMember>): Promise<StaffResp
 
 export async function updateStaff(id: string, data: Partial<StaffMember>): Promise<StaffResponse> {
   try {
-    const response = await authFetch(`${API_URL}/staff/${id}`, {
+    const response = await authFetch(`${API_URL}/education/staff/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(data),
     });
@@ -72,7 +72,7 @@ export async function updateStaff(id: string, data: Partial<StaffMember>): Promi
 
 export async function deleteStaff(id: string): Promise<StaffResponse> {
   try {
-    const response = await authFetch(`${API_URL}/staff/${id}`, { method: 'DELETE' });
+    const response = await authFetch(`${API_URL}/education/staff/${id}`, { method: 'DELETE' });
     const result = await parseJsonSafe<StaffResponse>(response);
     return result ?? { success: false, error: 'Failed to parse delete staff response' };
   } catch { return { success: false, error: 'Failed to delete staff'  };
@@ -82,7 +82,7 @@ export async function deleteStaff(id: string): Promise<StaffResponse> {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function getStaffStats(): Promise<any> {
   try {
-    const response = await authFetch(`${API_URL}/staff/stats/overview`);
+    const response = await authFetch(`${API_URL}/education/staff/stats/overview`);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const data = await parseJsonSafe<any>(response);
     return data ?? { success: false, error: 'Failed to parse staff statistics response' };

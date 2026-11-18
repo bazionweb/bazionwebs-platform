@@ -5,6 +5,7 @@
  */
 
 import React, { useState, useMemo, useCallback } from "react";
+import { PLATFORM_BRAND_MARK_URL } from "./PlatformBrandBadge";
 import {
   Search,
   
@@ -27,6 +28,7 @@ import {
 import { Student } from "../types";
 import { documentService } from "../services/documentService";
 import { getHtml2Pdf } from "../services/pdfService";
+import { useUIStore } from "../stores/uiStore";
 import type {
   StudentIDCard as StudentIDCardType,
   DocumentSecurityFeatures,
@@ -49,6 +51,14 @@ const THEME = {
 };
 
 export const IDCard: React.FC<IDCardProps> = ({ students, logo }) => {
+  const institutionName = useUIStore((state) => state.institutionName);
+  const shortName = useUIStore((state) => state.shortName);
+  const primaryColor = useUIStore((state) => state.primaryColor);
+  const secondaryColor = useUIStore((state) => state.secondaryColor);
+  const accentColor = useUIStore((state) => state.accentColor);
+  const storeLogo = useUIStore((state) => state.logo);
+  const configuredLogo = logo || storeLogo;
+  const institutionCode = shortName.toUpperCase().includes("BMI") ? "BMI" : shortName.replace(/[^a-z0-9]/gi, "").toUpperCase().slice(0, 8) || "ORG";
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [showCard, setShowCard] = useState(false);
@@ -101,6 +111,9 @@ export const IDCard: React.FC<IDCardProps> = ({ students, logo }) => {
       // Card data shape is a superset of StudentIDCard — cast via unknown to bypass
       // the strict Omit<> check while preserving runtime correctness.
       const cardData = {
+        institutionName,
+        shortName,
+        institutionCode,
         studentId: student.id,
         studentName: `${getFirstName(student)} ${getLastName(student)}`,
         studentNumber: getStudentNumber(student),
@@ -145,7 +158,7 @@ export const IDCard: React.FC<IDCardProps> = ({ students, logo }) => {
 
       return { card, security };
     },
-    [],
+    [institutionName, shortName, institutionCode],
   );
 
   const handleGenerate = async () => {
@@ -187,19 +200,19 @@ export const IDCard: React.FC<IDCardProps> = ({ students, logo }) => {
 
   const designStyles = {
     modern: {
-      front: "bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900",
-      back: "bg-gradient-to-br from-indigo-600 to-purple-700",
-      accent: "bg-indigo-500",
+      front: primaryColor,
+      back: secondaryColor,
+      accent: accentColor,
     },
     classic: {
-      front: "bg-gradient-to-br from-emerald-800 via-teal-900 to-emerald-900",
-      back: "bg-gradient-to-br from-emerald-600 to-teal-700",
-      accent: "bg-emerald-500",
+      front: secondaryColor,
+      back: primaryColor,
+      accent: accentColor,
     },
     minimal: {
-      front: "bg-gradient-to-br from-slate-800 via-slate-900 to-black",
-      back: "bg-gradient-to-br from-slate-600 to-slate-700",
-      accent: "bg-slate-500",
+      front: primaryColor,
+      back: primaryColor,
+      accent: secondaryColor,
     },
   };
 
@@ -370,7 +383,7 @@ export const IDCard: React.FC<IDCardProps> = ({ students, logo }) => {
                   id="modern-idcard"
                   className="relative w-[340px] h-[215px] rounded-2xl shadow-2xl overflow-hidden"
                 >
-                  <div className={`absolute inset-0 ${style.front}`} />
+                  <div className="absolute inset-0" style={{ background: `linear-gradient(135deg, ${style.front}, ${style.back})` }} />
 
                   {/* Pattern Overlay */}
                   <div
@@ -386,22 +399,26 @@ export const IDCard: React.FC<IDCardProps> = ({ students, logo }) => {
                       <div className="flex items-center gap-2">
                         <div className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center backdrop-blur-sm">
                           <img
-                            src={logo}
-                            alt="BMI"
+                            src={configuredLogo}
+                            alt={shortName}
                             className="w-5 h-5 object-contain brightness-0 invert"
                           />
                         </div>
                         <div>
                           <p className="text-xs font-bold leading-tight">
-                            BMI UNIVERSITY
+                            {shortName.toUpperCase()}
                           </p>
                           <p className="text-[8px] opacity-80">
                             STUDENT IDENTITY CARD
                           </p>
                         </div>
                       </div>
-                      <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center backdrop-blur-sm border border-white/30">
-                        <Fingerprint size={18} />
+                      <div className="flex items-center gap-1 rounded-md bg-white px-1 py-0.5 text-[#0B2F75]">
+                        <picture>
+                          <source type="image/webp" srcSet="/brand/bazion-platform-mark-320.webp 320w, /brand/bazion-platform-mark-640.webp 640w" sizes="30px" />
+                          <img src={PLATFORM_BRAND_MARK_URL} alt="Bazion Web" width={30} height={25} className="h-[25px] w-[30px] object-contain" />
+                        </picture>
+                        <span className="text-[6px] font-bold leading-tight">Powered by<br />Bazion Web</span>
                       </div>
                     </div>
 
@@ -465,7 +482,7 @@ export const IDCard: React.FC<IDCardProps> = ({ students, logo }) => {
 
                 {/* Back of Card */}
                 <div className="relative w-[340px] h-[215px] rounded-2xl shadow-2xl overflow-hidden">
-                  <div className={`absolute inset-0 ${style.back}`} />
+                  <div className="absolute inset-0" style={{ background: `linear-gradient(135deg, ${style.back}, ${style.front})` }} />
 
                   <div className="relative h-full p-5 flex flex-col text-white">
                     <div className="flex-1 space-y-3">
@@ -504,9 +521,9 @@ export const IDCard: React.FC<IDCardProps> = ({ students, logo }) => {
                       </div>
                     </div>
 
-                    <div className="mt-auto pt-3 border-t border-white/20">
-                      <p className="text-[8px] opacity-60 text-center leading-relaxed">
-                        This card is the property of BMI University.
+                    <div className="mt-auto pt-2 border-t border-white/20 flex items-center gap-2">
+                      <p className="text-[7px] opacity-70 text-center leading-relaxed flex-1">
+                        This card is the property of {institutionName}.
                         <br />
                         If found, please return to the Security Office.
                         <br />
@@ -514,6 +531,7 @@ export const IDCard: React.FC<IDCardProps> = ({ students, logo }) => {
                           {securityFeatures.serialNumber}
                         </span>
                       </p>
+                      <div className="shrink-0 rounded-sm bg-white px-1 py-0.5 text-[#0B2F75] text-[6px] font-bold">Bazion Web</div>
                     </div>
                   </div>
                 </div>

@@ -16,6 +16,7 @@ import { ADD_PROVISIONING_QUEUE_MUTATION, GET_PROVISIONING_QUEUE_QUERY } from '.
 import { sendPinNotification } from '../services/pinNotificationService';
 import { generateOrgEmail, createAlias, loadImprovMXConfig, checkAliasExists } from '../services/improvmxService';
 import { computeRegistrationStatus, generateMemberPin, MemberContact } from '../services/provisioning';
+import { useTenantConfig } from '../context/TenantContext';
 interface SupabaseMember {
   id: string;
   first_name: string;
@@ -68,6 +69,7 @@ function transformTransaction(SupabaseTx: SupabaseTransaction): Transaction {
 }
 
 export function useTransactions() {
+  const tenantConfig = useTenantConfig();
   const { data, loading, error, fetchMore } = useQuery(GET_TRANSACTIONS_QUERY, {
     fetchPolicy: 'cache-and-network',
     nextFetchPolicy: 'cache-and-network',
@@ -424,6 +426,20 @@ export function useTransactions() {
                 email: memberNode.email,
                 pin: generatedPin,
                 orgEmail: orgEmail,
+                branding: {
+                  name: tenantConfig.churchName,
+                  shortName: tenantConfig.shortName,
+                  tagline: tenantConfig.tagline,
+                  logoUrl: tenantConfig.logoUrl,
+                  primaryColor: tenantConfig.primaryColor,
+                  secondaryColor: tenantConfig.secondaryColor,
+                  accentColor: tenantConfig.accentColor,
+                  websiteUrl: tenantConfig.websiteUrl,
+                  portalUrl: tenantConfig.portalUrl,
+                  contactEmail: tenantConfig.contact?.email,
+                  contactPhone: tenantConfig.contact?.phone,
+                  address: tenantConfig.contact?.address,
+                },
               });
 
               try {
