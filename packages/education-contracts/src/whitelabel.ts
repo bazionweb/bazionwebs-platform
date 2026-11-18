@@ -63,7 +63,7 @@ export const schoolPortalConfigSchema = z.object({
     primaryColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).default("#0E1D38"),
     secondaryColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).default("#172A4D"),
     accentColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).default("#C5A048"),
-    logoUrl: websiteResourceUrlSchema.default("/images/bmi-logo.png"),
+    logoUrl: websiteResourceUrlSchema.default("/logo.svg"),
   }),
   contact: z.object({
     admissionsEmail: z.string().email().default(ADMISSIONS_EMAIL),
@@ -290,7 +290,7 @@ export function createWhiteLabeledEducationConfig(input: CreateWhiteLabeledEduca
         primaryColor: pkg.website.branding.primaryColor,
         secondaryColor: pkg.website.branding.secondaryColor,
         accentColor: "#C5A048",
-        logoUrl: input.logoUrl ?? pkg.packageSettings.branding.logoUrl,
+        logoUrl: input.logoUrl || pkg.packageSettings.branding.logoUrl || "/logo.svg",
       },
       contact: {
         admissionsEmail: input.email ?? `admissions@${input.tenantSlug}.org`,
