@@ -14,6 +14,16 @@ const checks = [
 
 let failed = false;
 
+function isLoopbackHostname(hostname) {
+  const normalized = hostname.toLowerCase().replace(/^\[|\]$/g, "");
+  return normalized === "localhost"
+    || normalized.endsWith(".localhost")
+    || normalized === "::1"
+    || normalized === "::"
+    || normalized === "0.0.0.0"
+    || /^127(?:\.\d{1,3}){3}$/.test(normalized);
+}
+
 const storefrontApiBaseUrl = process.env.API_BASE_URL?.trim();
 if (!storefrontApiBaseUrl) {
   process.stderr.write("BLOCKER: API_BASE_URL must be set on the storefront runtime for server-side tenant and admin requests.\n");
@@ -25,7 +35,7 @@ if (!storefrontApiBaseUrl) {
       process.stderr.write("BLOCKER: API_BASE_URL must be an HTTP(S) origin without credentials, path, query, or fragment.\n");
       failed = true;
     }
-    if (["localhost", "127.0.0.1", "::1"].includes(apiUrl.hostname.toLowerCase())) {
+    if (isLoopbackHostname(apiUrl.hostname)) {
       process.stderr.write("BLOCKER: API_BASE_URL cannot point to loopback from a production storefront container.\n");
       failed = true;
     }

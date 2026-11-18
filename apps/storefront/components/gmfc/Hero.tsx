@@ -36,6 +36,7 @@ export function Hero() {
           const target = entry.target as HTMLElement;
           const finalValue = parseInt(target.getAttribute("data-target") || "0", 10);
           const suffix = target.getAttribute("data-suffix") || "";
+          const prefix = target.getAttribute("data-prefix") || "";
           if (Number.isNaN(finalValue)) return;
           let startTimestamp: number | null = null;
           const animate = (timestamp: number) => {
@@ -43,9 +44,9 @@ export function Hero() {
             const progress = Math.min((timestamp - startTimestamp) / 2000, 1);
             const easeProgress = 1 - Math.pow(1 - progress, 4);
             const currentVal = Math.floor(easeProgress * finalValue);
-            target.textContent = currentVal.toLocaleString() + suffix;
+            target.textContent = prefix + currentVal.toLocaleString() + suffix;
             if (progress < 1) requestAnimationFrame(animate);
-            else target.textContent = finalValue.toLocaleString() + suffix;
+            else target.textContent = prefix + finalValue.toLocaleString() + suffix;
           };
           requestAnimationFrame(animate);
           obs.unobserve(target);
@@ -142,8 +143,9 @@ export function Hero() {
                       className="gmfci-stat-num"
                       data-target={numericTarget}
                       data-suffix={stat.suffix ?? ""}
+                      data-prefix={stat.prefix ?? ""}
                     >
-                      {numericTarget.toLocaleString()}
+                      {stat.prefix ?? ""}{numericTarget.toLocaleString()}
                       {stat.suffix ?? ""}
                     </span>
                     <span className="gmfci-stat-label">{stat.label}</span>

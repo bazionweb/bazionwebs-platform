@@ -14,7 +14,7 @@ import { addSiteNavigationItem, removeSiteNavigationItem, setSitePageEnabled, up
 import { MediaUploadField } from "./media-upload-field";
 
 type SiteProfile = ChurchSiteSettingsInput["profile"];
-type RowName = "serviceTimes" | "locations" | "ministries" | "faqs" | "coreValues" | "statementOfFaith";
+type RowName = "serviceTimes" | "locations" | "ministries" | "faqs" | "coreValues" | "statementOfFaith" | "statistics";
 
 const ROW_HELPERS: Record<RowName, { title: string; hint: string; sample: string }> = {
   serviceTimes: {
@@ -46,6 +46,11 @@ const ROW_HELPERS: Record<RowName, { title: string; hint: string; sample: string
     title: "Statement of faith",
     hint: "Topic | Belief statement",
     sample: "The Scriptures | We believe the Bible is the inspired, authoritative, and infallible Word of God.",
+  },
+  statistics: {
+    title: "Public statistics",
+    hint: "Label | Whole number | Optional suffix | Optional prefix",
+    sample: "Years of ministry | 12 | + |",
   },
 };
 
@@ -132,6 +137,7 @@ function rowsText(settings: ChurchPublicSiteSettings, key: RowName): string {
   if (key === "ministries") return settings.ministries.map((row) => [row.title, row.description, row.audience ?? ""].join(" | ")).join("\n");
   if (key === "faqs") return settings.faqs.map((row) => [row.question, row.answer].join(" | ")).join("\n");
   if (key === "coreValues") return settings.coreValues.map((row) => [row.title, row.description, row.icon ?? ""].join(" | ")).join("\n");
+  if (key === "statistics") return settings.statistics.map((row) => [row.label, row.value, row.suffix ?? "", row.prefix ?? ""].join(" | ")).join("\n");
   return settings.statementOfFaith.map((row) => [row.topic, row.belief].join(" | ")).join("\n");
 }
 
@@ -154,7 +160,7 @@ export function SiteSettingsEditor() {
   const [settings, setSettings] = useState<ChurchPublicSiteSettings>(() => churchPublicSiteSettingsSchema.parse({}));
   const [rotatorWordsText, setRotatorWordsText] = useState("");
   const [rows, setRows] = useState<Record<RowName, string>>({
-    serviceTimes: "", locations: "", ministries: "", faqs: "", coreValues: "", statementOfFaith: "",
+    serviceTimes: "", locations: "", ministries: "", faqs: "", coreValues: "", statementOfFaith: "", statistics: "",
   });
   const [versions, setVersions] = useState<SiteSettingsVersionSummary[]>([]);
   const [showVersions, setShowVersions] = useState(false);
@@ -195,6 +201,7 @@ export function SiteSettingsEditor() {
         faqs: rowsText(initialSettings, "faqs"),
         coreValues: rowsText(initialSettings, "coreValues"),
         statementOfFaith: rowsText(initialSettings, "statementOfFaith"),
+        statistics: rowsText(initialSettings, "statistics"),
       });
       await loadVersions();
     } catch (reason: unknown) {
@@ -294,6 +301,12 @@ export function SiteSettingsEditor() {
       coreValues: parseRows(rows.coreValues, (parts) => parts.length >= 2 && parts[0] && parts[1]
         ? { title: parts[0], description: parts[1], icon: parts[2] || undefined } : null, "Core values"),
       statementOfFaith: parseRows(rows.statementOfFaith, (parts) => { const [topic, belief] = splitPair(parts.join(" | ")); return topic && belief ? { topic, belief } : null; }, "Statement of faith"),
+      statistics: parseRows(rows.statistics, (parts) => {
+        const value = Number(parts[1]);
+        return parts.length >= 2 && parts[0] && /^\d+$/.test(parts[1] ?? "")
+          ? { label: parts[0], value, suffix: parts[2] || undefined, prefix: parts[3] || undefined }
+          : null;
+      }, "Public statistics"),
       galleryImages: settings.galleryImages
         .filter((item) => item.imageUrl?.trim())
         .map((item) => ({
@@ -730,6 +743,26 @@ export function SiteSettingsEditor() {
             ))}
           </div>
         </div>
+      </section>
+
+      <section style={sectionStyle}>
+        <h2>Homepage statistics</h2>
+        <p className="admin-muted">Add up to eight verified public figures shown below the homepage hero. Use one line per figure, separated by vertical bars.</p>
+        <label style={labelStyle}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: 6 }}>
+            <span>{ROW_HELPERS.statistics.title}</span>
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <small className="admin-muted">{ROW_HELPERS.statistics.hint}</small>
+              <button type="button" className="admin-sample-btn" onClick={() => appendSampleRow("statistics")}>+ Insert sample</button>
+            </div>
+          </div>
+          <textarea
+            style={textareaStyle}
+            value={rows.statistics}
+            onChange={(event) => setRows({ ...rows, statistics: event.target.value })}
+            placeholder="Years of ministry | 12 | + |"
+          />
+        </label>
       </section>
 
       <section style={sectionStyle}>

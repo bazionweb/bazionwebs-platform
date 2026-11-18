@@ -250,6 +250,12 @@ export const churchPublicSiteSettingsSchema = z.object({
     subtitle: "Join us for worship, community, and a life of faith.",
     rotatorWords: [],
   }),
+  statistics: z.array(z.object({
+    label: z.string().trim().min(2).max(100),
+    value: z.number().int().min(0).max(1_000_000_000),
+    suffix: z.string().trim().max(12).optional(),
+    prefix: z.string().trim().max(12).optional(),
+  })).max(8).default([]),
   serviceTimes: z.array(z.object({
     label: z.string().trim().min(2).max(100),
     day: z.string().trim().min(2).max(40),

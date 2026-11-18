@@ -583,6 +583,7 @@ export function createWhiteLabeledChurchConfig(
       subtitle: config.hero.subtitle,
       rotatorWords: config.hero.rotatorWords ?? [],
     },
+    statistics: config.statistics,
     serviceTimes: config.serviceTimes,
     locations: config.locations,
     visitorInfo: config.visitorInfo,

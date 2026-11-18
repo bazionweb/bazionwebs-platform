@@ -143,6 +143,7 @@ export function useMinistrySite(): MinistryConfig {
           logoUrl: safeImageUrl(profile?.logoAssetUrl) || fallback.branding.logoUrl,
         },
         hero: settings?.hero ?? fallback.hero,
+        statistics: settings?.statistics ?? fallback.statistics,
         contact: {
           ...fallback.contact,
           phones,

@@ -1,11 +1,9 @@
 import type { NextRequest } from "next/server";
 import { extractTenantSlugFromHost } from "@bazion/auth";
+import { getServerApiBaseUrl } from "../../../lib/server-api-base-url";
 
 export const dynamic = "force-dynamic";
 
-const PRIMARY_API_BASE_URL = (
-  process.env.API_BASE_URL ?? "http://localhost:4000"
-).replace(/\/$/, "");
 const DEV_FALLBACK_API_BASE_URL = "http://localhost:4000";
 
 const FORWARDED_REQUEST_HEADERS = [
@@ -78,6 +76,14 @@ async function handleProxy(
   request: NextRequest,
   context: { params: Promise<unknown> },
 ): Promise<Response> {
+  let primaryApiBaseUrl: string;
+  try {
+    primaryApiBaseUrl = getServerApiBaseUrl();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "API_BASE_URL is not configured correctly.";
+    return Response.json({ error: "API_CONFIGURATION_INVALID", message }, { status: 502 });
+  }
+
   const routeParams = await context.params;
   const path =
     typeof routeParams === "object" &&
@@ -129,11 +135,11 @@ async function handleProxy(
 
   let upstream: Response;
   try {
-    upstream = await forwardOnce(PRIMARY_API_BASE_URL);
+    upstream = await forwardOnce(primaryApiBaseUrl);
   } catch (error) {
     if (
       process.env.NODE_ENV !== "production" &&
-      PRIMARY_API_BASE_URL !== DEV_FALLBACK_API_BASE_URL
+      primaryApiBaseUrl !== DEV_FALLBACK_API_BASE_URL
     ) {
       upstream = await forwardOnce(DEV_FALLBACK_API_BASE_URL);
     } else {
