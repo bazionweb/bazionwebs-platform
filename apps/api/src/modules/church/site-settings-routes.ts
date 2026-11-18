@@ -6,6 +6,7 @@ import {
   siteSettingsRollbackInputSchema,
   type ChurchSiteSettingsInput,
 } from "@bazion/church-ministry-contracts";
+import { resolveEffectiveChurchSiteSettings } from "@bazion/church-ministry-template";
 import {
   leadershipProfiles,
   ministryProfiles,
@@ -92,9 +93,15 @@ export async function registerChurchSiteSettingsVersionsRoutes(app: FastifyInsta
         .where(and(eq(leadershipProfiles.tenantId, context.tenantId), eq(leadershipProfiles.status, "active")))
         .orderBy(leadershipProfiles.displayOrder);
 
-      const siteSettings = draft
+      const rawSettings = draft
         ? draft.settings
         : (publishedRow?.settingValue ? JSON.parse(publishedRow.settingValue) : null);
+      const siteSettings = rawSettings
+        ? resolveEffectiveChurchSiteSettings(rawSettings, {
+            tenantSlug: tenant?.slug,
+            tenantName: tenant?.name,
+          })
+        : null;
 
       return reply.send({
         tenant: tenant ?? null,

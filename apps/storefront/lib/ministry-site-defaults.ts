@@ -1,5 +1,9 @@
 import { defaultChurchNavigation, defaultChurchPages } from "@bazion/church-ministry-contracts";
-import { globalMissionConfig, type MinistryConfig } from "@bazion/church-ministry-template";
+import {
+  createWhiteLabeledChurchConfig,
+  globalMissionConfig,
+  type MinistryConfig,
+} from "@bazion/church-ministry-template";
 
 /** Neutral defaults for a ministry tenant that has not configured its public site yet. */
 export const neutralMinistrySite: MinistryConfig = {
@@ -67,7 +71,16 @@ export function createNeutralMinistrySite(
 export function getMinistrySiteFallback(
   tenant?: { slug?: string | null; name?: string | null } | null,
 ): MinistryConfig {
-  return tenant?.slug === globalMissionConfig.tenantSlug
-    ? globalMissionConfig
-    : createNeutralMinistrySite(tenant);
+  if (tenant?.slug === globalMissionConfig.tenantSlug) {
+    return globalMissionConfig;
+  }
+  if (tenant?.slug && tenant.slug.toLowerCase().includes("hkm")) {
+    return createWhiteLabeledChurchConfig({
+      tenantSlug: tenant.slug,
+      ministryName: tenant.name?.trim() || "Heavenly God Kingdom Churches",
+      templateId: "hkm-kingdom-cms",
+      includeStarterContent: true,
+    }).config;
+  }
+  return createNeutralMinistrySite(tenant);
 }

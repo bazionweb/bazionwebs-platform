@@ -227,6 +227,7 @@ export const churchTestimonySchema = z.object({
 export type ChurchTestimony = z.infer<typeof churchTestimonySchema>;
 
 export const churchPublicSiteSettingsSchema = z.object({
+  templateId: z.string().trim().optional(),
   schemaVersion: websiteConfigurationVersionSchema.default(WEBSITE_CONFIGURATION_VERSION),
   theme: churchThemeSchema,
   branding: websiteBrandingSchema.default({

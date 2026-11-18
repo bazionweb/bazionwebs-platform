@@ -1409,3 +1409,110 @@ export function generateByowDokployCompose(input: ByowComposeInput): ByowCompose
     envOverrides,
   };
 }
+
+function structuredCloneSafe<T>(value: T): T {
+  if (value === undefined || value === null || typeof value !== "object") {
+    return value;
+  }
+  return JSON.parse(JSON.stringify(value)) as T;
+}
+
+/**
+ * Recursively cascades base prototype/template data with tenant sparse overrides.
+ *
+ * Rules:
+ * 1. If override is null or undefined, base is preserved.
+ * 2. If base is an Array:
+ *    - Keyed merge by `id`: if items are objects with an `id` property (e.g. `pages` or `navigation`),
+ *      base items are matched with overrides by id. Any new items in the template cascade down automatically;
+ *      tenant overrides for matching items are deeply merged; custom tenant-added items (id not in template) are preserved.
+ *    - Non-keyed arrays: if overrides is a non-empty array, overrides takes precedence; if empty or undefined, base is preserved.
+ * 3. If base is a Plain Object:
+ *    - Keys present in base are recursively merged with overrides[key].
+ *    - Keys present in overrides not in base are copied over.
+ * 4. For primitives (string, number, boolean):
+ *    - If override is undefined or null, base is preserved; otherwise override replaces base.
+ */
+export function deepMergeCascade<T>(base: T, overrides?: unknown): T {
+  if (overrides === undefined || overrides === null) {
+    return structuredCloneSafe(base);
+  }
+
+  if (typeof base !== "object" || base === null) {
+    return overrides as T;
+  }
+
+  if (Array.isArray(base)) {
+    if (!Array.isArray(overrides)) {
+      return structuredCloneSafe(base);
+    }
+
+    const isKeyedArray =
+      base.length > 0 &&
+      base.every(
+        (item) => item && typeof item === "object" && typeof (item as { id?: unknown }).id === "string",
+      );
+
+    if (isKeyedArray) {
+      const overrideMap = new Map<string, unknown>();
+      for (const item of overrides) {
+        if (item && typeof item === "object" && typeof (item as { id?: unknown }).id === "string") {
+          overrideMap.set((item as { id: string }).id, item);
+        }
+      }
+
+      const mergedList: unknown[] = [];
+      const seenIds = new Set<string>();
+
+      for (const baseItem of base as Array<{ id: string }>) {
+        seenIds.add(baseItem.id);
+        const overrideItem = overrideMap.get(baseItem.id);
+        if (overrideItem) {
+          mergedList.push(deepMergeCascade(baseItem, overrideItem));
+        } else {
+          mergedList.push(structuredCloneSafe(baseItem));
+        }
+      }
+
+      for (const overrideItem of overrides) {
+        if (
+          overrideItem &&
+          typeof overrideItem === "object" &&
+          typeof (overrideItem as { id?: unknown }).id === "string"
+        ) {
+          const id = (overrideItem as { id: string }).id;
+          if (!seenIds.has(id)) {
+            mergedList.push(structuredCloneSafe(overrideItem));
+            seenIds.add(id);
+          }
+        }
+      }
+
+      return mergedList as unknown as T;
+    }
+
+    return structuredCloneSafe(overrides) as unknown as T;
+  }
+
+  const result: Record<string, unknown> = {};
+  const baseObj = base as Record<string, unknown>;
+  const overrideObj =
+    typeof overrides === "object" && overrides !== null ? (overrides as Record<string, unknown>) : {};
+
+  for (const key of Object.keys(baseObj)) {
+    if (key in overrideObj && overrideObj[key] !== undefined) {
+      result[key] = deepMergeCascade(baseObj[key], overrideObj[key]);
+    } else {
+      result[key] = structuredCloneSafe(baseObj[key]);
+    }
+  }
+
+  for (const key of Object.keys(overrideObj)) {
+    if (!(key in baseObj) && overrideObj[key] !== undefined) {
+      result[key] = structuredCloneSafe(overrideObj[key]);
+    }
+  }
+
+  return result as T;
+}
+

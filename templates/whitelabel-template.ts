@@ -1,4 +1,5 @@
 import {
+  churchPublicSiteSettingsSchema,
   churchSiteSettingsInputSchema,
   defaultChurchNavigation,
   defaultChurchPages,
@@ -7,6 +8,7 @@ import {
   type ChurchTheme,
 } from "@bazion/church-ministry-contracts";
 import {
+  deepMergeCascade,
   ensureAccessibleHexColor,
   generateByowDokployCompose,
   platformWhiteLabelPackageCatalog,
@@ -552,6 +554,7 @@ export function createWhiteLabeledChurchConfig(
   };
 
   const settingsPayload: ChurchPublicSiteSettings = churchSiteSettingsInputSchema.shape.settings.parse({
+    templateId: template.id,
     theme,
     branding: {
       primaryColor,
@@ -624,6 +627,126 @@ export function createWhiteLabeledChurchConfig(
     template,
     config,
     siteSettingsInput,
+  };
+}
+
+export interface ResolveChurchSiteOptions {
+  templateId?: WhiteLabelTemplateId | string | null | undefined;
+  tenantSlug?: string | null | undefined;
+  tenantName?: string | null | undefined;
+  includeStarterContent?: boolean | undefined;
+}
+
+export function inferChurchTemplateId(rawInput: unknown, tenantSlug?: string | null | undefined): WhiteLabelTemplateId {
+  let parsed: Record<string, unknown> | null = null;
+  if (typeof rawInput === "string" && rawInput.trim().length > 0) {
+    try {
+      parsed = JSON.parse(rawInput) as Record<string, unknown>;
+    } catch {
+      parsed = null;
+    }
+  } else if (typeof rawInput === "object" && rawInput !== null) {
+    parsed = rawInput as Record<string, unknown>;
+  }
+
+  const rawTemplateId =
+    parsed?.templateId ??
+    (parsed?.overrides as Record<string, unknown> | undefined)?.templateId;
+
+  if (
+    typeof rawTemplateId === "string" &&
+    churchTemplateCatalog.some((t) => t.id === rawTemplateId)
+  ) {
+    return rawTemplateId as WhiteLabelTemplateId;
+  }
+
+  const slug = (tenantSlug ?? "").toLowerCase();
+  if (slug.includes("hkm")) {
+    return "hkm-kingdom-cms";
+  }
+
+  const preset =
+    (parsed?.theme as { preset?: string } | undefined)?.preset ??
+    ((parsed?.overrides as Record<string, unknown> | undefined)?.theme as { preset?: string } | undefined)?.preset;
+
+  if (preset === "royal-navy") return "royal-cathedral";
+  if (preset === "forest-bronze") {
+    return slug.includes("hkm") ? "hkm-kingdom-cms" : "church-ministry";
+  }
+  return "gmfc-revival-signature";
+}
+
+/**
+ * Resolves the live, effective church public site settings using prototype-based cascading overrides.
+ *
+ * The canonical template in compiled code acts as the single source of truth for pages, sections,
+ * theme defaults, and layout structure. Any tenant-specific overrides (sparse delta or legacy JSON)
+ * are cascaded on top.
+ *
+ * This completely eliminates "double editing": when an engineer updates a template, the change
+ * reflects across all its tenants immediately without writing database migrations or updating DB rows.
+ */
+export function resolveEffectiveChurchSiteSettings(
+  rawInput: unknown,
+  options?: ResolveChurchSiteOptions,
+): ChurchPublicSiteSettings {
+  const templateId =
+    options?.templateId && churchTemplateCatalog.some((t) => t.id === options.templateId)
+      ? (options.templateId as WhiteLabelTemplateId)
+      : inferChurchTemplateId(rawInput, options?.tenantSlug);
+
+  const tenantSlug = options?.tenantSlug?.trim() || "ministry";
+  const ministryName = options?.tenantName?.trim() || "Ministry";
+
+  // 1. Generate live canonical template defaults as the prototype foundation
+  const canonical = createWhiteLabeledChurchConfig({
+    tenantSlug,
+    ministryName,
+    templateId,
+    includeStarterContent: options?.includeStarterContent ?? false,
+  });
+  const canonicalSettings = canonical.siteSettingsInput.settings;
+
+  let parsedRaw: Record<string, unknown> | null = null;
+  if (typeof rawInput === "string" && rawInput.trim().length > 0) {
+    try {
+      parsedRaw = JSON.parse(rawInput) as Record<string, unknown>;
+    } catch {
+      parsedRaw = null;
+    }
+  } else if (typeof rawInput === "object" && rawInput !== null) {
+    parsedRaw = rawInput as Record<string, unknown>;
+  }
+
+  if (!parsedRaw) {
+    return {
+      ...canonicalSettings,
+      templateId,
+    };
+  }
+
+  // 2. Extract overrides (support sparse delta format `{ overrides: { ... } }` or legacy full JSON)
+  const overrides =
+    "overrides" in parsedRaw && typeof parsedRaw.overrides === "object" && parsedRaw.overrides !== null
+      ? (parsedRaw.overrides as Record<string, unknown>)
+      : parsedRaw;
+
+  // 3. Cascade tenant overrides on top of the live canonical template
+  const cascaded = deepMergeCascade(canonicalSettings, overrides);
+  cascaded.templateId = templateId;
+
+  // 4. Validate through schema
+  const parsed = churchPublicSiteSettingsSchema.safeParse(cascaded);
+  if (parsed.success) {
+    return {
+      ...parsed.data,
+      templateId,
+    };
+  }
+
+  return {
+    ...canonicalSettings,
+    templateId,
   };
 }
 

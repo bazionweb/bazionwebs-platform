@@ -33,6 +33,7 @@ import {
 } from "@bazion/database";
 import { registerChurchOperationsRoutes } from "./operations-routes.js";
 import { registerChurchSiteSettingsVersionsRoutes } from "./site-settings-routes.js";
+import { resolveEffectiveChurchSiteSettings, type ResolveChurchSiteOptions } from "@bazion/church-ministry-template";
 import { requireActiveTenantPermission } from "@bazion/auth";
 import type { AppConfig } from "../../config.js";
 import { withTenantTransaction, type TenantTransaction } from "../../lib/database.js";
@@ -80,14 +81,11 @@ function isUniqueConstraintViolation(error: unknown, depth = 0): boolean {
   return record.code === "23505" || isUniqueConstraintViolation(record.cause, depth + 1);
 }
 
-function parseStoredSiteSettings(value: string | null | undefined) {
-  if (!value) return churchPublicSiteSettingsSchema.parse({});
-  try {
-    const parsed = churchPublicSiteSettingsSchema.safeParse(JSON.parse(value) as unknown);
-    return parsed.success ? parsed.data : churchPublicSiteSettingsSchema.parse({});
-  } catch {
-    return churchPublicSiteSettingsSchema.parse({});
-  }
+function parseStoredSiteSettings(
+  value: string | null | undefined,
+  options?: ResolveChurchSiteOptions,
+) {
+  return resolveEffectiveChurchSiteSettings(value, options);
 }
 
 async function assertChurchEnabled(tenantId: string): Promise<void> {
@@ -229,7 +227,10 @@ export async function churchRoutes(app: FastifyInstance, options: RouteOptions) 
         .where(and(eq(ministrySettings.tenantId, tenantId), eq(ministrySettings.settingKey, "public_site")))
         .limit(1);
       const siteSettings = storedSiteSettings?.settingValue
-        ? parseStoredSiteSettings(storedSiteSettings.settingValue)
+        ? parseStoredSiteSettings(storedSiteSettings.settingValue, {
+            tenantSlug: tenant?.slug,
+            tenantName: tenant?.name,
+          })
         : null;
 
       return reply.send({
@@ -895,7 +896,13 @@ export async function churchRoutes(app: FastifyInstance, options: RouteOptions) 
   app.get("/admin/church/site-settings", async (request, reply) => {
     const context = await requireActiveTenantPermission(request.raw.headers, { store: ["read"] });
     await assertChurchEnabled(context.tenantId);
-    return reply.send(await getMinistrySiteSettings(ministrySiteSettingsRepository, context.tenantId));
+    const result = await getMinistrySiteSettings(ministrySiteSettingsRepository, context.tenantId);
+    return reply.send({
+      ...result,
+      settings: resolveEffectiveChurchSiteSettings(result.settings, {
+        tenantName: result.profile.ministryName,
+      }),
+    });
   });
 
   // PUT /v1/admin/church/site-settings
