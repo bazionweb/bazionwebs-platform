@@ -29,16 +29,23 @@ function required(name: string): string {
 
 const nodeEnv = process.env.NODE_ENV ?? "development";
 const appBaseUrl = process.env.AUTH_APP_URL ?? "http://localhost:3000";
-const authBrandName = process.env.AUTH_APP_NAME?.trim() || "Bazion Web";
+const platformBrandName = process.env.PLATFORM_BRAND_NAME?.trim() || process.env.AUTH_APP_NAME?.trim() || "Bazion Web";
+const authBrandName = platformBrandName;
+const platformBaseUrl = process.env.PUBLIC_STOREFRONT_URL || appBaseUrl;
+const platformLogoUrl = process.env.PLATFORM_BRAND_LOGO_URL?.trim()
+  || process.env.AUTH_EMAIL_LOGO_URL?.trim()
+  || new URL("/brand/bazion-platform-logo.png", platformBaseUrl).toString();
 const authBrandVariables: Record<string, string | number> = {
-  appName: authBrandName,
-  brandName: authBrandName,
-  ...(process.env.AUTH_EMAIL_LOGO_URL?.trim() ? { logoUrl: process.env.AUTH_EMAIL_LOGO_URL.trim() } : {}),
-  ...(process.env.AUTH_EMAIL_PRIMARY_COLOR?.trim() ? { primaryColor: process.env.AUTH_EMAIL_PRIMARY_COLOR.trim() } : {}),
-  ...(process.env.AUTH_EMAIL_SECONDARY_COLOR?.trim() ? { secondaryColor: process.env.AUTH_EMAIL_SECONDARY_COLOR.trim() } : {}),
-  ...(process.env.AUTH_EMAIL_ACCENT_COLOR?.trim() ? { accentColor: process.env.AUTH_EMAIL_ACCENT_COLOR.trim() } : {}),
-  ...(process.env.AUTH_EMAIL_TAGLINE?.trim() ? { tagline: process.env.AUTH_EMAIL_TAGLINE.trim() } : {}),
-  ...(process.env.AUTH_EMAIL_SUPPORT_ADDRESS?.trim() ? { supportEmail: process.env.AUTH_EMAIL_SUPPORT_ADDRESS.trim() } : {}),
+  platformBrandName,
+  platformLogoUrl,
+  platformPrimaryColor: process.env.PLATFORM_BRAND_PRIMARY_COLOR?.trim() || process.env.AUTH_EMAIL_PRIMARY_COLOR?.trim() || "#0B2F75",
+  platformSecondaryColor: process.env.PLATFORM_BRAND_SECONDARY_COLOR?.trim() || process.env.AUTH_EMAIL_SECONDARY_COLOR?.trim() || "#17345E",
+  platformAccentColor: process.env.PLATFORM_BRAND_ACCENT_COLOR?.trim() || process.env.AUTH_EMAIL_ACCENT_COLOR?.trim() || "#EF3024",
+  platformTagline: process.env.PLATFORM_BRAND_TAGLINE?.trim() || process.env.AUTH_EMAIL_TAGLINE?.trim() || "Build, Host n Grow",
+  platformWebsiteUrl: platformBaseUrl,
+  ...(process.env.PLATFORM_BRAND_SUPPORT_EMAIL?.trim() || process.env.AUTH_EMAIL_SUPPORT_ADDRESS?.trim()
+    ? { platformSupportEmail: process.env.PLATFORM_BRAND_SUPPORT_EMAIL?.trim() || process.env.AUTH_EMAIL_SUPPORT_ADDRESS!.trim() }
+    : {}),
 };
 const defaultTrustedOrigins = (process.env.BETTER_AUTH_TRUSTED_ORIGINS ?? "http://localhost:3000,http://localhost:4000")
   .split(",").map((value) => value.trim()).filter(Boolean);
@@ -93,7 +100,7 @@ async function enqueueAuthEmail(
     channel: "email",
     payload: {
       to,
-      subject,
+      ...(subject ? { subject } : {}),
       template: `auth.${event}`,
       variables: { ...authBrandVariables, ...(brandOverrides ?? {}), url, intro, ...(extraVars ?? {}) },
     },
@@ -108,13 +115,7 @@ async function authRequestBranding(request?: Request): Promise<Record<string, st
     const tenant = await resolvePublicTenantByHostname(hostname);
     if (!tenant) return {};
     const publicUrl = `https://${hostname}`;
-    return {
-      appName: tenant.name,
-      brandName: tenant.name,
-      tagline: "A secure message from your organization",
-      websiteUrl: publicUrl,
-      url: publicUrl,
-    };
+    return { tenantName: tenant.name, tenantWebsiteUrl: publicUrl };
   } catch {
     return {};
   }
@@ -283,16 +284,35 @@ export const auth = betterAuth({
     sendOnSignUp: true,
     autoSignInAfterVerification: true,
     expiresIn: 60 * 60,
-    sendVerificationEmail: async ({ user, url }, request?: Request) => {
+    sendVerificationEmail: async ({ user, url, token }: { user: { email: string; name?: string }; url: string; token?: string }, request?: Request) => {
+      let directUrl = url;
+      try {
+        const parsed = new URL(url);
+        const callbackURL = parsed.searchParams.get("callbackURL");
+        if (callbackURL && token) {
+          const cb = new URL(callbackURL);
+          const trusted = await trustedOriginsForRequest(request);
+          if (trusted.includes(cb.origin) || (await isVerifiedTenantHost(cb.hostname))) {
+            cb.searchParams.set("token", token);
+            directUrl = cb.toString();
+          }
+        }
+      } catch {
+        // Keep default url if parsing fails
+      }
+
+      const branding = await authRequestBranding(request);
+      const appName = typeof branding.appName === "string" ? branding.appName : authBrandName;
+
       await enqueueAuthEmail(
         user.email,
-        undefined,
-        url,
+        `Verify your ${appName} email`,
+        directUrl,
         "Verify your email address to activate your account.",
         "email-verification",
         url,
-        undefined,
-        await authRequestBranding(request),
+        token ? { token } : undefined,
+        branding,
       );
     },
   },

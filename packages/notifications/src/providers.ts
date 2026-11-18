@@ -1,6 +1,24 @@
 import type { OutboxDelivery } from "./outbox.js";
 import { renderEmailTemplate } from "./templates.js";
 
+function platformEmailBrandVariables(): Record<string, string> {
+  const publicUrl = process.env.PUBLIC_STOREFRONT_URL?.trim() || process.env.AUTH_APP_URL?.trim() || "";
+  let logoUrl = process.env.PLATFORM_BRAND_LOGO_URL?.trim() || "";
+  if (!logoUrl && publicUrl) {
+    try { logoUrl = new URL("/brand/bazion-platform-logo.png", publicUrl).toString(); } catch {}
+  }
+  return {
+    platformBrandName: process.env.PLATFORM_BRAND_NAME?.trim() || "Bazion Web",
+    platformLogoUrl: logoUrl,
+    platformPrimaryColor: process.env.PLATFORM_BRAND_PRIMARY_COLOR?.trim() || "#0B2F75",
+    platformSecondaryColor: process.env.PLATFORM_BRAND_SECONDARY_COLOR?.trim() || "#17345E",
+    platformAccentColor: process.env.PLATFORM_BRAND_ACCENT_COLOR?.trim() || "#EF3024",
+    platformTagline: process.env.PLATFORM_BRAND_TAGLINE?.trim() || "Build, Host n Grow",
+    platformWebsiteUrl: publicUrl,
+    platformSupportEmail: process.env.PLATFORM_BRAND_SUPPORT_EMAIL?.trim() || "",
+  };
+}
+
 export interface EmailTransportLike {
   sendMail(options: {
     from: string;
@@ -27,7 +45,7 @@ export function renderNotificationContent(delivery: OutboxDelivery): {
     delivery.payload.template,
     delivery.payload.to,
     delivery.payload.subject,
-    delivery.payload.variables,
+    { ...delivery.payload.variables, ...platformEmailBrandVariables() },
   );
 }
 

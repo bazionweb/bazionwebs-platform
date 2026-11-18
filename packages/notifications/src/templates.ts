@@ -31,6 +31,8 @@ export interface RenderedEmail {
 interface EmailBrand {
   name: string;
   logoUrl: string;
+  tenantName: string;
+  tenantWebsiteUrl: string;
   tagline: string;
   supportEmail: string;
   websiteUrl: string;
@@ -40,20 +42,35 @@ interface EmailBrand {
 }
 
 function emailBrand(variables: Record<string, string | number>): EmailBrand {
+  const platformName = typeof variables.platformBrandName === "string" ? variables.platformBrandName.trim() : "";
   const appName = typeof variables.appName === "string" ? variables.appName.trim() : "";
-  const name = typeof variables.brandName === "string" ? variables.brandName.trim() : "";
-  const rawLogo = typeof variables.logoUrl === "string" ? variables.logoUrl : "";
-  const rawSupport = typeof variables.supportEmail === "string" ? variables.supportEmail.trim() : "";
-  const rawWebsite = typeof variables.websiteUrl === "string" ? variables.websiteUrl : "";
+  const legacyName = typeof variables.brandName === "string" ? variables.brandName.trim() : "";
+  const name = platformName || legacyName || appName || "Bazion Web";
+  const rawLogo = typeof variables.platformLogoUrl === "string"
+    ? variables.platformLogoUrl
+    : typeof variables.logoUrl === "string" ? variables.logoUrl : "";
+  const rawSupport = typeof variables.platformSupportEmail === "string"
+    ? variables.platformSupportEmail.trim()
+    : typeof variables.supportEmail === "string" ? variables.supportEmail.trim() : "";
+  const rawWebsite = typeof variables.platformWebsiteUrl === "string"
+    ? variables.platformWebsiteUrl
+    : typeof variables.websiteUrl === "string" ? variables.websiteUrl : "";
+  const tenantName = typeof variables.tenantName === "string"
+    ? variables.tenantName.trim()
+    : platformName && legacyName && legacyName !== platformName ? legacyName : "";
   return {
-    name: name || appName || "Bazion Web",
+    name,
     logoUrl: safeHttpUrl(rawLogo),
-    tagline: typeof variables.tagline === "string" ? variables.tagline.trim() : "",
+    tenantName,
+    tenantWebsiteUrl: safeHttpUrl(typeof variables.tenantWebsiteUrl === "string" ? variables.tenantWebsiteUrl : ""),
+    tagline: typeof variables.platformTagline === "string"
+      ? variables.platformTagline.trim()
+      : typeof variables.tagline === "string" ? variables.tagline.trim() : "",
     supportEmail: /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(rawSupport) ? rawSupport : "",
     websiteUrl: safeHttpUrl(rawWebsite),
-    primary: safeColor(variables.primaryColor, "#0f172a"),
-    secondary: safeColor(variables.secondaryColor, "#334155"),
-    accent: safeColor(variables.accentColor, "#10b981"),
+    primary: safeColor(variables.platformPrimaryColor ?? variables.primaryColor, "#0B2F75"),
+    secondary: safeColor(variables.platformSecondaryColor ?? variables.secondaryColor, "#17345E"),
+    accent: safeColor(variables.platformAccentColor ?? variables.accentColor, "#EF3024"),
   };
 }
 
@@ -65,7 +82,7 @@ function renderEmailShell(
 ): string {
   const name = escapeHtml(brand.name);
   const logo = brand.logoUrl
-    ? `<img src="${escapeHtml(brand.logoUrl)}" alt="${name}" width="44" height="44" style="display:block;width:44px;height:44px;object-fit:contain;border:0;">`
+    ? `<img src="${escapeHtml(brand.logoUrl)}" alt="${name}" width="96" height="86" style="display:block;width:96px;height:86px;object-fit:contain;border:0;background:#ffffff;">`
     : `<span style="font-size:20px;font-weight:800;letter-spacing:-0.5px;color:#ffffff;">${name}</span>`;
   const tagline = brand.tagline
     ? `<div style="margin-top:6px;font-size:12px;line-height:1.5;color:#cbd5e1;">${escapeHtml(brand.tagline)}</div>`
@@ -78,6 +95,9 @@ function renderEmailShell(
     : "";
   const website = brand.websiteUrl
     ? `<a href="${escapeHtml(brand.websiteUrl)}" style="color:${brand.accent};text-decoration:underline;">${escapeHtml(brand.websiteUrl.replace(/^https?:\/\//, ""))}</a>`
+    : "";
+  const tenant = brand.tenantName
+    ? `<div style="margin-top:5px;font-size:11px;color:#cbd5e1;">For ${escapeHtml(brand.tenantName)}${brand.tenantWebsiteUrl ? ` · <a href="${escapeHtml(brand.tenantWebsiteUrl)}" style="color:#cbd5e1;text-decoration:underline;">${escapeHtml(brand.tenantWebsiteUrl.replace(/^https?:\/\//, ""))}</a>` : ""}</div>`
     : "";
 
   return `<!DOCTYPE html>
@@ -95,12 +115,12 @@ function renderEmailShell(
         <tr><td style="height:4px;background:${brand.accent};font-size:0;line-height:0;">&nbsp;</td></tr>
         <tr><td style="background:${brand.primary};padding:24px 32px;">
           <table role="presentation" cellspacing="0" cellpadding="0"><tr>
-            ${brand.logoUrl ? `<td valign="middle" style="padding-right:14px;">${logo}</td><td valign="middle"><div style="font-size:18px;font-weight:800;letter-spacing:-0.3px;color:#ffffff;">${name}</div>${label}${tagline}</td>` : `<td valign="middle">${logo}${label}${tagline}</td>`}
+            ${brand.logoUrl ? `<td valign="middle" style="padding-right:16px;">${logo}</td><td valign="middle"><div style="font-size:18px;font-weight:800;letter-spacing:-0.3px;color:#ffffff;">${name}</div>${label}${tagline}${tenant}</td>` : `<td valign="middle">${logo}${label}${tagline}${tenant}</td>`}
           </tr></table>
         </td></tr>
         <tr><td style="padding:32px;">${content}</td></tr>
         <tr><td style="background:#f8fafc;padding:18px 32px;border-top:1px solid #e2e8f0;text-align:center;font-size:12px;line-height:1.6;color:#64748b;">
-          ${name}${website ? ` · ${website}` : ""}${support ? ` · Support: ${support}` : ""}
+          Powered by ${name}${website ? ` · ${website}` : ""}${support ? ` · Support: ${support}` : ""}
         </td></tr>
       </table>
     </td></tr>
