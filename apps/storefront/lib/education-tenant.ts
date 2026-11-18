@@ -9,9 +9,11 @@ import {
   isBmiHost,
   isBemiHost,
   cleanHostname,
+  schoolPortalConfigSchema,
   type SchoolPortalConfig,
 } from "@bazion/education-contracts";
 import { extractTenantSlugFromHost } from "@bazion/auth";
+import { fetchTenantPublicData } from "./server-tenant-api";
 
 export interface EducationTenantContext {
   host?: string;
@@ -59,6 +61,15 @@ export function resolveEducationTenantFromContext(
     value === BMI_UNIVERSITY_TENANT_ID ||
     value === BMI_LEGACY_TENANT_ID;
 
+  // A verified BMI/BEMI domain is authoritative for institution branding.
+  // Query/header/cookie selectors are preview tools and cannot switch a live domain.
+  if (host && isBemiHost(host)) {
+    return { isEducation: true, isBemi: true, tenantConfig: bemiTrainingInstituteTenantConfig };
+  }
+  if (host && isBmiHost(host)) {
+    return { isEducation: true, isBemi: false, tenantConfig: bmiUniversityTenantConfig };
+  }
+
   // 1. Explicit Header Override (set by middleware from ?tenant=... query param or proxy)
   if (tenantHeader) {
     if (matchesBemiIdentifier(tenantHeader)) {
@@ -81,13 +92,6 @@ export function resolveEducationTenantFromContext(
 
   // 3. Hostname Resolution (Production domains & Dev subdomains like bemi.localhost or bmi.localhost)
   if (host) {
-    if (isBemiHost(host)) {
-      return { isEducation: true, isBemi: true, tenantConfig: bemiTrainingInstituteTenantConfig };
-    }
-    if (isBmiHost(host)) {
-      return { isEducation: true, isBemi: false, tenantConfig: bmiUniversityTenantConfig };
-    }
-
     const previewSlug = extractTenantSlugFromHost(host, process.env.PUBLIC_STOREFRONT_URL);
     if (previewSlug) {
       if (matchesBemiIdentifier(previewSlug)) {
@@ -154,7 +158,7 @@ export async function resolveEducationTenant(): Promise<EducationTenantResult> {
     // In static rendering or non-request context
   }
 
-  return resolveEducationTenantFromContext({
+  const resolved = resolveEducationTenantFromContext({
     host,
     tenantHeader,
     tenantCookie,
@@ -163,4 +167,12 @@ export async function resolveEducationTenant(): Promise<EducationTenantResult> {
     tenantMode: process.env.NEXT_PUBLIC_TENANT_TYPE ?? process.env.TENANT_RESOLUTION_MODE,
     previewMode: process.env.EDUCATION_PREVIEW === "true",
   });
+  if (!resolved.isEducation) return resolved;
+
+  const response = await fetchTenantPublicData<{
+    success?: boolean;
+    data?: { websiteConfig?: unknown };
+  }>("/v1/public/education/institution");
+  const config = schoolPortalConfigSchema.safeParse(response?.data?.websiteConfig);
+  return config.success ? { ...resolved, tenantConfig: config.data } : resolved;
 }

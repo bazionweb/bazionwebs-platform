@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { fetchTenantPublicData } from "../../lib/server-tenant-api";
 import { ShopStorefront } from "./shop-storefront";
+import { SmeWebsiteShell, isSmeWebsitePageEnabled } from "@bazion/sme-website-template";
+import { getPublicTenantWebsiteConfig } from "../../lib/server-website-config";
 import "./shop.css";
 
 type Currency = "KES" | "USD" | "EUR" | "GBP" | "CAD" | "AUD" | "NZD" | "CHF" | "SGD" | "ZAR" | "NGN" | "GHS" | "INR" | "AED" | "BRL" | "MXN" | "SAR" | "CNY" | "HKD" | "SEK" | "NOK" | "DKK" | "PLN" | "THB" | "PHP";
@@ -22,18 +24,32 @@ const fallbackStore: Store = {
 };
 
 export async function generateMetadata(): Promise<Metadata> {
-  const data = await fetchTenantPublicData<{ store?: Store }>("/v1/storefront");
+  const [data, website] = await Promise.all([
+    fetchTenantPublicData<{ store?: Store }>("/v1/storefront"),
+    getPublicTenantWebsiteConfig(),
+  ]);
+  if (website?.packageId === "ecommerce") {
+    const shopPage = website.smeConfig.website.pages.find((page) => page.id === "shop");
+    return { title: shopPage?.title ?? website.smeConfig.business.name, description: website.smeConfig.website.seo.description || website.smeConfig.business.tagline };
+  }
   const name = data?.store?.storeName || fallbackStore.storeName;
   return { title: `Shop | ${name}`, description: data?.store?.tagline || "Explore a considered collection from our store." };
 }
 
 export default async function ShopPage() {
-  const response = await fetchTenantPublicData<{ store: Omit<Store, "paymentProvider">; paymentProvider: Store["paymentProvider"] }>("/v1/storefront");
+  const [response, website] = await Promise.all([
+    fetchTenantPublicData<{ store: Omit<Store, "paymentProvider">; paymentProvider: Store["paymentProvider"] }>("/v1/storefront"),
+    getPublicTenantWebsiteConfig(),
+  ]);
+  if (website?.packageId === "ecommerce" && !isSmeWebsitePageEnabled(website.smeConfig, "shop")) notFound();
   if (!response?.store) notFound();
   const store = { ...fallbackStore, ...response.store, paymentProvider: response.paymentProvider };
   const currency = store.paymentProvider === "mpesa" ? "KES" : store.defaultCurrency;
   const productResponse = await fetchTenantPublicData<{ items: Product[]; categories: string[]; total: number }>(
     `/v1/products?limit=100&sort=featured&currency=${encodeURIComponent(currency)}`,
   );
-  return <ShopStorefront initialProducts={productResponse?.items ?? []} categories={productResponse?.categories ?? []} store={store} homeHref="/" />;
+  const storefront = <ShopStorefront initialProducts={productResponse?.items ?? []} categories={productResponse?.categories ?? []} store={store} homeHref="/" />;
+  return website?.packageId === "ecommerce"
+    ? <SmeWebsiteShell config={website.smeConfig} currentPath="/shop">{storefront}</SmeWebsiteShell>
+    : storefront;
 }

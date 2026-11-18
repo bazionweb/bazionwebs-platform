@@ -6,7 +6,10 @@ import {
   siteSettingsRollbackInputSchema,
   type ChurchSiteSettingsInput,
 } from "@bazion/church-ministry-contracts";
-import { resolveEffectiveChurchSiteSettings } from "@bazion/church-ministry-template";
+import {
+  createChurchSiteSettingsOverlay,
+  resolveEffectiveChurchSiteSettings,
+} from "@bazion/church-ministry-template";
 import {
   leadershipProfiles,
   ministryProfiles,
@@ -99,7 +102,9 @@ export async function registerChurchSiteSettingsVersionsRoutes(app: FastifyInsta
       const siteSettings = rawSettings
         ? resolveEffectiveChurchSiteSettings(rawSettings, {
             tenantSlug: tenant?.slug,
-            tenantName: tenant?.name,
+            tenantName: (draft?.profile as ChurchSiteSettingsInput["profile"] | undefined)?.ministryName
+              ?? profile?.ministryName
+              ?? tenant?.name,
           })
         : null;
 
@@ -125,6 +130,14 @@ export async function registerChurchSiteSettingsVersionsRoutes(app: FastifyInsta
     }
 
     return withTenantTransaction(context.tenantId, async (tx) => {
+      const [tenant] = await tx.select({ slug: tenants.slug }).from(tenants)
+        .where(eq(tenants.id, context.tenantId)).limit(1);
+      const settingsOverlay = createChurchSiteSettingsOverlay({
+        tenantSlug: tenant?.slug ?? "tenant",
+        ministryName: parsed.data.profile.ministryName,
+        settings: parsed.data.settings,
+      });
+
       // Find highest version number
       const [maxVerRow] = await tx
         .select({ maxVer: max(ministrySiteSettingsVersions.versionNumber) })
@@ -147,7 +160,7 @@ export async function registerChurchSiteSettingsVersionsRoutes(app: FastifyInsta
         await tx
           .update(ministrySiteSettingsVersions)
           .set({
-            settings: parsed.data.settings,
+            settings: settingsOverlay,
             profile: parsed.data.profile,
             createdBy: context.email,
             note: (request.body as { note?: string })?.note || "Draft updated",
@@ -165,7 +178,7 @@ export async function registerChurchSiteSettingsVersionsRoutes(app: FastifyInsta
         .values({
           tenantId: context.tenantId,
           versionNumber: nextVersion,
-          settings: parsed.data.settings,
+          settings: settingsOverlay,
           profile: parsed.data.profile,
           status: "draft",
           createdBy: context.email,
@@ -186,6 +199,8 @@ export async function registerChurchSiteSettingsVersionsRoutes(app: FastifyInsta
     const note = parsedNote.success ? parsedNote.data.note : undefined;
 
     return withTenantTransaction(context.tenantId, async (tx) => {
+      const [tenant] = await tx.select({ slug: tenants.slug }).from(tenants)
+        .where(eq(tenants.id, context.tenantId)).limit(1);
       // Find draft if present
       const [draft] = await tx
         .select()
@@ -196,7 +211,7 @@ export async function registerChurchSiteSettingsVersionsRoutes(app: FastifyInsta
         ))
         .limit(1);
 
-      let settingsToPublish = draft ? (draft.settings as ChurchSiteSettingsInput["settings"]) : null;
+      let settingsToPublish: unknown = draft ? draft.settings : null;
       let profileToPublish = draft ? (draft.profile as ChurchSiteSettingsInput["profile"]) : null;
 
       // If no draft was pending, check if a body was supplied directly to publish
@@ -212,6 +227,16 @@ export async function registerChurchSiteSettingsVersionsRoutes(app: FastifyInsta
           });
         }
       }
+
+      const effectiveSettings = resolveEffectiveChurchSiteSettings(settingsToPublish, {
+        tenantSlug: tenant?.slug,
+        tenantName: profileToPublish.ministryName,
+      });
+      settingsToPublish = createChurchSiteSettingsOverlay({
+        tenantSlug: tenant?.slug ?? "tenant",
+        ministryName: profileToPublish.ministryName,
+        settings: effectiveSettings,
+      });
 
       // Mark all existing published versions as superseded
       await tx
@@ -235,6 +260,7 @@ export async function registerChurchSiteSettingsVersionsRoutes(app: FastifyInsta
           .update(ministrySiteSettingsVersions)
           .set({
             status: "published",
+            settings: settingsToPublish,
             publishedAt: new Date(),
             publishedBy: context.email,
             note: note || "Published changes",
@@ -351,6 +377,8 @@ export async function registerChurchSiteSettingsVersionsRoutes(app: FastifyInsta
     const note = parsedNote.success ? parsedNote.data.note : undefined;
 
     return withTenantTransaction(context.tenantId, async (tx) => {
+      const [tenant] = await tx.select({ slug: tenants.slug }).from(tenants)
+        .where(eq(tenants.id, context.tenantId)).limit(1);
       const [targetRow] = await tx
         .select()
         .from(ministrySiteSettingsVersions)
@@ -389,13 +417,22 @@ export async function registerChurchSiteSettingsVersionsRoutes(app: FastifyInsta
 
       const newVersion = (maxVerRow?.maxVer ?? 0) + 1;
       const rollbackNote = note || `Rolled back to version ${targetVersion}`;
+      const profile = targetRow.profile as ChurchSiteSettingsInput["profile"];
+      const rollbackSettings = createChurchSiteSettingsOverlay({
+        tenantSlug: tenant?.slug ?? "tenant",
+        ministryName: profile.ministryName,
+        settings: resolveEffectiveChurchSiteSettings(targetRow.settings, {
+          tenantSlug: tenant?.slug,
+          tenantName: profile.ministryName,
+        }),
+      });
 
       const [published] = await tx
         .insert(ministrySiteSettingsVersions)
         .values({
           tenantId: context.tenantId,
           versionNumber: newVersion,
-          settings: targetRow.settings,
+          settings: rollbackSettings,
           profile: targetRow.profile,
           status: "published",
           publishedAt: new Date(),
@@ -404,22 +441,19 @@ export async function registerChurchSiteSettingsVersionsRoutes(app: FastifyInsta
         })
         .returning();
 
-      const profile = targetRow.profile as ChurchSiteSettingsInput["profile"];
-      const settings = targetRow.settings as ChurchSiteSettingsInput["settings"];
-
       // Update active settings row
       await tx
         .insert(ministrySettings)
         .values({
           tenantId: context.tenantId,
           settingKey: "public_site",
-          settingValue: JSON.stringify(settings),
+          settingValue: JSON.stringify(rollbackSettings),
           updatedAt: new Date(),
         })
         .onConflictDoUpdate({
           target: [ministrySettings.tenantId, ministrySettings.settingKey],
           set: {
-            settingValue: JSON.stringify(settings),
+            settingValue: JSON.stringify(rollbackSettings),
             updatedAt: new Date(),
           },
         });

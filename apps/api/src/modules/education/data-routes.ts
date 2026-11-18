@@ -4,9 +4,15 @@ import type { FastifyInstance, FastifyRequest } from "fastify";
 import { z } from "zod";
 import {
   BMI_UNIVERSITY_TENANT_ID,
+  EDUCATION_CONFIGURATION_VERSION,
+  SCHOOL_PORTAL_TEMPLATE_VERSION,
+  createEducationInstitutionWebsiteOverlay,
+  educationInstitutionWebsiteOverridesSchema,
   isBemiHost,
   isBmiHost,
+  resolveEducationInstitutionWebsiteConfig,
 } from "@bazion/education-contracts";
+import { deepMergeCascade, isTenantTemplateOverlay } from "@bazion/website-contracts";
 import { auth, isVerifiedTenantHost } from "@bazion/auth/server";
 import {
   educationInstitutions,
@@ -100,6 +106,7 @@ const institutionProfileInput = z.object({
   phones: z.array(z.string().trim().min(3).max(40)).max(12).optional(),
   address: z.string().trim().max(1000).nullable().optional(),
   website_url: z.string().trim().url().max(2048).nullable().optional(),
+  website_overrides: educationInstitutionWebsiteOverridesSchema.optional(),
 }).strict();
 
 const regulatoryEvidenceInput = z.object({
@@ -124,7 +131,7 @@ function institutionKeyForHost(hostname: string): InstitutionKey | null {
   return null;
 }
 
-async function resolveEducationContext(request: FastifyRequest, config: AppConfig) {
+async function resolveEducationContext(request: FastifyRequest, config: AppConfig, requireUms = true) {
   const tenantId = await resolveRequestTenantId(request, config);
   if (tenantId !== BMI_UNIVERSITY_TENANT_ID) {
     throw routeError("Education records are not configured for this tenant.", 404, "EDUCATION_TENANT_NOT_FOUND");
@@ -134,7 +141,7 @@ async function resolveEducationContext(request: FastifyRequest, config: AppConfi
   if (config.NODE_ENV === "production" && !(await isVerifiedTenantHost(request.hostname))) {
     throw routeError("A verified institution domain is required.", 404, "EDUCATION_HOST_NOT_VERIFIED");
   }
-  if (!(await isTenantModuleEnabled(tenantId, "education-ums"))) {
+  if (requireUms && !(await isTenantModuleEnabled(tenantId, "education-ums"))) {
     throw routeError("The education management module is disabled for this tenant.", 404, "TENANT_MODULE_DISABLED");
   }
   await assertTenantNotInMaintenance(tenantId);
@@ -222,6 +229,30 @@ function publicInstitution(row: typeof educationInstitutions.$inferSelect) {
   };
 }
 
+function publicEducationWebsiteConfig(row: typeof educationInstitutions.$inferSelect) {
+  if (row.websiteTemplateId !== "school-portal"
+    || row.websiteConfigurationSchemaVersion !== EDUCATION_CONFIGURATION_VERSION) {
+    throw routeError("The institution website configuration needs a schema migration before it can be published.", 503, "EDUCATION_WEBSITE_SCHEMA_UNSUPPORTED");
+  }
+  if (isTenantTemplateOverlay(row.websiteOverrides)
+    && (row.websiteOverrides.packageId !== "school-education"
+      || row.websiteOverrides.templateId !== row.websiteTemplateId
+      || row.websiteOverrides.configurationSchemaVersion !== row.websiteConfigurationSchemaVersion
+      || row.websiteOverrides.updateMode !== "automatic")) {
+    throw routeError("The institution website overlay is incompatible with its template.", 503, "EDUCATION_WEBSITE_OVERLAY_INVALID");
+  }
+  return resolveEducationInstitutionWebsiteConfig(row.institutionKey as InstitutionKey, row.websiteOverrides, {
+    name: row.name,
+    legalName: row.legalName,
+    admissionsEmail: row.admissionsEmail,
+    registrarEmail: row.registrarEmail,
+    financeEmail: row.financeEmail,
+    adminEmail: row.adminEmail,
+    phones: row.phones,
+    address: row.address,
+  });
+}
+
 function publicRegulatoryEvidence(row: typeof educationRegulatoryEvidence.$inferSelect) {
   return {
     id: row.id, title: row.title, evidence_type: row.evidenceType, authority: row.authority,
@@ -265,6 +296,31 @@ async function getStudent(tx: TenantTransaction, tenantId: string, institutionId
 }
 
 export async function educationDataRoutes(app: FastifyInstance, options: RouteOptions): Promise<void> {
+  app.get("/v1/public/education/institution", async (request, reply) => {
+    const { tenantId, key } = await resolveEducationContext(request, options.config, false);
+    const result = await withInstitution(tenantId, key, async (tx, institutionId) => {
+      const [row] = await tx.select().from(educationInstitutions).where(and(
+        eq(educationInstitutions.id, institutionId), eq(educationInstitutions.tenantId, tenantId),
+      )).limit(1);
+      if (!row) return null;
+      return {
+        institution: publicInstitution(row),
+        websiteConfig: publicEducationWebsiteConfig(row),
+        template: {
+          id: row.websiteTemplateId,
+          configuredVersion: row.websiteTemplateVersion,
+          currentVersion: SCHOOL_PORTAL_TEMPLATE_VERSION,
+          configurationSchemaVersion: row.websiteConfigurationSchemaVersion,
+          currentConfigurationSchemaVersion: EDUCATION_CONFIGURATION_VERSION,
+          updateMode: "automatic" as const,
+        },
+      };
+    });
+    reply.header("cache-control", "no-store");
+    reply.header("vary", "host");
+    return result ? reply.send({ success: true, data: result }) : reply.code(404).send({ success: false, error: "EDUCATION_INSTITUTION_NOT_FOUND" });
+  });
+
   app.post("/api/v1/education/session/activate", async (request, reply) => {
     const { tenantId } = await resolveEducationContext(request, options.config);
     const identity = await getCurrentIdentity(request.headers);
@@ -293,7 +349,7 @@ export async function educationDataRoutes(app: FastifyInstance, options: RouteOp
       const [row] = await tx.select().from(educationInstitutions).where(and(
         eq(educationInstitutions.id, institutionId), eq(educationInstitutions.tenantId, tenantId),
       )).limit(1);
-      return row ? publicInstitution(row) : null;
+      return row ? { ...publicInstitution(row), website_config: publicEducationWebsiteConfig(row) } : null;
     });
     return profile ? reply.send({ success: true, data: profile }) : reply.code(404).send({ success: false, error: "EDUCATION_INSTITUTION_NOT_FOUND" });
   });
@@ -305,6 +361,14 @@ export async function educationDataRoutes(app: FastifyInstance, options: RouteOp
     await requireEducationPermission(request, tenantId, "update");
     const profile = await withInstitution(tenantId, key, async (tx, institutionId) => {
       const input = parsed.data;
+      const [existing] = await tx.select().from(educationInstitutions).where(and(
+        eq(educationInstitutions.id, institutionId), eq(educationInstitutions.tenantId, tenantId),
+      )).limit(1).for("update");
+      if (!existing) return null;
+      const existingWebsiteConfig = resolveEducationInstitutionWebsiteConfig(key, existing.websiteOverrides);
+      const nextWebsiteConfig = input.website_overrides === undefined
+        ? undefined
+        : deepMergeCascade(existingWebsiteConfig, input.website_overrides);
       const [row] = await tx.update(educationInstitutions).set({
         ...(input.name !== undefined ? { name: input.name } : {}),
         ...(input.legal_name !== undefined ? { legalName: input.legal_name } : {}),
@@ -315,9 +379,15 @@ export async function educationDataRoutes(app: FastifyInstance, options: RouteOp
         ...(input.phones !== undefined ? { phones: input.phones } : {}),
         ...(input.address !== undefined ? { address: input.address } : {}),
         ...(input.website_url !== undefined ? { websiteUrl: input.website_url } : {}),
+        ...(nextWebsiteConfig ? {
+          websiteOverrides: createEducationInstitutionWebsiteOverlay(key, nextWebsiteConfig) as unknown as Record<string, unknown>,
+          websiteTemplateId: "school-portal",
+          websiteTemplateVersion: SCHOOL_PORTAL_TEMPLATE_VERSION,
+          websiteConfigurationSchemaVersion: EDUCATION_CONFIGURATION_VERSION,
+        } : {}),
         updatedAt: new Date(),
       }).where(and(eq(educationInstitutions.id, institutionId), eq(educationInstitutions.tenantId, tenantId))).returning();
-      return row ? publicInstitution(row) : null;
+      return row ? { ...publicInstitution(row), website_config: publicEducationWebsiteConfig(row) } : null;
     });
     return profile ? reply.send({ success: true, data: profile }) : reply.code(404).send({ success: false, error: "EDUCATION_INSTITUTION_NOT_FOUND" });
   });

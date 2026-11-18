@@ -24,6 +24,7 @@
     "@bazion/education-portal": "workspace:*",
     "@bazion/education-template": "workspace:*",
     "@bazion/education-ums": "workspace:*",
+    "@bazion/sme-website-template": "workspace:*",
     "@bazion/ui": "workspace:*",
     "next": "16.4.5",
     "react": "^19.2.0",

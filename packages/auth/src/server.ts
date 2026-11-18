@@ -952,6 +952,54 @@ export async function updatePlatformTenantModuleEntitlement(input: {
   }
 }
 
+/** Applies a package's required module entitlements as one recoverable database transaction. */
+export async function updatePlatformTenantModuleEntitlements(input: {
+  tenantId: string;
+  moduleIds: readonly string[];
+  enabled: boolean;
+  actorUserId: string;
+}): Promise<PlatformTenantModuleEntitlement[]> {
+  const moduleIds = [...new Set(input.moduleIds.map((moduleId) => moduleId.trim()).filter(Boolean))];
+  if (moduleIds.length === 0) return [];
+  if (moduleIds.length > 100 || moduleIds.some((moduleId) => moduleId.length > 120)) {
+    throw new Error("Tenant module entitlement batch is invalid.");
+  }
+
+  const client = await tenantProvisionerPool.connect();
+  try {
+    await client.query("BEGIN");
+    const tenant = await client.query<{ id: string; status: string }>(
+      "SELECT id, status FROM public.tenants WHERE id = $1 FOR UPDATE",
+      [input.tenantId],
+    );
+    if (tenant.rowCount !== 1 || tenant.rows[0]?.status === "closed") {
+      throw Object.assign(new Error("Tenant is unavailable for module provisioning."), {
+        code: "TENANT_NOT_AVAILABLE",
+      });
+    }
+
+    const result = await client.query<PlatformTenantModuleEntitlement>(
+      `INSERT INTO public.tenant_module_entitlements (tenant_id, module_id, enabled, updated_by)
+       SELECT $1, module_id, $3, $4
+         FROM unnest($2::text[]) AS requested(module_id)
+       ON CONFLICT (tenant_id, module_id)
+       DO UPDATE SET enabled = EXCLUDED.enabled, updated_by = EXCLUDED.updated_by, updated_at = now()
+       RETURNING module_id, enabled, updated_at, updated_by`,
+      [input.tenantId, moduleIds, input.enabled, input.actorUserId],
+    );
+    if (result.rowCount !== moduleIds.length) {
+      throw new Error("Tenant module entitlement batch did not update every requested module.");
+    }
+    await client.query("COMMIT");
+    return result.rows;
+  } catch (error) {
+    await client.query("ROLLBACK").catch(() => undefined);
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
 export interface PlatformTenantSettings {
   settings: {
     locale: string;

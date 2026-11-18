@@ -18,7 +18,13 @@ export async function EducationShell({ children, tenantConfig }: EducationShellP
 
   return (
     <EducationTenantProvider config={resolvedConfig}>
-      <div className="education-site-root">
+      <div className="education-site-root" style={{
+        "--color-gold": resolvedConfig.branding.accentColor,
+        "--color-gold-light": resolvedConfig.branding.accentColor,
+        "--color-gold-dark": resolvedConfig.branding.accentColor,
+        "--education-primary": resolvedConfig.branding.primaryColor,
+        "--education-secondary": resolvedConfig.branding.secondaryColor,
+      } as React.CSSProperties}>
         <link rel="stylesheet" href="/styles/bmi-website.css" />
         <style>{`
           .education-site-root {

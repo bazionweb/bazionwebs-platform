@@ -1,8 +1,13 @@
 import { z } from "zod";
 import {
+  buildTenantTemplateOverlay,
+  deepMergeCascade,
+  isTenantTemplateOverlay,
   websiteConfigurationSchema,
+  resolveTenantTemplateOverlay,
   ensureAccessibleHexColor,
   createWhiteLabeledPackageConfig,
+  websiteResourceUrlSchema,
 } from "@bazion/website-contracts";
 import { PROGRAMS, type Program } from "./programs.js";
 import { INSTITUTION_ACADEMIC_FULL, INSTITUTION_LEGAL_NAME } from "./institution.js";
@@ -18,6 +23,7 @@ import {
 } from "./domains.js";
 
 export const EDUCATION_CONFIGURATION_VERSION = "1.0.0" as const;
+export const SCHOOL_PORTAL_TEMPLATE_VERSION = "1.0.0" as const;
 
 export {
   BMI_UNIVERSITY_TENANT_ID,
@@ -57,7 +63,7 @@ export const schoolPortalConfigSchema = z.object({
     primaryColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).default("#0E1D38"),
     secondaryColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).default("#172A4D"),
     accentColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).default("#C5A048"),
-    logoUrl: z.string().default("/images/bmi-logo.png"),
+    logoUrl: websiteResourceUrlSchema.default("/images/bmi-logo.png"),
   }),
   contact: z.object({
     admissionsEmail: z.string().email().default(ADMISSIONS_EMAIL),
@@ -128,6 +134,78 @@ export const bemiTrainingInstituteTenantConfig: SchoolPortalConfig = schoolPorta
     address: "Mukurwe-ini Plaza, Mukurweini Road, Nyeri County, Kenya",
   },
 });
+
+export type EducationInstitutionKey = "bmi" | "bemi";
+
+export interface EducationInstitutionWebsiteProfile {
+  name?: string | null;
+  legalName?: string | null;
+  admissionsEmail?: string | null;
+  registrarEmail?: string | null;
+  financeEmail?: string | null;
+  adminEmail?: string | null;
+  phones?: string[];
+  address?: string | null;
+}
+
+export const educationInstitutionWebsiteOverridesSchema = z.object({
+  tagline: z.string().trim().max(400).optional(),
+  description: z.string().trim().max(4000).optional(),
+  founderName: z.string().trim().max(180).optional(),
+  missionStatement: z.string().trim().max(2000).optional(),
+  visionStatement: z.string().trim().max(2000).optional(),
+  valuesStatement: z.string().trim().max(2000).optional(),
+  legalDisclaimer: z.string().trim().max(1000).optional(),
+  regionalHubNote: z.string().trim().max(1000).optional(),
+  branding: schoolPortalConfigSchema.shape.branding.partial().optional(),
+  contact: schoolPortalConfigSchema.shape.contact.partial().optional(),
+  website: websiteConfigurationSchema.optional(),
+}).strict();
+
+function educationTemplateBase(key: EducationInstitutionKey): SchoolPortalConfig {
+  return key === "bemi" ? bemiTrainingInstituteTenantConfig : bmiUniversityTenantConfig;
+}
+
+export function resolveEducationInstitutionWebsiteConfig(
+  key: EducationInstitutionKey,
+  stored: unknown,
+  profile?: EducationInstitutionWebsiteProfile,
+): SchoolPortalConfig {
+  const base = educationTemplateBase(key);
+  const storedConfig = isTenantTemplateOverlay(stored)
+    ? resolveTenantTemplateOverlay(base, stored)
+    : deepMergeCascade(base, stored);
+  const resolved = profile
+    ? deepMergeCascade(storedConfig, {
+        ...(profile.name ? { institutionName: profile.name, shortName: profile.name.slice(0, 60) } : {}),
+        ...(profile.legalName !== undefined ? { legalEntityName: profile.legalName ?? undefined } : {}),
+        contact: {
+          ...(profile.admissionsEmail !== undefined ? { admissionsEmail: profile.admissionsEmail ?? undefined } : {}),
+          ...(profile.registrarEmail !== undefined ? { registrarEmail: profile.registrarEmail ?? undefined } : {}),
+          ...(profile.financeEmail !== undefined ? { financeEmail: profile.financeEmail ?? undefined } : {}),
+          ...(profile.adminEmail !== undefined ? { adminEmail: profile.adminEmail ?? undefined } : {}),
+          ...(profile.phones !== undefined ? { phones: profile.phones } : {}),
+          ...(profile.address !== undefined ? { address: profile.address ?? undefined } : {}),
+        },
+      })
+    : storedConfig;
+  const parsed = schoolPortalConfigSchema.safeParse(resolved);
+  return parsed.success ? parsed.data : base;
+}
+
+export function createEducationInstitutionWebsiteOverlay(
+  key: EducationInstitutionKey,
+  effective: SchoolPortalConfig,
+) {
+  return buildTenantTemplateOverlay({
+    packageId: "school-education",
+    templateId: "school-portal",
+    templateVersion: SCHOOL_PORTAL_TEMPLATE_VERSION,
+    configurationSchemaVersion: EDUCATION_CONFIGURATION_VERSION,
+    base: educationTemplateBase(key),
+    effective,
+  });
+}
 
 export interface CreateWhiteLabeledEducationInput {
   tenantSlug: string;

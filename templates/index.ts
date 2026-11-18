@@ -17,6 +17,7 @@ export {
   createWhiteLabeledChurchConfig,
   inferChurchTemplateId,
   resolveEffectiveChurchSiteSettings,
+  createChurchSiteSettingsOverlay,
   extractWhiteLabelTemplateFromRepoSource,
   generateByowDokployCompose,
   platformWhiteLabelPackageCatalog,

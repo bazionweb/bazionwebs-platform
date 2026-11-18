@@ -175,3 +175,79 @@ export function SmePrivacyPage({ config }: { config: SmeWebsiteTemplateConfig })
   );
 }
 
+/** Renders a configured non-core page from the same live template configuration used by navigation. */
+export function SmeConfiguredPage({ config, page }: {
+  config: SmeWebsiteTemplateConfig;
+  page: SmeWebsiteTemplateConfig["website"]["pages"][number];
+}) {
+  const sections = new Set(page.sections);
+  const showOfferings = sections.has("feature-list") || sections.has("card-grid") || sections.has("gallery");
+  const hasContactPage = isSmeWebsitePageEnabled(config, "contact");
+
+  return (
+    <main id="main-content">
+      {sections.has("hero") && (
+        <section className="sme-home-hero">
+          <Container>
+            {config.business.tagline && <p className="sme-eyebrow">{config.business.tagline}</p>}
+            <h1>{page.title}</h1>
+            <p className="sme-home-intro">{config.business.introduction}</p>
+          </Container>
+        </section>
+      )}
+      {sections.has("text") && (
+        <section className="bw-section">
+          <Container>
+            {!sections.has("hero") && <h1>{page.title}</h1>}
+            <div className="sme-prose">{config.business.about.split(/\n\s*\n/).map((paragraph, index) => <p key={index}>{paragraph}</p>)}</div>
+          </Container>
+        </section>
+      )}
+      {showOfferings && (
+        <section className="bw-section">
+          <Container>
+            <div className="sme-section-heading">
+              <p className="sme-eyebrow">{config.business.name}</p>
+              <h2>{page.title}</h2>
+            </div>
+            <Grid columns="auto" className="sme-services-grid">
+              {config.business.services.map((service) => (
+                <article className="sme-service-card" key={service.id}>
+                  <h3>{service.name}</h3>
+                  <p>{service.description}</p>
+                  {hasContactPage && <a href="/contact">Contact us</a>}
+                </article>
+              ))}
+            </Grid>
+          </Container>
+        </section>
+      )}
+      {sections.has("faq") && (
+        <section className="bw-section">
+          <Container>
+            <h2>Questions about {config.business.name}?</h2>
+            <p className="sme-page-intro">Contact the team for details about services, availability, and next steps.</p>
+            {hasContactPage && <a className="sme-action" href="/contact">Contact us</a>}
+          </Container>
+        </section>
+      )}
+      {sections.has("contact-form") && (
+        <section className="bw-section">
+          <Container>
+            {hasContactPage && <a className="sme-action" href="/contact">Contact us</a>}
+            {!hasContactPage && <p className="sme-contact-unavailable">Contact details are not published for this page.</p>}
+          </Container>
+        </section>
+      )}
+      {sections.has("call-to-action") && hasContactPage && (
+        <section className="bw-section">
+          <Container><a className="sme-action" href="/contact">Talk to our team</a></Container>
+        </section>
+      )}
+      {!page.sections.length && (
+        <section className="bw-section"><Container><h1>{page.title}</h1><p className="sme-page-intro">{config.business.introduction}</p></Container></section>
+      )}
+    </main>
+  );
+}
+

@@ -9,6 +9,9 @@ import {
 } from "@bazion/church-ministry-contracts";
 import {
   deepMergeCascade,
+  buildTenantTemplateOverlay,
+  resolveTenantTemplateOverlay,
+  isTenantTemplateOverlay,
   ensureAccessibleHexColor,
   generateByowDokployCompose,
   platformWhiteLabelPackageCatalog,
@@ -49,6 +52,7 @@ export type WhiteLabelTemplateId =
 
 export interface WhiteLabelTemplateDescriptor {
   id: WhiteLabelTemplateId;
+  version: string;
   name: string;
   tagline: string;
   description: string;
@@ -63,6 +67,7 @@ export interface WhiteLabelTemplateDescriptor {
 export const churchTemplateCatalog: WhiteLabelTemplateDescriptor[] = [
   {
     id: "gmfc-revival-signature",
+    version: "1.0.0",
     name: "GMFC Revival & Apostolic Signature",
     tagline: "Editorial church design with portrait leadership cards, M-Pesa giving hub, sermons & outreach",
     description:
@@ -82,6 +87,7 @@ export const churchTemplateCatalog: WhiteLabelTemplateDescriptor[] = [
   },
   {
     id: "church-ministry",
+    version: "1.0.0",
     name: "Modern Sanctuary & Community",
     tagline: "Warm emerald & bronze layout built around small groups, ministries & welcoming guests",
     description:
@@ -100,6 +106,7 @@ export const churchTemplateCatalog: WhiteLabelTemplateDescriptor[] = [
   },
   {
     id: "royal-cathedral",
+    version: "1.0.0",
     name: "Royal Cathedral & Heritage",
     tagline: "Dignified navy & amber aesthetic for multi-campus ministries and regional fellowships",
     description:
@@ -118,6 +125,7 @@ export const churchTemplateCatalog: WhiteLabelTemplateDescriptor[] = [
   },
   {
     id: "hkm-kingdom-cms",
+    version: "1.0.0",
     name: "HKM Kingdom CMS & Member Portal",
     tagline: "Integrated Church Administration CMS and Self-Service Member Portal with PIN/Password authentication",
     description:
@@ -533,7 +541,7 @@ export function createWhiteLabeledChurchConfig(
         ]
       : [],
     metadata: {
-      title: `${ministryName} | ${template.name}`,
+      title: ministryName,
       description: tagline,
     },
     vision: {
@@ -676,6 +684,35 @@ export function inferChurchTemplateId(rawInput: unknown, tenantSlug?: string | n
   return "gmfc-revival-signature";
 }
 
+export function createChurchSiteSettingsOverlay(input: {
+  tenantSlug: string;
+  ministryName: string;
+  settings: ChurchPublicSiteSettings;
+  updateMode?: "automatic" | "pinned";
+}) {
+  const templateId = inferChurchTemplateId(input.settings, input.tenantSlug);
+  const template = getTemplateDescriptor(templateId);
+  const base = createWhiteLabeledChurchConfig({
+    tenantSlug: input.tenantSlug,
+    ministryName: input.ministryName,
+    templateId,
+  }).siteSettingsInput.settings;
+
+  return buildTenantTemplateOverlay({
+    packageId: "church-ministry",
+    templateId,
+    templateVersion: template.version,
+    configurationSchemaVersion: input.settings.schemaVersion,
+    context: {
+      tenantSlug: input.tenantSlug.trim().toLowerCase().replace(/[^a-z0-9-]/g, "-") || "ministry",
+      brandName: input.ministryName,
+    },
+    base,
+    effective: input.settings,
+    ...(input.updateMode ? { updateMode: input.updateMode } : {}),
+  });
+}
+
 /**
  * Resolves the live, effective church public site settings using prototype-based cascading overrides.
  *
@@ -698,15 +735,6 @@ export function resolveEffectiveChurchSiteSettings(
   const tenantSlug = options?.tenantSlug?.trim() || "ministry";
   const ministryName = options?.tenantName?.trim() || "Ministry";
 
-  // 1. Generate live canonical template defaults as the prototype foundation
-  const canonical = createWhiteLabeledChurchConfig({
-    tenantSlug,
-    ministryName,
-    templateId,
-    includeStarterContent: options?.includeStarterContent ?? false,
-  });
-  const canonicalSettings = canonical.siteSettingsInput.settings;
-
   let parsedRaw: Record<string, unknown> | null = null;
   if (typeof rawInput === "string" && rawInput.trim().length > 0) {
     try {
@@ -716,6 +744,26 @@ export function resolveEffectiveChurchSiteSettings(
     }
   } else if (typeof rawInput === "object" && rawInput !== null) {
     parsedRaw = rawInput as Record<string, unknown>;
+  }
+  const isVersionedOverlay = isTenantTemplateOverlay(parsedRaw);
+
+  // 1. Generate live canonical template defaults as the prototype foundation
+  const canonical = createWhiteLabeledChurchConfig({
+    tenantSlug,
+    ministryName,
+    templateId,
+    includeStarterContent: options?.includeStarterContent ?? isVersionedOverlay,
+  });
+  const canonicalSettings = canonical.siteSettingsInput.settings;
+
+  const expectedTenantSlug = (options?.tenantSlug ?? "").trim().toLowerCase().replace(/[^a-z0-9-]/g, "-");
+  if (isVersionedOverlay
+    && isTenantTemplateOverlay(parsedRaw)
+    && parsedRaw.context
+    && expectedTenantSlug
+    && parsedRaw.context.tenantSlug !== expectedTenantSlug) {
+    // A copied or mis-scoped overlay must never expose another tenant's settings.
+    return { ...canonicalSettings, templateId };
   }
 
   if (!parsedRaw) {
@@ -727,12 +775,16 @@ export function resolveEffectiveChurchSiteSettings(
 
   // 2. Extract overrides (support sparse delta format `{ overrides: { ... } }` or legacy full JSON)
   const overrides =
-    "overrides" in parsedRaw && typeof parsedRaw.overrides === "object" && parsedRaw.overrides !== null
+    isVersionedOverlay
+      ? parsedRaw
+      : "overrides" in parsedRaw && typeof parsedRaw.overrides === "object" && parsedRaw.overrides !== null
       ? (parsedRaw.overrides as Record<string, unknown>)
       : parsedRaw;
 
   // 3. Cascade tenant overrides on top of the live canonical template
-  const cascaded = deepMergeCascade(canonicalSettings, overrides);
+  const cascaded = isTenantTemplateOverlay(overrides)
+    ? resolveTenantTemplateOverlay(canonicalSettings, overrides)
+    : deepMergeCascade(canonicalSettings, overrides);
   cascaded.templateId = templateId;
 
   // 4. Validate through schema

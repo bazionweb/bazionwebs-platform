@@ -8,6 +8,7 @@ import "@bazion/ui/primitives.css";
 import "@bazion/ui/navigation.css";
 import "@bazion/ui/church.css";
 import "@bazion/ui/pulse.css";
+import "@bazion/sme-website-template/theme.css";
 import "../styles/gmfc/index.css";
 import { PulseHost } from "@bazion/ui";
 import { SiteThemeProvider } from "../lib/site-theme-provider";
