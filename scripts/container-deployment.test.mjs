@@ -93,7 +93,12 @@ test("Docker build context excludes credentials and generated files", () => {
 
 test("successful main CI publishes SHA-addressed images with isolated BuildKit caches", () => {
   assert.match(ciWorkflow, /publish-container-images:[\s\S]{0,200}needs: validate/);
-  assert.match(ciWorkflow, /if: github\.ref == 'refs\/heads\/main'/);
+  const validateJob = ciWorkflow.slice(ciWorkflow.indexOf("  validate:"), ciWorkflow.indexOf("  publish-container-images:"));
+  const publishJob = ciWorkflow.slice(ciWorkflow.indexOf("publish-container-images:"));
+  assert.match(validateJob, /^    if: github\.event_name != 'push'$/m);
+  assert.match(publishJob, /if:\s*>-\s*always\(\)\s+&&\s+github\.ref == 'refs\/heads\/main'/);
+  assert.match(publishJob, /github\.event_name == 'push' && needs\.validate\.result == 'skipped'/);
+  assert.match(publishJob, /github\.event_name == 'workflow_dispatch' && needs\.validate\.result == 'success'/);
   for (const [target, image] of [
     ["api", "api"],
     ["admin", "admin"],
@@ -111,7 +116,6 @@ test("successful main CI publishes SHA-addressed images with isolated BuildKit c
   assert.match(ciWorkflow, /cache-to: type=gha,scope=bazion-platform-\$\{\{ matrix\.image \}\},mode=max/);
   assert.match(ciWorkflow, /packages: write/);
   assert.match(ciWorkflow, /type=raw,value=staging,enable=\{\{is_default_branch\}\}/);
-  const publishJob = ciWorkflow.slice(ciWorkflow.indexOf("publish-container-images:"));
   assert.equal([...publishJob.matchAll(/uses: [^\s]+@([a-f0-9]{40})/g)].length, 5, "every publish-job action must be pinned to a full commit SHA");
   assert.match(publishJob, /push: true/);
   assert.match(publishJob, /provenance: mode=max/);
