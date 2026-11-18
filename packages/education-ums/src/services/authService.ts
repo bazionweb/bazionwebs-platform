@@ -42,37 +42,18 @@ const REMEMBER_KEY = 'bmi_remember_me';
 const TOKEN_EXPIRY_KEY = 'bmi_token_expiry';
 const JWT_KEY = 'bmi_jwt_token';
 const UMS_AUTH_KEY = 'bmi_ums_auth_token';
+const API_ORIGIN = API_URL.endsWith('/api/v1') ? API_URL.slice(0, -'/api/v1'.length) : API_URL;
+const BETTER_AUTH_URL = `${API_ORIGIN}/api/auth`;
+const EDUCATION_SESSION_URL = `${API_URL}/education/session/activate`;
 
-function getStoredJwt(): string | null {
-  try {
-    return (typeof window !== 'undefined')
-      ? (sessionStorage.getItem(JWT_KEY)
-        || sessionStorage.getItem(UMS_AUTH_KEY)
-        || localStorage.getItem(JWT_KEY)
-        || null)
-      : null;
-  } catch {
-    return null;
-  }
-}
-
-function setStoredJwt(token: string | null, rememberMe: boolean = false): void {
-  _jwtToken = token;
+function clearLegacyTokens(): void {
   try {
     if (typeof window === 'undefined') return;
-    if (token) {
-      sessionStorage.setItem(JWT_KEY, token);
-      sessionStorage.setItem(UMS_AUTH_KEY, token);
-      if (rememberMe) {
-        localStorage.setItem(JWT_KEY, token);
-      }
-    } else {
-      sessionStorage.removeItem(JWT_KEY);
-      sessionStorage.removeItem(UMS_AUTH_KEY);
-      localStorage.removeItem(JWT_KEY);
-    }
+    sessionStorage.removeItem(JWT_KEY);
+    sessionStorage.removeItem(UMS_AUTH_KEY);
+    localStorage.removeItem(JWT_KEY);
   } catch {
-    // Ignore storage quota / security exceptions
+    // Ignore browser storage access failures.
   }
 }
 
@@ -81,8 +62,6 @@ let _memoryToken: string | null = null;
 
 // JWT bearer token initialized from storage — sent as Authorization: Bearer on all authenticated requests
 // This handles cross-origin Pages deployments where SameSite=None cookies may be blocked
-let _jwtToken: string | null = getStoredJwt();
-
 // Session timeout constants
 const TOKEN_EXPIRY_BUFFER_MS = 5 * 60 * 1000;  // 5 minute buffer before expiry
 const WARNING_BEFORE_EXPIRY_MS = 30 * 60 * 1000; // Show warning 30 minutes before expiry
@@ -92,7 +71,7 @@ const WARNING_BEFORE_EXPIRY_MS = 30 * 60 * 1000; // Show warning 30 minutes befo
  */
 export async function login(email: string, password: string, rememberMe: boolean = false): Promise<AuthResponse> {
   try {
-    const response = await fetchWithTimeout(`${API_URL.replace('/v1', '')}/auth/login`, {
+    const response = await fetchWithTimeout(`${BETTER_AUTH_URL}/sign-in/email`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -100,95 +79,35 @@ export async function login(email: string, password: string, rememberMe: boolean
       body: JSON.stringify({ email, password, rememberMe }),
       credentials: 'include',
     }, 8000);
+    const signIn = await response.json().catch(() => ({})) as { message?: string; error?: string };
+    if (response.status === 429) return { success: false, error: 'Too many login attempts. Please wait and try again.' };
+    if (!response.ok) return { success: false, error: signIn.message || signIn.error || 'Email or password is incorrect.' };
 
-    // Handle rate limiting (429) — returns plain text, not JSON
-    if (response.status === 429) {
-      return {
-        success: false,
-        error: 'Too many login attempts. Please wait 15 minutes and try again.',
-      };
+    const sessionResponse = await fetchWithTimeout(EDUCATION_SESSION_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+    }, 8000);
+    const sessionBody = await sessionResponse.json().catch(() => ({})) as {
+      success?: boolean; error?: string; message?: string;
+      data?: { user?: { id?: string; email?: string; name?: string }; organization?: { role?: string }; tenant?: { id?: string; name?: string } };
+    };
+    if (!sessionResponse.ok || !sessionBody.success || !sessionBody.data?.user || !sessionBody.data.organization) {
+      await fetchWithTimeout(`${BETTER_AUTH_URL}/sign-out`, { method: 'POST', credentials: 'include' }, 3000).catch(() => undefined);
+      return { success: false, error: sessionBody.message || sessionBody.error || 'This account is not an administrator for this institution.' };
     }
 
-    // Guard against empty responses
-    const text = await response.text();
-    if (!text || text.trim() === '') {
-      return {
-        success: false,
-        error: 'Server returned an empty response. Please try again.',
-      };
-    }
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let data: any;
-    try {
-      data = JSON.parse(text);
-    } catch {
-      return {
-        success: false,
-        error: 'Invalid server response. Please try again.',
-      };
-    }
-
-    if (data.success) {
-      if (data.requires_mfa || data.data?.requires_mfa) {
-        return {
-          success: true,
-          data: {
-            mfaRequired: true,
-            user: data.data?.user || data.user,
-          }
-        };
-      }
-      // Regular login success - store user info
-      // API returns: { success: true, data: { csrf_token, user } }
-      const apiUser = data.data?.user || data.user;
-      if (!apiUser) {
-        return {
-          success: false,
-          error: 'Invalid server response: user data missing',
-        };
-      }
-      const user = {
-        id: apiUser.id,
-        email: apiUser.email,
-        name: `${apiUser.first_name} ${apiUser.last_name}`,
-        role: apiUser.role,
-        isActive: true,
-      };
-
-      // Guard: UMS is exclusively for University Staff, Faculty, and Administrators
-      if (user.role === 'student' || user.role === 'applicant') {
-        return {
-          success: false,
-          error: 'Access Restricted: The University Management System (UMS) is strictly for university staff, faculty, and administrators. Please log in to the Student Portal at https://portal.bmiuniversities.org',
-        };
-      }
-
-      // eslint-disable-next-line no-console
-      console.log('[authService] Login success - User object:', user);
-      localStorage.setItem(USER_KEY, JSON.stringify(user));
-      localStorage.setItem(REMEMBER_KEY, JSON.stringify(rememberMe));
-      const expiryTime = Date.now() + (7 * 24 * 60 * 60 * 1000); // 7 days (matches backend cookie)
-      localStorage.setItem(TOKEN_EXPIRY_KEY, expiryTime.toString());
-      _memoryToken = data.data?.csrf_token || data.csrf_token; // Store CSRF token in memory
-      const jwt = data.data?.token || data.token || null;
-      setStoredJwt(jwt, rememberMe);
-
-      // eslint-disable-next-line no-console
-      console.log('[authService] Returning success with user role:', user.role);
-      return {
-        success: true,
-        data: {
-          token: data.data?.csrf_token || data.csrf_token,
-          user,
-        }
-      };
-    } else {
-      return {
-        success: false,
-        error: data.error || 'Login failed',
-      };
-    }
+    const identity = sessionBody.data;
+    const user: User = {
+      id: identity.user.id ?? '', email: identity.user.email ?? email,
+      name: identity.user.name ?? email, role: identity.organization.role ?? 'member', isActive: true,
+    };
+    _memoryToken = null;
+    clearLegacyTokens();
+    localStorage.setItem(USER_KEY, JSON.stringify(user));
+    localStorage.setItem(REMEMBER_KEY, JSON.stringify(rememberMe));
+    localStorage.setItem(TOKEN_EXPIRY_KEY, String(Date.now() + 7 * 24 * 60 * 60 * 1000));
+    return { success: true, data: { user } };
   } catch (error) {
     // Distinguish between network errors and other errors
     if (error instanceof TypeError && error.message.includes('fetch')) {
@@ -217,14 +136,13 @@ export function wasRememberMeSelected(): boolean {
  */
 export async function logout(): Promise<void> {
   try {
-    await fetchWithTimeout(`${API_URL.replace('/v1', '')}/auth/logout`, { method: 'DELETE' }, 3000);
-  } catch (error) {
-    // eslint-disable-next-line no-console
-    console.error('Logout request failed:', error);
+    await fetchWithTimeout(`${BETTER_AUTH_URL}/sign-out`, { method: 'POST', credentials: 'include' }, 3000);
+  } catch {
+    // Local session state is still cleared when the remote session is unavailable.
   } finally {
     // Clear memory token
     _memoryToken = null;
-    setStoredJwt(null);
+    clearLegacyTokens();
     // Clear localStorage
     localStorage.removeItem(USER_KEY);
     localStorage.removeItem(TOKEN_EXPIRY_KEY);
@@ -296,90 +214,33 @@ export function isAuthenticated(): boolean {
   return !!_memoryToken || !!localStorage.getItem(USER_KEY);
 }
 
-/**
- * Refresh the access token by re-validating the existing HttpOnly cookie.
- * The BMI API uses cookie-based auth, so we simply re-hit /auth/me to get
- * a fresh CSRF token.  If the cookie has expired, the request will 401 and
- * we return null so the caller can redirect to login.
- */
+/** Compatibility entrypoint: Better Auth refreshes its session cookie server-side. */
 export async function refreshAccessToken(): Promise<string | null> {
-  try {
-    const existingJwt = getStoredJwt();
-    const headers: Record<string, string> = {};
-    if (existingJwt) {
-      headers['Authorization'] = `Bearer ${existingJwt}`;
-    }
-    const response = await fetchWithTimeout(
-      `${API_URL.replace('/v1', '')}/auth/me`,
-      { method: 'GET', headers },
-      5000,
-    );
-    if (!response.ok) return null;
-    const data = await response.json();
-    if (data.success) {
-      if (data.data?.csrf_token || data.csrf_token) {
-        _memoryToken = data.data?.csrf_token || data.csrf_token;
-      }
-      const refreshedJwt = data.data?.token || data.token;
-      if (refreshedJwt) {
-        setStoredJwt(refreshedJwt, wasRememberMeSelected());
-        return refreshedJwt;
-      }
-      return _memoryToken;
-    }
-    return null;
-  } catch {
-    return null;
-  }
+  if (!(await verifySession())) return null;
+  return null;
 }
 
 /**
  * Fetch with authentication and automatic retry on 401 (Token Refresh)
  */
 export async function authFetch(url: string, options: RequestInit = {}, timeoutMs: number = 8000): Promise<Response> {
-  const csrfToken = _memoryToken;
   const isFormData = options.body instanceof FormData;
-  const activeJwt = _jwtToken || getStoredJwt();
-
-  const headers: Record<string, string> = {
-    // Don't force JSON when the caller is sending multipart FormData (authFetch must not
-    // mangle the browser-generated multipart boundary).
-    ...(options.body && !isFormData ? { 'Content-Type': 'application/json' } : {}),
-    ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
-    // Send JWT as Authorization header so cross-origin Pages requests authenticate
-    // even when the SameSite=None cookie doesn't flow correctly
-    ...(activeJwt ? { 'Authorization': `Bearer ${activeJwt}` } : {}),
-    ...(options.headers as Record<string, string>),
-  };
-
+  const headers = new Headers(options.headers);
+  if (options.body && !isFormData && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
+  headers.delete('Authorization');
+  headers.delete('X-CSRF-Token');
   // Use AbortController for timeout
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
-    let response = await fetch(url, {
+    const response = await fetch(url, {
       ...options,
       headers,
       credentials: 'include',
       signal: controller.signal,
     });
     clearTimeout(timeoutId);
-
-    // If unauthorized, try to refresh token once
-    if (response.status === 401) {
-      const newToken = await refreshAccessToken();
-      
-      if (newToken) {
-        // Retry with new token
-        return fetch(url, {
-          ...options,
-          headers: {
-            ...headers,
-            Authorization: `Bearer ${newToken}`,
-          },
-        });
-      }
-    }
 
     return response;
   } catch (error) {
@@ -423,57 +284,37 @@ async function fetchWithTimeout(
  * Verify session on app startup
  */
 export async function verifySession(): Promise<boolean> {
-  const storedUser = localStorage.getItem(USER_KEY);
-  if (!storedUser) {
-    return false;
-  }
-
   try {
-    // Use a forgiving timeout for the initial session check so a cold-
-    // starting worker (first request after deploy) doesn't bounce the user out.
-    const response = await authFetch(`${API_URL.replace('/v1', '')}/auth/me`, {}, 10000);
-    const data = await response.json();
-
-    if (data.success && data.data) {
-      const apiUser = data.data;
-      const user = {
-        id: apiUser.id,
-        email: apiUser.email,
-        name: `${apiUser.first_name} ${apiUser.last_name}`,
-        role: apiUser.role,
-        isActive: true,
-      };
-
-      // Guard: UMS is exclusively for University Staff, Faculty, and Administrators
-      if (user.role === 'student' || user.role === 'applicant') {
-        localStorage.removeItem(USER_KEY);
-        localStorage.removeItem(TOKEN_EXPIRY_KEY);
-        localStorage.removeItem(REMEMBER_KEY);
-        _memoryToken = null;
-        _jwtToken = null;
-        return false;
-      }
-
-      // eslint-disable-next-line no-console
-      console.log('[authService] Session verified - User object:', user);
-      localStorage.setItem(USER_KEY, JSON.stringify(user));
-      if (data.csrf_token || data.data?.csrf_token) {
-        _memoryToken = data.data?.csrf_token || data.csrf_token;
-      }
-      const refreshedJwt = data.token || data.data?.token;
-      if (refreshedJwt) {
-        setStoredJwt(refreshedJwt, wasRememberMeSelected());
-      } else if (!_jwtToken) {
-        _jwtToken = getStoredJwt();
-      }
-      return true;
+    const response = await fetchWithTimeout(EDUCATION_SESSION_URL, { method: 'POST' }, 10000);
+    const result = await response.json().catch(() => ({})) as {
+      success?: boolean;
+      data?: { user?: { id?: string; email?: string; name?: string }; organization?: { role?: string } };
+    };
+    const identity = result.data;
+    if (!response.ok || !result.success || !identity?.user || !identity.organization) {
+      clearLocalAuthState();
+      return false;
     }
-    return false;
-  } catch (error) {
-    // eslint-disable-next-line no-console
-    console.warn('Session verification failed:', error);
+    _memoryToken = null;
+    clearLegacyTokens();
+    const user: User = {
+      id: identity.user.id ?? '', email: identity.user.email ?? '', name: identity.user.name ?? '',
+      role: identity.organization.role ?? 'member', isActive: true,
+    };
+    localStorage.setItem(USER_KEY, JSON.stringify(user));
+    localStorage.setItem(TOKEN_EXPIRY_KEY, String(Date.now() + 7 * 24 * 60 * 60 * 1000));
+    return true;
+  } catch {
     return false;
   }
+}
+
+function clearLocalAuthState(): void {
+  _memoryToken = null;
+  clearLegacyTokens();
+  localStorage.removeItem(USER_KEY);
+  localStorage.removeItem(TOKEN_EXPIRY_KEY);
+  localStorage.removeItem(REMEMBER_KEY);
 }
 
 /**
@@ -501,31 +342,9 @@ export async function isBackendAvailable(): Promise<boolean> {
  * Verify MFA code
  */
 export async function verifyMfa(mfaToken: string, code: string): Promise<AuthResponse> {
-  try {
-    const response = await fetchWithTimeout(`${API_URL.replace('/v1', '')}/auth/mfa/verify`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ mfaToken, code }),
-    }, 8000);
-
-    const data: AuthResponse = await response.json();
-
-    if (data.success && data.data?.token) {
-      _memoryToken = data.data.token;
-      localStorage.setItem(USER_KEY, JSON.stringify(data.data.user));
-      const expiryTime = Date.now() + (8 * 60 * 60 * 1000);
-      localStorage.setItem(TOKEN_EXPIRY_KEY, expiryTime.toString());
-    }
-
-    return data;
-  } catch (error) {
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Network error',
-    };
-  }
+  void mfaToken;
+  void code;
+  return { success: false, error: 'Two-factor authentication is not enabled for this UMS sign-in flow.' };
 }
 
 /**
@@ -533,45 +352,18 @@ export async function verifyMfa(mfaToken: string, code: string): Promise<AuthRes
  * Can be called with either access token or mfa token
  */
 export async function setupMfa(token: string): Promise<ApiResponse<{ secret: string; qrCode: string }>> {
-  try {
-    const response = await fetchWithTimeout(`${API_URL.replace('/v1', '')}/auth/mfa/setup`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      },
-    }, 8000);
-
-    return await response.json();
-  } catch (error) {
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Network error',
-    };
-  }
+  void token;
+  return { success: false, error: { code: 'MFA_UNAVAILABLE', message: 'Two-factor authentication is not enabled for this UMS sign-in flow.' } };
 }
 
 /**
  * Enable MFA (Verify first code and get recovery codes)
  */
 export async function enableMfa(token: string, secret: string, code: string): Promise<ApiResponse<{ recoveryCodes: string[] }>> {
-  try {
-    const response = await fetchWithTimeout(`${API_URL.replace('/v1', '')}/auth/mfa/enable`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      },
-      body: JSON.stringify({ secret, code }),
-    }, 8000);
-
-    return await response.json();
-  } catch (error) {
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Network error',
-    };
-  }
+  void token;
+  void secret;
+  void code;
+  return { success: false, error: { code: 'MFA_UNAVAILABLE', message: 'Two-factor authentication is not enabled for this UMS sign-in flow.' } };
 }
 
 /**
@@ -579,16 +371,16 @@ export async function enableMfa(token: string, secret: string, code: string): Pr
  */
 export async function requestPasswordReset(email: string): Promise<AuthResponse> {
   try {
-    const response = await fetchWithTimeout(`${API_URL.replace('/v1', '')}/auth/forgot-password`, {
+    const redirectTo = typeof window !== 'undefined' ? `${window.location.origin}/reset-password` : undefined;
+    const response = await fetchWithTimeout(`${BETTER_AUTH_URL}/request-password-reset`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ email }),
+      body: JSON.stringify({ email, ...(redirectTo ? { redirectTo } : {}) }),
     }, 8000);
-
-    const data: AuthResponse = await response.json();
-    return data;
+    const data = await response.json().catch(() => ({})) as { message?: string; error?: string };
+    return { success: response.ok, ...(!response.ok ? { error: data.message || data.error || 'Password reset request failed.' } : {}) };
   } catch (error) {
     return {
       success: false,
@@ -606,16 +398,15 @@ export async function resetPassword(
 //   passwordConfirm: string
 ): Promise<AuthResponse> {
   try {
-    const response = await fetchWithTimeout(`${API_URL.replace('/v1', '')}/auth/reset-password`, {
+    const response = await fetchWithTimeout(`${BETTER_AUTH_URL}/reset-password`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ token, new_password: password }),
+      body: JSON.stringify({ token, newPassword: password }),
     }, 8000);
-
-    const data: AuthResponse = await response.json();
-    return data;
+    const data = await response.json().catch(() => ({})) as { message?: string; error?: string };
+    return { success: response.ok, ...(!response.ok ? { error: data.message || data.error || 'Password reset failed.' } : {}) };
   } catch (error) {
     return {
       success: false,

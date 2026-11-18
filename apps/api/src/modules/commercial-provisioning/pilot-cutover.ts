@@ -27,20 +27,21 @@ import { CommercialProvisioningError } from "./service.js";
 
 /**
  * Validated non-production staging pilot binding: one real commercial offer (`website-launch`),
- * one real buildable release triad (`church-ministry` v1.0.0), shared-managed only (no Dokploy).
+ * one real release composition (`church-ministry` product v1.1.0 with solution/template v1.0.0),
+ * shared-managed only (no Dokploy).
  * Production `platformProvisioningOfferBindings` stays closed (`[]`) until manifests reach `stable`.
  */
 export const stagingPilotOfferBindings: readonly ProvisioningOfferBinding[] = [
   {
     offer: { id: "website-launch", version: "1.0.0" },
     composition: {
-      product: { id: "church-ministry", version: "1.0.0" },
+      product: { id: "church-ministry", version: "1.1.0" },
       solution: { id: "church-ministry", version: "1.0.0" },
       template: { id: "church-ministry", version: "1.0.0" },
     },
     requiredModules: [
       { id: "platform-identity", version: "1.0.0" },
-      { id: "church-ministry", version: "1.0.0" },
+      { id: "church-ministry", version: "1.1.0" },
       { id: "media-storage", version: "1.0.0" },
     ],
     optionalModules: [],

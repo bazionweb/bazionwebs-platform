@@ -44,7 +44,7 @@
         "properties": {
           "packageName": { "type": "string", "pattern": "^@bazion/[a-z0-9-]+$" },
           "version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
-          "role": { "enum": ["api", "storefront", "admin"] }
+          "role": { "enum": ["api", "storefront", "admin", "website", "ums"] }
         }
       }
     },
@@ -98,6 +98,16 @@
         "sourcePath": { "type": "string", "minLength": 1 }
       }
     },
-    "databaseSchemaVersion": { "type": "string", "pattern": "^\\d{4}_[a-z0-9_]+\\.sql$" }
+    "databaseSchemaVersion": { "type": "string", "pattern": "^\\d{4}_[a-z0-9_]+\\.sql$" },
+    "readiness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["implemented", "partial", "roadmap"],
+      "properties": {
+        "implemented": { "type": "array", "items": { "type": "string", "minLength": 2 } },
+        "partial": { "type": "array", "items": { "type": "string", "minLength": 2 } },
+        "roadmap": { "type": "array", "items": { "type": "string", "minLength": 2 } }
+      }
+    }
   }
 }

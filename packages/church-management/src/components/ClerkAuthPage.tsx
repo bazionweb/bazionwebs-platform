@@ -1,10 +1,8 @@
-import React, { useState } from 'react';
-import { SignIn, SignUp } from '../shims/clerk';
-import { Shield, UserPlus, LogIn } from '../shims/lucide-react';
+import React from 'react';
+import { SignIn } from '../shims/clerk';
+import { Shield } from '../shims/lucide-react';
 
 const ClerkAuthPage: React.FC = () => {
-  const [mode, setMode] = useState<'signin' | 'signup'>('signin');
-
   return (
     <div className="min-h-screen bg-[#0f172a] flex flex-col items-center justify-center p-4">
       {/* Top Logo - Always visible on mobile */}
@@ -78,31 +76,6 @@ const ClerkAuthPage: React.FC = () => {
         {/* Right Side: Auth Component */}
         <div className="flex flex-col items-center">
           <div className="w-full max-w-md bg-white/5 backdrop-blur-xl rounded-3xl p-1 border border-white/10 shadow-2xl">
-            <div className="flex p-1 gap-1 mb-8 bg-black/20 rounded-2xl">
-              <button
-                onClick={() => setMode('signin')}
-                className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-semibold transition-all ${
-                  mode === 'signin'
-                    ? 'bg-green-600 text-white shadow-lg'
-                    : 'text-slate-400 hover:text-white hover:bg-white/5'
-                }`}
-              >
-                <LogIn className="w-4 h-4" />
-                Sign In
-              </button>
-              <button
-                onClick={() => setMode('signup')}
-                className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-semibold transition-all ${
-                  mode === 'signup'
-                    ? 'bg-green-600 text-white shadow-lg'
-                    : 'text-slate-400 hover:text-white hover:bg-white/5'
-                }`}
-              >
-                <UserPlus className="w-4 h-4" />
-                Register
-              </button>
-            </div>
-
             <div className="p-4 clerk-container relative">
               {/* Subtle background logo */}
               <div className="absolute top-4 right-4 opacity-10">
@@ -113,57 +86,7 @@ const ClerkAuthPage: React.FC = () => {
                 />
               </div>
 
-              {mode === 'signin' ? (
-                <SignIn
-                  routing="hash"
-                  appearance={{
-                    elements: {
-                      rootBox: 'w-full',
-                      card: 'bg-transparent shadow-none border-none p-0',
-                      headerTitle: 'text-white text-2xl font-bold',
-                      headerSubtitle: 'text-slate-400',
-                      socialButtonsBlockButton:
-                        'bg-white/5 border-white/10 text-white hover:bg-white/10 transition-colors',
-                      socialButtonsBlockButtonText: 'font-medium',
-                      dividerLine: 'bg-white/10',
-                      dividerText: 'text-slate-500',
-                      formFieldLabel: 'text-slate-300 font-medium mb-1.5',
-                      formFieldInput:
-                        'bg-white/5 border-white/10 text-white focus:border-green-500 focus:ring-green-500/20 rounded-xl py-3',
-                      formButtonPrimary:
-                        'bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-xl shadow-lg shadow-green-900/20 transition-all',
-                      footerActionText: 'text-slate-400',
-                      footerActionLink: 'text-green-500 hover:text-green-400 font-bold',
-                      identityPreviewText: 'text-white',
-                      identityPreviewEditButtonIcon: 'text-green-500',
-                    },
-                  }}
-                />
-              ) : (
-                <SignUp
-                  routing="hash"
-                  signInUrl="/#sign-in"
-                  unsafeMetadata={{ role: 'member' }}
-                  appearance={{
-                    elements: {
-                      rootBox: 'w-full',
-                      card: 'bg-transparent shadow-none border-none p-0',
-                      headerTitle: 'text-white text-2xl font-bold',
-                      headerSubtitle: 'text-slate-400',
-                      socialButtonsBlockButton:
-                        'bg-white/5 border-white/10 text-white hover:bg-white/10 transition-colors',
-                      formFieldLabel: 'text-slate-300 font-medium mb-1.5',
-                      formFieldInput:
-                        'bg-white/5 border-white/10 text-white focus:border-green-500 focus:ring-green-500/20 rounded-xl py-3',
-                      formButtonPrimary:
-                        'bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-xl shadow-lg shadow-green-900/20 transition-all',
-                      footerActionText: 'text-slate-400',
-                      footerActionLink: 'text-green-500 hover:text-green-400 font-bold',
-                      formFieldAction__phoneNumber: 'hidden', // Attempt to hide via CSS classes
-                    },
-                  }}
-                />
-              )}
+              <SignIn />
             </div>
           </div>
 

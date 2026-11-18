@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, useContext, useEffect, useState } from "react";
 
 export interface ClerkUser {
   id: string;
@@ -12,250 +12,165 @@ export interface ClerkUser {
   imageUrl?: string;
   primaryEmailAddress?: { emailAddress?: string } | null;
   emailAddresses?: Array<{ emailAddress?: string }>;
+  organizationRole?: string;
 }
 
 interface ClerkContextValue {
   isLoaded: boolean;
   isSignedIn: boolean;
   user: ClerkUser | null;
-  setUser: (u: ClerkUser | null) => void;
+  setUser: (user: ClerkUser | null) => void;
   signOut: () => Promise<void>;
+  signIn: (email: string, password: string) => Promise<void>;
+  refresh: () => Promise<void>;
   getToken: (options?: { template?: string }) => Promise<string | null>;
 }
 
-const defaultUser: ClerkUser = {
-  id: "user_hkm_admin_001",
-  fullName: "Senior Pastor",
-  firstName: "Senior",
-  lastName: "Pastor",
-  username: "pastor",
-  imageUrl: "https://ui-avatars.com/api/?name=Senior+Pastor",
-  primaryEmailAddress: { emailAddress: "pastor@hkm.org" },
-  emailAddresses: [{ emailAddress: "pastor@hkm.org" }],
-};
+interface HkmIdentity {
+  success?: boolean;
+  identity?: {
+    user: { id: string; email: string; name: string };
+    organization?: { role: string } | null;
+  };
+  error?: string;
+  message?: string;
+}
 
-const ClerkContext = createContext<ClerkContextValue>({
-  isLoaded: true,
-  isSignedIn: true,
-  user: defaultUser,
-  setUser: () => {},
-  signOut: async () => {},
-  getToken: async () => "mock-supabase-clerk-token",
-});
+function toClerkUser(identity: NonNullable<HkmIdentity["identity"]>): ClerkUser {
+  const [firstName, ...lastName] = identity.user.name.split(/\s+/);
+  return {
+    id: identity.user.id,
+    fullName: identity.user.name,
+    firstName,
+    lastName: lastName.join(" "),
+    username: identity.user.email.split("@")[0],
+    primaryEmailAddress: { emailAddress: identity.user.email },
+    emailAddresses: [{ emailAddress: identity.user.email }],
+    organizationRole: identity.organization?.role,
+  };
+}
 
-export function ClerkProvider({
-  children,
-  publishableKey: _pk,
-  appearance: _app,
-}: {
-  children?: React.ReactNode;
-  publishableKey?: string;
-  appearance?: any;
-}) {
-  const [user, setUser] = useState<ClerkUser | null>(defaultUser);
-  const [isLoaded, setIsLoaded] = useState(true);
+async function responseJson(response: Response) {
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.message ?? data.error ?? "Authentication failed.");
+  return data;
+}
 
-  useEffect(() => {
+const ClerkContext = createContext<ClerkContextValue | null>(null);
+
+export function ClerkProvider({ children }: { children?: React.ReactNode; publishableKey?: string; appearance?: any }) {
+  const [user, setUser] = useState<ClerkUser | null>(null);
+  const [isLoaded, setIsLoaded] = useState(false);
+
+  const refresh = async () => {
     try {
-      const stored = localStorage.getItem("hkm_clerk_user");
-      if (stored) {
-        setUser(JSON.parse(stored));
+      const response = await fetch("/api/church/hkm/admin/session/activate", { credentials: "include", cache: "no-store" });
+      if (!response.ok) {
+        setUser(null);
+        return;
       }
-    } catch {}
+      const result = await responseJson(response) as HkmIdentity;
+      setUser(result.identity ? toClerkUser(result.identity) : null);
+    } catch {
+      setUser(null);
+    } finally {
+      setIsLoaded(true);
+    }
+  };
+
+  useEffect(() => { void refresh(); }, []);
+
+  const signIn = async (email: string, password: string) => {
+    const signedIn = await responseJson(await fetch("/api/auth/sign-in/email", {
+      method: "POST", credentials: "include", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password, rememberMe: true }),
+    })) as { user?: { id: string; email: string; name: string } };
+    if (!signedIn.user) throw new Error("The identity service returned no user session.");
+    const active = await responseJson(await fetch("/api/church/hkm/admin/session/activate", {
+      method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({}),
+    })) as HkmIdentity;
+    if (!active.identity) throw new Error("Your account does not have HKM administrator access.");
+    setUser(toClerkUser(active.identity));
     setIsLoaded(true);
-  }, []);
+  };
 
   const signOut = async () => {
-    setUser(null);
     try {
-      localStorage.removeItem("hkm_clerk_user");
-    } catch {}
+      await fetch("/api/auth/sign-out", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({}) });
+    } finally {
+      setUser(null);
+    }
   };
 
-  const getToken = async (_options?: { template?: string }) => {
-    return "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.mock-token";
-  };
+  return <ClerkContext.Provider value={{ isLoaded, isSignedIn: Boolean(user), user, setUser, signOut, signIn, refresh, getToken: async () => null }}>{children}</ClerkContext.Provider>;
+}
 
-  return (
-    <ClerkContext.Provider
-      value={{
-        isLoaded,
-        isSignedIn: Boolean(user),
-        user,
-        setUser,
-        signOut,
-        getToken,
-      }}
-    >
-      {children}
-    </ClerkContext.Provider>
-  );
+function useClerkContext() {
+  const context = useContext(ClerkContext);
+  if (!context) throw new Error("Authentication hooks must be used inside ClerkAuthProvider.");
+  return context;
 }
 
 export function useUser() {
-  const ctx = useContext(ClerkContext);
-  return {
-    isLoaded: ctx.isLoaded,
-    isSignedIn: ctx.isSignedIn,
-    user: ctx.user,
-  };
+  const context = useClerkContext();
+  return { isLoaded: context.isLoaded, isSignedIn: context.isSignedIn, user: context.user };
 }
 
 export function useAuth() {
-  const ctx = useContext(ClerkContext);
+  const context = useClerkContext();
   return {
-    isLoaded: ctx.isLoaded,
-    isSignedIn: ctx.isSignedIn,
-    userId: ctx.user?.id || null,
-    sessionId: "sess_hkm_001",
-    signOut: ctx.signOut,
-    getToken: ctx.getToken,
+    isLoaded: context.isLoaded,
+    isSignedIn: context.isSignedIn,
+    userId: context.user?.id ?? null,
+    sessionId: null,
+    signOut: context.signOut,
+    getToken: context.getToken,
   };
 }
 
 export function useSignIn() {
-  const ctx = useContext(ClerkContext);
+  const context = useClerkContext();
   return {
-    isLoaded: true,
-    signIn: {
-      create: async ({ identifier, password }: any) => {
-        const loggedUser: ClerkUser = {
-          id: `usr_${identifier.replace(/[^a-zA-Z0-9]/g, "_")}`,
-          username: identifier.split("@")[0] || "admin",
-          fullName: identifier.split("@")[0] || "Church Admin",
-          primaryEmailAddress: { emailAddress: identifier },
-          imageUrl: `https://ui-avatars.com/api/?name=${encodeURIComponent(identifier)}`,
-        };
-        ctx.setUser(loggedUser);
-        try {
-          localStorage.setItem("hkm_clerk_user", JSON.stringify(loggedUser));
-        } catch {}
-        return { status: "complete" };
-      },
-    },
+    isLoaded: context.isLoaded,
+    signIn: { create: async ({ identifier, password }: { identifier: string; password: string }) => {
+      await context.signIn(identifier, password);
+      return { status: "complete" as const };
+    } },
   };
 }
 
 export function useSignUp() {
-  const ctx = useContext(ClerkContext);
   return {
     isLoaded: true,
-    signUp: {
-      create: async ({ emailAddress }: any) => {
-        const newUser: ClerkUser = {
-          id: `usr_${Date.now()}`,
-          username: emailAddress.split("@")[0] || "member",
-          fullName: emailAddress.split("@")[0] || "New Member",
-          primaryEmailAddress: { emailAddress },
-          imageUrl: `https://ui-avatars.com/api/?name=${encodeURIComponent(emailAddress)}`,
-        };
-        ctx.setUser(newUser);
-        try {
-          localStorage.setItem("hkm_clerk_user", JSON.stringify(newUser));
-        } catch {}
-        return { status: "complete" };
-      },
-    },
+    signUp: { create: async () => { throw new Error("Self-registration is disabled. Ask an HKM tenant administrator for an invitation."); } },
   };
 }
 
-export function SignIn({
-  routing: _r,
-  appearance: _a,
-}: {
-  routing?: string;
-  appearance?: any;
-}) {
-  const [email, setEmail] = useState("admin@hkm.org");
-  const [password, setPassword] = useState("••••••••");
+export function useClerk() {
+  const context = useClerkContext();
+  return { signOut: context.signOut };
+}
+
+export function SignIn() {
   const { signIn } = useSignIn();
-
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    await signIn.create({ identifier: email, password });
-  };
-
-  return (
-    <form onSubmit={handleLogin} className="space-y-4 text-white">
-      <div>
-        <label className="block text-xs font-semibold text-slate-300 mb-1">Email Address</label>
-        <input
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-2.5 text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-green-500"
-          required
-        />
-      </div>
-      <div>
-        <label className="block text-xs font-semibold text-slate-300 mb-1">Password</label>
-        <input
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-2.5 text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-green-500"
-          required
-        />
-      </div>
-      <button
-        type="submit"
-        className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-xl shadow-lg transition-all"
-      >
-        Sign In to Church CMS
-      </button>
-    </form>
-  );
-}
-
-export function SignUp({
-  routing: _r,
-  signInUrl: _s,
-  unsafeMetadata: _u,
-  appearance: _a,
-}: {
-  routing?: string;
-  signInUrl?: string;
-  unsafeMetadata?: any;
-  appearance?: any;
-}) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const { signUp } = useSignUp();
-
-  const handleRegister = async (e: React.FormEvent) => {
-    e.preventDefault();
-    await signUp.create({ emailAddress: email, password });
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const submit = async (event: React.FormEvent) => {
+    event.preventDefault(); setLoading(true); setError("");
+    try { await signIn.create({ identifier: email, password }); }
+    catch (cause) { setError(cause instanceof Error ? cause.message : "Unable to sign in."); setPassword(""); }
+    finally { setLoading(false); }
   };
-
-  return (
-    <form onSubmit={handleRegister} className="space-y-4 text-white">
-      <div>
-        <label className="block text-xs font-semibold text-slate-300 mb-1">Email Address</label>
-        <input
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-2.5 text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-green-500"
-          required
-        />
-      </div>
-      <div>
-        <label className="block text-xs font-semibold text-slate-300 mb-1">Choose Password</label>
-        <input
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-2.5 text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-green-500"
-          required
-        />
-      </div>
-      <button
-        type="submit"
-        className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-xl shadow-lg transition-all"
-      >
-        Create Ministry Account
-      </button>
-    </form>
-  );
+  return <form onSubmit={submit} className="space-y-4 text-white">
+    <div><label className="mb-1 block text-xs font-semibold text-slate-300">Email Address</label><input type="email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="username" className="w-full rounded-xl border border-white/20 bg-white/10 px-4 py-2.5 text-white" required /></div>
+    <div><label className="mb-1 block text-xs font-semibold text-slate-300">Password</label><input type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="current-password" className="w-full rounded-xl border border-white/20 bg-white/10 px-4 py-2.5 text-white" required /></div>
+    {error && <p role="alert" className="text-sm text-red-300">{error}</p>}
+    <button type="submit" disabled={loading} className="w-full rounded-xl bg-green-600 py-3 font-bold text-white disabled:opacity-60">{loading ? "Signing in…" : "Sign In to Church CMS"}</button>
+  </form>;
 }
 
+export function SignUp() {
+  return <p className="text-sm text-slate-300">Self-registration is disabled. Ask an HKM tenant administrator for an invitation.</p>;
+}

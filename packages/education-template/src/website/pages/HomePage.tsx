@@ -24,7 +24,7 @@ export default function HomePage() {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch(`${API_WORKER_URL}/api/public/programs`, { cache: 'no-store' });
+        const res = await fetch(`${API_WORKER_URL}/api/public/education/programs`, { cache: 'no-store' });
         if (!res.ok) return;
         const body = await res.json();
         // Only update if the API returned a non-empty array

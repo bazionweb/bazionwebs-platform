@@ -111,6 +111,7 @@ export type TenantPermissionRequest = {
   enquiry?: Array<"read" | "export" | "delete">;
   enquiryPolicy?: Array<"read" | "update">;
   analytics?: Array<"read">;
+  education?: Array<"read" | "create" | "update" | "delete">;
   organization?: Array<"update">;
   member?: Array<"create" | "update" | "delete">;
   invitation?: Array<"create" | "cancel">;

@@ -7,7 +7,7 @@ interface AllAttendanceRecordsPageProps {
   setActivePage: (page: string) => void;
   attendanceRecords: AttendanceRecord[];
   onEdit: (date: string, service: string) => void;
-  onDelete: (id: number) => void;
+  onDelete: (id: string | number) => void;
 }
 
 const AllAttendanceRecordsPage: React.FC<AllAttendanceRecordsPageProps> = ({

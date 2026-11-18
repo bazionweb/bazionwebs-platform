@@ -126,13 +126,27 @@ export const platformModuleCatalog: readonly PlatformModuleCatalogItem[] = [
   {
     "id": "church-ministry",
     "name": "Church & Ministry Platform",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "status": "partial",
     "tenantModel": "tenant-owned",
     "dependencies": [
       "platform-identity"
     ],
-    "description": "Tenant-scoped sermons, events, registrations, donations, enquiries and prayer requests; broader ministry operations remain in progress.",
+    "description": "Tenant-scoped church content and HKM member, attendance, and giving records; member portal account linking and broader ministry operations remain in progress.",
+    "defaultEnabled": false,
+    "required": false,
+    "tenantAssignable": true
+  },
+  {
+    "id": "education-ums",
+    "name": "Education UMS",
+    "version": "0.1.0",
+    "status": "partial",
+    "tenantModel": "tenant-owned",
+    "dependencies": [
+      "platform-identity"
+    ],
+    "description": "Institution-scoped student and programme records for education tenants; admissions, finance, courses, grading and LMS remain in progress.",
     "defaultEnabled": false,
     "required": false,
     "tenantAssignable": true

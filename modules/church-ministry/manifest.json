@@ -1,7 +1,7 @@
 {
   "id": "church-ministry",
   "name": "Church and ministry public content and operations",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "owner": "church-ministry",
   "status": "partial",
   "entrypoints": {
@@ -39,14 +39,22 @@
     { "name": "church_volunteer_applications", "owner": "church-ministry", "tenantScoped": true, "rls": "forced", "migration": "0026_church_ministry_operations.sql" },
     { "name": "church_inventory_assets", "owner": "church-ministry", "tenantScoped": true, "rls": "forced", "migration": "0026_church_ministry_operations.sql" },
     { "name": "church_inventory_asset_events", "owner": "church-ministry", "tenantScoped": true, "rls": "forced", "migration": "0026_church_ministry_operations.sql" },
-    { "name": "ministry_site_settings_versions", "owner": "church-ministry", "tenantScoped": true, "rls": "forced", "migration": "0027_church_site_settings_versions.sql" }
+    { "name": "ministry_site_settings_versions", "owner": "church-ministry", "tenantScoped": true, "rls": "forced", "migration": "0027_church_site_settings_versions.sql" },
+    { "name": "hkm_branches", "owner": "church-ministry", "tenantScoped": true, "rls": "forced", "migration": "0029_hkm_member_records.sql" },
+    { "name": "hkm_members", "owner": "church-ministry", "tenantScoped": true, "rls": "forced", "migration": "0029_hkm_member_records.sql" },
+    { "name": "hkm_attendance_records", "owner": "church-ministry", "tenantScoped": true, "rls": "forced", "migration": "0029_hkm_member_records.sql" },
+    { "name": "hkm_member_attendance_records", "owner": "church-ministry", "tenantScoped": true, "rls": "forced", "migration": "0032_hkm_member_attendance.sql" },
+    { "name": "hkm_giving_transactions", "owner": "church-ministry", "tenantScoped": true, "rls": "forced", "migration": "0029_hkm_member_records.sql" }
   ],
   "migrations": [
     "0008_church_ministry_domain.sql",
     "0009_church_integrity_and_payment_callbacks.sql",
     "0011_church_site_and_privacy.sql",
     "0026_church_ministry_operations.sql",
-    "0027_church_site_settings_versions.sql"
+    "0027_church_site_settings_versions.sql",
+    "0029_hkm_member_records.sql",
+    "0031_hkm_member_profile_fields.sql",
+    "0032_hkm_member_attendance.sql"
   ],
   "providers": ["Safaricom Daraja M-Pesa STK Push for donations; requires merchant credentials and provider callback verification"],
   "dependencies": ["platform-identity", "media-storage"],

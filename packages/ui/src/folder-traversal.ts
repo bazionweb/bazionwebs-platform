@@ -25,6 +25,59 @@ export function formatFilenameStem(filename: string): string {
     .replace(/\b\w/g, (c) => c.toUpperCase()); // title case
 }
 
+export interface InferredMediaMetadata {
+  altText: string;
+  caption?: string | undefined;
+  category: string;
+  tags: string[];
+}
+
+/**
+ * Intelligent Tier-1 heuristic metadata extractor.
+ * Converts filename stems and relative paths into semantic accessibility alt text and captions.
+ */
+export function inferMediaMetadata(filename: string, context: string = "gallery"): InferredMediaMetadata {
+  const stem = filename.replace(/\.[a-zA-Z0-9]+$/, "");
+  const cleanTitle = stem
+    .replace(/^\d{4}[-_]\d{2}[-_]\d{2}[-_]?/, "")
+    .replace(/[-_]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+
+  const lower = stem.toLowerCase();
+  let category = "General";
+  const tags: string[] = [];
+
+  if (lower.includes("worship") || lower.includes("praise") || lower.includes("choir") || lower.includes("sing")) {
+    category = "Praise & Worship";
+    tags.push("worship", "choir");
+  } else if (lower.includes("youth") || lower.includes("camp") || lower.includes("teens")) {
+    category = "Youth Ministry";
+    tags.push("youth", "fellowship");
+  } else if (lower.includes("outreach") || lower.includes("mission") || lower.includes("charity") || lower.includes("community")) {
+    category = "Community Outreach";
+    tags.push("outreach", "community");
+  } else if (lower.includes("sunday") || lower.includes("service") || lower.includes("sermon")) {
+    category = "Sunday Service";
+    tags.push("sunday", "service");
+  } else if (lower.includes("pastor") || lower.includes("elder") || lower.includes("leadership") || lower.includes("bishop")) {
+    category = "Leadership";
+    tags.push("pastoral", "leadership");
+  }
+
+  const titleOrFallback = cleanTitle.length >= 3 ? cleanTitle : "Sanctuary photo";
+  const altText = `${titleOrFallback} in sanctuary`;
+  const caption = `${titleOrFallback} · ${category}`;
+
+  return {
+    altText,
+    caption,
+    category,
+    tags,
+  };
+}
+
 /**
  * Recursively traverses entries from an HTML5 DataTransferItemList (drag-and-drop)
  * or a FileList (file input).

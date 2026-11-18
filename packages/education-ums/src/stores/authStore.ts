@@ -8,7 +8,6 @@ import {
   login as authLogin,
   logout as authLogout,
   verifySession,
-  refreshAccessToken,
   getToken,
   getCurrentUser,
   type User,
@@ -88,13 +87,13 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   refreshToken: async () => {
-    const newToken = await refreshAccessToken();
-    if (newToken) {
-      set({ token: newToken, isLoggedIn: true, user: getCurrentUser() });
-    } else {
-      set({ isLoggedIn: false, user: null, token: null });
-    }
-    return newToken;
+    const sessionIsValid = await verifySession();
+    set({
+      token: null,
+      isLoggedIn: sessionIsValid,
+      user: sessionIsValid ? getCurrentUser() : null,
+    });
+    return null;
   },
 }));
 

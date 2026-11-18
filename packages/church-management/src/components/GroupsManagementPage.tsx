@@ -5,12 +5,13 @@ import { Member, AgeGroup } from './memberData';
 import ActionButtons from './ActionButtons';
 
 export interface Group {
-  id: number;
+  id: string | number;
   name: string;
   leader: string;
   members: number;
   created: string;
   category?: AgeGroup | 'General'; // Age-based category or General for adult groups
+  description?: string;
 }
 
 interface GroupsManagementPageProps {
@@ -18,7 +19,7 @@ interface GroupsManagementPageProps {
   members: Member[];
   groups: Group[];
   onSaveGroup: (groupData: Partial<Group>) => void;
-  onDeleteGroup: (id: number) => void;
+  onDeleteGroup: (id: string | number) => void;
   onEditGroup: (group: Group) => void;
   groupToEdit: Group | null;
   setGroupToEdit: (group: Group | null) => void;

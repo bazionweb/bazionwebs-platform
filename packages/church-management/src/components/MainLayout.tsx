@@ -27,7 +27,6 @@ import { useUsers } from '../hooks/useUsers';
 import { useBranches } from '../hooks/useBranches';
 import { useRecycleBin } from '../hooks/useRecycleBin';
 import { usePermissionRequests } from '../hooks/usePermissionRequests';
-import { useProvisioningQueue } from '../hooks/useProvisioningQueue';
 
 interface MainLayoutProps {
   currentUser: User | null;
@@ -78,27 +77,6 @@ const MainLayout: React.FC<MainLayoutProps> = ({ currentUser, onLogout }) => {
   const { users: allUsers, upsertUser: onSaveOrUpdateUser, deleteUser: onDeleteUser } = useUsers();
   const { data: permissionRequests, updateRequest } = usePermissionRequests();
 
-  const { processRetries } = useProvisioningQueue();
-
-  // Process provisioning queue retries on startup (non-blocking, runs once)
-  useEffect(() => {
-    const run = async () => {
-      const result = await processRetries();
-      if (result.activated.length > 0) {
-        showToast(`Auto-activated ${result.activated.length} member(s) from provisioning queue.`, 'success');
-      }
-      if (result.stillBlocked.length > 0) {
-        showToast(
-          `${result.stillBlocked.length} member(s) still blocked — missing contact details. Update profiles and retry.`,
-          'info',
-        );
-      }
-      if (result.errors.length > 0) {
-        console.warn('[ProvisioningQueue] Retry errors:', result.errors);
-      }
-    };
-    run();
-  }, []);
 
   // Listen for Clerk JWT template errors
   useEffect(() => {
@@ -196,35 +174,6 @@ const MainLayout: React.FC<MainLayoutProps> = ({ currentUser, onLogout }) => {
     }
   }, [activePage]);
 
-  // Update Groups Logic — keep denormalized member_count / leader_id in sync.
-  // Debounced so bursts of member changes coalesce into a single pass, and it
-  // only writes when a value actually differs (compares leader_id to leader_id,
-  // not id to email, which would otherwise loop endlessly).
-  useEffect(() => {
-    if (members.length === 0 || groups.length === 0) return;
-
-    const timer = setTimeout(() => {
-      groups.map((group) => {
-        const membersInDept = members.filter((m) => m.department === group.name);
-        const leader = membersInDept.find((m) => m.role === 'Leader') || membersInDept[0];
-        const newMemberCount = membersInDept.length;
-        const newLeaderId = leader ? leader.id : '';
-        const newLeaderEmail = leader ? leader.email || '' : '';
-
-        if (group.members !== newMemberCount || group.leader !== newLeaderId) {
-          updateGroup(Number(group.id), {
-            ...group,
-            members: newMemberCount,
-            leader: newLeaderEmail,
-            leaderId: newLeaderId,
-          }).catch((err) => console.error('Failed to update group stats:', err));
-        }
-      });
-    }, 1200);
-
-    return () => clearTimeout(timer);
-  }, [members, groups, updateGroup]);
-
   // --- Member Handlers ---
   const handleSaveOrUpdateMember = async (memberData: Partial<Member>) => {
     try {
@@ -320,7 +269,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ currentUser, onLogout }) => {
     setGroupToEdit(null);
   };
 
-  const handleDeleteGroup = async (id: number) => {
+  const handleDeleteGroup = async (id: string | number) => {
     if (window.confirm('Delete this group?')) {
       try {
         const groupToDelete = groups.find((g) => g.id === id);
@@ -353,7 +302,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ currentUser, onLogout }) => {
     }
   };
 
-  const handleDeleteAttendanceRecord = async (id: number) => {
+  const handleDeleteAttendanceRecord = async (id: string | number) => {
     if (window.confirm('Delete this record?')) {
       try {
         const attendanceToDelete = attendanceRecords.find((a) => a.id === id);

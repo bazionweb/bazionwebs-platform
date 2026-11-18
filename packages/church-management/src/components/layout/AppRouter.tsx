@@ -60,7 +60,7 @@ export interface AppRouterProps {
   groupToEdit: Group | null;
   setGroupToEdit: (g: Group | null) => void;
   handleSaveOrUpdateGroup: (g: Partial<Group>) => Promise<void>;
-  handleDeleteGroup: (id: number) => Promise<void>;
+  handleDeleteGroup: (id: string | number) => Promise<void>;
   handleStartEditGroup: (g: Group) => void;
 
   attendanceRecords: AttendanceRecord[];
@@ -72,7 +72,7 @@ export interface AppRouterProps {
     serviceDate: string,
   ) => Promise<void>;
   handleEditAttendanceRecord: (date: string, service: string) => void;
-  handleDeleteAttendanceRecord: (id: number) => Promise<void>;
+  handleDeleteAttendanceRecord: (id: string | number) => Promise<void>;
 
   transactions: Transaction[];
   transactionToEdit: Transaction | null;

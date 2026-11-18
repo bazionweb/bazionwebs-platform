@@ -1,371 +1,173 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useMutation, useQuery } from '../shims/apollo';
-import { useAuth } from '../shims/clerk';
-import { toTitleCase, formatEmail } from '../utils/stringFormatter';
-import { Member, EmailTier } from '../components/memberData';
-import {
-  GET_MEMBERS_QUERY,
-  ADD_MEMBER_MUTATION,
-  UPDATE_MEMBER_MUTATION,
-  DELETE_MEMBER_MUTATION,
-} from '../services/graphql/members';
-import { ADD_AUDIT_LOG_MUTATION } from '../services/graphql/transactions';
-import { updateAlias, deleteAlias } from '../services/improvmxService';
+import { useCallback, useEffect, useState } from "react";
+import { Member } from "../components/memberData";
+import { formatEmail, toTitleCase } from "../utils/stringFormatter";
+import { hkmApiRequest, hkmStatusLabel } from "../services/hkmApi";
 
-const GRAPHQL_SUFFIX = '/graphql/v1';
-
-function getSupabaseRestUrl() {
-  const explicitUrl = import.meta.env.VITE_SUPABASE_URL;
-  const graphQlUrl = import.meta.env.VITE_SUPABASE_GRAPHQL_URL;
-  // Local Supabase (localhost) is a safe non-production fallback; never silently
-  // point at a remote database when env vars are missing.
-  const baseUrl = explicitUrl || (graphQlUrl ? graphQlUrl.replace(GRAPHQL_SUFFIX, '') : 'http://localhost:54321');
-  return `${baseUrl}/rest/v1`;
-}
-
-function parseCountHeader(contentRange: string | null): number | null {
-  if (!contentRange) return null;
-
-  const total = contentRange.split('/').pop();
-  if (!total || total === '*') return null;
-
-  const parsed = Number.parseInt(total, 10);
-  return Number.isNaN(parsed) ? null : parsed;
-}
-
-interface SupabaseMember {
+interface HkmMemberRecord {
   id: string;
-  first_name: string;
-  last_name: string;
+  membershipNumber: string;
+  firstName: string;
+  lastName: string;
   title?: string;
-  email?: string;
+  email: string;
   phone?: string;
   department?: string;
-  status: 'Active' | 'Inactive' | 'Transferred' | 'Pending Fee';
-  dob?: string;
-  gender: 'Male' | 'Female';
-  avatar_transform?: string;
-  address?: string;
-  joined_at?: string;
-  occupation?: string;
-  marital_status?: string;
-  pin?: string | null;
+  gender?: string;
   avatar?: string | null;
-  is_portal_active?: boolean;
-  email_tier?: EmailTier;
-  org_email?: string;
+  avatarTransform?: Member["avatarTransform"] | null;
+  address?: string | null;
+  occupation?: string | null;
+  maritalStatus?: string | null;
+  joinedAt?: string | null;
+  status?: string;
+  role?: string;
+  dateOfBirth?: string | null;
+  createdAt?: string;
+  branchId?: string;
+  branchName?: string;
 }
 
-// Transform Supabase data to frontend Member format
-function transformMember(SupabaseMember: SupabaseMember): Member {
-  const firstName = SupabaseMember.first_name || '';
-  const lastName = SupabaseMember.last_name || '';
-  let fullName = `${firstName} ${lastName}`.trim();
+interface HkmMemberPage {
+  items: HkmMemberRecord[];
+  total: number;
+  page: number;
+  perPage: number;
+}
 
-  // Fallback to email or ID if name is empty
-  if (!fullName || fullName.length === 0) {
-    if (SupabaseMember.email) {
-      fullName = SupabaseMember.email.split('@')[0]; // Use email username part
-    } else {
-      fullName = `Member ${SupabaseMember.id}`; // Fallback to ID
-    }
-    console.warn('Member with empty name found, using fallback:', {
-      id: SupabaseMember.id,
-      firstName,
-      lastName,
-      email: SupabaseMember.email,
-      fallbackName: fullName,
-    });
-  }
-
+function toMember(row: HkmMemberRecord): Member {
+  const name = `${row.firstName ?? ""} ${row.lastName ?? ""}`.trim() || row.email || `Member ${row.id}`;
   return {
-    id: SupabaseMember.id,
-    name: fullName,
-    title: SupabaseMember.title || '',
-    avatar: SupabaseMember.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(fullName)}`,
-    avatarTransform: SupabaseMember.avatar_transform ? JSON.parse(SupabaseMember.avatar_transform) : undefined,
-    phone: SupabaseMember.phone || '',
-    email: SupabaseMember.email || '',
-    department: SupabaseMember.department || '',
-    role: 'Member', // Default role since it's not in the database
-    status: SupabaseMember.status,
-    dateAdded: SupabaseMember.joined_at || new Date().toISOString().split('T')[0],
-    dob: SupabaseMember.dob || '',
-    gender: SupabaseMember.gender,
-    occupation: SupabaseMember.occupation,
-    maritalStatus: SupabaseMember.marital_status,
-    location: SupabaseMember.address,
-    pin: SupabaseMember.pin || null,
-    is_portal_active: SupabaseMember.is_portal_active || false,
-    email_tier: SupabaseMember.email_tier || 'member',
-    org_email: SupabaseMember.org_email || undefined,
+    id: row.id,
+    name,
+    title: row.title ?? "",
+    avatar: row.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}`,
+    avatarTransform: row.avatarTransform ?? undefined,
+    phone: row.phone ?? "",
+    email: row.email ?? "",
+    department: row.department ?? "",
+    role: row.role ?? "Member",
+    status: hkmStatusLabel(row.status),
+    dateAdded: row.joinedAt ?? row.createdAt?.slice(0, 10) ?? "",
+    dob: row.dateOfBirth ?? "",
+    gender: (row.gender === "Female" ? "Female" : "Male"),
+    occupation: row.occupation ?? undefined,
+    maritalStatus: row.maritalStatus ?? undefined,
+    location: row.address ?? undefined,
+    pin: null,
+    is_portal_active: false,
+    email_tier: "member",
+  };
+}
+
+function serializeMember(member: Partial<Member>) {
+  const [firstName, ...lastNameParts] = (member.name ?? "").trim().split(/\s+/);
+  const email = formatEmail(member.email);
+  if (!firstName || !lastNameParts.length || !email) {
+    throw new Error("Enter the member’s first name, last name, and email address.");
+  }
+  return {
+    first_name: toTitleCase(firstName),
+    last_name: toTitleCase(lastNameParts.join(" ")),
+    title: toTitleCase(member.title),
+    email,
+    phone: member.phone ?? "",
+    department: toTitleCase(member.department),
+    gender: member.gender ?? "Male",
+    avatar: member.avatar ?? null,
+    avatarTransform: member.avatarTransform ?? null,
+    address: member.location ?? null,
+    occupation: member.occupation ?? null,
+    maritalStatus: member.maritalStatus ?? null,
+    joinedAt: member.dateAdded || new Date().toISOString().slice(0, 10),
+    status: (member.status ?? "Active").toLowerCase().replaceAll(" ", "_"),
+    role: member.role ?? "Member",
+    dateOfBirth: member.dob || null,
   };
 }
 
 export function useMembers() {
-  const { getToken } = useAuth();
-  const { data, loading, error, fetchMore } = useQuery(GET_MEMBERS_QUERY, {
-    fetchPolicy: 'cache-and-network',
-    notifyOnNetworkStatusChange: false,
-    errorPolicy: 'all',
-  });
-  const [exactTotal, setExactTotal] = useState<number | null>(null);
-  const [totalCountLoading, setTotalCountLoading] = useState(false);
+  const [members, setMembers] = useState<Member[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<Error | undefined>();
+  const [totalCount, setTotalCount] = useState(0);
+  const pageSize = 250;
 
-  const pageInfo = data?.membersCollection?.pageInfo;
-  const hasNextPage = !!pageInfo?.hasNextPage;
-  const fetchNextPage = useCallback(async () => {
-    if (!hasNextPage || !pageInfo?.endCursor) return;
-    await fetchMore({
-      variables: {
-        after: pageInfo.endCursor,
-      },
-    });
-  }, [fetchMore, hasNextPage, pageInfo?.endCursor]);
-
-  const [addMemberMutation] = useMutation(ADD_MEMBER_MUTATION, {
-    refetchQueries: [{ query: GET_MEMBERS_QUERY }],
-  });
-  const [updateMemberMutation] = useMutation(UPDATE_MEMBER_MUTATION, {
-    refetchQueries: [{ query: GET_MEMBERS_QUERY }],
-  });
-  const [deleteMemberMutation] = useMutation(DELETE_MEMBER_MUTATION, {
-    refetchQueries: [{ query: GET_MEMBERS_QUERY }],
-  });
-  const [addAuditLogMutation] = useMutation(ADD_AUDIT_LOG_MUTATION);
-
-  const members: Member[] = useMemo(() => {
-    // Supabase pg_graphql wraps results in membersCollection.edges[].node
-    const rows =
-      data?.membersCollection?.edges?.map((e: { node: SupabaseMember }) => e.node) ??
-      data?.members ?? // fallback for tests
-      [];
-    return rows.map(transformMember);
-  }, [data]);
-
-  // Since members are fetched in full (first: 10000), members.length IS the
-  // exact total. We only hit the REST count endpoint as a fallback when the
-  // GraphQL page looks truncated (>= page size), so no extra request is made
-  // on every startup or after every mutation.
-  const refreshTotalCount = useCallback(async () => {
-    const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
-    if (!anonKey || members.length < 10000) {
-      setTotalCountLoading(false);
-      return;
-    }
-
-    setTotalCountLoading(true);
-
+  const loadAll = useCallback(async () => {
     try {
-      const token = await getToken({ template: 'supabase' });
-      const response = await fetch(`${getSupabaseRestUrl()}/members?select=id&limit=1`, {
-        method: 'HEAD',
-        headers: {
-          apikey: anonKey,
-          Authorization: `Bearer ${token || anonKey}`,
-          Prefer: 'count=exact',
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch members count (${response.status})`);
-      }
-
-      setExactTotal(parseCountHeader(response.headers.get('content-range')));
-    } catch (countError) {
-      console.warn('Failed to fetch exact members count:', countError);
+      setLoading(true);
+      const allMembers: Member[] = [];
+      let pageNumber = 1;
+      let resultTotal = 0;
+      do {
+        const result = await hkmApiRequest<HkmMemberPage>(`/api/church/hkm/members?page=${pageNumber}&perPage=${pageSize}`);
+        allMembers.push(...result.items.map(toMember));
+        resultTotal = result.total;
+        pageNumber += 1;
+        if (result.items.length === 0) break;
+      } while (allMembers.length < resultTotal);
+      setMembers(allMembers);
+      setTotalCount(resultTotal);
+      setError(undefined);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause : new Error("Unable to load members."));
+      throw cause;
     } finally {
-      setTotalCountLoading(false);
+      setLoading(false);
     }
-  }, [getToken, members.length]);
+  }, []);
 
   useEffect(() => {
-    if (members.length >= 10000) void refreshTotalCount();
-  }, [refreshTotalCount, members.length]);
+    void loadAll().catch(() => undefined);
+  }, [loadAll]);
 
-  const addMember = async (member: Partial<Member>) => {
-    try {
-      // Check for duplicate member
-      const isDuplicate = members.some((m) => {
-        const nameMatches = m.name?.trim().toLowerCase() === member.name?.trim().toLowerCase();
-        const phoneMatches = m.phone && member.phone && m.phone.trim() === member.phone.trim();
-        const emailMatches =
-          m.email && member.email && m.email.trim().toLowerCase() === member.email.trim().toLowerCase();
+  const refresh = loadAll;
 
-        return (nameMatches && phoneMatches) || (emailMatches && emailMatches === true); // email must be present and match
-      });
+  const addMember = useCallback(async (member: Partial<Member>) => {
+    await hkmApiRequest("/api/church/hkm/members", { method: "POST", body: JSON.stringify(serializeMember(member)) });
+    await refresh();
+  }, [refresh]);
 
-      if (isDuplicate) {
-        throw new Error(
-          'A member with this name, phone, or email already exists. If they are pending registration, please go to Finances to pay their remaining balance.',
-        );
-      }
-
-      const [firstName, ...lastNameParts] = (member.name || '').split(' ');
-      const lastName = lastNameParts.join(' ');
-
-      const memberData = {
-        id: member.id || `HKM-${Date.now()}`,
-        first_name: toTitleCase(firstName),
-        last_name: toTitleCase(lastName),
-        title: toTitleCase(member.title),
-        email: formatEmail(member.email) || null,
-        phone: member.phone || null,
-        department: toTitleCase(member.department),
-        status: member.status || 'Pending Fee',
-        dob: member.dob || null, // empty string -> null (Postgres date rejects "")
-        gender: member.gender || 'Male',
-        avatar: member.avatar || null,
-        avatar_transform: member.avatarTransform ? JSON.stringify(member.avatarTransform) : null,
-        address: toTitleCase(member.location),
-        occupation: toTitleCase(member.occupation) || null,
-        marital_status: toTitleCase(member.maritalStatus) || null,
-        joined_at: member.dateAdded || new Date().toISOString().split('T')[0],
-        pin: null,
-        is_portal_active: false,
-        email_tier: member.email_tier || 'member',
-        org_email: member.org_email || null,
-      };
-
-      await addMemberMutation({
-        variables: {
-          object: memberData,
-        },
-      });
-
-      // Real-time subscription will update UI automatically
-    } catch (error) {
-      console.error('Error adding member:', error);
-      throw error;
+  const updateMember = useCallback(async (id: string, updates: Partial<Member>) => {
+    const payload: Record<string, unknown> = {};
+    if (updates.name !== undefined) {
+      const [firstName, ...rest] = updates.name.trim().split(/\s+/);
+      if (!firstName || !rest.length) throw new Error("Enter both the member’s first and last name.");
+      payload.first_name = toTitleCase(firstName);
+      payload.last_name = toTitleCase(rest.join(" "));
     }
-  };
+    if (updates.title !== undefined) payload.title = toTitleCase(updates.title);
+    if (updates.email !== undefined) payload.email = formatEmail(updates.email);
+    if (updates.phone !== undefined) payload.phone = updates.phone;
+    if (updates.department !== undefined) payload.department = toTitleCase(updates.department);
+    if (updates.gender !== undefined) payload.gender = updates.gender;
+    if (updates.avatar !== undefined) payload.avatar = updates.avatar || null;
+    if (updates.avatarTransform !== undefined) payload.avatarTransform = updates.avatarTransform;
+    if (updates.location !== undefined) payload.address = updates.location || null;
+    if (updates.occupation !== undefined) payload.occupation = updates.occupation || null;
+    if (updates.maritalStatus !== undefined) payload.maritalStatus = updates.maritalStatus || null;
+    if (updates.status !== undefined) payload.status = updates.status.toLowerCase().replaceAll(" ", "_");
+    if (updates.dob !== undefined) payload.dateOfBirth = updates.dob || null;
+    if (updates.dateAdded !== undefined) payload.joinedAt = updates.dateAdded || null;
+    if (updates.role !== undefined) payload.role = updates.role;
+    await hkmApiRequest(`/api/church/hkm/members/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(payload) });
+    await refresh();
+  }, [refresh]);
 
-  const updateMember = async (id: string, updates: Partial<Member>) => {
-    // Check for duplicate member
-    const isDuplicate = members.some((m) => {
-      if (m.id === id) return false;
-
-      const currentMember = members.find((member) => member.id === id);
-      const targetName = updates.name !== undefined ? updates.name : currentMember?.name;
-      const targetPhone = updates.phone !== undefined ? updates.phone : currentMember?.phone;
-      const targetEmail = updates.email !== undefined ? updates.email : currentMember?.email;
-
-      const nameMatches = m.name?.trim().toLowerCase() === targetName?.trim().toLowerCase();
-      const phoneMatches = m.phone && targetPhone && m.phone.trim() === targetPhone.trim();
-      const emailMatches = m.email && targetEmail && m.email.trim().toLowerCase() === targetEmail.trim().toLowerCase();
-
-      return (nameMatches && phoneMatches) || (emailMatches && emailMatches === true);
-    });
-
-    if (isDuplicate) {
-      throw new Error('A member with this name, phone, or email already exists.');
-    }
-
-    const SupabaseUpdates: Record<string, unknown> = {};
-
-    if (updates.name) {
-      const [firstName, ...lastNameParts] = updates.name.split(' ');
-      SupabaseUpdates.first_name = toTitleCase(firstName);
-      SupabaseUpdates.last_name = toTitleCase(lastNameParts.join(' '));
-    }
-
-    if (updates.title !== undefined) SupabaseUpdates.title = toTitleCase(updates.title);
-    if (updates.email !== undefined) SupabaseUpdates.email = formatEmail(updates.email) || null;
-    if (updates.phone !== undefined) SupabaseUpdates.phone = updates.phone || null;
-    if (updates.department !== undefined) SupabaseUpdates.department = toTitleCase(updates.department);
-    if (updates.status !== undefined) {
-      SupabaseUpdates.status = updates.status;
-      if (updates.status === 'Inactive' || updates.status === 'Transferred') {
-        SupabaseUpdates.pin = null;
-        SupabaseUpdates.is_portal_active = false;
-      }
-    }
-    if (updates.dob !== undefined) SupabaseUpdates.dob = updates.dob || null; // empty string -> null (Postgres date rejects "")
-    if (updates.gender !== undefined) SupabaseUpdates.gender = updates.gender;
-    if (updates.avatar !== undefined) SupabaseUpdates.avatar = updates.avatar || null;
-    if (updates.avatarTransform !== undefined)
-      SupabaseUpdates.avatar_transform = JSON.stringify(updates.avatarTransform);
-    if (updates.location !== undefined) SupabaseUpdates.address = toTitleCase(updates.location);
-    if (updates.occupation !== undefined) SupabaseUpdates.occupation = toTitleCase(updates.occupation) || null;
-    if (updates.maritalStatus !== undefined)
-      SupabaseUpdates.marital_status = toTitleCase(updates.maritalStatus) || null;
-    if (updates.email_tier !== undefined) SupabaseUpdates.email_tier = updates.email_tier;
-    if (updates.org_email !== undefined) SupabaseUpdates.org_email = updates.org_email || null;
-
-    await updateMemberMutation({
-      variables: {
-        id,
-        updates: SupabaseUpdates,
-      },
-    });
-
-    // Handle ImprovMX alias updates and deletions
-    const currentMember = members.find((member) => member.id === id);
-    if (currentMember?.org_email && currentMember?.email_tier === 'member') {
-      // If email changed, update forwarding destination
-      if (updates.email !== undefined && updates.email !== currentMember.email) {
-        if (updates.email) {
-          updateAlias(currentMember.org_email, updates.email).catch((err) =>
-            console.error('Failed to update alias:', err),
-          );
-        }
-      }
-
-      // If status changed to inactive/transferred, delete the alias
-      if (updates.status !== undefined && updates.status !== currentMember.status) {
-        if (updates.status === 'Inactive' || updates.status === 'Transferred') {
-          deleteAlias(currentMember.org_email).catch((err) => console.error('Failed to delete alias:', err));
-        }
-      }
-    }
-
-    // Audit log for status changes
-    if (updates.status !== undefined && currentMember && updates.status !== currentMember.status) {
-      try {
-        await addAuditLogMutation({
-          variables: {
-            object: {
-              action: 'Member Status Changed',
-              entity_type: 'member',
-              entity_id: id,
-              details: {
-                from: currentMember.status,
-                to: updates.status,
-                changes: SupabaseUpdates,
-              },
-            },
-          },
-        });
-      } catch (auditErr) {
-        console.error('Failed to write audit log for status change:', auditErr);
-      }
-    }
-
-    // Real-time subscription will update UI automatically
-  };
-
-  const deleteMember = async (id: string) => {
-    const result = await deleteMemberMutation({
-      variables: { id },
-    });
-
-    if (!result.data?.deleteFrommembersCollection?.records?.length) {
-      throw new Error('Failed to delete member - no data returned');
-    }
-  };
+  const deleteMember = useCallback(async (id: string) => {
+    await hkmApiRequest(`/api/church/hkm/members/${encodeURIComponent(id)}`, { method: "DELETE" });
+    await refresh();
+  }, [refresh]);
 
   return {
     data: members,
-    setData: (_newMembers: Member[]) => {
-      console.warn('setData called on Supabase subscription - data is managed by GraphQL');
-    },
+    setData: setMembers,
     loading,
     error,
-    totalCount: exactTotal ?? members.length,
-    totalCountLoading,
-    refreshTotalCount,
-    hasNextPage,
-    fetchNextPage,
+    totalCount,
+    totalCountLoading: false,
+    refreshTotalCount: refresh,
+    hasNextPage: false,
+    fetchNextPage: async () => undefined,
     addMember,
     updateMember,
     deleteMember,

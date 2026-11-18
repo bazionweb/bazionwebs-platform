@@ -16,6 +16,7 @@ const AddGroupPage: React.FC<AddGroupPageProps> = ({ onBack, members, onSave, gr
   const [groupName, setGroupName] = useState('');
   const [leaderName, setLeaderName] = useState('');
   const [category, setCategory] = useState<AgeGroup | 'General'>('General');
+  const [description, setDescription] = useState('');
 
   useEffect(() => {
     if (isEditMode && groupToEdit) {
@@ -25,6 +26,7 @@ const AddGroupPage: React.FC<AddGroupPageProps> = ({ onBack, members, onSave, gr
         setLeaderName(leader.name);
       }
       setCategory(groupToEdit.category || 'General');
+      setDescription(groupToEdit.description || '');
     }
   }, [isEditMode, groupToEdit, members]);
 
@@ -47,6 +49,7 @@ const AddGroupPage: React.FC<AddGroupPageProps> = ({ onBack, members, onSave, gr
       name: groupName,
       leader: leader.email,
       category: category,
+      description,
     };
 
     if (isEditMode && groupToEdit) {
@@ -99,7 +102,7 @@ const AddGroupPage: React.FC<AddGroupPageProps> = ({ onBack, members, onSave, gr
             value={leaderName}
             onChange={(e) => setLeaderName(e.target.value)}
           />
-          <TextAreaField label="Group Description" placeholder="Briefly describe the purpose of this group." />
+          <TextAreaField name="description" label="Group Description" placeholder="Briefly describe the purpose of this group." value={description} onChange={(event) => setDescription(event.target.value)} />
 
           <div className="flex justify-end pt-6 border-t">
             <button

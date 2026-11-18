@@ -6,6 +6,7 @@ import {
 
 export { tenants } from "./schema/tenants.js";
 export * from "./schema/commerce.js";
+export * from "./schema/education.js";
 
 /** Control-plane routing metadata. This table stores secret references, never credentials. */
 export const tenantDatabaseBindings = pgTable("tenant_database_bindings", {

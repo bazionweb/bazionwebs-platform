@@ -76,7 +76,16 @@
     {
       "id": "church-ministry",
       "displayName": "Church & Ministry Platform",
-      "description": "Tenant-scoped sermons, events, registrations, donations, enquiries and prayer requests; broader ministry operations remain in progress.",
+      "description": "Tenant-scoped church content and HKM member, attendance, and giving records; member portal account linking and broader ministry operations remain in progress.",
+      "defaultEnabled": false,
+      "required": false,
+      "tenantAssignable": true,
+      "entitlementDependencies": ["platform-identity"]
+    },
+    {
+      "id": "education-ums",
+      "displayName": "Education UMS",
+      "description": "Institution-scoped student and programme records for education tenants; admissions, finance, courses, grading and LMS remain in progress.",
       "defaultEnabled": false,
       "required": false,
       "tenantAssignable": true,

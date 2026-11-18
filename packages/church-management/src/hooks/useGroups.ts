@@ -1,108 +1,83 @@
-import { useCallback, useMemo } from 'react';
-import { useMutation, useQuery } from '../shims/apollo';
-import { toTitleCase } from '../utils/stringFormatter';
-import { Group } from '../components/GroupsManagementPage';
-import {
-  GET_GROUPS_QUERY,
-  ADD_GROUP_MUTATION,
-  UPDATE_GROUP_MUTATION,
-  DELETE_GROUP_MUTATION,
-} from '../services/graphql/groups';
-import { Member } from '../components/memberData';
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Group } from "../components/GroupsManagementPage";
+import { Member } from "../components/memberData";
+import { toTitleCase } from "../utils/stringFormatter";
+import { hkmApiRequest } from "../services/hkmApi";
+
+interface HkmSmallGroup {
+  id: string;
+  name: string;
+  category: string;
+  description?: string | null;
+  leaderName: string;
+  memberCount: number;
+  createdAt: string;
+  status: string;
+}
+
+function toGroup(row: HkmSmallGroup, members: Member[]): Group {
+  const leader = members.find((member) => member.name.toLowerCase() === row.leaderName.toLowerCase());
+  return {
+    id: row.id,
+    name: row.name,
+    leader: leader?.email ?? row.leaderName,
+    members: row.memberCount ?? 0,
+    created: row.createdAt ? new Date(row.createdAt).toISOString().slice(0, 10) : "",
+    category: row.category as Group["category"],
+    description: row.description ?? "",
+  };
+}
 
 export function useGroups(members: Member[] = []) {
-  const { data, loading, error } = useQuery(GET_GROUPS_QUERY, {
-    fetchPolicy: 'cache-and-network',
-    notifyOnNetworkStatusChange: false,
-    errorPolicy: 'all',
-  });
-  const [addGroupMutation] = useMutation(ADD_GROUP_MUTATION, { refetchQueries: [{ query: GET_GROUPS_QUERY }] });
-  const [updateGroupMutation] = useMutation(UPDATE_GROUP_MUTATION, { refetchQueries: [{ query: GET_GROUPS_QUERY }] });
-  const [deleteGroupMutation] = useMutation(DELETE_GROUP_MUTATION, { refetchQueries: [{ query: GET_GROUPS_QUERY }] });
+  const [rows, setRows] = useState<HkmSmallGroup[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<Error | undefined>();
 
-  const groups: Group[] = useMemo(() => {
-    const edges = data?.groupsCollection?.edges;
-    if (!edges) return [];
-    return edges.map(
-      (edge: {
-        node: {
-          id: number;
-          name: string;
-          leader?: { email?: string } | null;
-          leader_id?: string;
-          member_count?: number;
-          created_at?: string;
-          category?: string;
-        };
-      }) => {
-        const g = edge.node;
-        return {
-          id: g.id,
-          name: g.name,
-          leader: g.leader?.email || g.leader_id || '',
-          members: g.member_count || 0,
-          created: g.created_at ? new Date(g.created_at).toISOString().split('T')[0] : '',
-          category: g.category || 'General',
-        };
-      },
-    );
-  }, [data]);
+  const refresh = useCallback(async () => {
+    try {
+      setLoading(true);
+      const result = await hkmApiRequest<{ groups: HkmSmallGroup[] }>("/v1/admin/church/groups");
+      setRows(result.groups);
+      setError(undefined);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause : new Error("Unable to load church groups."));
+      throw cause;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
-  const addGroup = useCallback(
-    async (groupData: Partial<Group>) => {
-      // Find member ID by email (UI uses email for leader)
-      const leaderMember = members.find((m) => m.email === groupData.leader);
+  useEffect(() => { void refresh().catch(() => undefined); }, [refresh]);
 
-      await addGroupMutation({
-        variables: {
-          object: {
-            name: toTitleCase(groupData.name),
-            leader_id: leaderMember?.id || null,
-            member_count: groupData.members || 0,
-            category: toTitleCase(groupData.category) || 'General',
-          },
-        },
-      });
-    },
-    [members, addGroupMutation],
-  );
+  const addGroup = useCallback(async (group: Partial<Group>) => {
+    const leader = members.find((member) => member.email === group.leader);
+    const leaderName = leader?.name ?? group.leader ?? "";
+    await hkmApiRequest("/v1/admin/church/groups", {
+      method: "POST",
+      body: JSON.stringify({
+        name: toTitleCase(group.name), category: group.category ?? "General", description: group.description ?? "",
+        leaderName, meetingSchedule: "Not set", publicLocationLabel: "Not set", isPublic: true, acceptingMembers: true,
+      }),
+    });
+    await refresh();
+  }, [members, refresh]);
 
-  const updateGroup = useCallback(
-    async (id: number, updates: Partial<Group> & { leaderId?: string }) => {
-      const set: Record<string, unknown> = {};
-      if (updates.name) set.name = toTitleCase(updates.name);
-      if (updates.leaderId !== undefined) {
-        set.leader_id = updates.leaderId || null;
-      } else if (updates.leader) {
-        const leaderMember = members.find((m) => m.email === updates.leader);
-        set.leader_id = leaderMember?.id || null;
-      }
-      if (updates.members !== undefined) set.member_count = updates.members;
-      if (updates.category) set.category = toTitleCase(updates.category);
+  const updateGroup = useCallback(async (id: string | number, updates: Partial<Group>) => {
+    const leader = updates.leader ? members.find((member) => member.email === updates.leader) : undefined;
+    const body: Record<string, unknown> = {};
+    if (updates.name !== undefined) body.name = toTitleCase(updates.name);
+    if (updates.category !== undefined) body.category = updates.category;
+    if (updates.description !== undefined) body.description = updates.description;
+    if (updates.leader !== undefined) body.leaderName = leader?.name ?? updates.leader;
+    await hkmApiRequest(`/v1/admin/church/groups/${encodeURIComponent(String(id))}`, { method: "PUT", body: JSON.stringify(body) });
+    await refresh();
+  }, [members, refresh]);
 
-      await updateGroupMutation({
-        variables: { id, _set: set },
-      });
-    },
-    [members, updateGroupMutation],
-  );
+  const deleteGroup = useCallback(async (id: string | number) => {
+    await hkmApiRequest(`/v1/admin/church/groups/${encodeURIComponent(String(id))}`, { method: "DELETE" });
+    await refresh();
+  }, [refresh]);
 
-  const deleteGroup = useCallback(
-    async (id: number) => {
-      await deleteGroupMutation({
-        variables: { id },
-      });
-    },
-    [deleteGroupMutation],
-  );
-
-  return {
-    data: groups,
-    loading,
-    error,
-    addGroup,
-    updateGroup,
-    deleteGroup,
-    setData: () => {}, // Compatibility
-  };
+  const groups = useMemo(() => rows.map((row) => toGroup(row, members)), [members, rows]);
+  return { data: groups, loading, error, addGroup, updateGroup, deleteGroup, setData: () => undefined };
 }

@@ -317,7 +317,8 @@ describe.skipIf(!runIntegration)("Phase 5 live PostgreSQL HTTP OIDC, BFF, claim 
     expect(vaultRows.rowCount).toBeGreaterThanOrEqual(1);
     const latestVault = vaultRows.rows[vaultRows.rows.length - 1]!;
     expect(String(latestVault.access_token_ciphertext)).toMatch(/^v1\./);
-    expect(String(latestVault.access_token_ciphertext)).not.toContain("eyJ");
+    // Encrypted bytes are random and can coincidentally contain "eyJ"; reject a raw JWT shape instead.
+    expect(String(latestVault.access_token_ciphertext)).not.toMatch(/^eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/);
     expect(latestVault.revoked_at).toBeNull();
 
     // 5. GET /v1/bff/session returns verified session claims cleanly

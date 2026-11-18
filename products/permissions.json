@@ -300,6 +300,42 @@
       "action": "update",
       "roles": ["owner", "admin"],
       "description": "publish or disable the tenant website privacy notice and configure enquiry retention."
+    },
+    {
+      "id": "tenant.education.read",
+      "moduleId": "education-ums",
+      "scope": "tenant",
+      "resource": "education",
+      "action": "read",
+      "roles": ["owner", "admin"],
+      "description": "read institution-scoped student and program records in the active tenant."
+    },
+    {
+      "id": "tenant.education.create",
+      "moduleId": "education-ums",
+      "scope": "tenant",
+      "resource": "education",
+      "action": "create",
+      "roles": ["owner", "admin"],
+      "description": "create student and program records for the active institution."
+    },
+    {
+      "id": "tenant.education.update",
+      "moduleId": "education-ums",
+      "scope": "tenant",
+      "resource": "education",
+      "action": "update",
+      "roles": ["owner", "admin"],
+      "description": "update student and program records for the active institution."
+    },
+    {
+      "id": "tenant.education.delete",
+      "moduleId": "education-ums",
+      "scope": "tenant",
+      "resource": "education",
+      "action": "delete",
+      "roles": ["owner", "admin"],
+      "description": "remove student records and archive programs for the active institution."
     }
   ]
 }

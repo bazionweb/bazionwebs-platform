@@ -2,7 +2,7 @@
   "schemaVersion": "1.0.0",
   "id": "church-ministry",
   "name": "Church and Ministry Management",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "status": "partial",
   "solution": {
     "id": "church-ministry",
@@ -15,7 +15,7 @@
   ],
   "requiredModules": [
     { "id": "platform-identity", "version": "1.0.0" },
-    { "id": "church-ministry", "version": "1.0.0" },
+    { "id": "church-ministry", "version": "1.1.0" },
     { "id": "media-storage", "version": "1.0.0" }
   ],
   "optionalModules": [
@@ -30,5 +30,18 @@
     "schemaVersion": "1.0.0",
     "sourcePath": "packages/church-ministry-contracts/src/index.ts"
   },
-  "databaseSchemaVersion": "0027_church_site_settings_versions.sql"
+  "databaseSchemaVersion": "0032_hkm_member_attendance.sql",
+  "readiness": {
+    "implemented": [
+      "Better Auth administrator sessions and active-tenant permission checks",
+      "persistent HKM member profiles, branch records, per-member attendance, and group management UI",
+      "member portal dashboard and giving history scoped to the authenticated member"
+    ],
+    "partial": [
+      "giving API is persistent but finance UI still uses the legacy local GraphQL shim",
+      "inventory API is persistent but equipment UI still uses the legacy local GraphQL shim",
+      "member PIN delivery and account recovery require a configured verified delivery provider"
+    ],
+    "roadmap": ["visitor and follow-up records", "SMS delivery ledger", "church finance and expenses", "equipment maintenance ledger"]
+  }
 }

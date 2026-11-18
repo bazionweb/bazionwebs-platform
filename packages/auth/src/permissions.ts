@@ -12,6 +12,7 @@ export const statement = {
   enquiry: ["read", "export", "delete"],
   enquiryPolicy: ["read", "update"],
   analytics: ["read"],
+  education: ["read", "create", "update", "delete"],
 } as const;
 
 export const ac = createAccessControl(statement);
@@ -28,6 +29,7 @@ export const owner = ac.newRole({
   enquiry: ["read", "export", "delete"],
   enquiryPolicy: ["read", "update"],
   analytics: ["read"],
+  education: ["read", "create", "update", "delete"],
 });
 
 export const admin = ac.newRole({
@@ -41,6 +43,7 @@ export const admin = ac.newRole({
   enquiry: ["read", "export", "delete"],
   enquiryPolicy: ["read", "update"],
   analytics: ["read"],
+  education: ["read", "create", "update", "delete"],
 });
 
 export const member = ac.newRole({});
@@ -89,6 +92,7 @@ export const rolePermissionMap = {
     enquiry: ["read", "export", "delete"],
     enquiryPolicy: ["read", "update"],
     analytics: ["read"],
+    education: ["read", "create", "update", "delete"],
   },
   admin: {
     member: ["create", "update", "delete"],
@@ -101,6 +105,7 @@ export const rolePermissionMap = {
     enquiry: ["read", "export", "delete"],
     enquiryPolicy: ["read", "update"],
     analytics: ["read"],
+    education: ["read", "create", "update", "delete"],
   },
   member: {},
   catalogManager: { product: ["read", "create", "update", "delete"] },

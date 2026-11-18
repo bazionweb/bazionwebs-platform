@@ -21,7 +21,7 @@ export async function getPrograms(filters?: {
     if (filters?.is_active !== undefined) params.append('is_active', filters.is_active.toString());
 
     const queryString = params.toString();
-    const url = `${API_URL}/programs${queryString ? `?${queryString}` : ''}`;
+    const url = `${API_URL}/education/programs${queryString ? `?${queryString}` : ''}`;
     const response = await authFetch(url);
     const status = response.status;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -44,7 +44,7 @@ export async function getPrograms(filters?: {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function getProgramById(id: string): Promise<ApiResponse<Program & { courses: any[] }>> {
   try {
-    const response = await authFetch(`${API_URL}/programs/${id}`);
+    const response = await authFetch(`${API_URL}/education/programs/${id}`);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const data = await parseJsonSafe<ApiResponse<Program & { courses: any[] }>>(response);
     return data ?? { success: false, // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -56,7 +56,7 @@ export async function getProgramById(id: string): Promise<ApiResponse<Program & 
 
 export async function createProgram(data: Partial<Program>): Promise<ApiResponse<Program>> {
   try {
-    const response = await authFetch(`${API_URL}/programs`, {
+    const response = await authFetch(`${API_URL}/education/programs`, {
       method: 'POST',
       body: JSON.stringify(data),
     });
@@ -70,7 +70,7 @@ export async function createProgram(data: Partial<Program>): Promise<ApiResponse
 
 export async function updateProgram(id: string, data: Partial<Program>): Promise<ApiResponse<Program>> {
   try {
-    const response = await authFetch(`${API_URL}/programs/${id}`, {
+    const response = await authFetch(`${API_URL}/education/programs/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(data),
     });
@@ -84,7 +84,7 @@ export async function updateProgram(id: string, data: Partial<Program>): Promise
 
 export async function deleteProgram(id: string): Promise<ApiResponse<{ deleted: boolean }>> {
   try {
-    const response = await authFetch(`${API_URL}/programs/${id}`, { method: 'DELETE' });
+    const response = await authFetch(`${API_URL}/education/programs/${id}`, { method: 'DELETE' });
     const result = await parseJsonSafe<ApiResponse<{ deleted: boolean }>>(response);
     return result ?? { success: false, data: { deleted: false } };
   } catch { return { success: false, data: { deleted: false } }; }
@@ -94,7 +94,7 @@ export async function deleteProgram(id: string): Promise<ApiResponse<{ deleted: 
 
 export async function getFaculties(): Promise<ApiResponse<Faculty[]>> {
   try {
-    const response = await authFetch(`${API_URL}/catalog/faculties`);
+    const response = await authFetch(`${API_URL}/education/catalog/faculties`);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let data = await parseJsonSafe<any>(response);
     if (data?.success && !Array.isArray(data.data)) {
@@ -111,7 +111,7 @@ export async function getDepartments(facultyId?: string): Promise<ApiResponse<De
     if (facultyId) params.append('faculty_id', facultyId);
     
     const queryString = params.toString();
-    const url = `${API_URL}/catalog/departments${queryString ? `?${queryString}` : ''}`;
+    const url = `${API_URL}/education/catalog/departments${queryString ? `?${queryString}` : ''}`;
     const response = await authFetch(url);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let data = await parseJsonSafe<any>(response);
@@ -126,7 +126,7 @@ export async function getDepartments(facultyId?: string): Promise<ApiResponse<De
 
 export async function getAcademicTerms(): Promise<ApiResponse<AcademicTerm[]>> {
   try {
-    const response = await authFetch(`${API_URL}/catalog/terms`);
+    const response = await authFetch(`${API_URL}/education/terms`);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let data = await parseJsonSafe<any>(response);
     if (data?.success && !Array.isArray(data.data)) {

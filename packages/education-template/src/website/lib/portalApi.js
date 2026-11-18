@@ -53,7 +53,7 @@ async function portalFetch(path, options = {}) {
  */
 export async function getPortalPrograms(level) {
   const qs = level ? `?level=${encodeURIComponent(level)}` : '';
-  const data = await portalFetch(`/api/public/programs${qs}`);
+  const data = await portalFetch(`/api/public/education/programs${qs}`);
   return Array.isArray(data) ? data : [];
 }
 

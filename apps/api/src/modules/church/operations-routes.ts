@@ -1,5 +1,5 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
-import { and, desc, eq } from "drizzle-orm";
+import { and, count, desc, eq } from "drizzle-orm";
 import {
   departmentInputSchema,
   departmentUpdateSchema,
@@ -335,9 +335,14 @@ export async function registerChurchOperationsRoutes(app: FastifyInstance, optio
       const groups = await tx
         .select()
         .from(churchSmallGroups)
-        .where(eq(churchSmallGroups.tenantId, context.tenantId))
+        .where(and(eq(churchSmallGroups.tenantId, context.tenantId), eq(churchSmallGroups.status, "active")))
         .orderBy(desc(churchSmallGroups.createdAt));
-      return reply.send({ groups });
+      const membershipCounts = await tx.select({ groupId: churchGroupMemberships.groupId, total: count() })
+        .from(churchGroupMemberships)
+        .where(and(eq(churchGroupMemberships.tenantId, context.tenantId), eq(churchGroupMemberships.status, "active")))
+        .groupBy(churchGroupMemberships.groupId);
+      const countByGroup = new Map(membershipCounts.map((row) => [row.groupId, row.total]));
+      return reply.send({ groups: groups.map((group) => ({ ...group, memberCount: countByGroup.get(group.id) ?? 0 })) });
     });
   });
 
