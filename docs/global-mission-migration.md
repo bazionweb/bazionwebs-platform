@@ -1,6 +1,6 @@
 # Global Mission tenant migration
 
-Global Mission is migrated as a tenant instance. The shared church template, its demo seed, and the generic storefront are left unchanged. The importer only targets a local PostgreSQL database and only creates or updates the `global-mission-fc` tenant's public site profile/settings, public events, and initial optional-module entitlement defaults.
+Global Mission is provisioned as a tenant instance using the GMFC template data in `templates/global-mission.config.ts` and the checked-in public event archive in `templates/global-mission.events.ts`. The local clean-slate importer remains restricted to a local PostgreSQL database. Deployments use a separate additive seed that preserves existing admin-edited values.
 
 ## Source data included
 
@@ -42,7 +42,21 @@ After reviewing the counts and source export, apply it to the local database:
 pnpm gmfc:migrate:apply
 ```
 
-The importer is transactional, preserves existing same-slug events, and will stop if the selected UUID or `global-mission-fc` slug belongs to a different tenant. It explicitly blocks non-local database hosts.
+The importer runs transactionally, deletes the selected GMFC tenant's existing church/site rows before re-importing them, and stops if the selected UUID or `global-mission-fc` slug belongs to a different tenant. It explicitly blocks non-local database hosts. Use the additive deployment seed below for staging and production.
+
+## Staging and production deployment seed
+
+The Dockerfile's one-shot `migrate` image runs the GMFC seed after application and Better Auth migrations. The staging Compose stack already runs this image before the API starts; production deployments using the same migration image receive the same seed step.
+
+The seed is safe to repeat. It creates the GMFC tenant if it does not exist, enables Church Ministry only when no entitlement exists, adds the template-backed public site, ministry profile, leaders, gallery references, and four public archive events only when those records are missing. It does not delete rows, replace existing admin edits, re-enable an explicitly disabled module, enable commerce, or claim/verify a public domain. The site settings are stored as an automatic template overlay so changes to the shared template continue to cascade through fields the tenant has not overridden.
+
+Preview the checked-in seed payload without a database connection:
+
+```powershell
+pnpm --filter @bazion/database seed:global-mission -- --dry-run
+```
+
+The deployment seed does not create a tenant domain or bypass verified-domain onboarding. Add and verify the GMFC staging or production hostname through the platform's domain workflow before directing public traffic.
 
 ## Open the local site
 

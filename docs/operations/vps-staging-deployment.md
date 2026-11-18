@@ -51,7 +51,7 @@ References: [Next.js production checklist](https://nextjs.org/docs/app/guides/pr
 
 ## Guided Dokploy setup
 
-The release Compose file is [`deploy/dokploy/platform-staging.compose.yml`](../../deploy/dokploy/platform-staging.compose.yml). It deploys Platform PostgreSQL, a migration job, API, admin, storefront, commercial status worker, and notification worker. The one-shot migration target applies both the application schema and the Better Auth schema using the same least-privilege migrator role; the Better Auth CLI is pinned in the workspace lockfile, so deployment does not download tools at runtime. Images are pulled from GHCR; the VPS does not build images. The Platform database is private to the migration/API/workers network, while the UI services cannot resolve or connect to the database. No container port is published on the VPS.
+The release Compose file is [`deploy/dokploy/platform-staging.compose.yml`](../../deploy/dokploy/platform-staging.compose.yml). It deploys Platform PostgreSQL, a migration job, API, admin, storefront, commercial status worker, and notification worker. The one-shot migration target applies the application and Better Auth schemas, then performs the repeatable additive GMFC tenant seed before the API starts. The Better Auth CLI is pinned in the workspace lockfile, so deployment does not download tools at runtime. Images are pulled from GHCR; the VPS does not build images. The Platform database is private to the migration/API/workers network, while the UI services cannot resolve or connect to the database. No container port is published on the VPS.
 
 ### 1. Confirm the staging names
 

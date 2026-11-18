@@ -593,6 +593,9 @@ importers:
 
   packages/database:
     dependencies:
+      '@bazion/church-ministry-contracts':
+        specifier: workspace:*
+        version: link:../church-ministry-contracts
       '@bazion/church-ministry-template':
         specifier: workspace:*
         version: link:../../templates

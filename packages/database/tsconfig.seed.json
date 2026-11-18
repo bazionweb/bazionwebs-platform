@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "../..",
+    "noEmit": true
+  },
+  "include": [
+    "scripts/seed-global-mission.ts",
+    "src/global-mission-migration.ts",
+    "../../templates/global-mission.events.ts"
+  ]
+}
