@@ -195,7 +195,7 @@ importers:
         version: link:../../packages/ui
       next:
         specifier: 16.4.5
-        version: 16.4.5(@types/node@26.6.6)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+        version: 16.4.5(@babel/core@7.29.13)(@types/node@26.6.6)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       react:
         specifier: ^19.2.0
         version: 19.3.1
@@ -218,6 +218,9 @@ importers:
 
   apps/api:
     dependencies:
+      '@bazion/analytics':
+        specifier: workspace:*
+        version: link:../../packages/analytics
       '@bazion/api-contracts':
         specifier: workspace:*
         version: link:../../packages/api-contracts
@@ -341,7 +344,7 @@ importers:
         version: link:../../packages/ui
       next:
         specifier: 16.4.5
-        version: 16.4.5(@types/node@26.6.6)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+        version: 16.4.5(@babel/core@7.29.13)(@types/node@26.6.6)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       react:
         specifier: ^19.2.0
         version: 19.3.1
@@ -431,9 +434,15 @@ importers:
 
   packages/analytics:
     devDependencies:
+      '@types/node':
+        specifier: ^26.6.6
+        version: 26.6.6
       typescript:
         specifier: ^5.9.3
         version: 5.9.3
+      vitest:
+        specifier: ^5.1.0
+        version: 5.1.0(@types/node@26.6.6)(vite@8.3.6(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15))
 
   packages/api-contracts:
     dependencies:
@@ -475,6 +484,9 @@ importers:
       '@bazion/platform-identity':
         specifier: workspace:*
         version: link:../platform-identity
+      '@bazion/ui':
+        specifier: workspace:*
+        version: link:../ui
       better-auth:
         specifier: 1.7.17
         version: 1.7.17(drizzle-kit@0.31.11)(drizzle-orm@0.45.4(@types/pg@8.23.1)(kysely@0.29.8)(pg@8.23.1))(next@16.4.5(@babel/core@7.29.13)(@types/node@26.6.6)(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(pg@8.23.1)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(vitest@5.1.0(@types/node@26.6.6)(vite@8.3.6(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)))
@@ -797,9 +809,15 @@ importers:
 
   packages/platform-identity:
     devDependencies:
+      '@types/node':
+        specifier: ^26.6.6
+        version: 26.6.6
       typescript:
         specifier: ^5.9.3
         version: 5.9.3
+      vitest:
+        specifier: ^5.1.0
+        version: 5.1.0(@types/node@26.6.6)(vite@8.3.6(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15))
 
   packages/product-installations:
     dependencies:
@@ -4802,31 +4820,6 @@ snapshots:
       - '@types/node'
       - babel-plugin-macros
 
-  next@16.4.5(@types/node@26.6.6)(react-dom@19.3.1(react@19.3.1))(react@19.3.1):
-    dependencies:
-      '@next/env': 16.4.5
-      '@swc/helpers': 0.5.23
-      baseline-browser-mapping: 2.11.35
-      caniuse-lite: 1.0.30001823
-      postcss: 8.5.23
-      react: 19.3.1
-      react-dom: 19.3.1(react@19.3.1)
-      styled-jsx: 5.1.6(react@19.3.1)
-    optionalDependencies:
-      '@next/swc-darwin-arm64': 16.4.5
-      '@next/swc-darwin-x64': 16.4.5
-      '@next/swc-linux-arm64-gnu': 16.4.5
-      '@next/swc-linux-arm64-musl': 16.4.5
-      '@next/swc-linux-x64-gnu': 16.4.5
-      '@next/swc-linux-x64-musl': 16.4.5
-      '@next/swc-win32-arm64-msvc': 16.4.5
-      '@next/swc-win32-x64-msvc': 16.4.5
-      sharp: 0.35.5(@types/node@26.6.6)
-    transitivePeerDependencies:
-      - '@babel/core'
-      - '@types/node'
-      - babel-plugin-macros
-
   node-releases@2.0.63: {}
 
   nodemailer@10.3.1: {}
@@ -5079,11 +5072,6 @@ snapshots:
       react: 19.3.1
     optionalDependencies:
       '@babel/core': 7.29.13
-
-  styled-jsx@5.1.6(react@19.3.1):
-    dependencies:
-      client-only: 0.0.1
-      react: 19.3.1
 
   swiper@14.4.0: {}
 

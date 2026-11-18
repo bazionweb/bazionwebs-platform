@@ -132,3 +132,25 @@ export const accountEmailChangeRequests = pgTable("account_email_change_requests
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+export const serviceIdentities = pgTable("service_identities", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  tenantId: uuid("tenant_id").references(() => tenants.id, { onDelete: "cascade" }),
+  name: varchar("name", { length: 120 }).notNull(),
+  keyPrefix: varchar("key_prefix", { length: 24 }).notNull(),
+  secretHash: varchar("secret_hash", { length: 64 }).notNull().unique(),
+  scopes: jsonb("scopes").$type<string[]>().notNull().default([]),
+  status: varchar("status", { length: 24 }).notNull().default("active"),
+  expiresAt: timestamp("expires_at", { withTimezone: true }),
+  lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+  createdBy: varchar("created_by", { length: 128 }).notNull(),
+  revokedBy: varchar("revoked_by", { length: 128 }),
+  revokedAt: timestamp("revoked_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index("service_identities_tenant_status_idx").on(table.tenantId, table.status),
+  index("service_identities_prefix_idx").on(table.keyPrefix),
+  check("service_identities_status_ck", sql`${table.status} in ('active', 'revoked', 'expired')`),
+]);
+
+

@@ -292,6 +292,85 @@ export class PostgresNotificationOutbox {
     );
     return result.rowCount === 1;
   }
+
+  /**
+   * Computes operational queue-age and dead-letter health metrics for alerting.
+   */
+  async getOutboxHealthMetrics(): Promise<{
+    pendingCount: number;
+    processingCount: number;
+    deadLetterCount: number;
+    expiredLeaseCount: number;
+    oldestPendingSeconds: number;
+    alertStatus: "healthy" | "degraded" | "critical";
+  }> {
+    const result = await this.pool.query<{
+      pending_count: string | number;
+      processing_count: string | number;
+      dead_letter_count: string | number;
+      expired_lease_count: string | number;
+      oldest_pending_seconds: string | number | null;
+    }>(
+      `SELECT
+         count(*) FILTER (WHERE status = 'pending')::int AS pending_count,
+         count(*) FILTER (WHERE status = 'processing')::int AS processing_count,
+         count(*) FILTER (WHERE status = 'dead')::int AS dead_letter_count,
+         count(*) FILTER (
+           WHERE status = 'processing'
+             AND locked_at < now() - ($1::double precision * interval '1 millisecond')
+         )::int AS expired_lease_count,
+         COALESCE(
+           EXTRACT(EPOCH FROM (now() - min(available_at) FILTER (WHERE status = 'pending'))),
+           0
+         )::int AS oldest_pending_seconds
+       FROM public.notification_outbox`,
+      [this.leaseMilliseconds],
+    );
+
+    const row = result.rows[0];
+    const pendingCount = Number(row?.pending_count ?? 0);
+    const processingCount = Number(row?.processing_count ?? 0);
+    const deadLetterCount = Number(row?.dead_letter_count ?? 0);
+    const expiredLeaseCount = Number(row?.expired_lease_count ?? 0);
+    const oldestPendingSeconds = Math.max(0, Number(row?.oldest_pending_seconds ?? 0));
+
+    let alertStatus: "healthy" | "degraded" | "critical" = "healthy";
+    if (deadLetterCount >= 10 || oldestPendingSeconds >= 900 || expiredLeaseCount >= 5) {
+      alertStatus = "critical";
+    } else if (deadLetterCount > 0 || oldestPendingSeconds >= 300 || expiredLeaseCount > 0) {
+      alertStatus = "degraded";
+    }
+
+    return {
+      pendingCount,
+      processingCount,
+      deadLetterCount,
+      expiredLeaseCount,
+      oldestPendingSeconds,
+      alertStatus,
+    };
+  }
+
+  /**
+   * Redacts/scrubs expired ciphertext payloads on completed/dead outbox rows
+   * past their retention window using UPDATE-only worker privileges.
+   */
+  async purgeExpiredDeliveries(retentionDays = 30): Promise<number> {
+    if (!Number.isInteger(retentionDays) || retentionDays < 1 || retentionDays > 3650) {
+      throw new Error("Notification retentionDays must be an integer between 1 and 3650.");
+    }
+    const result = await this.pool.query(
+      `UPDATE public.notification_outbox
+          SET payload_ciphertext = 'v1.scrubbed.scrubbed.scrubbed',
+              last_error_code = COALESCE(last_error_code, 'RETENTION_SCRUBBED'),
+              updated_at = now()
+        WHERE status IN ('sent', 'dead')
+          AND payload_ciphertext <> 'v1.scrubbed.scrubbed.scrubbed'
+          AND updated_at < now() - ($1::int * interval '1 day')`,
+      [retentionDays],
+    );
+    return result.rowCount ?? 0;
+  }
 }
 
 export interface NotificationOutboxWorker {

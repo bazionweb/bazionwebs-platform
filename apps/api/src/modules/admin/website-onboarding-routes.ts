@@ -17,6 +17,7 @@ import {
   createWhiteLabeledPackageConfig,
   extractWhiteLabelFromRepoSource,
   generateByowDokployCompose,
+  isTenantTemplateOverlay,
   platformWhiteLabelPackageCatalog,
   resolveWhiteLabelPackageOverlay,
   universalThemePalettes,
@@ -486,6 +487,59 @@ export async function websiteOnboardingRoutes(app: FastifyInstance): Promise<voi
       const packageRow = snapshot.settingsRows.find(
         (r) => r.settingKey === "package_whitelabel_config",
       );
+      const storedPackageConfig = parseJsonSafe(packageRow?.settingValue);
+      const activePackageConfig = resolveWhiteLabelPackageOverlay(storedPackageConfig, tenant.slug);
+      const overlay = isTenantTemplateOverlay(storedPackageConfig) ? storedPackageConfig : null;
+      const rawPackageSettings = storedPackageConfig && typeof storedPackageConfig === "object"
+        ? ((storedPackageConfig as Record<string, unknown>).packageSettings
+          && typeof (storedPackageConfig as Record<string, unknown>).packageSettings === "object"
+          ? (storedPackageConfig as Record<string, unknown>).packageSettings as Record<string, unknown>
+          : storedPackageConfig as Record<string, unknown>)
+        : null;
+      const activeConfigRecord = activePackageConfig && typeof activePackageConfig === "object"
+        ? activePackageConfig as Record<string, unknown>
+        : null;
+      const templatePackageId = overlay?.packageId
+        ?? rawPackageSettings?.packageId
+        ?? activeConfigRecord?.packageId;
+      const templateId = overlay?.templateId
+        ?? rawPackageSettings?.templateId
+        ?? activeConfigRecord?.templateId;
+      const currentPackage = platformWhiteLabelPackageCatalog.find((item) => item.packageId === templatePackageId);
+      const currentTemplate = currentPackage?.templates.find((item) => item.id === templateId);
+      const configuredVersion = overlay?.templateVersion
+        ?? (typeof rawPackageSettings?.templateVersion === "string" ? rawPackageSettings.templateVersion : currentTemplate?.version);
+      const hasPinnedSource = rawPackageSettings?.updateMode === "pinned"
+        || typeof rawPackageSettings?.repoUrl === "string"
+        || typeof rawPackageSettings?.sourceRepoUrl === "string";
+      const storedSiteRow = snapshot.settingsRows.find((row) => row.settingKey === "public_site");
+      const storedSiteSettings = parseJsonSafe(storedSiteRow?.settingValue);
+      const storedSiteRecord = storedSiteSettings && typeof storedSiteSettings === "object"
+        ? storedSiteSettings as Record<string, unknown>
+        : null;
+      const storedSiteOverlay = isTenantTemplateOverlay(storedSiteSettings) ? storedSiteSettings : null;
+      const nestedSiteOverrides = storedSiteRecord?.overrides && typeof storedSiteRecord.overrides === "object"
+        ? storedSiteRecord.overrides as Record<string, unknown>
+        : null;
+      const churchTemplateId = storedSiteOverlay?.templateId
+        ?? storedSiteRecord?.templateId
+        ?? nestedSiteOverrides?.templateId;
+      const currentChurchTemplate = churchTemplateCatalog.find((item) => item.id === churchTemplateId);
+      const churchConfiguredVersion = storedSiteOverlay?.templateVersion
+        ?? (typeof storedSiteRecord?.templateVersion === "string" ? storedSiteRecord.templateVersion : undefined)
+        ?? (typeof nestedSiteOverrides?.templateVersion === "string" ? nestedSiteOverrides.templateVersion : undefined)
+        ?? (currentChurchTemplate ? "1.0.0" : undefined);
+      const websiteTemplateRelease = currentTemplate ? {
+        templateId: currentTemplate.id,
+        configuredVersion: configuredVersion ?? currentTemplate.version,
+        currentVersion: currentTemplate.version,
+        updateMode: overlay?.updateMode ?? (hasPinnedSource ? "pinned" as const : "automatic" as const),
+      } : currentChurchTemplate ? {
+        templateId: currentChurchTemplate.id,
+        configuredVersion: churchConfiguredVersion ?? currentChurchTemplate.version,
+        currentVersion: currentChurchTemplate.version,
+        updateMode: storedSiteOverlay?.updateMode ?? (storedSiteRecord?.updateMode === "pinned" ? "pinned" as const : "automatic" as const),
+      } : null;
 
       return reply.send({
         tenant: {
@@ -498,7 +552,8 @@ export async function websiteOnboardingRoutes(app: FastifyInstance): Promise<voi
         palettes: universalThemePalettes,
         templates: churchTemplateCatalog,
         currentProfile: snapshot.profileRow ?? null,
-        activePackageConfig: resolveWhiteLabelPackageOverlay(parseJsonSafe(packageRow?.settingValue)),
+        activePackageConfig,
+        templateRelease: websiteTemplateRelease,
         hasStoredSiteSettings: snapshot.settingsRows.some(
           (r) => r.settingKey === "public_site" && Boolean(r.settingValue),
         ),

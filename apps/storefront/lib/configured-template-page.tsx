@@ -20,7 +20,11 @@ export async function renderConfiguredTemplatePage(path: string) {
 
   return (
     <SmeWebsiteShell config={website.smeConfig} currentPath={path}>
-      <SmeConfiguredPage config={website.smeConfig as SmeWebsiteTemplateConfig} page={page} />
+      <SmeConfiguredPage
+        config={website.smeConfig as SmeWebsiteTemplateConfig}
+        page={page}
+        formsLeadsEnabled={website.formsLeadsEnabled}
+      />
     </SmeWebsiteShell>
   );
 }

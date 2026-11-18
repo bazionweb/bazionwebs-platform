@@ -40,8 +40,9 @@ describe("database migration registry", () => {
     expect(requiredDatabaseMigrations).toContain("0031_hkm_member_profile_fields.sql");
     expect(requiredDatabaseMigrations).toContain("0032_hkm_member_attendance.sql");
     expect(requiredDatabaseMigrations).toContain("0033_education_website_template_overlays.sql");
+    expect(requiredDatabaseMigrations).toContain("0034_complete_partial_modules.sql");
     expect(currentDatabaseSchemaVersion).toBe(requiredDatabaseMigrations.at(-1));
-    expect(currentDatabaseSchemaVersion).toBe("0033_education_website_template_overlays.sql");
+    expect(currentDatabaseSchemaVersion).toBe("0034_complete_partial_modules.sql");
   });
 
   it("enforces immutable installation changes ledger in 0025", () => {

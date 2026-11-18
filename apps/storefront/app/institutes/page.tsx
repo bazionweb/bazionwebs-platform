@@ -1,3 +1,4 @@
+import { isEducationInstitutionWebsitePageEnabled } from "@bazion/education-contracts";
 import { resolveEducationTenant } from "../../lib/education-tenant";
 import { EducationShell } from "../../components/education/education-shell";
 import { BmiInstitutesPage } from "@bazion/education-template";
@@ -11,6 +12,7 @@ export default async function InstitutesPageRoute() {
     if (configuredPage) return configuredPage;
     notFound();
   }
+  if (!isEducationInstitutionWebsitePageEnabled(education.tenantConfig, "/institutes")) notFound();
   return (
     <EducationShell>
       <BmiInstitutesPage />

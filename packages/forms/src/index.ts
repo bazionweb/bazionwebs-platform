@@ -9,11 +9,23 @@ export const DEFAULT_SITE_ENQUIRY_RETENTION_DAYS = 180;
 export { WEBSITE_ENQUIRY_PRIVACY_NOTICE_VERSION, websiteEnquirySchema };
 export type { WebsiteEnquiry };
 
+export const siteEnquiryStatusSchema = z.enum(["new", "in_progress", "responded", "archived"]);
+export type SiteEnquiryStatus = z.infer<typeof siteEnquiryStatusSchema>;
+
+export const siteEnquiryUpdateSchema = z.object({
+  status: siteEnquiryStatusSchema.optional(),
+  assignedTo: z.string().trim().max(128).nullable().optional(),
+}).strict().refine((value) => value.status !== undefined || value.assignedTo !== undefined, {
+  message: "Provide a status or assignee update.",
+});
+export type SiteEnquiryUpdateInput = z.infer<typeof siteEnquiryUpdateSchema>;
+
 export const siteEnquiryPolicyInputSchema = z.object({
   enabled: z.boolean(),
   privacyNotice: z.string().trim().max(10000).default(""),
   privacyNoticeVersion: z.string().max(40).regex(/^\d+\.\d+\.\d+$/),
   retentionDays: z.number().int().min(1).max(3650),
+  routingEmail: z.union([z.string().trim().email().max(254), z.literal(""), z.null()]).optional(),
 }).strict().superRefine((policy, context) => {
   if (policy.enabled && policy.privacyNotice.length < 40) {
     context.addIssue({ code: "custom", message: "Publish a privacy notice of at least 40 characters before enabling enquiries.", path: ["privacyNotice"] });

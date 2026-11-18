@@ -23,7 +23,7 @@ import {
 } from "./domains.js";
 
 export const EDUCATION_CONFIGURATION_VERSION = "1.0.0" as const;
-export const SCHOOL_PORTAL_TEMPLATE_VERSION = "1.0.0" as const;
+export const SCHOOL_PORTAL_TEMPLATE_VERSION = "1.1.0" as const;
 
 export {
   BMI_UNIVERSITY_TENANT_ID,
@@ -78,6 +78,31 @@ export const schoolPortalConfigSchema = z.object({
 
 export type SchoolPortalConfig = z.infer<typeof schoolPortalConfigSchema>;
 
+const educationWebsiteDefaults = websiteConfigurationSchema.parse({
+  navigation: [
+    { id: "academics", label: "Academics", href: "/academics" },
+    { id: "admissions", label: "Admissions", href: "/admissions" },
+    { id: "institutes", label: "Institutes", href: "/institutes" },
+    { id: "accreditation", label: "Accreditation", href: "/accreditation" },
+    { id: "about", label: "About", href: "/about" },
+    { id: "contact", label: "Contact", href: "/contact" },
+  ],
+  pages: [
+    { id: "home", path: "/", title: "Home", enabled: true, sections: ["hero", "text", "feature-list", "call-to-action"] },
+    { id: "academics", path: "/academics", title: "Academics", enabled: true, sections: ["hero", "text", "feature-list"] },
+    { id: "admissions", path: "/admissions", title: "Admissions", enabled: true, sections: ["hero", "text", "call-to-action"] },
+    { id: "institutes", path: "/institutes", title: "Institutes", enabled: true, sections: ["hero", "text", "feature-list"] },
+    { id: "bemi-institute", path: "/institutes/bemi", title: "BEMI Training Institute", enabled: true, sections: ["hero", "text", "feature-list"] },
+    { id: "accreditation", path: "/accreditation", title: "Accreditation", enabled: true, sections: ["hero", "text"] },
+    { id: "apply", path: "/apply", title: "Apply", enabled: true, sections: ["hero", "text", "call-to-action"] },
+    { id: "about", path: "/about", title: "About", enabled: true, sections: ["hero", "text", "feature-list"] },
+    { id: "contact", path: "/contact", title: "Contact", enabled: true, sections: ["hero", "text", "contact-form"] },
+    { id: "privacy", path: "/privacy", title: "Privacy", enabled: true, sections: ["text"] },
+    { id: "terms", path: "/terms", title: "Terms", enabled: true, sections: ["text"] },
+    { id: "verify", path: "/verify", title: "Credential Verification", enabled: true, sections: ["hero", "text"] },
+  ],
+});
+
 export const schoolEducationConfigInputSchema = schoolPortalConfigSchema.partial().extend({
   institutionName: z.string().trim().min(2).max(180),
 });
@@ -107,6 +132,7 @@ export const bmiUniversityTenantConfig: SchoolPortalConfig = schoolPortalConfigS
     phones: ["+254 721 341 793", "+254 704 500 872", "704-607-5540"],
     address: "Mukurwe-ini Plaza, Nyeri County, Kenya & Charlotte, NC, USA",
   },
+  website: educationWebsiteDefaults,
 });
 
 export const bemiTrainingInstituteTenantConfig: SchoolPortalConfig = schoolPortalConfigSchema.parse({
@@ -133,6 +159,7 @@ export const bemiTrainingInstituteTenantConfig: SchoolPortalConfig = schoolPorta
     phones: ["+254 721 341 793", "+254 704 500 872"],
     address: "Mukurwe-ini Plaza, Mukurweini Road, Nyeri County, Kenya",
   },
+  website: educationWebsiteDefaults,
 });
 
 export type EducationInstitutionKey = "bmi" | "bemi";
@@ -146,6 +173,10 @@ export interface EducationInstitutionWebsiteProfile {
   adminEmail?: string | null;
   phones?: string[];
   address?: string | null;
+}
+
+export function isEducationInstitutionWebsitePageEnabled(config: SchoolPortalConfig, path: string): boolean {
+  return config.website?.pages.some((page) => page.path === path && page.enabled) ?? true;
 }
 
 export const educationInstitutionWebsiteOverridesSchema = z.object({
@@ -170,10 +201,14 @@ export function resolveEducationInstitutionWebsiteConfig(
   key: EducationInstitutionKey,
   stored: unknown,
   profile?: EducationInstitutionWebsiteProfile,
+  scope?: { tenantId: string },
 ): SchoolPortalConfig {
   const base = educationTemplateBase(key);
-  const storedConfig = isTenantTemplateOverlay(stored)
-    ? resolveTenantTemplateOverlay(base, stored)
+  const storedOverlay = isTenantTemplateOverlay(stored) ? stored : null;
+  const overlayScopeMatches = !storedOverlay?.context?.scopeKey
+    || (Boolean(scope) && storedOverlay.context.scopeKey === `${scope!.tenantId}:${key}`);
+  const storedConfig = storedOverlay
+    ? (overlayScopeMatches ? resolveTenantTemplateOverlay(base, storedOverlay) : base)
     : deepMergeCascade(base, stored);
   const resolved = profile
     ? deepMergeCascade(storedConfig, {
@@ -196,6 +231,7 @@ export function resolveEducationInstitutionWebsiteConfig(
 export function createEducationInstitutionWebsiteOverlay(
   key: EducationInstitutionKey,
   effective: SchoolPortalConfig,
+  scope?: { tenantId: string },
 ) {
   return buildTenantTemplateOverlay({
     packageId: "school-education",
@@ -204,6 +240,11 @@ export function createEducationInstitutionWebsiteOverlay(
     configurationSchemaVersion: EDUCATION_CONFIGURATION_VERSION,
     base: educationTemplateBase(key),
     effective,
+    ...(scope ? { context: {
+      tenantSlug: key,
+      brandName: effective.institutionName,
+      scopeKey: `${scope.tenantId}:${key}`,
+    } } : {}),
   });
 }
 

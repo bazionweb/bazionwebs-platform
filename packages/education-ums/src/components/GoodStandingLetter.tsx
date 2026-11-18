@@ -14,6 +14,7 @@ import { Student } from '../types';
 import { documentService } from '../services/documentService';
 import { getHtml2Pdf } from '../services/pdfService';
 import type { GoodStandingLetter as GoodStandingLetterType, DocumentSecurityFeatures } from '../types/documents';
+import { useUIStore } from '../stores/uiStore';
 
 interface GoodStandingLetterProps {
   students: Student[];
@@ -28,6 +29,12 @@ const THEME = {
 };
 
 export const GoodStandingLetter: React.FC<GoodStandingLetterProps> = ({ students, logo }) => {
+  const institutionName = useUIStore((state) => state.institutionName);
+  const shortName = useUIStore((state) => state.shortName);
+  const configuredLogo = useUIStore((state) => state.logo);
+  const primaryColor = useUIStore((state) => state.primaryColor);
+  const accentColor = useUIStore((state) => state.accentColor);
+  const documentLogo = logo || configuredLogo;
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [showLetter, setShowLetter] = useState(false);
@@ -61,7 +68,7 @@ export const GoodStandingLetter: React.FC<GoodStandingLetterProps> = ({ students
       conductStatus: 'Satisfactory',
       financialStatus: 'Cleared',
       effectiveDate: new Date().toISOString().split('T')[0],
-      letterBody: `This letter certifies that ${getFirstName(student)} ${getLastName(student)} is a student in good standing at BMI University.`,
+      letterBody: `This letter certifies that ${getFirstName(student)} ${getLastName(student)} is a student in good standing at ${institutionName}.`,
       authorizedBy: 'Dr. Michael Ochieng',
       authorizedTitle: 'University Registrar',
       status: 'draft',
@@ -77,7 +84,7 @@ export const GoodStandingLetter: React.FC<GoodStandingLetterProps> = ({ students
     });
 
     return { letter, security };
-  }, [letterConfig]);
+  }, [letterConfig, institutionName]);
 
   const handleGenerate = async () => {
     if (!selectedStudent) return;
@@ -267,23 +274,23 @@ export const GoodStandingLetter: React.FC<GoodStandingLetterProps> = ({ students
               </div>
 
               {/* Letter Document */}
-              <div id="modern-standing-letter" className="bg-white rounded-2xl shadow-2xl overflow-hidden border border-slate-200">
-                <div className="h-2 bg-gradient-to-r from-cyan-500 via-blue-500 to-cyan-600" />
+              <div id="modern-standing-letter" className="bg-white rounded-2xl shadow-2xl overflow-hidden border border-slate-200" style={{ "--institution-primary": primaryColor, "--institution-accent": accentColor } as React.CSSProperties}>
+                <div className="h-2" style={{ background: `linear-gradient(90deg, ${primaryColor}, ${accentColor}, ${primaryColor})` }} />
                 
                 <div className="p-10">
                   {/* Header */}
                   <div className="flex items-center justify-between mb-8 pb-6 border-b-2 border-slate-100">
                     <div className="flex items-center gap-4">
                       <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-slate-900 to-slate-800 flex items-center justify-center shadow-xl">
-                        <img src={logo} alt="BMI" className="w-10 h-10 object-contain brightness-0 invert" />
+                        <img src={documentLogo} alt={shortName} className="w-10 h-10 object-contain brightness-0 invert" />
                       </div>
                       <div>
-                        <h2 className="text-xl font-black text-slate-900 tracking-tight">BMI University</h2>
+                        <h2 className="text-xl font-black text-slate-900 tracking-tight">{institutionName}</h2>
                         <p className="text-sm text-slate-500 font-medium">Office of the Registrar</p>
                       </div>
                     </div>
                     <div className="text-right">
-                      <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-bold text-xs shadow-lg">
+                      <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-white font-bold text-xs shadow-lg" style={{ backgroundColor: primaryColor }}>
                         <ShieldCheck size={14} />
                         Official Certification
                       </div>
@@ -293,11 +300,11 @@ export const GoodStandingLetter: React.FC<GoodStandingLetterProps> = ({ students
 
                   {/* Title */}
                   <div className="text-center mb-8">
-                    <div className="inline-flex items-center gap-3 px-6 py-3 bg-gradient-to-r from-cyan-50 to-blue-50 rounded-xl border border-cyan-200">
-                      <Award className="text-cyan-600" size={28} />
+                      <div className="inline-flex items-center gap-3 px-6 py-3 rounded-xl border" style={{ backgroundColor: `${accentColor}14`, borderColor: `${accentColor}66` }}>
+                      <Award style={{ color: primaryColor }} size={28} />
                       <div className="text-left">
                         <h1 className="text-2xl font-black text-slate-900">CERTIFICATE OF GOOD STANDING</h1>
-                        <p className="text-sm text-cyan-700 font-medium">{generatedLetter.standingType} Verification</p>
+                        <p className="text-sm font-medium" style={{ color: primaryColor }}>{generatedLetter.standingType} Verification</p>
                       </div>
                     </div>
                   </div>
@@ -316,8 +323,8 @@ export const GoodStandingLetter: React.FC<GoodStandingLetterProps> = ({ students
                     <p>
                       This is to certify that <span className="font-bold text-slate-900">{generatedLetter.studentName}</span>, 
                       Student ID Number <span className="font-mono font-bold">{generatedLetter.studentId}</span>, 
-                      is a registered student at BMI University and is currently in 
-                      <span className="font-bold text-cyan-700"> GOOD STANDING</span> in all respects.
+                      is a registered student at {institutionName} and is currently in 
+                      <span className="font-bold" style={{ color: primaryColor }}> GOOD STANDING</span> in all respects.
                     </p>
 
                     <div className="bg-slate-50 rounded-xl p-5 my-6 border-l-4 border-cyan-500">
@@ -347,7 +354,7 @@ export const GoodStandingLetter: React.FC<GoodStandingLetterProps> = ({ students
                         <div className="h-12 border-b border-slate-400 w-48 my-2"></div>
                         <p className="font-bold text-slate-900">Dr. Michael Ochieng</p>
                         <p className="text-sm text-slate-600">University Registrar</p>
-                        <p className="text-xs text-slate-500">BMI University</p>
+                        <p className="text-xs text-slate-500">{institutionName}</p>
                       </div>
                       
                       <div className="text-right">
@@ -362,13 +369,13 @@ export const GoodStandingLetter: React.FC<GoodStandingLetterProps> = ({ students
                   {/* Footer */}
                   <div className="mt-8 pt-4 border-t border-slate-200">
                     <p className="text-[10px] text-slate-400 text-center">
-                      This is an official document issued by BMI University. The authenticity of this document can be verified 
+                      This is an official document issued by {institutionName}. The authenticity of this document can be verified 
                       by scanning the QR code above or visiting {MARKETING_URL_WWW.replace('https://', '')}/verify and entering the reference number.
                     </p>
                   </div>
                 </div>
                 
-                <div className="h-2 bg-gradient-to-r from-cyan-500 via-blue-500 to-cyan-600" />
+                <div className="h-2" style={{ background: `linear-gradient(90deg, ${primaryColor}, ${accentColor}, ${primaryColor})` }} />
               </div>
             </div>
           ) : (

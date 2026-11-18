@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { planPaymentSettlement } from "./index.js";
+import { planOrderStatusTransition, planPaymentSettlement } from "./index.js";
 
 describe("commerce payment settlement", () => {
   it("consumes reserved stock only after a successful payment", () => {
@@ -36,5 +36,27 @@ describe("commerce payment settlement", () => {
 
   it("rejects unexpected payment states", () => {
     expect(planPaymentSettlement("pending_payment", "unknown", true)).toEqual({ kind: "order_not_payable" });
+  });
+
+  it("plans valid admin order lifecycle transitions for fulfill, cancel, and refund", () => {
+    expect(planOrderStatusTransition("paid", "fulfilled")).toEqual({
+      kind: "allowed",
+      nextStatus: "fulfilled",
+      releaseReservedStock: false,
+      restockOnHand: false,
+    });
+    expect(planOrderStatusTransition("pending_payment", "cancelled")).toEqual({
+      kind: "allowed",
+      nextStatus: "cancelled",
+      releaseReservedStock: true,
+      restockOnHand: false,
+    });
+    expect(planOrderStatusTransition("fulfilled", "refunded", { restock: true })).toEqual({
+      kind: "allowed",
+      nextStatus: "refunded",
+      releaseReservedStock: false,
+      restockOnHand: true,
+    });
+    expect(planOrderStatusTransition("pending_payment", "refunded").kind).toBe("invalid_transition");
   });
 });

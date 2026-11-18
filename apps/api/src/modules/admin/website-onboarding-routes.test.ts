@@ -7,7 +7,7 @@ const TENANT_ID = "00000000-0000-4000-8000-000000000055";
 const mocks = vi.hoisted(() => ({
   requirePlatformRole: vi.fn(),
   getPlatformTenant: vi.fn(),
-  updatePlatformTenantModuleEntitlement: vi.fn(),
+  updatePlatformTenantModuleEntitlements: vi.fn(),
   withTenantTransaction: vi.fn(),
   appendAuditEvent: vi.fn(),
 }));
@@ -26,7 +26,7 @@ vi.mock("@bazion/auth", () => ({
 
 vi.mock("@bazion/auth/server", () => ({
   getPlatformTenant: mocks.getPlatformTenant,
-  updatePlatformTenantModuleEntitlement: mocks.updatePlatformTenantModuleEntitlement,
+  updatePlatformTenantModuleEntitlements: mocks.updatePlatformTenantModuleEntitlements,
 }));
 
 vi.mock("../../lib/database.js", () => ({
@@ -77,7 +77,7 @@ describe("websiteOnboardingRoutes", () => {
       name: "Savanna Enterprise Ltd",
       status: "active",
     });
-    mocks.updatePlatformTenantModuleEntitlement.mockResolvedValue(true);
+    mocks.updatePlatformTenantModuleEntitlements.mockResolvedValue(true);
     mocks.appendAuditEvent.mockResolvedValue(undefined);
   });
 
@@ -113,9 +113,9 @@ describe("websiteOnboardingRoutes", () => {
     expect(body.packageSettings.organization.name).toBe("Savanna Urban Retail");
     expect(body.packageSettings.payment.mpesaPaybill).toBe("522533");
     expect(body.assignableModules).toContain("commerce");
-    expect(mocks.updatePlatformTenantModuleEntitlement).toHaveBeenCalledWith({
+    expect(mocks.updatePlatformTenantModuleEntitlements).toHaveBeenCalledWith({
       tenantId: TENANT_ID,
-      moduleId: "commerce",
+      moduleIds: expect.arrayContaining(["commerce"]),
       enabled: true,
       actorUserId: "owner-1",
     });

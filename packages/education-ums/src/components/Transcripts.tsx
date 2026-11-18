@@ -88,6 +88,10 @@ export const Transcripts: React.FC<TranscriptsProps> = (props) => {
 
   const storeStudents = studentsRes?.data?.items || [];
   const storeLogo = useUIStore((s) => s.logo);
+  const institutionName = useUIStore((s) => s.institutionName);
+  const shortName = useUIStore((s) => s.shortName);
+  const primaryColor = useUIStore((s) => s.primaryColor);
+  const accentColor = useUIStore((s) => s.accentColor);
   const students = props.students ?? storeStudents ?? [];
   const logo = props.logo ?? storeLogo ?? "";
   const [searchTerm, setSearchTerm] = useState("");
@@ -786,9 +790,9 @@ export const Transcripts: React.FC<TranscriptsProps> = (props) => {
             pdf.setProperties({
               title: `Official Transcript - ${selectedStudent.first_name} ${selectedStudent.last_name}`,
               subject: "Official Academic Record",
-              author: "BMI University Systems",
-              keywords: "transcript, academic, record, BMI",
-              creator: "BMI UMS",
+              author: institutionName,
+              keywords: `transcript, academic record, ${shortName}`,
+              creator: `${shortName} Student Records`,
             });
           })
           .save();
@@ -821,7 +825,7 @@ export const Transcripts: React.FC<TranscriptsProps> = (props) => {
         pdf.setProperties({
           title: `Official Transcript - ${selectedStudent.first_name} ${selectedStudent.last_name}`,
           subject: "Official Academic Record",
-          author: "BMI University Systems",
+          author: institutionName,
         });
         
         pdf.save(`${fileName}.pdf`);
@@ -1588,6 +1592,8 @@ export const Transcripts: React.FC<TranscriptsProps> = (props) => {
                   padding: "7mm",
                   boxSizing: "border-box",
                   overflow: "hidden",
+                  "--institution-primary": primaryColor,
+                  "--institution-accent": accentColor,
                 }}
                 onMouseDown={() => {
                   // Click on empty A4 background → clear all selection
@@ -1886,7 +1892,7 @@ export const Transcripts: React.FC<TranscriptsProps> = (props) => {
                   {/* Large Center Logo Watermark */}
                   <div className="absolute inset-0 flex items-center justify-center opacity-[0.08] pointer-events-none">
                     <img
-                      src={logo || "/BMI.svg"}
+                      src={logo || storeLogo}
                       className="h-[32%] w-auto object-contain"
                       alt=""
                       style={{
@@ -1904,7 +1910,7 @@ export const Transcripts: React.FC<TranscriptsProps> = (props) => {
                     {Array.from({ length: 12 }).map((_, i) => (
                       <img
                         key={`watermark-${i}`}
-                        src={logo || "/BMI.svg"}
+                        src={logo || storeLogo}
                         className="w-32 h-32 object-contain grayscale"
                         alt=""
                         style={{
@@ -1926,16 +1932,16 @@ export const Transcripts: React.FC<TranscriptsProps> = (props) => {
                   onMouseDown={(e) => startBlockDrag("microTop", e)}
                 >
                   <MicroText
-                    text={`BMI UNIVERSITY OFFICIAL ACADEMIC TRANSCRIPT • SECURITY VALIDATED RECORD • DO NOT REPRODUCE • UV PROTECTED INK • ANTI-FORGERY • ID: ${securityData?.serialNumber || "PENDING"}`}
+                    text={`${shortName.toUpperCase()} OFFICIAL ACADEMIC TRANSCRIPT • SECURITY VALIDATED RECORD • DO NOT REPRODUCE • UV PROTECTED INK • ANTI-FORGERY • ID: ${securityData?.serialNumber || "PENDING"}`}
                   />
                 </div>
 
                 {/* Seal — top left, mirrors the QR code on the right */}
                 <div className="absolute top-8 left-8 flex flex-col items-center gap-1 z-20">
                   <img
-                    src="/BMI SEAL.png"
+                    src={logo || storeLogo}
                     className="w-16 h-16 object-cover scale-110"
-                    alt="BMI University Seal"
+                    alt={`${institutionName} seal`}
                     onError={(e) => {
                       (e.target as HTMLImageElement).style.display = "none";
                     }}
@@ -1952,7 +1958,7 @@ export const Transcripts: React.FC<TranscriptsProps> = (props) => {
                       />
                     ) : (
                       <img
-                        src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&ecc=H&margin=1&data=${encodeURIComponent(`BMI UNIVERSITY - OFFICIAL ACADEMIC RECORD\nSTUDENT: ${selectedStudent.first_name} ${selectedStudent.last_name}\nID: ${selectedStudent.id}\nSTATUS: VERIFIED`)}`}
+                        src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&ecc=H&margin=1&data=${encodeURIComponent(`${shortName.toUpperCase()} - OFFICIAL ACADEMIC RECORD\nSTUDENT: ${selectedStudent.first_name} ${selectedStudent.last_name}\nID: ${selectedStudent.id}\nSTATUS: VERIFIED`)}`}
                         className="w-16 h-16"
                         alt="Security QR"
                       />
@@ -1967,20 +1973,20 @@ export const Transcripts: React.FC<TranscriptsProps> = (props) => {
                   onMouseDown={(e) => startBlockDrag("headerTitle", e)}
                 >
                   <img
-                    src={logo || "/BMI.svg"}
+                    src={logo || storeLogo}
                     className="h-10 mb-1 object-contain filter contrast-125"
-                    alt="BMI Logo"
+                    alt={`${institutionName} logo`}
                     onError={(e) => {
-                      (e.target as HTMLImageElement).src = "/BMI.svg";
+                      (e.target as HTMLImageElement).src = storeLogo;
                     }}
                   />
-                  <h1 className="text-[24px] leading-none font-serif font-black tracking-tight text-gray-900 uppercase">
-                    BMI UNIVERSITY
+                  <h1 className="text-[24px] leading-none font-serif font-black tracking-tight uppercase" style={{ color: primaryColor }}>
+                    {institutionName}
                   </h1>
                   <p className="text-[7px] font-sans font-black text-gray-600 uppercase tracking-[0.35em] mt-0.5">
                     OFFICE OF THE REGISTRAR
                   </p>
-                  <div className="mt-1 px-7 py-0.5 border-y border-gray-900 bg-gradient-to-r from-purple-50/80 via-white to-purple-50/80">
+                  <div className="mt-1 px-7 py-0.5 border-y bg-gradient-to-r from-purple-50/80 via-white to-purple-50/80" style={{ borderColor: primaryColor }}>
                     <h2 className="text-[11px] font-serif font-black uppercase tracking-[0.26em] leading-tight">
                       {transcriptType} Academic Transcript
                       {transcriptType === "Provisional" && (
@@ -2448,7 +2454,7 @@ export const Transcripts: React.FC<TranscriptsProps> = (props) => {
                   onMouseDown={(e) => startBlockDrag("microBottom", e)}
                 >
                   <MicroText
-                    text={`OFFICIAL TRANSCRIPT • TAMPER-EVIDENT SECURITY FEATURES • VERIFY AT ${securityData?.verificationUrl || "BMI.EDU/VERIFY"} • BMI UNIVERSITY`}
+                    text={`OFFICIAL TRANSCRIPT • TAMPER-EVIDENT SECURITY FEATURES • VERIFY AT ${securityData?.verificationUrl || (typeof window !== "undefined" ? `${window.location.origin}/verify` : "/verify")} • ${shortName.toUpperCase()}`}
                   />
                 </div>
 

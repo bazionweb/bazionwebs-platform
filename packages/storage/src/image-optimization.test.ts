@@ -1,11 +1,13 @@
 import sharp from "sharp";
 import { describe, expect, it } from "vitest";
 import {
+  IMAGE_VARIANT_PRESETS,
   ImageOptimizationBusyError,
   InvalidUploadedImageError,
   MAX_IMAGE_INPUT_PIXELS,
   MAX_IMAGE_OUTPUT_EDGE,
   optimizeUploadedImage,
+  transformImageVariant,
   UploadedImageTooLargeError,
 } from "./image-optimization.js";
 
@@ -91,5 +93,14 @@ describe("tenant upload image optimization", () => {
 
   it("keeps canonical image dimensions below the edge transformation ceiling", () => {
     expect(MAX_IMAGE_OUTPUT_EDGE).toBe(2_560);
+    expect(IMAGE_VARIANT_PRESETS.thumbnail.maxWidth).toBe(320);
+  });
+
+  it("generates bounded responsive WebP variants via transformImageVariant", async () => {
+    const input = await createSolidPng(1_600, 900);
+    const thumb = await transformImageVariant(input, "thumbnail");
+    expect(thumb.contentType).toBe("image/webp");
+    expect(thumb.width).toBe(320);
+    expect(thumb.height).toBe(180);
   });
 });

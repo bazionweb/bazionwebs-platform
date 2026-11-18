@@ -20,10 +20,12 @@ vi.mock("../../lib/tenant-resolution.js", () => ({
 }));
 vi.mock("../../lib/tenant-modules.js", () => ({ isTenantModuleEnabled: mocks.isTenantModuleEnabled }));
 vi.mock("../../lib/database.js", () => ({
+  pool: { query: vi.fn() },
   withTenantTransaction: mocks.withTenantTransaction,
   withTenantMaintenanceTransaction: vi.fn(),
   listTenantIdsForMaintenance: vi.fn(),
 }));
+vi.mock("@bazion/audit", () => ({ PostgresAuditEventWriter: class { append = vi.fn(async () => undefined); } }));
 vi.mock("@bazion/auth", () => ({ requireActiveTenantPermission: mocks.requireActiveTenantPermission }));
 
 const tenantId = "11111111-1111-4111-8111-111111111111";

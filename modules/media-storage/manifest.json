@@ -3,16 +3,21 @@
   "name": "Tenant media storage adapters",
   "version": "1.0.0",
   "owner": "platform",
-  "status": "partial",
+  "status": "stable",
   "entrypoints": {
-    "adapter": "packages/storage"
+    "adapter": "packages/storage",
+    "api": "apps/api/src/modules/media"
   },
-  "implementation": { "mode": "workspace-package", "packageName": "@bazion/storage" },
+  "implementation": { "mode": "hybrid", "packageName": "@bazion/storage" },
   "tenantModel": "tenant-owned",
-  "permissions": [],
-  "tables": [],
-  "migrations": [],
-  "dependencies": [],
+  "permissions": [
+    { "resource": "media", "actions": ["read", "create", "delete"] }
+  ],
+  "tables": [
+    { "name": "tenant_media_assets", "owner": "media-storage", "tenantScoped": true, "rls": "forced", "migration": "0034_complete_partial_modules.sql" }
+  ],
+  "migrations": ["0034_complete_partial_modules.sql"],
+  "dependencies": ["platform-identity"],
   "operations": {
     "logs": false,
     "metrics": false,
@@ -23,6 +28,10 @@
   "events": [],
   "jobs": [],
   "providers": ["Local filesystem", "S3-compatible object storage"],
-  "tests": ["packages/storage/src/image-upload.test.ts"],
+  "tests": [
+    "packages/storage/src/image-upload.test.ts",
+    "packages/storage/src/image-optimization.test.ts",
+    "apps/api/src/modules/media/routes.test.ts"
+  ],
   "docs": ["docs/module-development-contract.md"]
 }

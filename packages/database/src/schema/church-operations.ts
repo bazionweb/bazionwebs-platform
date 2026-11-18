@@ -237,21 +237,81 @@ export const hkmMemberAttendanceRecords = pgTable("hkm_member_attendance_records
 export const hkmGivingTransactions = pgTable("hkm_giving_transactions", {
   id: uuid("id").defaultRandom().primaryKey(),
   tenantId: uuid("tenant_id").notNull().references(() => tenants.id, { onDelete: "restrict" }),
-  memberId: uuid("member_id").notNull(),
+  memberId: uuid("member_id"),
   branchId: uuid("branch_id").notNull(),
   amountMinor: integer("amount_minor").notNull(),
   currency: varchar("currency", { length: 3 }).notNull().default("KES"),
   givingType: varchar("giving_type", { length: 48 }).notNull(),
+  transactionKind: varchar("transaction_kind", { length: 16 }).notNull().default("income"),
+  description: text("description"),
+  nonMemberName: varchar("non_member_name", { length: 160 }),
+  isAnonymous: boolean("is_anonymous").notNull().default(false),
   transactionDate: timestamp("transaction_date", { withTimezone: true }).notNull().defaultNow(),
   paymentMethod: varchar("payment_method", { length: 40 }).notNull().default("manual"),
   receiptNumber: varchar("receipt_number", { length: 80 }).notNull(),
   paymentStatus: varchar("payment_status", { length: 24 }).notNull().default("verified"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [
   foreignKey({ columns: [t.memberId, t.tenantId], foreignColumns: [hkmMembers.id, hkmMembers.tenantId], name: "hkm_giving_member_tenant_fk" }).onDelete("restrict"),
   foreignKey({ columns: [t.branchId, t.tenantId], foreignColumns: [hkmBranches.id, hkmBranches.tenantId], name: "hkm_giving_branch_tenant_fk" }).onDelete("restrict"),
   uniqueIndex("hkm_giving_tenant_receipt_uq").on(t.tenantId, t.receiptNumber),
   index("hkm_giving_tenant_member_date_idx").on(t.tenantId, t.memberId, t.transactionDate),
+]);
+
+export const hkmVisitors = pgTable("hkm_visitors", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+  name: varchar("name", { length: 160 }).notNull(),
+  phone: varchar("phone", { length: 40 }),
+  email: varchar("email", { length: 254 }),
+  visitDate: date("visit_date").notNull(),
+  serviceAttended: varchar("service_attended", { length: 80 }).notNull().default("Sunday Service"),
+  howHeard: varchar("how_heard", { length: 80 }),
+  invitedBy: varchar("invited_by", { length: 160 }),
+  prayerRequest: text("prayer_request"),
+  wantsFollowUp: boolean("wants_follow_up").notNull().default(true),
+  followUpStatus: varchar("follow_up_status", { length: 32 }).notNull().default("Pending"),
+  assignedTo: varchar("assigned_to", { length: 160 }),
+  notes: text("notes"),
+  convertedToMember: boolean("converted_to_member").notNull().default(false),
+  memberId: uuid("member_id"),
+  branchId: uuid("branch_id"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  index("hkm_visitors_tenant_date_idx").on(t.tenantId, t.visitDate),
+]);
+
+export const hkmVisitorFollowUps = pgTable("hkm_visitor_follow_ups", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+  visitorId: uuid("visitor_id").notNull().references(() => hkmVisitors.id, { onDelete: "cascade" }),
+  date: date("date").notNull(),
+  method: varchar("method", { length: 40 }).notNull().default("Phone Call"),
+  notes: text("notes").notNull(),
+  outcome: varchar("outcome", { length: 80 }).notNull().default("Reached"),
+  nextFollowUpDate: date("next_follow_up_date"),
+  followedUpBy: varchar("followed_up_by", { length: 160 }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  index("hkm_visitor_follow_ups_tenant_visitor_idx").on(t.tenantId, t.visitorId),
+]);
+
+export const hkmSmsLogs = pgTable("hkm_sms_logs", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+  recipients: jsonb("recipients").$type<string[]>().notNull().default([]),
+  recipientGroup: varchar("recipient_group", { length: 120 }),
+  message: text("message").notNull(),
+  status: varchar("status", { length: 24 }).notNull().default("Sent"),
+  sentBy: varchar("sent_by", { length: 160 }).notNull(),
+  recipientCount: integer("recipient_count").notNull().default(1),
+  branchId: uuid("branch_id"),
+  sentAt: timestamp("sent_at", { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  index("hkm_sms_logs_tenant_sent_idx").on(t.tenantId, t.sentAt),
 ]);
 
 export const ministrySiteSettingsVersions = pgTable("ministry_site_settings_versions", {

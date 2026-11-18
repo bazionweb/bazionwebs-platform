@@ -25,7 +25,7 @@
     "schemaVersion": "1.0.0",
     "sourcePath": "packages/education-contracts/src/index.ts"
   },
-  "databaseSchemaVersion": "0032_hkm_member_attendance.sql",
+  "databaseSchemaVersion": "0034_complete_partial_modules.sql",
   "readiness": {
     "implemented": [
       "BMI and BEMI branding resolved from verified host while sharing tenant 055",

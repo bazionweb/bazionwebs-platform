@@ -22,7 +22,7 @@
     {
       "id": "analytics",
       "displayName": "Analytics",
-      "description": "Tenant workspace metrics and analytics authorization surface.",
+      "description": "Privacy-aware tenant workspace analytics, event tracking, exports and retention controls.",
       "defaultEnabled": false,
       "required": false,
       "tenantAssignable": true,
@@ -76,7 +76,7 @@
     {
       "id": "church-ministry",
       "displayName": "Church & Ministry Platform",
-      "description": "Tenant-scoped church content and HKM member, attendance, and giving records; member portal account linking and broader ministry operations remain in progress.",
+      "description": "Tenant-scoped church content, operations, HKM member, attendance, visitor, SMS and giving records.",
       "defaultEnabled": false,
       "required": false,
       "tenantAssignable": true,
@@ -85,7 +85,7 @@
     {
       "id": "education-ums",
       "displayName": "Education UMS",
-      "description": "Institution-scoped student and programme records for education tenants; admissions, finance, courses, grading and LMS remain in progress.",
+      "description": "Institution-scoped admissions, student, course, enrollment, grading, finance, staff, study center and library records.",
       "defaultEnabled": false,
       "required": false,
       "tenantAssignable": true,

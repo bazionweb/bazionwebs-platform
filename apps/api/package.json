@@ -9,6 +9,7 @@
     "dev:bmi": "tsx watch src/server.ts",
     "dev:bemi": "tsx watch src/server.ts",
     "db:expire-site-enquiries": "tsx scripts/expire-site-enquiries.ts",
+    "db:expire-analytics-events": "tsx scripts/expire-analytics-events.ts",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/server.js",
     "start:hosting-reconciler": "node dist/hosting-worker.js",
@@ -20,6 +21,7 @@
   },
   "dependencies": {
     "@bazion/api-contracts": "workspace:*",
+    "@bazion/analytics": "workspace:*",
     "@bazion/church-ministry-domain": "workspace:*",
     "@bazion/church-ministry-contracts": "workspace:*",
     "@bazion/church-ministry-template": "workspace:*",

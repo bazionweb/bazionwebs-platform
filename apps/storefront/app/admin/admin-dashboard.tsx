@@ -11,6 +11,11 @@ type Overview = {
   metrics: { products: number; activeProducts: number; orders: number; pendingOrders: number; paidOrders: number };
 };
 
+type AnalyticsSummaryResponse = {
+  days: number;
+  summary: { totalEvents: number; pageViews: number; conversions: number; conversionRatePercent: number };
+};
+
 type Member = {
   id: string;
   role: string;
@@ -67,6 +72,7 @@ export function AdminDashboard() {
   const session = authClient.useSession();
   const activeOrganization = authClient.useActiveOrganization();
   const [overview, setOverview] = useState<Overview | null>(null);
+  const [analyticsSummary, setAnalyticsSummary] = useState<AnalyticsSummaryResponse | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
   const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [loading, setLoading] = useState(false);
@@ -89,15 +95,18 @@ export function AdminDashboard() {
       setMembersError("");
       setInvitationsError("");
 
-      const [overviewResult, membersResult, invitationsResult] = await Promise.allSettled([
+      const [overviewResult, membersResult, invitationsResult, analyticsResult] = await Promise.allSettled([
         apiRequest<Overview>("/v1/admin/overview"),
         apiRequest<MemberResponse>("/v1/admin/members"),
         apiRequest<Invitation[]>("/v1/admin/invitations"),
+        apiRequest<AnalyticsSummaryResponse>("/v1/admin/analytics/summary?days=30"),
       ]);
 
       if (!cancelled) {
         if (overviewResult.status === "fulfilled") setOverview(overviewResult.value);
         else setOverviewError(overviewResult.reason instanceof Error ? overviewResult.reason.message : "Could not load dashboard metrics.");
+        if (analyticsResult.status === "fulfilled") setAnalyticsSummary(analyticsResult.value);
+        else setAnalyticsSummary(null);
         if (membersResult.status === "fulfilled") setMembers(membersResult.value.members ?? []);
         else setMembersError(membersResult.reason instanceof Error ? membersResult.reason.message : "Could not load team members.");
         if (invitationsResult.status === "fulfilled") setInvitations(invitationsResult.value ?? []);
@@ -275,6 +284,13 @@ export function AdminDashboard() {
         <article><span>Products</span><strong>{overview?.metrics.products ?? "—"}</strong><small>{overview?.metrics.activeProducts ?? "—"} active</small></article>
         <article><span>Orders</span><strong>{overview?.metrics.orders ?? "—"}</strong><small>{overview?.metrics.pendingOrders ?? "—"} awaiting payment</small></article>
         <article><span>Paid orders</span><strong>{overview?.metrics.paidOrders ?? "—"}</strong><small>Based on current order status</small></article>
+        {analyticsSummary && (
+          <article>
+            <span>Analytics (30d)</span>
+            <strong>{analyticsSummary.summary.totalEvents}</strong>
+            <small>{analyticsSummary.summary.pageViews} views · {analyticsSummary.summary.conversionRatePercent}% conv · <a href="/v1/admin/analytics/export">Export</a></small>
+          </article>
+        )}
       </div>
 
       <div className="admin-section-title admin-team-title">

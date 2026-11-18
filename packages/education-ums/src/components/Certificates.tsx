@@ -111,24 +111,24 @@ function formatDate(iso: string): string {
 // We'll use the actual seal provided by the user as a CSS-rendered element
 
 // ── Micro-text security border ────────────────────────────────────────────────
-const MicroBorder: React.FC = () => (
+const MicroBorder: React.FC<{ shortName: string }> = ({ shortName }) => (
   <div className="absolute inset-0 pointer-events-none overflow-hidden z-10">
     {/* Top micro-text strip */}
     <div className="absolute top-0 left-0 w-full h-3 overflow-hidden">
-      <p className="text-[3.5px] leading-none whitespace-nowrap text-[#4B0082] opacity-40 tracking-[0.05em]">
+      <p className="text-[3.5px] leading-none whitespace-nowrap text-[var(--institution-primary)] opacity-40 tracking-[0.05em]">
         {Array(300)
           .fill(
-            `BMI UNIVERSITY · NAIROBI KENYA · CHARTERED 2005 · CUE ACCREDITED · VERIFY AT ${MARKETING_URL.replace('https://', '').toUpperCase()}/VERIFY · `,
+            `${shortName.toUpperCase()} · ${MARKETING_URL.replace('https://', '').toUpperCase()}/VERIFY · `,
           )
           .join("")}
       </p>
     </div>
     {/* Bottom micro-text strip */}
     <div className="absolute bottom-0 left-0 w-full h-3 overflow-hidden">
-      <p className="text-[3.5px] leading-none whitespace-nowrap text-[#4B0082] opacity-40 tracking-[0.05em]">
+      <p className="text-[3.5px] leading-none whitespace-nowrap text-[var(--institution-primary)] opacity-40 tracking-[0.05em]">
         {Array(300)
           .fill(
-            "ANY ALTERATION RENDERS THIS DOCUMENT VOID · DOCUMENT SECURITY FEATURE · BMI UNIVERSITY OFFICIAL CERTIFICATE · ",
+            `ANY ALTERATION RENDERS THIS DOCUMENT VOID · DOCUMENT SECURITY FEATURE · ${shortName.toUpperCase()} OFFICIAL CERTIFICATE · `,
           )
           .join("")}
       </p>
@@ -136,12 +136,12 @@ const MicroBorder: React.FC = () => (
     {/* Left micro-text strip */}
     <div className="absolute top-0 left-0 h-full w-3 overflow-hidden flex items-center justify-center">
       <p
-        className="text-[3.5px] leading-none whitespace-nowrap text-[#4B0082] opacity-40"
+        className="text-[3.5px] leading-none whitespace-nowrap text-[var(--institution-primary)] opacity-40"
         style={{ writingMode: "vertical-rl", transform: "rotate(180deg)" }}
       >
         {Array(200)
           .fill(
-            "BMI UNIVERSITY SECURE DOCUMENT · EXCELLENCE IN FAITH AND KNOWLEDGE · ",
+            `${shortName.toUpperCase()} SECURE DOCUMENT · ${shortName.toUpperCase()} · `,
           )
           .join("")}
       </p>
@@ -149,12 +149,12 @@ const MicroBorder: React.FC = () => (
     {/* Right micro-text strip */}
     <div className="absolute top-0 right-0 h-full w-3 overflow-hidden flex items-center justify-center">
       <p
-        className="text-[3.5px] leading-none whitespace-nowrap text-[#4B0082] opacity-40"
+        className="text-[3.5px] leading-none whitespace-nowrap text-[var(--institution-primary)] opacity-40"
         style={{ writingMode: "vertical-rl" }}
       >
         {Array(200)
           .fill(
-            "ANTI-TAMPER SECURITY LAYER · CRYPTOGRAPHICALLY SIGNED · BMI UNIVERSITY KENYA · ",
+            `ANTI-TAMPER SECURITY LAYER · CRYPTOGRAPHICALLY SIGNED · ${shortName.toUpperCase()} · `,
           )
           .join("")}
       </p>
@@ -189,13 +189,25 @@ const CertificateDocument: React.FC<CertDocProps> = ({
   logo,
   orientation,
 }) => {
+  const institutionName = useUIStore((state) => state.institutionName);
+  const shortName = useUIStore((state) => state.shortName);
+  const primaryColor = useUIStore((state) => state.primaryColor);
+  const accentColor = useUIStore((state) => state.accentColor);
+  const tagline = useUIStore((state) => state.tagline);
+  const accreditationLabel = useUIStore((state) => state.accreditationLabel);
+  const address = useUIStore((state) => state.address);
+  const contactEmail = useUIStore((state) => state.contactEmail);
+  const contactPhone = useUIStore((state) => state.contactPhone);
+  const institutionCode = shortName.toUpperCase().includes("BMI")
+    ? "BMI"
+    : shortName.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8) || "ORG";
   const serial = formatSerial(cert.serial_number);
   const hash = shortHash(cert.content_hash);
   const sig = cert.signature
     ? cert.signature.substring(0, 20).toUpperCase()
     : "";
   const deptCode = DEPT_CODE[student.faculty ?? ""] ?? "GEN";
-  const studentRef = `BMI/${new Date(cert.issue_date).getFullYear()}/${deptCode}/${student.id.replace(/\D/g, "").slice(-3).padStart(3, "0")}`;
+  const studentRef = `${institutionCode}/${new Date(cert.issue_date).getFullYear()}/${deptCode}/${student.id.replace(/\D/g, "").slice(-3).padStart(3, "0")}`;
   const issueDate = formatDate(cert.issue_date);
   const timestamp =
     new Date(cert.issue_date).toISOString().replace("T", " ").substring(0, 19) +
@@ -210,16 +222,16 @@ const CertificateDocument: React.FC<CertDocProps> = ({
       id="official-certificate-root"
       className={`relative bg-[#FEFDF8] overflow-hidden shadow-2xl print:shadow-none
         ${isLandscape ? "w-[297mm] h-[210mm]" : "w-[210mm] h-[297mm]"}`}
-      style={{ fontFamily: "'Georgia', 'Times New Roman', serif" }}
+      style={{ fontFamily: "'Georgia', 'Times New Roman', serif", "--institution-primary": primaryColor, "--institution-secondary": primaryColor, "--institution-accent": accentColor } as React.CSSProperties}
     >
       {/* ── Outer gold + purple double border ── */}
-      <div className="absolute inset-0 border-[10px] border-[#4B0082] pointer-events-none z-20" />
-      <div className="absolute inset-[10px] border-[3px] border-[#C9A84C] pointer-events-none z-20" />
-      <div className="absolute inset-[14px] border-[1px] border-[#4B0082]/30 pointer-events-none z-20" />
+      <div className="absolute inset-0 border-[10px] border-[var(--institution-primary)] pointer-events-none z-20" />
+      <div className="absolute inset-[10px] border-[3px] border-[var(--institution-accent)] pointer-events-none z-20" />
+      <div className="absolute inset-[14px] border-[1px] border-[var(--institution-primary)]/30 pointer-events-none z-20" />
 
       {/* ── Security layers ── */}
       <GuillocheWatermark logo={logo} />
-      <MicroBorder />
+      <MicroBorder shortName={shortName} />
 
       {/* ── Corner ornaments ── */}
       {[
@@ -235,17 +247,17 @@ const CertificateDocument: React.FC<CertDocProps> = ({
           <svg viewBox="0 0 40 40" className={`w-full h-full ${rot}`}>
             <path
               d="M2,2 L2,16 M2,2 L16,2"
-              stroke="#C9A84C"
+              stroke={accentColor}
               strokeWidth="2.5"
               fill="none"
             />
             <path
               d="M2,2 L10,10"
-              stroke="#4B0082"
+              stroke={primaryColor}
               strokeWidth="1"
               fill="none"
             />
-            <circle cx="2" cy="2" r="2" fill="#C9A84C" />
+            <circle cx="2" cy="2" r="2" fill={accentColor} />
           </svg>
         </div>
       ))}
@@ -259,34 +271,34 @@ const CertificateDocument: React.FC<CertDocProps> = ({
           <div className="relative mb-2">
             <img
               src={logo}
-              alt="BMI University"
-              className="h-14 w-14 object-contain rounded-full border-2 border-[#C9A84C] bg-white shadow-md"
+              alt={institutionName}
+              className="h-14 w-14 object-contain rounded-full bg-white shadow-md"
+              style={{ border: `2px solid ${accentColor}` }}
             />
           </div>
           <h1
-            className="text-[22px] font-black tracking-[0.35em] text-[#1a1a3e] uppercase"
-            style={{ fontFamily: "Georgia, serif", letterSpacing: "0.3em" }}
+            className="text-[22px] font-black tracking-[0.35em] uppercase"
+            style={{ fontFamily: "Georgia, serif", letterSpacing: "0.3em", color: primaryColor }}
           >
-            BMI University
+            {institutionName}
           </h1>
           <p className="text-[7px] tracking-[0.25em] text-[#555] uppercase mt-0.5">
-            Nairobi, Kenya &nbsp;·&nbsp; Chartered 2005 &nbsp;·&nbsp; CUE
-            Accredited
+            {[tagline, address, accreditationLabel].filter(Boolean).join(" · ")}
           </p>
           {/* Gold divider */}
           <div className="flex items-center gap-2 mt-2 w-full max-w-xs">
-            <div className="flex-1 h-[1px] bg-gradient-to-r from-transparent to-[#C9A84C]" />
-            <div className="w-1.5 h-1.5 rounded-full bg-[#C9A84C]" />
-            <div className="flex-1 h-[1px] bg-gradient-to-l from-transparent to-[#C9A84C]" />
+            <div className="flex-1 h-[1px]" style={{ background: `linear-gradient(90deg, transparent, ${accentColor})` }} />
+            <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: accentColor }} />
+            <div className="flex-1 h-[1px]" style={{ background: `linear-gradient(90deg, ${accentColor}, transparent)` }} />
           </div>
         </div>
 
         {/* ── Document ID bar ── */}
         <div className="flex items-center justify-center gap-3 mb-3">
-          <div className="flex items-center gap-2 bg-[#1a1a3e] text-white px-3 py-1 rounded-sm text-[7px] tracking-widest uppercase">
-            <span className="text-[#C9A84C] font-bold">Document ID</span>
-            <span className="font-mono font-bold text-[#FFD700]">{serial}</span>
-            <span className="text-[#C9A84C] font-bold ml-2">Hash:</span>
+          <div className="flex items-center gap-2 text-white px-3 py-1 rounded-sm text-[7px] tracking-widest uppercase" style={{ backgroundColor: primaryColor }}>
+            <span className="font-bold" style={{ color: accentColor }}>Document ID</span>
+            <span className="font-mono font-bold" style={{ color: accentColor }}>{serial}</span>
+            <span className="font-bold ml-2" style={{ color: accentColor }}>Hash:</span>
             <span className="font-mono text-gray-300">
               {hash.substring(0, 12)}
             </span>
@@ -297,8 +309,8 @@ const CertificateDocument: React.FC<CertDocProps> = ({
         {/* ── Certificate title ── */}
         <div className="text-center mb-2">
           <h2
-            className="text-[18px] text-[#1a1a3e] italic"
-            style={{ fontFamily: "Georgia, serif" }}
+            className="text-[18px] italic"
+            style={{ fontFamily: "Georgia, serif", color: primaryColor }}
           >
             Certificate of Graduation
           </h2>
@@ -307,20 +319,20 @@ const CertificateDocument: React.FC<CertDocProps> = ({
         {/* ── Body text ── */}
         <div className="text-center mb-2">
           <p className="text-[9px] text-[#444] tracking-wide">
-            The Senate and Council of BMI University hereby certify that
+            The Senate and Council of {institutionName} hereby certify that
           </p>
         </div>
 
         {/* ── Student name ── */}
         <div className="text-center mb-1">
           <h3
-            className="text-[26px] font-bold text-[#1a1a3e]"
-            style={{ fontFamily: "Georgia, serif" }}
+            className="text-[26px] font-bold"
+            style={{ fontFamily: "Georgia, serif", color: primaryColor }}
           >
             {student.first_name} {student.last_name}
           </h3>
-          <div className="inline-block border border-[#4B0082]/40 px-3 py-0.5 mt-1 rounded-sm">
-            <span className="text-[7.5px] font-mono text-[#4B0082] tracking-widest">
+          <div className="inline-block border px-3 py-0.5 mt-1 rounded-sm" style={{ borderColor: `${primaryColor}66` }}>
+            <span className="text-[7.5px] font-mono tracking-widest" style={{ color: primaryColor }}>
               {studentRef}
             </span>
           </div>
@@ -339,10 +351,10 @@ const CertificateDocument: React.FC<CertDocProps> = ({
 
         {/* ── Degree title box ── */}
         <div className="flex justify-center mb-2">
-          <div className="border-2 border-[#C9A84C] rounded-sm px-8 py-2 bg-[#FFFBF0]">
+          <div className="border-2 rounded-sm px-8 py-2 bg-[#FFFBF0]" style={{ borderColor: accentColor }}>
             <p
-              className="text-[14px] font-bold text-[#8B6914] text-center"
-              style={{ fontFamily: "Georgia, serif" }}
+              className="text-[14px] font-bold text-center"
+              style={{ fontFamily: "Georgia, serif", color: primaryColor }}
             >
               {cert.degree}
             </p>
@@ -356,15 +368,15 @@ const CertificateDocument: React.FC<CertDocProps> = ({
           </p>
           <div className="flex items-baseline justify-center gap-2 mt-0.5">
             <span
-              className="text-[22px] font-black text-[#1a1a3e]"
-              style={{ fontFamily: "Georgia, serif" }}
+              className="text-[22px] font-black"
+              style={{ fontFamily: "Georgia, serif", color: primaryColor }}
             >
               {cert.gpa > 0 ? cert.gpa.toFixed(2) : "N/A"}
             </span>
             <span className="text-[10px] text-[#888]">/ 4.0</span>
           </div>
           {cert.graduation_class && (
-            <div className="inline-flex items-center gap-1.5 bg-[#4B0082] text-white px-3 py-0.5 rounded-full mt-1">
+            <div className="inline-flex items-center gap-1.5 text-white px-3 py-0.5 rounded-full mt-1" style={{ backgroundColor: primaryColor }}>
               <span className="text-[7px] tracking-widest uppercase">
                 {cert.graduation_class}
               </span>
@@ -377,9 +389,9 @@ const CertificateDocument: React.FC<CertDocProps> = ({
 
         {/* ── Gold divider ── */}
         <div className="flex items-center gap-2 mb-3">
-          <div className="flex-1 h-[1px] bg-[#C9A84C]/40" />
-          <div className="w-1 h-1 rounded-full bg-[#C9A84C]" />
-          <div className="flex-1 h-[1px] bg-[#C9A84C]/40" />
+          <div className="flex-1 h-[1px]" style={{ backgroundColor: `${accentColor}66` }} />
+          <div className="w-1 h-1 rounded-full" style={{ backgroundColor: accentColor }} />
+          <div className="flex-1 h-[1px]" style={{ backgroundColor: `${accentColor}66` }} />
         </div>
 
         {/* ── Signatories + Seal ── */}
@@ -387,25 +399,24 @@ const CertificateDocument: React.FC<CertDocProps> = ({
           {/* Vice Chancellor */}
           <div className="flex flex-col items-start">
             <div className="relative w-28 mb-1">
-              <p className="font-[cursive] text-[13px] text-[#1a1a3e] italic -mb-1 ml-2">
-                Prof. I. Sigei
+              <p className="font-[cursive] text-[13px] italic -mb-1 ml-2" style={{ color: primaryColor }}>
+                Authorized
               </p>
               <div className="h-[1px] bg-gray-700 w-full" />
             </div>
-            <p className="text-[7.5px] font-bold text-[#1a1a3e] tracking-wide">
-              Prof. Isaac Sigei, PhD
+            <p className="text-[7.5px] font-bold tracking-wide" style={{ color: primaryColor }}>
+              Authorized Signatory
             </p>
-            <p className="text-[6.5px] text-[#666]">Vice-Chancellor</p>
-            <p className="text-[6px] text-[#888] font-mono">VC/BMI/001</p>
+            <p className="text-[6.5px] text-[#666]">Institutional Officer</p>
           </div>
 
           {/* University Seal — center */}
           <div className="flex flex-col items-center">
             <div className="relative w-16 h-16">
               {/* Outer gold ring */}
-              <div className="absolute inset-0 rounded-full border-[3px] border-[#C9A84C] bg-gradient-to-br from-[#C9A84C]/20 to-[#4B0082]/20" />
+              <div className="absolute inset-0 rounded-full border-[3px]" style={{ borderColor: accentColor, background: `${accentColor}22` }} />
               {/* Inner seal */}
-              <div className="absolute inset-[3px] rounded-full bg-[#4B0082] flex items-center justify-center overflow-hidden border-2 border-[#C9A84C]/60">
+              <div className="absolute inset-[3px] flex items-center justify-center overflow-hidden border-2" style={{ backgroundColor: primaryColor, borderColor: `${accentColor}99` }}>
                 <img
                   src={logo}
                   alt="Seal"
@@ -424,13 +435,13 @@ const CertificateDocument: React.FC<CertDocProps> = ({
                 />
                 <text
                   className="text-[4px]"
-                  fill="#C9A84C"
+                  fill={accentColor}
                   fontSize="4.5"
                   fontWeight="bold"
                   letterSpacing="1.5"
                 >
                   <textPath href="#sealArc" startOffset="5%">
-                    UNIVERSITY SEAL · BMI · EST. 2015
+                    {shortName.toUpperCase()}
                   </textPath>
                 </text>
               </svg>
@@ -443,34 +454,32 @@ const CertificateDocument: React.FC<CertDocProps> = ({
           {/* Academic Registrar */}
           <div className="flex flex-col items-end">
             <div className="relative w-28 mb-1">
-              <p className="font-[cursive] text-[13px] text-[#1a1a3e] italic -mb-1 mr-2 text-right">
-                Dr. S. Kiptoo
+              <p className="font-[cursive] text-[13px] italic -mb-1 mr-2 text-right" style={{ color: primaryColor }}>
+                Registrar
               </p>
               <div className="h-[1px] bg-gray-700 w-full" />
             </div>
-            <p className="text-[7.5px] font-bold text-[#1a1a3e] tracking-wide text-right">
-              Dr. Samuel Kiptoo
+            <p className="text-[7.5px] font-bold tracking-wide text-right" style={{ color: primaryColor }}>
+              Office of the Registrar
             </p>
             <p className="text-[6.5px] text-[#666] text-right">
               Academic Registrar
-            </p>
-            <p className="text-[6px] text-[#888] font-mono text-right">
-              REG/BMI/001
             </p>
           </div>
         </div>
 
         {/* ── Security footer (dark bar) ── */}
         <div
-          className="bg-[#1a1a3e] text-white px-4 py-2 -mx-14 grid grid-cols-3 items-center gap-2"
+          className="text-white px-4 py-2 -mx-14 grid grid-cols-3 items-center gap-2"
           style={{
             marginLeft: isLandscape ? "-3.5rem" : "-3rem",
             marginRight: isLandscape ? "-3.5rem" : "-3rem",
+            backgroundColor: primaryColor,
           }}
         >
           {/* Left: hash + timestamp */}
           <div>
-            <p className="text-[6px] font-bold text-[#C9A84C] uppercase tracking-widest mb-0.5">
+            <p className="text-[6px] font-bold uppercase tracking-widest mb-0.5" style={{ color: accentColor }}>
               Document Security Hash
             </p>
             <p className="text-[6.5px] font-mono text-white tracking-wider">
@@ -502,15 +511,15 @@ const CertificateDocument: React.FC<CertDocProps> = ({
 
           {/* Right: verify instructions */}
           <div className="text-right">
-            <p className="text-[6px] font-bold text-[#C9A84C] uppercase tracking-widest mb-0.5">
+            <p className="text-[6px] font-bold uppercase tracking-widest mb-0.5" style={{ color: accentColor }}>
               Verify Authenticity
             </p>
-            <p className="text-[6px] text-white">{MARKETING_URL.replace('https://', '')}/verify</p>
+            <p className="text-[6px] text-white">{typeof window !== "undefined" ? window.location.host : MARKETING_URL.replace('https://', '')}/verify</p>
             <p className="text-[6px] text-gray-300">
-              {REGISTRAR_EMAIL}
+              {contactEmail || REGISTRAR_EMAIL}
             </p>
-            <p className="text-[6px] text-gray-300">+254 726 912 577</p>
-            <p className="text-[5.5px] text-[#C9A84C] mt-0.5 font-bold uppercase tracking-wide">
+            <p className="text-[6px] text-gray-300">{contactPhone}</p>
+            <p className="text-[5.5px] mt-0.5 font-bold uppercase tracking-wide" style={{ color: accentColor }}>
               Any alteration renders this document void
             </p>
           </div>
@@ -524,6 +533,13 @@ const CertificateDocument: React.FC<CertDocProps> = ({
 const Certificates: React.FC = () => {
   const students = useDataStore((s) => s.students);
   const logo = useUIStore((s) => s.logo);
+  const institutionName = useUIStore((s) => s.institutionName);
+  const shortName = useUIStore((s) => s.shortName);
+  const primaryColor = useUIStore((s) => s.primaryColor);
+  const accentColor = useUIStore((s) => s.accentColor);
+  const institutionCode = shortName.toUpperCase().includes("BMI")
+    ? "BMI"
+    : shortName.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8) || "ORG";
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [showCertificate, setShowCertificate] = useState(false);
@@ -561,7 +577,7 @@ const Certificates: React.FC = () => {
         .replace(/\D/g, "")
         .slice(-6)
         .padStart(6, "0");
-      const serial = `BMI-${year}-${numericId}`;
+      const serial = `${institutionCode}-${year}-${numericId}`;
 
       // Content hash — FNV-1a over key fields (no crypto API needed)
       const raw = `${serial}|${student.id}|${getDegreeTitle(student)}|${student.gpa}`;
@@ -601,7 +617,7 @@ const Certificates: React.FC = () => {
       const qrDataUrl = await QRCode.toDataURL(verifyUrl, {
         width: 120,
         margin: 1,
-        color: { dark: "#1a1a3e", light: "#ffffff" },
+        color: { dark: primaryColor, light: "#ffffff" },
       });
       setQrData({ qrCode: qrDataUrl, url: verifyUrl, mode: "online" });
 
@@ -652,17 +668,17 @@ const Certificates: React.FC = () => {
   const handlePrint = () => handleDownloadPdf();
 
   return (
-    <div className="h-full flex flex-col animate-fade-in">
+      <div className="h-full flex flex-col animate-fade-in" style={{ "--institution-primary": primaryColor, "--institution-accent": accentColor } as React.CSSProperties}>
       {/* ── Header ── */}
       <div className="flex-shrink-0 sticky top-0 z-40 bg-white/95 dark:bg-gray-900/95 backdrop-blur-md border-b border-gray-200 dark:border-gray-700 px-4 py-2 flex justify-between items-center shadow-sm min-h-[60px]">
         <div className="flex items-center gap-3 pl-14">
-          <div className="w-1 h-5 bg-[#FFD700]" />
+          <div className="w-1 h-5" style={{ backgroundColor: accentColor }} />
           <div>
-            <h2 className="text-base font-bold text-[#2E004F] dark:text-white tracking-tight uppercase">
+            <h2 className="text-base font-bold dark:text-white tracking-tight uppercase" style={{ color: primaryColor }}>
               Degree & Certificate Issuance
             </h2>
             <p className="text-[8px] font-semibold text-gray-500 uppercase tracking-widest">
-              BMI Institutional Registrar · Graduation & Awards
+              {institutionName} · Registrar · Graduation & Awards
             </p>
           </div>
         </div>
@@ -671,7 +687,8 @@ const Certificates: React.FC = () => {
             <button
               key={o}
               onClick={() => setOrientation(o)}
-              className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest transition-all ${orientation === o ? "bg-[#4B0082] text-white" : "bg-gray-100 text-gray-500 hover:text-[#4B0082]"}`}
+              className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest transition-all ${orientation === o ? "text-white" : "bg-gray-100 text-gray-500"}`}
+              style={orientation === o ? { backgroundColor: primaryColor } : undefined}
             >
               <Layout size={10} className="inline mr-1" />
               {o}
@@ -698,7 +715,8 @@ const Certificates: React.FC = () => {
                 placeholder="Search candidate..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-xs outline-none focus:ring-1 focus:ring-[#4B0082]"
+                className="w-full pl-9 pr-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-xs outline-none"
+                style={{ "--tw-ring-color": primaryColor } as React.CSSProperties}
               />
             </div>
             <div className="flex-1 overflow-y-auto no-scrollbar space-y-1">
@@ -711,7 +729,8 @@ const Certificates: React.FC = () => {
                     setGeneratedCert(null);
                     setError("");
                   }}
-                  className={`w-full text-left p-3 transition-all flex items-center justify-between ${selectedStudent?.id === s.id ? "bg-[#4B0082] text-white" : "hover:bg-purple-50 dark:hover:bg-gray-700"}`}
+                  className={`w-full text-left p-3 transition-all flex items-center justify-between ${selectedStudent?.id === s.id ? "text-white" : "hover:bg-purple-50 dark:hover:bg-gray-700"}`}
+                  style={selectedStudent?.id === s.id ? { backgroundColor: primaryColor } : undefined}
                 >
                   <div>
                     <p className="text-[11px] font-black uppercase tracking-tight">

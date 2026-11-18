@@ -3,7 +3,14 @@ import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { createOutboxPayloadCodec, PostgresNotificationOutbox } from "@bazion/notifications";
 import { organization } from "better-auth/plugins";
 import { Pool } from "pg";
-import { reconcileTenantProvisioning } from "@bazion/platform-identity";
+import {
+  generateServiceIdentityToken,
+  hashServiceIdentitySecret,
+  normalizeServiceIdentityScopes,
+  reconcileTenantProvisioning,
+  verifyServiceIdentitySecretHash,
+  type ServiceIdentityRecord,
+} from "@bazion/platform-identity";
 import { ac, organizationRoles, parseOrganizationRoles } from "./permissions.js";
 import {
   canCreateClientOrganization,
@@ -22,6 +29,17 @@ function required(name: string): string {
 
 const nodeEnv = process.env.NODE_ENV ?? "development";
 const appBaseUrl = process.env.AUTH_APP_URL ?? "http://localhost:3000";
+const authBrandName = process.env.AUTH_APP_NAME?.trim() || "Bazion Web";
+const authBrandVariables: Record<string, string | number> = {
+  appName: authBrandName,
+  brandName: authBrandName,
+  ...(process.env.AUTH_EMAIL_LOGO_URL?.trim() ? { logoUrl: process.env.AUTH_EMAIL_LOGO_URL.trim() } : {}),
+  ...(process.env.AUTH_EMAIL_PRIMARY_COLOR?.trim() ? { primaryColor: process.env.AUTH_EMAIL_PRIMARY_COLOR.trim() } : {}),
+  ...(process.env.AUTH_EMAIL_SECONDARY_COLOR?.trim() ? { secondaryColor: process.env.AUTH_EMAIL_SECONDARY_COLOR.trim() } : {}),
+  ...(process.env.AUTH_EMAIL_ACCENT_COLOR?.trim() ? { accentColor: process.env.AUTH_EMAIL_ACCENT_COLOR.trim() } : {}),
+  ...(process.env.AUTH_EMAIL_TAGLINE?.trim() ? { tagline: process.env.AUTH_EMAIL_TAGLINE.trim() } : {}),
+  ...(process.env.AUTH_EMAIL_SUPPORT_ADDRESS?.trim() ? { supportEmail: process.env.AUTH_EMAIL_SUPPORT_ADDRESS.trim() } : {}),
+};
 const defaultTrustedOrigins = (process.env.BETTER_AUTH_TRUSTED_ORIGINS ?? "http://localhost:3000,http://localhost:4000")
   .split(",").map((value) => value.trim()).filter(Boolean);
 
@@ -61,11 +79,13 @@ const notificationOutbox = new PostgresNotificationOutbox(
 
 async function enqueueAuthEmail(
   to: string,
-  subject: string,
+  subject: string | undefined,
   url: string,
   intro: string,
   event: "password-reset" | "password-reset-complete" | "email-verification" | "organization-invitation",
   eventId: string,
+  extraVars?: Record<string, string | number>,
+  brandOverrides?: Record<string, string | number>,
 ): Promise<void> {
   const eventHash = createHash("sha256").update(eventId).digest("hex");
   await notificationOutbox.enqueue({
@@ -75,9 +95,29 @@ async function enqueueAuthEmail(
       to,
       subject,
       template: `auth.${event}`,
-      variables: { url, intro },
+      variables: { ...authBrandVariables, ...(brandOverrides ?? {}), url, intro, ...(extraVars ?? {}) },
     },
   });
+}
+
+async function authRequestBranding(request?: Request): Promise<Record<string, string | number>> {
+  if (!request) return {};
+  try {
+    const hostname = normalizeTenantHostname(new URL(request.url).hostname);
+    if (!hostname) return {};
+    const tenant = await resolvePublicTenantByHostname(hostname);
+    if (!tenant) return {};
+    const publicUrl = `https://${hostname}`;
+    return {
+      appName: tenant.name,
+      brandName: tenant.name,
+      tagline: "A secure message from your organization",
+      websiteUrl: publicUrl,
+      url: publicUrl,
+    };
+  } catch {
+    return {};
+  }
 }
 
 export async function isVerifiedTenantHost(hostname: string): Promise<boolean> {
@@ -172,7 +212,7 @@ const afterCreateOrganization = createAfterCreateOrganizationHook(
 );
 
 export const auth = betterAuth({
-  appName: "Bazion Web",
+  appName: authBrandName,
   database: authPool,
   baseURL: required("BETTER_AUTH_URL"),
   secret: required("BETTER_AUTH_SECRET"),
@@ -184,15 +224,35 @@ export const auth = betterAuth({
     requireEmailVerification: process.env.AUTH_REQUIRE_EMAIL_VERIFICATION !== "false",
     revokeSessionsOnPasswordReset: true,
     resetPasswordTokenExpiresIn: 60 * 60,
-    sendResetPassword: async ({ user, url }) => {
+    sendResetPassword: async ({ user, url, token }: { user: { email: string; name?: string }; url: string; token?: string }, request?: Request) => {
       try {
+        let directUrl = url;
+        try {
+          const parsed = new URL(url);
+          const callbackURL = parsed.searchParams.get("callbackURL");
+          if (callbackURL && token) {
+            const cb = new URL(callbackURL);
+            // Defense-in-depth: Strictly verify origin against trusted origins whitelist and verified tenant hosts
+            const trusted = await trustedOriginsForRequest();
+            const isOriginTrusted = trusted.includes(cb.origin) || (await isVerifiedTenantHost(cb.hostname));
+            if (isOriginTrusted) {
+              cb.searchParams.set("token", token);
+              directUrl = cb.toString();
+            }
+          }
+        } catch {
+          // Keep default url if parsing fails
+        }
+
         await enqueueAuthEmail(
           user.email,
-          "Reset your Bazion Web password",
-          url,
+          undefined,
+          directUrl,
           "Use the secure link below to reset your password.",
           "password-reset",
           url,
+          token ? { token } : undefined,
+          await authRequestBranding(request),
         );
       } catch {
         // Keep the public response identical for registered and unknown addresses.
@@ -200,15 +260,17 @@ export const auth = betterAuth({
         process.stderr.write("[bazion-auth] password-reset email could not be queued\n");
       }
     },
-    onPasswordReset: async ({ user }) => {
+    onPasswordReset: async ({ user }, request?: Request) => {
       try {
         await enqueueAuthEmail(
           user.email,
-          "Your Bazion Web password was changed",
+          undefined,
           "",
-          "Your password was successfully changed. If you did not make this change, contact Bazion support immediately.",
+          "Your password was successfully changed. If you did not make this change, contact your organization support team immediately.",
           "password-reset-complete",
           randomBytes(16).toString("hex"),
+          undefined,
+          await authRequestBranding(request),
         );
       } catch {
         // The password is already changed. Keep the success response while logging
@@ -221,14 +283,16 @@ export const auth = betterAuth({
     sendOnSignUp: true,
     autoSignInAfterVerification: true,
     expiresIn: 60 * 60,
-    sendVerificationEmail: async ({ user, url }) => {
+    sendVerificationEmail: async ({ user, url }, request?: Request) => {
       await enqueueAuthEmail(
         user.email,
-        "Verify your Bazion Web email",
+        undefined,
         url,
-        "Verify your email address to activate your Bazion Web account.",
+        "Verify your email address to activate your account.",
         "email-verification",
         url,
+        undefined,
+        await authRequestBranding(request),
       );
     },
   },
@@ -598,6 +662,7 @@ export interface PlatformTenantRecord {
   suspended_at: string | null;
   closed_at: string | null;
   auth_workspace_linked?: boolean;
+  auth_organization_id?: string | null;
 }
 
 /** Read-only platform directory; caller must enforce global or tenant-scoped tenant.list permission. */
@@ -1338,6 +1403,7 @@ export async function generateEmergencyPasswordResetUrl(userIdOrEmail: string): 
       "An emergency password reset link was generated by the platform administrator.",
       "password-reset",
       resetUrl,
+      { token },
     );
     emailDelivered = true;
   } catch (error) {
@@ -1469,6 +1535,226 @@ export async function resolveFederatedSubjectLink(
   input: Parameters<typeof resolvePlatformFederatedIdentity>[1],
 ) {
   return resolvePlatformFederatedIdentity(phase5Deps, input);
+}
+
+interface ServiceIdentityRow {
+  id: string;
+  tenant_id: string | null;
+  name: string;
+  key_prefix: string;
+  secret_hash: string;
+  scopes: string[];
+  status: "active" | "revoked" | "expired";
+  expires_at: Date | string | null;
+  last_used_at: Date | string | null;
+  created_by: string;
+  revoked_by: string | null;
+  revoked_at: Date | string | null;
+  created_at: Date | string;
+}
+
+function mapServiceIdentityRow(row: ServiceIdentityRow): ServiceIdentityRecord {
+  const toIso = (value: Date | string | null): string | null =>
+    value === null ? null : value instanceof Date ? value.toISOString() : String(value);
+  return {
+    id: row.id,
+    tenantId: row.tenant_id,
+    name: row.name,
+    keyPrefix: row.key_prefix,
+    secretHash: row.secret_hash,
+    scopes: Array.isArray(row.scopes) ? row.scopes : [],
+    status: row.status,
+    expiresAt: toIso(row.expires_at),
+    lastUsedAt: toIso(row.last_used_at),
+    createdBy: row.created_by,
+    revokedBy: row.revoked_by,
+    revokedAt: toIso(row.revoked_at),
+    createdAt: toIso(row.created_at) ?? new Date().toISOString(),
+  };
+}
+
+export async function createPlatformServiceIdentity(input: {
+  tenantId: string | null;
+  name: string;
+  scopes: string[];
+  expiresAt?: string | null | undefined;
+  createdBy: string;
+}): Promise<{ identity: Omit<ServiceIdentityRecord, "secretHash">; token: string }> {
+  const scopes = normalizeServiceIdentityScopes(input.scopes);
+  const { plaintextToken, keyPrefix, secretHash } = generateServiceIdentityToken();
+  const result = await tenantProvisionerPool.query<ServiceIdentityRow>(
+    `INSERT INTO public.service_identities
+       (tenant_id, name, key_prefix, secret_hash, scopes, status, expires_at, created_by)
+     VALUES ($1, $2, $3, $4, $5::jsonb, 'active', $6, $7)
+     RETURNING id, tenant_id, name, key_prefix, secret_hash, scopes, status, expires_at,
+               last_used_at, created_by, revoked_by, revoked_at, created_at`,
+    [
+      input.tenantId,
+      input.name.trim(),
+      keyPrefix,
+      secretHash,
+      JSON.stringify(scopes),
+      input.expiresAt ?? null,
+      input.createdBy,
+    ],
+  );
+  const mapped = mapServiceIdentityRow(result.rows[0]!);
+  const { secretHash: _secretHash, ...identity } = mapped;
+  return { identity, token: plaintextToken };
+}
+
+export async function listPlatformServiceIdentities(tenantId?: string | null): Promise<Array<Omit<ServiceIdentityRecord, "secretHash">>> {
+  const result = tenantId
+    ? await tenantProvisionerPool.query<ServiceIdentityRow>(
+        `SELECT id, tenant_id, name, key_prefix, secret_hash, scopes, status, expires_at,
+                last_used_at, created_by, revoked_by, revoked_at, created_at
+           FROM public.service_identities
+          WHERE tenant_id = $1
+          ORDER BY created_at DESC`,
+        [tenantId],
+      )
+    : await tenantProvisionerPool.query<ServiceIdentityRow>(
+        `SELECT id, tenant_id, name, key_prefix, secret_hash, scopes, status, expires_at,
+                last_used_at, created_by, revoked_by, revoked_at, created_at
+           FROM public.service_identities
+          ORDER BY created_at DESC
+          LIMIT 200`,
+      );
+  return result.rows.map((row) => {
+    const { secretHash: _secretHash, ...rest } = mapServiceIdentityRow(row);
+    return rest;
+  });
+}
+
+export async function revokePlatformServiceIdentity(
+  id: string,
+  revokedBy: string,
+): Promise<Omit<ServiceIdentityRecord, "secretHash"> | null> {
+  const result = await tenantProvisionerPool.query<ServiceIdentityRow>(
+    `UPDATE public.service_identities
+        SET status = 'revoked', revoked_by = $2, revoked_at = now(), updated_at = now()
+      WHERE id = $1 AND status <> 'revoked'
+      RETURNING id, tenant_id, name, key_prefix, secret_hash, scopes, status, expires_at,
+                last_used_at, created_by, revoked_by, revoked_at, created_at`,
+    [id, revokedBy],
+  );
+  if (!result.rows[0]) return null;
+  const { secretHash: _secretHash, ...rest } = mapServiceIdentityRow(result.rows[0]);
+  return rest;
+}
+
+export async function verifyServiceIdentityToken(plaintextToken: string): Promise<ServiceIdentityRecord | null> {
+  const secretHash = hashServiceIdentitySecret(plaintextToken);
+  const result = await tenantResolverPool.query<ServiceIdentityRow>(
+    `SELECT id, tenant_id, name, key_prefix, secret_hash, scopes, status, expires_at,
+            last_used_at, created_by, revoked_by, revoked_at, created_at
+       FROM public.service_identities
+      WHERE secret_hash = $1
+      LIMIT 1`,
+    [secretHash],
+  );
+  const row = result.rows[0];
+  if (!row) return null;
+  if (!verifyServiceIdentitySecretHash(plaintextToken, row.secret_hash)) return null;
+  return mapServiceIdentityRow(row);
+}
+
+export interface PlatformMemberSummary {
+  userId: string;
+  email: string;
+  role: "platform_owner" | "platform_admin" | "platform_support";
+  status: "active" | "suspended";
+  createdAt: string;
+  updatedAt: string;
+}
+
+export async function listPlatformMembers(): Promise<PlatformMemberSummary[]> {
+  const result = await tenantProvisionerPool.query<{
+    user_id: string;
+    email: string;
+    role: "platform_owner" | "platform_admin" | "platform_support";
+    status: "active" | "suspended";
+    created_at: Date | string;
+    updated_at: Date | string;
+  }>(
+    `SELECT user_id, email, role, status, created_at, updated_at
+       FROM public.platform_members
+      ORDER BY created_at DESC`,
+  );
+  return result.rows.map((row) => ({
+    userId: row.user_id,
+    email: row.email,
+    role: row.role,
+    status: row.status,
+    createdAt: row.created_at instanceof Date ? row.created_at.toISOString() : String(row.created_at),
+    updatedAt: row.updated_at instanceof Date ? row.updated_at.toISOString() : String(row.updated_at),
+  }));
+}
+
+export async function upsertPlatformMember(input: {
+  userId: string;
+  email: string;
+  role: "platform_owner" | "platform_admin" | "platform_support";
+  status?: "active" | "suspended" | undefined;
+}): Promise<PlatformMemberSummary> {
+  const status = input.status ?? "active";
+  const result = await tenantProvisionerPool.query<{
+    user_id: string;
+    email: string;
+    role: "platform_owner" | "platform_admin" | "platform_support";
+    status: "active" | "suspended";
+    created_at: Date | string;
+    updated_at: Date | string;
+  }>(
+    `INSERT INTO public.platform_members (user_id, email, role, status)
+     VALUES ($1, lower($2), $3, $4)
+     ON CONFLICT (user_id) DO UPDATE
+       SET email = EXCLUDED.email,
+           role = EXCLUDED.role,
+           status = EXCLUDED.status,
+           updated_at = now()
+     RETURNING user_id, email, role, status, created_at, updated_at`,
+    [input.userId.trim(), input.email.trim(), input.role, status],
+  );
+  const row = result.rows[0]!;
+  return {
+    userId: row.user_id,
+    email: row.email,
+    role: row.role,
+    status: row.status,
+    createdAt: row.created_at instanceof Date ? row.created_at.toISOString() : String(row.created_at),
+    updatedAt: row.updated_at instanceof Date ? row.updated_at.toISOString() : String(row.updated_at),
+  };
+}
+
+export async function updatePlatformMemberStatus(
+  userId: string,
+  status: "active" | "suspended",
+): Promise<PlatformMemberSummary | null> {
+  const result = await tenantProvisionerPool.query<{
+    user_id: string;
+    email: string;
+    role: "platform_owner" | "platform_admin" | "platform_support";
+    status: "active" | "suspended";
+    created_at: Date | string;
+    updated_at: Date | string;
+  }>(
+    `UPDATE public.platform_members
+        SET status = $2, updated_at = now()
+      WHERE user_id = $1
+      RETURNING user_id, email, role, status, created_at, updated_at`,
+    [userId.trim(), status],
+  );
+  const row = result.rows[0];
+  if (!row) return null;
+  return {
+    userId: row.user_id,
+    email: row.email,
+    role: row.role,
+    status: row.status,
+    createdAt: row.created_at instanceof Date ? row.created_at.toISOString() : String(row.created_at),
+    updatedAt: row.updated_at instanceof Date ? row.updated_at.toISOString() : String(row.updated_at),
+  };
 }
 
 export { IdentityLifecycleError } from "./identity-lifecycle.js";

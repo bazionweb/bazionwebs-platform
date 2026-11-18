@@ -1,8 +1,9 @@
-import { useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery } from '../shims/apollo';
 import { toTitleCase } from '../utils/stringFormatter';
 import { Equipment, EquipmentCondition } from '../components/equipmentData';
 import { MaintenanceRecord, MaintenanceStatus, MaintenanceType } from '../components/maintenanceData';
+import { hkmApiRequest, HkmIdMap } from '../services/hkmApi';
 import {
   GET_EQUIPMENT_QUERY,
   ADD_EQUIPMENT_MUTATION,
@@ -13,8 +14,40 @@ import {
   DELETE_MAINTENANCE_MUTATION,
 } from '../services/graphql/equipment';
 
+interface ApiMaintenanceRecord {
+  id: string;
+  equipmentId: string;
+  date: string;
+  type: string;
+  cost: number;
+  status: string;
+  description: string;
+}
+
+interface ApiEquipmentRecord {
+  id: string;
+  name: string;
+  category?: string;
+  purchase_date?: string | null;
+  purchase_price?: number | null;
+  condition?: string;
+  location?: string;
+  description?: string;
+  maintenanceRecords?: ApiMaintenanceRecord[];
+}
+
+function normalizeCondition(raw?: string): EquipmentCondition {
+  switch ((raw ?? 'good').toLowerCase().replaceAll('_', ' ')) {
+    case 'excellent': return 'Excellent';
+    case 'fair': return 'Fair';
+    case 'needs attention':
+    case 'needs repair': return 'Needs Attention';
+    default: return 'Good';
+  }
+}
+
 export function useEquipment() {
-  const { data, loading, error } = useQuery(GET_EQUIPMENT_QUERY, {
+  const { data: apolloData, loading: apolloLoading, error: apolloError } = useQuery(GET_EQUIPMENT_QUERY, {
     fetchPolicy: 'cache-and-network',
     notifyOnNetworkStatusChange: false,
     errorPolicy: 'all',
@@ -38,8 +71,42 @@ export function useEquipment() {
     refetchQueries: [{ query: GET_EQUIPMENT_QUERY }],
   });
 
+  const assetIdMapRef = useRef(new HkmIdMap());
+  const maintenanceIdMapRef = useRef(new HkmIdMap());
+  const apiReadyRef = useRef(false);
+  const [apiRows, setApiRows] = useState<ApiEquipmentRecord[] | null>(null);
+  const [apiLoading, setApiLoading] = useState(true);
+
+  const refresh = useCallback(async () => {
+    try {
+      const rows = await hkmApiRequest<ApiEquipmentRecord[]>('/api/church/hkm/equipment');
+      apiReadyRef.current = true;
+      setApiRows(rows);
+    } catch {
+      // Keep Apollo fallback when API endpoint is unavailable (e.g. standalone unit tests)
+    } finally {
+      setApiLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
   const equipment: Equipment[] = useMemo(() => {
-    const edges = data?.equipmentCollection?.edges;
+    if (apiRows !== null) {
+      return apiRows.map((row) => ({
+        id: assetIdMapRef.current.numericId(row.id),
+        name: row.name,
+        category: row.category || 'Other',
+        purchaseDate: row.purchase_date || undefined,
+        purchasePrice: row.purchase_price != null ? Number(row.purchase_price) : undefined,
+        condition: normalizeCondition(row.condition),
+        location: row.location || '',
+        description: row.description || '',
+      }));
+    }
+    const edges = apolloData?.equipmentCollection?.edges;
     if (!edges) return [];
     return edges.map(
       (edge: {
@@ -67,10 +134,28 @@ export function useEquipment() {
         };
       },
     );
-  }, [data]);
+  }, [apiRows, apolloData]);
 
   const maintenanceRecords: MaintenanceRecord[] = useMemo(() => {
-    const edges = data?.equipmentCollection?.edges;
+    if (apiRows !== null) {
+      const records: MaintenanceRecord[] = [];
+      for (const row of apiRows) {
+        const eqNumId = assetIdMapRef.current.numericId(row.id);
+        for (const m of row.maintenanceRecords ?? []) {
+          records.push({
+            id: maintenanceIdMapRef.current.numericId(m.id),
+            equipmentId: eqNumId,
+            date: m.date,
+            type: m.type as MaintenanceType,
+            cost: Number(m.cost ?? 0),
+            description: m.description || '',
+            status: m.status as MaintenanceStatus,
+          });
+        }
+      }
+      return records.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    }
+    const edges = apolloData?.equipmentCollection?.edges;
     if (!edges) return [];
     const allRecords: MaintenanceRecord[] = [];
     edges.forEach(
@@ -92,36 +177,40 @@ export function useEquipment() {
         };
       }) => {
         const e = edge.node;
-        e.maintenance_recordsCollection?.edges?.forEach(
-          (me: {
-            node: {
-              id: number;
-              equipment_id: number;
-              date: string;
-              type: string;
-              cost?: number;
-              description?: string;
-              status: string;
-            };
-          }) => {
-            const m = me.node;
-            allRecords.push({
-              id: m.id,
-              equipmentId: m.equipment_id,
-              date: m.date,
-              type: m.type as MaintenanceType,
-              cost: m.cost ? Number(m.cost) : 0,
-              description: m.description || '',
-              status: m.status as MaintenanceStatus,
-            });
-          },
-        );
+        e.maintenance_recordsCollection?.edges?.forEach((me) => {
+          const m = me.node;
+          allRecords.push({
+            id: m.id,
+            equipmentId: m.equipment_id,
+            date: m.date,
+            type: m.type as MaintenanceType,
+            cost: m.cost ? Number(m.cost) : 0,
+            description: m.description || '',
+            status: m.status as MaintenanceStatus,
+          });
+        });
       },
     );
     return allRecords.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [data]);
+  }, [apiRows, apolloData]);
 
   const addEquipment = async (item: Partial<Equipment>) => {
+    if (apiReadyRef.current) {
+      await hkmApiRequest('/api/church/hkm/equipment', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: toTitleCase(item.name),
+          category: item.category ?? 'Other',
+          purchase_date: item.purchaseDate || undefined,
+          purchase_price: item.purchasePrice,
+          condition: item.condition === 'Needs Attention' ? 'needs_repair' : (item.condition ?? 'good').toLowerCase(),
+          location: toTitleCase(item.location) || 'Main Campus',
+          description: toTitleCase(item.description),
+        }),
+      });
+      await refresh();
+      return;
+    }
     await addEquipmentMutation({
       variables: {
         object: {
@@ -138,6 +227,24 @@ export function useEquipment() {
   };
 
   const updateEquipment = async (id: number, updates: Partial<Equipment>) => {
+    if (apiReadyRef.current) {
+      const payload: Record<string, unknown> = {};
+      if (updates.name !== undefined) payload.name = toTitleCase(updates.name);
+      if (updates.category !== undefined) payload.category = updates.category;
+      if (updates.purchaseDate !== undefined) payload.purchase_date = updates.purchaseDate;
+      if (updates.purchasePrice !== undefined) payload.purchase_price = updates.purchasePrice;
+      if (updates.condition !== undefined) {
+        payload.condition = updates.condition === 'Needs Attention' ? 'needs_repair' : updates.condition.toLowerCase();
+      }
+      if (updates.location !== undefined) payload.location = toTitleCase(updates.location);
+      if (updates.description !== undefined) payload.description = toTitleCase(updates.description);
+      await hkmApiRequest(`/api/church/hkm/equipment/${encodeURIComponent(assetIdMapRef.current.resolve(id))}`, {
+        method: 'PATCH',
+        body: JSON.stringify(payload),
+      });
+      await refresh();
+      return;
+    }
     const set: Record<string, unknown> = {};
     if (updates.name) set.name = toTitleCase(updates.name);
     if (updates.category) set.category = updates.category;
@@ -153,12 +260,34 @@ export function useEquipment() {
   };
 
   const deleteEquipment = async (id: number) => {
+    if (apiReadyRef.current) {
+      await hkmApiRequest(`/api/church/hkm/equipment/${encodeURIComponent(assetIdMapRef.current.resolve(id))}`, {
+        method: 'DELETE',
+      });
+      await refresh();
+      return;
+    }
     await deleteEquipmentMutation({
       variables: { id },
     });
   };
 
   const addMaintenance = async (record: Omit<MaintenanceRecord, 'id'>) => {
+    if (apiReadyRef.current) {
+      const assetUuid = assetIdMapRef.current.resolve(record.equipmentId);
+      await hkmApiRequest(`/api/church/hkm/equipment/${encodeURIComponent(assetUuid)}/maintenance`, {
+        method: 'POST',
+        body: JSON.stringify({
+          date: record.date,
+          type: record.type,
+          cost: record.cost,
+          description: record.description,
+          status: record.status,
+        }),
+      });
+      await refresh();
+      return;
+    }
     await addMaintenanceMutation({
       variables: {
         object: {
@@ -174,6 +303,21 @@ export function useEquipment() {
   };
 
   const updateMaintenance = async (id: number, updates: Partial<MaintenanceRecord>) => {
+    if (apiReadyRef.current) {
+      const eventUuid = maintenanceIdMapRef.current.resolve(id);
+      await hkmApiRequest(`/api/church/hkm/equipment/maintenance/${encodeURIComponent(eventUuid)}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          date: updates.date,
+          type: updates.type,
+          cost: updates.cost,
+          description: updates.description,
+          status: updates.status,
+        }),
+      });
+      await refresh();
+      return;
+    }
     const set: Record<string, unknown> = {};
     if (updates.date) set.date = updates.date;
     if (updates.type) set.type = updates.type;
@@ -187,6 +331,14 @@ export function useEquipment() {
   };
 
   const deleteMaintenance = async (id: number) => {
+    if (apiReadyRef.current) {
+      const eventUuid = maintenanceIdMapRef.current.resolve(id);
+      await hkmApiRequest(`/api/church/hkm/equipment/maintenance/${encodeURIComponent(eventUuid)}`, {
+        method: 'DELETE',
+      });
+      await refresh();
+      return;
+    }
     await deleteMaintenanceMutation({
       variables: { id },
     });
@@ -195,8 +347,8 @@ export function useEquipment() {
   return {
     equipment,
     maintenanceRecords,
-    loading,
-    error,
+    loading: apiRows !== null ? apiLoading : apolloLoading,
+    error: apiReadyRef.current ? undefined : apolloError,
     addEquipment,
     updateEquipment,
     deleteEquipment,

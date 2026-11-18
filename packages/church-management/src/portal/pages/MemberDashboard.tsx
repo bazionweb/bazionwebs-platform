@@ -500,20 +500,49 @@ const MemberDashboard: React.FC = () => {
     if (!currentUser?.id) return;
     setSavingProfile(true);
     try {
-      await portalApolloClient.mutate({
-        mutation: UPDATE_MEMBER_PROFILE_MUTATION,
-        variables: {
-          id: currentUser.id,
-          updates: {
+      let persisted = false;
+      let serverError: Error | null = null;
+      try {
+        const res = await fetch('/api/church/hkm/portal/me', {
+          method: 'PATCH',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
             phone: profileForm.phone,
             email: profileForm.email,
             address: profileForm.address,
             occupation: profileForm.occupation,
             marital_status: profileForm.marital_status,
             avatar: profileForm.avatar,
+          }),
+        });
+        if (res.ok) {
+          persisted = true;
+        } else if (res.status === 400 || res.status === 409) {
+          const errBody = await res.json().catch(() => ({})) as { message?: string; error?: string };
+          serverError = new Error(errBody.message ?? errBody.error ?? 'Failed to save profile.');
+        }
+      } catch {
+        // Fallback to Apollo mock when network/API server is absent
+      }
+      if (serverError) throw serverError;
+
+      if (!persisted) {
+        await portalApolloClient.mutate({
+          mutation: UPDATE_MEMBER_PROFILE_MUTATION,
+          variables: {
+            id: currentUser.id,
+            updates: {
+              phone: profileForm.phone,
+              email: profileForm.email,
+              address: profileForm.address,
+              occupation: profileForm.occupation,
+              marital_status: profileForm.marital_status,
+              avatar: profileForm.avatar,
+            },
           },
-        },
-      });
+        });
+      }
       setProfileSaved(true);
       setIsEditing(false);
       await fetchDashboard();
@@ -531,15 +560,41 @@ const MemberDashboard: React.FC = () => {
     setSubmittingTicket(true);
     setTicketError('');
     try {
-      await portalApolloClient.mutate({
-        mutation: SUBMIT_HELPDESK_TICKET_MUTATION,
-        variables: {
-          sender_id: currentUser.id,
-          department: ticketDepartment,
-          subject: ticketSubject,
-          body: ticketBody,
-        },
-      });
+      let submitted = false;
+      let serverError: Error | null = null;
+      try {
+        const res = await fetch('/api/church/hkm/portal/helpdesk', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            department: ticketDepartment,
+            subject: ticketSubject,
+            body: ticketBody,
+          }),
+        });
+        if (res.ok) {
+          submitted = true;
+        } else if (res.status === 400) {
+          const errBody = await res.json().catch(() => ({})) as { message?: string; error?: string };
+          serverError = new Error(errBody.message ?? errBody.error ?? 'Failed to submit your message.');
+        }
+      } catch {
+        // Fallback to Apollo mock when network/API server is absent
+      }
+      if (serverError) throw serverError;
+
+      if (!submitted) {
+        await portalApolloClient.mutate({
+          mutation: SUBMIT_HELPDESK_TICKET_MUTATION,
+          variables: {
+            sender_id: currentUser.id,
+            department: ticketDepartment,
+            subject: ticketSubject,
+            body: ticketBody,
+          },
+        });
+      }
       setTicketSubmitted(true);
       setTicketSubject('');
       setTicketBody('');

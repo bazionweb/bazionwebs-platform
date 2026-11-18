@@ -6,6 +6,7 @@ import {
   type WebsiteNavigation,
   type WebsitePages,
 } from "./index.js";
+import { legacyUniversalThemePalettesV1, legacyWhiteLabelPackageCatalogV1 } from "./legacy-whitelabel-v1.js";
 
 export type WhiteLabelPackageId =
   | "sme-website"
@@ -175,7 +176,7 @@ export const platformWhiteLabelPackageCatalog: readonly WhiteLabelPackageDescrip
     templates: [
       {
         id: "sme-corporate-authority",
-        version: "1.0.0",
+        version: "1.1.0",
         name: "Corporate & Authority Showcase",
         tagline: "Clean executive hero, company credentials, services grid & quote enquiry form",
         defaultPalette: "corporate-slate",
@@ -195,7 +196,7 @@ export const platformWhiteLabelPackageCatalog: readonly WhiteLabelPackageDescrip
       },
       {
         id: "sme-local-services",
-        version: "1.0.0",
+        version: "1.1.0",
         name: "Local Service Business & Trades",
         tagline: "High-converting local trust layout with WhatsApp click-to-chat, service areas & FAQs",
         defaultPalette: "emerald-growth",
@@ -228,7 +229,7 @@ export const platformWhiteLabelPackageCatalog: readonly WhiteLabelPackageDescrip
     templates: [
       {
         id: "ecommerce-modern-retail",
-        version: "1.0.0",
+        version: "1.1.0",
         name: "Modern Online Storefront",
         tagline: "Featured collections, fast search, product detail cards & seamless M-Pesa checkout",
         defaultPalette: "emerald-growth",
@@ -250,7 +251,7 @@ export const platformWhiteLabelPackageCatalog: readonly WhiteLabelPackageDescrip
       },
       {
         id: "ecommerce-d2c-flagship",
-        version: "1.0.0",
+        version: "1.1.0",
         name: "D2C Brand & Catalogue Flagship",
         tagline: "Editorial product storytelling, customer reviews & multi-currency support",
         defaultPalette: "sanctuary-charcoal",
@@ -282,7 +283,7 @@ export const platformWhiteLabelPackageCatalog: readonly WhiteLabelPackageDescrip
     templates: [
       {
         id: "pro-advisory-practice",
-        version: "1.0.0",
+        version: "1.1.0",
         name: "Advisory & Legal Practice",
         tagline: "Partner bios, practice areas, client intake & consultation scheduler",
         defaultPalette: "royal-navy",
@@ -302,7 +303,7 @@ export const platformWhiteLabelPackageCatalog: readonly WhiteLabelPackageDescrip
       },
       {
         id: "pro-studio-booking",
-        version: "1.0.0",
+        version: "1.1.0",
         name: "Studio & Appointment Service",
         tagline: "Service menu, portfolio gallery & online slot reservation",
         defaultPalette: "corporate-slate",
@@ -334,7 +335,7 @@ export const platformWhiteLabelPackageCatalog: readonly WhiteLabelPackageDescrip
     templates: [
       {
         id: "clinic-medical-center",
-        version: "1.0.0",
+        version: "1.1.0",
         name: "Outpatient Clinic & Medical Center",
         tagline: "Clinical departments, doctor profiles, insurance partners & triage contact",
         defaultPalette: "medical-teal",
@@ -365,7 +366,7 @@ export const platformWhiteLabelPackageCatalog: readonly WhiteLabelPackageDescrip
     templates: [
       {
         id: "school-academy-heritage",
-        version: "1.0.0",
+        version: "1.1.0",
         name: "Academy & Admissions Portal",
         tagline: "Curriculum overview, campus facilities, term events & admissions enquiry",
         defaultPalette: "royal-navy",
@@ -387,7 +388,7 @@ export const platformWhiteLabelPackageCatalog: readonly WhiteLabelPackageDescrip
       },
       {
         id: "oxford-imperial-university",
-        version: "1.0.0",
+        version: "1.1.0",
         name: "Higher Education & University Campus",
         tagline: "Faculty departments, research, international admissions & campus life",
         defaultPalette: "royal-navy",
@@ -425,7 +426,7 @@ export const platformWhiteLabelPackageCatalog: readonly WhiteLabelPackageDescrip
     templates: [
       {
         id: "ngo-impact-foundation",
-        version: "1.0.0",
+        version: "1.1.0",
         name: "Community Impact & Donor Portal",
         tagline: "Program stories, field outreach updates, transparency report & partner support",
         defaultPalette: "living-waters",
@@ -455,7 +456,7 @@ export const platformWhiteLabelPackageCatalog: readonly WhiteLabelPackageDescrip
     templates: [
       {
         id: "saas-product-launch",
-        version: "1.0.0",
+        version: "1.1.0",
         name: "SaaS Product & Demo Funnel",
         tagline: "Clear problem-solution hero, feature pillars, security trust bar & demo booking",
         defaultPalette: "corporate-slate",
@@ -488,7 +489,7 @@ export const platformWhiteLabelPackageCatalog: readonly WhiteLabelPackageDescrip
     templates: [
       {
         id: "enterprise-group-holding",
-        version: "1.0.0",
+        version: "1.1.0",
         name: "Multi-Division Group Holding",
         tagline: "Subsidiary divisions, governance statements, executive leadership & tender desk",
         defaultPalette: "sanctuary-charcoal",
@@ -518,7 +519,7 @@ export const platformWhiteLabelPackageCatalog: readonly WhiteLabelPackageDescrip
     templates: [
       {
         id: "gmfc-revival-signature",
-        version: "1.0.0",
+        version: "1.1.0",
         name: "GMFC Revival & Apostolic Signature",
         tagline: "Editorial portrait leadership cards, M-Pesa giving card, sermons & outreach hub",
         defaultPalette: "maroon-gold",
@@ -548,7 +549,7 @@ export const platformWhiteLabelPackageCatalog: readonly WhiteLabelPackageDescrip
       },
       {
         id: "church-ministry",
-        version: "1.0.0",
+        version: "1.1.0",
         name: "Modern Sanctuary & Community",
         tagline: "Warm emerald & bronze layout highlighting small groups and community care",
         defaultPalette: "forest-bronze",
@@ -571,7 +572,7 @@ export const platformWhiteLabelPackageCatalog: readonly WhiteLabelPackageDescrip
       },
       {
         id: "royal-cathedral",
-        version: "1.0.0",
+        version: "1.1.0",
         name: "Royal Cathedral & Heritage",
         tagline: "Dignified navy & amber aesthetic for regional assemblies and campuses",
         defaultPalette: "royal-navy",
@@ -594,7 +595,7 @@ export const platformWhiteLabelPackageCatalog: readonly WhiteLabelPackageDescrip
       },
       {
         id: "hkm-kingdom-cms",
-        version: "1.0.0",
+        version: "1.1.0",
         name: "HKM Kingdom CMS & Member Portal",
         tagline: "Dual Church Administration CMS and Self-Service Member Portal with PIN/Password authentication",
         defaultPalette: "forest-bronze",
@@ -845,20 +846,26 @@ export interface UniversalWhiteLabelOutput {
 export function createWhiteLabeledPackageConfig(
   input: UniversalWhiteLabelInput,
 ): UniversalWhiteLabelOutput {
+  return createWhiteLabeledPackageConfigFromCatalog(input, platformWhiteLabelPackageCatalog, universalThemePalettes);
+}
+
+function createWhiteLabeledPackageConfigFromCatalog(
+  input: UniversalWhiteLabelInput,
+  catalog: readonly WhiteLabelPackageDescriptor[],
+  palettes: readonly UniversalThemePalette[],
+): UniversalWhiteLabelOutput {
   const inferredFromTemplate = input.templateId
-    ? platformWhiteLabelPackageCatalog.find((pkg) =>
+    ? catalog.find((pkg) =>
         pkg.templates.some((tpl) => tpl.id === input.templateId),
       )?.packageId
     : undefined;
-  const resolvedPackage = getWhiteLabelPackageDescriptor(
-    input.packageId ?? inferredFromTemplate ?? "sme-website",
-  );
+  const resolvedPackage = catalog.find((pkg) => pkg.packageId === (input.packageId ?? inferredFromTemplate ?? "sme-website"))
+    ?? catalog[0]!;
   const template =
     resolvedPackage.templates.find((tpl) => tpl.id === input.templateId) ??
     resolvedPackage.templates[0]!;
-  const palette = getWhiteLabelPalette(
-    input.paletteId ?? template.defaultPalette ?? resolvedPackage.defaultPalette,
-  );
+  const palette = palettes.find((item) => item.id === (input.paletteId ?? template.defaultPalette ?? resolvedPackage.defaultPalette))
+    ?? palettes[0]!;
 
   const primaryColor = ensureAccessibleHexColor(
     input.themeOverrides?.primaryColor ?? palette.primaryColor,
@@ -1110,16 +1117,20 @@ export function migrateLegacyWhiteLabelPackageConfig(
   if (typeof packageId !== "string" || typeof templateId !== "string"
     || typeof tenantSlug !== "string" || typeof brandName !== "string") return null;
 
-  const descriptor = platformWhiteLabelPackageCatalog.find((item) => item.packageId === packageId);
+  const descriptor = legacyWhiteLabelPackageCatalogV1.find((item) => item.packageId === packageId);
   const template = descriptor?.templates.find((item) => item.id === templateId);
   if (!descriptor || !template) return null;
 
-  const base = createWhiteLabeledPackageConfig({
+  const legacyBase = createWhiteLabeledPackageConfigFromCatalog({
     packageId: descriptor.packageId,
     templateId: template.id,
     tenantSlug,
     brandName,
-  });
+  }, legacyWhiteLabelPackageCatalogV1, legacyUniversalThemePalettesV1);
+  const currentDescriptor = platformWhiteLabelPackageCatalog.find((item) => item.packageId === packageId);
+  const currentTemplate = currentDescriptor?.templates.find((item) => item.id === templateId);
+  if (!currentDescriptor || !currentTemplate) return null;
+  const base = createWhiteLabeledPackageConfig({ packageId: packageId as WhiteLabelPackageId, templateId, tenantSlug, brandName });
   const allowedFields = [
     "schemaVersion", "packageId", "templateId", "templateVersion", "paletteId", "tenantSlug",
     "organization", "branding", "contact", "payment", "social", "offerings",
@@ -1151,19 +1162,34 @@ export function migrateLegacyWhiteLabelPackageConfig(
     }
     return merged;
   };
-  const effective = preserveLegacySnapshot(whiteLabelPackagePayload(base), legacyPayload) as Record<string, unknown>;
-  const parsedWebsite = websiteConfigurationSchema.safeParse(effective.website);
-  if (!parsedWebsite.success || !isPlainRecord(effective.smeConfig)) return null;
+  const legacyEffective = preserveLegacySnapshot(whiteLabelPackagePayload(legacyBase), legacyPayload) as Record<string, unknown>;
+  const parsedWebsite = websiteConfigurationSchema.safeParse(legacyEffective.website);
+  if (!parsedWebsite.success || !isPlainRecord(legacyEffective.smeConfig)) return null;
 
-  return buildTenantTemplateOverlay({
+  // First identify actual tenant edits against the immutable v1 baseline, then apply those
+  // edits to the current template. This prevents old default copy/layout values from becoming
+  // tenant overrides when an old full snapshot is upgraded for the first time.
+  const legacyOverlay = buildTenantTemplateOverlay({
     packageId: descriptor.packageId,
     templateId: template.id,
     templateVersion: template.version,
+    configurationSchemaVersion: legacyBase.packageSettings.schemaVersion,
+    updateMode: "automatic",
+    context: { tenantSlug, brandName },
+    base: whiteLabelPackagePayload(legacyBase),
+    effective: { ...legacyEffective, website: parsedWebsite.data },
+  });
+  const rebasedEffective = resolveTenantTemplateOverlay(whiteLabelPackagePayload(base), legacyOverlay);
+
+  return buildTenantTemplateOverlay({
+    packageId: currentDescriptor.packageId,
+    templateId: currentTemplate.id,
+    templateVersion: currentTemplate.version,
     configurationSchemaVersion: base.packageSettings.schemaVersion,
     updateMode: "automatic",
     context: { tenantSlug, brandName },
     base: whiteLabelPackagePayload(base),
-    effective: { ...effective, website: parsedWebsite.data },
+    effective: rebasedEffective,
   });
 }
 
@@ -1640,7 +1666,7 @@ export interface TenantTemplateOverlay {
   templateVersion: string;
   configurationSchemaVersion: string;
   updateMode: "automatic" | "pinned";
-  context?: { tenantSlug: string; brandName: string };
+  context?: { tenantSlug: string; brandName: string; scopeKey?: string };
   overrides: unknown;
   snapshot?: unknown;
   removedItems: Array<{ path: string[]; ids: string[] }>;
@@ -1689,7 +1715,7 @@ export function buildTenantTemplateOverlay(params: {
   base: unknown;
   effective: unknown;
   updateMode?: "automatic" | "pinned";
-  context?: { tenantSlug: string; brandName: string };
+  context?: { tenantSlug: string; brandName: string; scopeKey?: string };
 }): TenantTemplateOverlay {
   const removedItems: TenantTemplateOverlay["removedItems"] = [];
   const removedFields: string[][] = [];
@@ -1716,7 +1742,13 @@ export function buildTenantTemplateOverlay(params: {
       return effective;
     }
 
-    if (Array.isArray(base) || Array.isArray(effective)) return effective;
+    if (Array.isArray(base) || Array.isArray(effective)) {
+      if (Array.isArray(base) && Array.isArray(effective) && base.length > 0 && effective.length === 0) {
+        removedFields.push(path);
+        return undefined;
+      }
+      return effective;
+    }
 
     if (isPlainRecord(base) && isPlainRecord(effective)) {
       const result: Record<string, unknown> = Object.create(null) as Record<string, unknown>;
@@ -1774,7 +1806,9 @@ export function isTenantTemplateOverlay(value: unknown): value is TenantTemplate
       && typeof value.context.tenantSlug === "string"
       && value.context.tenantSlug.length <= 160
       && typeof value.context.brandName === "string"
-      && value.context.brandName.length <= 180);
+      && value.context.brandName.length <= 180
+      && (value.context.scopeKey === undefined
+        || (typeof value.context.scopeKey === "string" && value.context.scopeKey.length > 0 && value.context.scopeKey.length <= 240)));
   const validPinnedSnapshot = value.updateMode !== "pinned" || Object.hasOwn(value, "snapshot");
 
   return value.formatVersion === 1

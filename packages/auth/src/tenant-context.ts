@@ -1,5 +1,10 @@
 import { fromNodeHeaders } from "better-auth/node";
 import type { IncomingHttpHeaders } from "node:http";
+import {
+  evaluateServiceIdentityAccess,
+  parseBearerServiceToken,
+  type ServiceIdentityRecord,
+} from "@bazion/platform-identity";
 import { parseOrganizationRoles } from "./permissions.js";
 import { canAccessPlatformPermission, canAccessPlatformTenantScope, type PlatformPermission } from "./security-policy.js";
 
@@ -26,6 +31,7 @@ export interface CurrentIdentity {
   platformRole: "platform_owner" | "platform_admin" | "platform_support" | null;
   impersonatedBy: string | null;
   isSandbox: boolean;
+  serviceIdentity?: ServiceIdentityRecord | undefined;
 }
 
 function headerFlagIsTrue(raw: string | string[] | undefined): boolean {
@@ -50,10 +56,39 @@ function throwSandboxForbidden(): never {
 }
 
 export async function getCurrentIdentity(headers: IncomingHttpHeaders): Promise<CurrentIdentity | null> {
-  const { auth, resolvePlatformMemberByUserId, resolveTenantByOrganizationId } = await loadAuthServer();
+  const server = await loadAuthServer();
+  const { auth, resolvePlatformMemberByUserId, resolveTenantByOrganizationId } = server;
   const authHeaders = fromNodeHeaders(headers);
   const session = await auth.api.getSession({ headers: authHeaders });
-  if (!session) return null;
+  if (!session) {
+    const bearerToken = parseBearerServiceToken(
+      Array.isArray(headers.authorization) ? headers.authorization[0] : headers.authorization,
+    );
+    if (!bearerToken || typeof server.verifyServiceIdentityToken !== "function") return null;
+    const serviceRecord = await server.verifyServiceIdentityToken(bearerToken);
+    if (!serviceRecord) return null;
+    const accessCheck = evaluateServiceIdentityAccess(serviceRecord, "");
+    if (!accessCheck.allowed) return null;
+    const tenant = serviceRecord.tenantId && typeof server.getPlatformTenant === "function"
+      ? await server.getPlatformTenant(serviceRecord.tenantId)
+      : null;
+    return {
+      user: {
+        id: `service:${serviceRecord.id}`,
+        email: `${serviceRecord.keyPrefix}@service.bazion.internal`,
+        name: serviceRecord.name,
+        emailVerified: true,
+      },
+      organization: tenant ? { id: tenant.id, role: "service" } : null,
+      tenant: tenant
+        ? { id: tenant.id, slug: tenant.slug, name: tenant.name, currency: tenant.default_currency, status: tenant.status }
+        : null,
+      platformRole: serviceRecord.tenantId === null ? "platform_admin" : null,
+      impersonatedBy: null,
+      isSandbox: false,
+      serviceIdentity: serviceRecord,
+    };
+  }
 
   const sessionRecord = session.session as typeof session.session & {
     activeOrganizationId?: string | null;
@@ -108,18 +143,38 @@ export type TenantPermissionRequest = {
   customer?: Array<"read" | "update">;
   store?: Array<"read" | "update">;
   churchprivate?: Array<"read" | "update">;
-  enquiry?: Array<"read" | "export" | "delete">;
+  enquiry?: Array<"read" | "update" | "export" | "delete">;
   enquiryPolicy?: Array<"read" | "update">;
-  analytics?: Array<"read">;
+  analytics?: Array<"read" | "export" | "delete">;
+  audit?: Array<"read" | "export">;
+  media?: Array<"read" | "create" | "delete">;
   education?: Array<"read" | "create" | "update" | "delete">;
   organization?: Array<"update">;
   member?: Array<"create" | "update" | "delete">;
   invitation?: Array<"create" | "cancel">;
 };
 
+function serviceIdentityHasTenantPermissions(
+  serviceIdentity: ServiceIdentityRecord,
+  tenantId: string,
+  permissions: TenantPermissionRequest,
+): boolean {
+  for (const [resource, actions] of Object.entries(permissions)) {
+    if (!Array.isArray(actions)) continue;
+    for (const action of actions) {
+      const check = evaluateServiceIdentityAccess(serviceIdentity, `${resource}:${action}`, { tenantId });
+      if (!check.allowed) return false;
+    }
+  }
+  return true;
+}
+
 export async function hasActiveTenantPermission(headers: IncomingHttpHeaders, permissions: TenantPermissionRequest): Promise<boolean> {
-  const context = await getActiveTenantContext(headers);
-  if (!context) return false;
+  const identity = await getCurrentIdentity(headers);
+  if (!identity?.organization || !identity.tenant || identity.tenant.status !== "active") return false;
+  if (identity.serviceIdentity) {
+    return serviceIdentityHasTenantPermissions(identity.serviceIdentity, identity.tenant.id, permissions);
+  }
   const { auth } = await loadAuthServer();
   const result = await auth.api.hasPermission({ headers: fromNodeHeaders(headers), body: { permissions } });
   return result.success === true;

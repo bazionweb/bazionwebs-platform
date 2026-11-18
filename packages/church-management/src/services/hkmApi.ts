@@ -22,3 +22,26 @@ export function hkmStatusLabel(value: string | undefined): "Active" | "Inactive"
     default: return "Active";
   }
 }
+
+/**
+ * Bidirectional map between backend UUID strings and numeric IDs expected by legacy UI components.
+ */
+export class HkmIdMap {
+  private readonly toNum = new Map<string, number>();
+  private readonly toRaw = new Map<number, string>();
+  private nextId = 1_000_000;
+
+  numericId(rawId: string | number): number {
+    if (typeof rawId === "number") return rawId;
+    const existing = this.toNum.get(rawId);
+    if (existing !== undefined) return existing;
+    const assigned = this.nextId++;
+    this.toNum.set(rawId, assigned);
+    this.toRaw.set(assigned, rawId);
+    return assigned;
+  }
+
+  resolve(id: number): string {
+    return this.toRaw.get(id) ?? String(id);
+  }
+}
