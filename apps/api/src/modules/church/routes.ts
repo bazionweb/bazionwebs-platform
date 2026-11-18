@@ -836,7 +836,7 @@ export async function churchRoutes(app: FastifyInstance, options: RouteOptions) 
     bodyLimit: MEDIA_UPLOAD_LIMIT_BYTES,
     config: {
       rateLimit: {
-        max: 10,
+        max: 120,
         timeWindow: "1 minute",
         keyGenerator: (request) => request.ip,
       },
