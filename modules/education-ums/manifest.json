@@ -1,0 +1,37 @@
+{
+  "id": "education-ums",
+  "name": "Education UMS",
+  "version": "0.1.0",
+  "owner": "education",
+  "status": "partial",
+  "entrypoints": {
+    "domain": "packages/database/src/schema/education.ts",
+    "api": "apps/api/src/modules/education/data-routes.ts",
+    "ui": "packages/education-ums"
+  },
+  "implementation": { "mode": "workspace-package", "packageName": "@bazion/education-ums" },
+  "tenantModel": "tenant-owned",
+  "permissions": [
+    { "resource": "education", "actions": ["read", "create", "update", "delete"] }
+  ],
+  "dependencies": ["platform-identity"],
+  "tables": [
+    { "name": "education_institutions", "owner": "education-ums", "tenantScoped": true, "rls": "forced", "migration": "0028_education_institution_records.sql" },
+    { "name": "education_programs", "owner": "education-ums", "tenantScoped": true, "rls": "forced", "migration": "0028_education_institution_records.sql" },
+    { "name": "education_terms", "owner": "education-ums", "tenantScoped": true, "rls": "forced", "migration": "0028_education_institution_records.sql" },
+    { "name": "education_students", "owner": "education-ums", "tenantScoped": true, "rls": "forced", "migration": "0028_education_institution_records.sql" },
+    { "name": "education_regulatory_evidence", "owner": "education-ums", "tenantScoped": true, "rls": "forced", "migration": "0030_education_institution_contacts_evidence.sql" }
+  ],
+  "migrations": ["0028_education_institution_records.sql", "0030_education_institution_contacts_evidence.sql"],
+  "events": [],
+  "jobs": [],
+  "tests": ["packages/education-ums/src/index.test.tsx"],
+  "docs": [],
+  "operations": {
+    "logs": true,
+    "metrics": false,
+    "retention": "Student personal data is retained in the institution tenant until an authorized deletion or approved retention workflow is implemented.",
+    "recovery": "Use tenant-scoped database backups and verify both tenant and institution boundaries after restore.",
+    "enableDisable": "Disable the education-ums entitlement to stop education API access; retain database records until the institution has exported or removed them under its retention policy."
+  }
+}

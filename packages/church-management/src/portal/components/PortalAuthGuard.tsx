@@ -7,17 +7,27 @@ interface AuthGuardProps {
 }
 
 const PortalAuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
-  const [isAuthenticated, setIsAuthenticated] = useState(portalAuthService.isAuthenticated());
+  const [sessionState, setSessionState] = useState<'checking' | 'authenticated' | 'unauthenticated'>(
+    portalAuthService.isAuthenticated() ? 'checking' : 'unauthenticated',
+  );
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      setIsAuthenticated(portalAuthService.isAuthenticated());
-    }, 60000);
+    let active = true;
+    const verify = async () => {
+      const session = await portalAuthService.verifySession();
+      if (active) setSessionState(session ? 'authenticated' : 'unauthenticated');
+    };
+    void verify();
+    const interval = setInterval(() => void verify(), 60000);
 
-    return () => clearInterval(interval);
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
   }, []);
 
-  if (!isAuthenticated) {
+  if (sessionState === 'checking') return <div className="portal-auth-checking">Checking your member session…</div>;
+  if (sessionState === 'unauthenticated') {
     return <Navigate to="/portal/login" replace />;
   }
 

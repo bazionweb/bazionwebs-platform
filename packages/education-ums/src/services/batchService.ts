@@ -14,7 +14,7 @@ export type BatchResult = {
 };
 
 export async function postStudentBatch(items: unknown[]): Promise<BatchResult> {
-  const res = await authFetch(`${API_URL}/batch/students`, {
+  const res = await authFetch(`${API_URL}/education/students/batch`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ items }),

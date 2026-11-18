@@ -20,7 +20,7 @@ interface AttendanceModuleProps {
   setEditContext: (context: { date: string; service: string } | null) => void;
   attendanceRecords: typeof attendanceData;
   onEditAttendanceRecord: (date: string, service: string) => void;
-  onDeleteAttendanceRecord: (id: number) => void;
+  onDeleteAttendanceRecord: (id: string | number) => void;
 }
 
 const AttendanceModule: React.FC<AttendanceModuleProps> = ({

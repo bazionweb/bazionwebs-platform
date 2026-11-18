@@ -1,0 +1,42 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "education-records",
+  "name": "Education Institution Records",
+  "version": "1.1.0",
+  "status": "partial",
+  "solution": { "id": "education-records", "version": "1.1.0" },
+  "applications": [
+    { "packageName": "@bazion/api", "version": "0.1.0", "role": "api" },
+    { "packageName": "@bazion/storefront", "version": "0.1.0", "role": "storefront" },
+    { "packageName": "@bazion/education-template", "version": "0.1.0", "role": "website" },
+    { "packageName": "@bazion/education-ums", "version": "0.1.0", "role": "ums" }
+  ],
+  "requiredModules": [
+    { "id": "platform-identity", "version": "1.0.0" },
+    { "id": "education-ums", "version": "0.1.0" }
+  ],
+  "optionalModules": [
+    { "id": "notifications", "version": "0.1.0" },
+    { "id": "analytics", "version": "1.0.0" },
+    { "id": "media-storage", "version": "1.0.0" }
+  ],
+  "templates": [{ "id": "school-portal", "version": "1.0.0" }],
+  "configuration": {
+    "schemaVersion": "1.0.0",
+    "sourcePath": "packages/education-contracts/src/index.ts"
+  },
+  "databaseSchemaVersion": "0032_hkm_member_attendance.sql",
+  "readiness": {
+    "implemented": [
+      "BMI and BEMI branding resolved from verified host while sharing tenant 055",
+      "authenticated institution-scoped student, program and term records",
+      "editable institution contacts in UMS Settings",
+      "institution-scoped regulatory evidence register with review status"
+    ],
+    "partial": [
+      "public website and portal content are white-labeled but remain configuration/static-content led",
+      "institution profile edits are stored in UMS records and are not yet propagated to all static website configuration consumers"
+    ],
+    "roadmap": ["admissions workflows", "courses and enrollment", "grading and transcript records", "finance and LMS"]
+  }
+}

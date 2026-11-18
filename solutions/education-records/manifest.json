@@ -1,0 +1,27 @@
+{
+  "version": "1.1.0",
+  "status": "partial",
+  "readiness": "buildable",
+  "id": "education-records",
+  "name": "Education Institution Records",
+  "description": "A bounded education release covering the branded website and portal, authenticated UMS student, program and term records, editable institution contacts, and a scoped regulatory evidence register. Admissions, courses, enrollment, grading, finance and LMS workflows remain incomplete.",
+  "requiredModules": ["platform-identity", "education-ums"],
+  "optionalModules": ["notifications", "analytics", "media-storage"],
+  "defaultRoles": [
+    { "id": "owner", "label": "Institution owner", "permissions": ["tenant.education.read", "tenant.education.create", "tenant.education.update", "tenant.education.delete"] },
+    { "id": "admin", "label": "Institution administrator", "permissions": ["tenant.education.read", "tenant.education.create", "tenant.education.update", "tenant.education.delete"] }
+  ],
+  "navigation": [
+    { "id": "students", "label": "Students", "module": "education-ums", "path": "/ums/students" },
+    { "id": "programs", "label": "Programs", "module": "education-ums", "path": "/ums/programs" },
+    { "id": "terms", "label": "Academic terms", "module": "education-ums", "path": "/ums/terms" },
+    { "id": "institution-settings", "label": "Institution profile and evidence", "module": "education-ums", "path": "/ums/settings" }
+  ],
+  "defaults": {
+    "locale": "en-KE",
+    "timezone": "Africa/Nairobi",
+    "currency": "KES",
+    "features": ["institution-website", "institution-portal", "institution-profile", "regulatory-evidence", "ums-students", "ums-programs", "ums-academic-terms"]
+  },
+  "templateIds": ["school-portal"]
+}

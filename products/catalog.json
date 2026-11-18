@@ -392,6 +392,18 @@
       ],
       "status": "partial",
       "scope": "Tenant-scoped public site profile, sermons, events, registrations, campaigns, donation records, prayer requests and enquiries exist. Member management, attendance, volunteer workflows, settings UI and production payment reconciliation remain incomplete."
+    },
+    {
+      "id": "education-ums",
+      "name": "Institution-scoped education records",
+      "classification": "module",
+      "sourcePath": [
+        "packages/database/src/schema/education.ts",
+        "apps/api/src/modules/education/data-routes.ts",
+        "packages/education-ums"
+      ],
+      "status": "partial",
+      "scope": "Persistent institution-scoped student and program records with membership permissions and forced row-level isolation are implemented. Admissions, courses, terms, enrollment, grading, finance and LMS workflows remain incomplete."
     }
   ],
   "capabilities": [

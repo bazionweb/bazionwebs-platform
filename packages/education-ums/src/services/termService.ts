@@ -17,21 +17,21 @@ export interface Term {
 }
 
 export async function getTerms() {
-  const res = await authFetch(`${API_URL}/terms`);
+  const res = await authFetch(`${API_URL}/education/terms`);
   return parseJsonSafe<{ success: boolean; data: Term[] }>(res);
 }
 
 export async function createTerm(data: Partial<Term>) {
-  const res = await authFetch(`${API_URL}/terms`, { method: 'POST', body: JSON.stringify(data) });
+  const res = await authFetch(`${API_URL}/education/terms`, { method: 'POST', body: JSON.stringify(data) });
   return parseJsonSafe<{ success: boolean; data: Term }>(res);
 }
 
 export async function updateTerm(id: string, data: Partial<Term>) {
-  const res = await authFetch(`${API_URL}/terms/${id}`, { method: 'PATCH', body: JSON.stringify(data) });
+  const res = await authFetch(`${API_URL}/education/terms/${id}`, { method: 'PATCH', body: JSON.stringify(data) });
   return parseJsonSafe<{ success: boolean; data: Term }>(res);
 }
 
 export async function closeTerm(id: string) {
-  const res = await authFetch(`${API_URL}/admin/terms/${id}/close`, { method: 'POST', body: JSON.stringify({}) });
+  const res = await authFetch(`${API_URL}/education/admin/terms/${id}/close`, { method: 'POST', body: JSON.stringify({}) });
   return parseJsonSafe<{ success: boolean; data: unknown }>(res);
 }

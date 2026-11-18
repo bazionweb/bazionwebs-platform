@@ -12,17 +12,17 @@ export default function ApplyPage() {
     program: "",
   });
 
-  // ── DB-as-SSOT: load programs list from the canonical /api/public/programs endpoint.
+  // ── Load institution-specific programs from the tenant-scoped education API.
   //    Fallback to the bundled list so first paint + unit tests work without a network call.
   const [programs, setPrograms] = useState(FALLBACK_PROGRAMS);
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch(`${API_WORKER_URL}/api/public/programs`, { cache: 'no-store' });
+        const res = await fetch(`${API_WORKER_URL}/api/public/education/programs`, { cache: 'no-store' });
         if (!res.ok) return;
         const body = await res.json();
-        if (!body?.success || !Array.isArray(body.data)) return;
+        if (!body?.success || !Array.isArray(body.data) || body.data.length === 0) return;
         if (cancelled) return;
         setPrograms(body.data.map(p => ({
           label: p.label ?? p.name,

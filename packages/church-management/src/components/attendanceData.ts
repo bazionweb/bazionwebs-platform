@@ -1,7 +1,7 @@
 export type AttendanceStatus = 'Present' | 'Absent' | 'Late';
 
 export type AttendanceRecord = {
-  id: number;
+  id: string | number;
   date: string;
   service: string;
   memberName: string;

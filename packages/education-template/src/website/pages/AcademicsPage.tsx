@@ -11,7 +11,7 @@ export default function Academics() {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch(`${API_WORKER_URL}/api/public/programs`, { cache: 'no-store' });
+        const res = await fetch(`${API_WORKER_URL}/api/public/education/programs`, { cache: 'no-store' });
         if (!res.ok) return;
         const body = await res.json();
         // Only override if the API returned a non-empty array of valid programs

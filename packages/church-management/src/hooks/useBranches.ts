@@ -1,141 +1,92 @@
-import { useMutation, useQuery } from '../shims/apollo';
-import { toTitleCase, formatEmail } from '../utils/stringFormatter';
-import { useMemo } from 'react';
-import { Branch, BranchGivingRecord } from '../components/branchData';
-import {
-  GET_BRANCHES_QUERY,
-  ADD_BRANCH_MUTATION,
-  UPDATE_BRANCH_MUTATION,
-  DELETE_BRANCH_MUTATION,
-} from '../services/graphql/branches';
+import { useCallback, useEffect, useState } from "react";
+import { Branch } from "../components/branchData";
+import { formatEmail, toTitleCase } from "../utils/stringFormatter";
+import { hkmApiRequest } from "../services/hkmApi";
+
+interface HkmBranchRecord {
+  id: string;
+  name: string;
+  location?: string;
+  pastorName?: string;
+  contactPhone?: string;
+  contactEmail?: string;
+  status?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+function toBranch(row: HkmBranchRecord): Branch {
+  return {
+    id: row.id,
+    name: row.name,
+    location: row.location ?? "",
+    address: row.location ?? "",
+    phone: row.contactPhone ?? "",
+    email: row.contactEmail ?? "",
+    isActive: row.status === "active",
+    pastor: {
+      name: row.pastorName ?? "",
+      email: row.contactEmail ?? "",
+      phone: row.contactPhone ?? "",
+      gender: "Male",
+      maritalStatus: "Single",
+      avatar: "",
+    },
+    memberCount: { male: 0, female: 0, total: 0 },
+    givingRecords: [],
+    createdAt: row.createdAt ?? "",
+    updatedAt: row.updatedAt ?? "",
+  };
+}
+
+function serializeBranch(branch: Partial<Branch>) {
+  const result: Record<string, unknown> = {};
+  if (branch.name !== undefined) result.name = toTitleCase(branch.name);
+  if (branch.location !== undefined || branch.address !== undefined) result.location = toTitleCase(branch.location ?? branch.address ?? "");
+  if (branch.pastor?.name !== undefined) result.pastorName = toTitleCase(branch.pastor.name);
+  if (branch.phone !== undefined || branch.pastor?.phone !== undefined) result.contactPhone = branch.phone ?? branch.pastor?.phone ?? "";
+  const email = formatEmail(branch.email ?? branch.pastor?.email);
+  if (email) result.contactEmail = email;
+  if (branch.isActive !== undefined) result.status = branch.isActive ? "active" : "inactive";
+  return result;
+}
 
 export function useBranches() {
-  const { data, loading, error } = useQuery(GET_BRANCHES_QUERY, {
-    fetchPolicy: 'cache-and-network',
-    notifyOnNetworkStatusChange: false,
-    errorPolicy: 'all',
-  });
-  const [addBranchMutation] = useMutation(ADD_BRANCH_MUTATION, { refetchQueries: [{ query: GET_BRANCHES_QUERY }] });
-  const [updateBranchMutation] = useMutation(UPDATE_BRANCH_MUTATION, {
-    refetchQueries: [{ query: GET_BRANCHES_QUERY }],
-  });
-  const [deleteBranchMutation] = useMutation(DELETE_BRANCH_MUTATION, {
-    refetchQueries: [{ query: GET_BRANCHES_QUERY }],
-  });
+  const [data, setData] = useState<Branch[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<Error | undefined>();
 
-  const branches: Branch[] = useMemo(() => {
-    const edges = data?.branchesCollection?.edges;
-    if (!edges) return [];
-    return edges.map(
-      (edge: {
-        node: {
-          id: string;
-          name: string;
-          location?: string;
-          phone?: string;
-          email?: string;
-          is_active?: boolean;
-          manager_id?: string;
-          created_at?: string;
-          updated_at?: string;
-        };
-      }) => {
-        const b = edge.node;
-        // Generate realistic member counts (since we don't have real relationships yet)
-        const memberCount = {
-          male: Math.floor(Math.random() * 50) + 10,
-          female: Math.floor(Math.random() * 60) + 15,
-          total: 0,
-        };
-        memberCount.total = memberCount.male + memberCount.female;
-
-        // Generate some sample giving records (since we don't have real relationships yet)
-        const givingRecords: BranchGivingRecord[] = [];
-        const currentDate = new Date();
-        for (let i = 0; i < 5; i++) {
-          const date = new Date(currentDate);
-          date.setMonth(date.getMonth() - i);
-          givingRecords.push({
-            id: `giving-${b.id}-${i}`,
-            date: date.toISOString().split('T')[0],
-            type: (['Tithe', 'Offering', 'Special Seed', 'Building Fund'] as const)[Math.floor(Math.random() * 4)],
-            amount: Math.floor(Math.random() * 50000) + 10000,
-            description: 'Monthly contribution',
-          });
-        }
-
-        return {
-          id: b.id,
-          name: b.name,
-          location: b.location || '',
-          address: b.location || '',
-          phone: b.phone || '',
-          email: b.email || '',
-          isActive: b.is_active !== false,
-          pastor: {
-            name: b.manager_id || 'Pastor ' + b.name.split(' ')[0],
-            email: b.email || `pastor@${b.name.toLowerCase().replace(/\s+/g, '')}.church`,
-            phone: b.phone || '0700000000',
-            gender: 'Male' as const,
-            maritalStatus: 'Married' as const,
-            avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(b.manager_id || 'Pastor ' + b.name.split(' ')[0])}&background=059669&color=fff`,
-            avatarTransform: undefined,
-          },
-          memberCount,
-          givingRecords,
-          created: b.created_at ? new Date(b.created_at).toISOString().split('T')[0] : '',
-          createdAt: b.created_at || new Date().toISOString(),
-          updatedAt: b.updated_at || new Date().toISOString(),
-        };
-      },
-    );
-  }, [data]);
-
-  const addBranch = async (branch: Branch) => {
-    await addBranchMutation({
-      variables: {
-        object: {
-          name: toTitleCase(branch.name),
-          location: toTitleCase(branch.location || branch.address || ''),
-          manager_id: null, // Set to null to avoid foreign key constraint
-          phone: branch.phone || null,
-          email: branch.email ? formatEmail(branch.email) : null,
-          is_active: branch.isActive !== false,
-        },
-      },
-    });
-  };
-
-  const updateBranch = async (id: string, branch: Partial<Branch>) => {
-    const changes: Record<string, unknown> = {};
-    if (branch.name !== undefined) changes.name = toTitleCase(branch.name);
-    if (branch.location !== undefined || branch.address !== undefined) {
-      changes.location = toTitleCase(branch.location || branch.address || '');
+  const refresh = useCallback(async () => {
+    try {
+      setLoading(true);
+      const rows = await hkmApiRequest<HkmBranchRecord[]>("/api/church/hkm/branches");
+      setData(rows.map(toBranch));
+      setError(undefined);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause : new Error("Unable to load branches."));
+      throw cause;
+    } finally {
+      setLoading(false);
     }
-    if (branch.phone !== undefined) changes.phone = branch.phone || null;
-    if (branch.email !== undefined) changes.email = branch.email ? formatEmail(branch.email) : null;
-    if (branch.isActive !== undefined) changes.is_active = branch.isActive;
+  }, []);
 
-    await updateBranchMutation({
-      variables: {
-        id: parseInt(id, 10) || Number(id),
-        changes,
-      },
-    });
-  };
+  useEffect(() => { void refresh().catch(() => undefined); }, [refresh]);
 
-  const deleteBranch = async (id: string) => {
-    await deleteBranchMutation({
-      variables: { id: parseInt(id, 10) || Number(id) },
-    });
-  };
+  const addBranch = useCallback(async (branch: Branch) => {
+    await hkmApiRequest("/api/church/hkm/branches", { method: "POST", body: JSON.stringify(serializeBranch(branch)) });
+    await refresh();
+  }, [refresh]);
 
-  return {
-    data: branches,
-    loading,
-    error,
-    addBranch,
-    updateBranch,
-    deleteBranch,
-  };
+  const updateBranch = useCallback(async (id: string, branch: Partial<Branch>) => {
+    const body = serializeBranch(branch);
+    await hkmApiRequest(`/api/church/hkm/branches/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(body) });
+    await refresh();
+  }, [refresh]);
+
+  const deleteBranch = useCallback(async (id: string) => {
+    await hkmApiRequest(`/api/church/hkm/branches/${encodeURIComponent(id)}`, { method: "DELETE" });
+    await refresh();
+  }, [refresh]);
+
+  return { data, loading, error, addBranch, updateBranch, deleteBranch };
 }

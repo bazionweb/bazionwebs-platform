@@ -33,6 +33,11 @@ export const requiredDatabaseMigrations = [
   "0025_installation_changes.sql",
   "0026_church_ministry_operations.sql",
   "0027_church_site_settings_versions.sql",
+  "0028_education_institution_records.sql",
+  "0029_hkm_member_records.sql",
+  "0030_education_institution_contacts_evidence.sql",
+  "0031_hkm_member_profile_fields.sql",
+  "0032_hkm_member_attendance.sql",
 ] as const;
 
 /** Current tenant database release marker; updates automatically with the registry. */

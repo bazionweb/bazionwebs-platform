@@ -109,7 +109,7 @@ export async function getStudents(filters?: StudentFilters): Promise<StudentsLis
     if (filters?.program) params.append('program', filters.program);
 
     const queryString = params.toString();
-    const url = `${API_URL}/students${queryString ? `?${queryString}` : ''}`;
+    const url = `${API_URL}/education/students${queryString ? `?${queryString}` : ''}`;
 
     const response = await authFetch(url, {}, 8000);
     const data = await parseJsonSafe<StudentsListResponse>(response);
@@ -135,7 +135,7 @@ export async function getStudents(filters?: StudentFilters): Promise<StudentsLis
  */
 export async function getStudent(id: string): Promise<StudentResponse> {
   try {
-    const response = await authFetch(`${API_URL}/students/${id}`, {}, 5000);
+    const response = await authFetch(`${API_URL}/education/students/${id}`, {}, 5000);
     const data = await parseJsonSafe<StudentResponse>(response);
     if (!data) return { success: false, error: 'Invalid API response from student endpoint' };
     return {
@@ -155,7 +155,7 @@ export async function getStudent(id: string): Promise<StudentResponse> {
 export async function createStudent(studentData: Partial<Student>): Promise<StudentResponse> {
   try {
     const response = await authFetch(
-      `${API_URL}/students`,
+      `${API_URL}/education/students`,
       {
         method: 'POST',
         body: JSON.stringify(toStudentApiPayload(studentData as StudentLike)),
@@ -182,7 +182,7 @@ export async function createStudent(studentData: Partial<Student>): Promise<Stud
 export async function updateStudent(id: string, studentData: Partial<Student>): Promise<StudentResponse> {
   try {
     const response = await authFetch(
-      `${API_URL}/students/${id}`,
+      `${API_URL}/education/students/${id}`,
       {
         method: 'PATCH',
         body: JSON.stringify(toStudentApiPayload(studentData as StudentLike)),
@@ -209,7 +209,7 @@ export async function updateStudent(id: string, studentData: Partial<Student>): 
 export async function deleteStudent(id: string): Promise<StudentResponse> {
   try {
     const response = await authFetch(
-      `${API_URL}/students/${id}`,
+      `${API_URL}/education/students/${id}`,
       {
         method: 'DELETE',
       },
@@ -231,7 +231,7 @@ export async function deleteStudent(id: string): Promise<StudentResponse> {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function getStudentStats(): Promise<any> {
   try {
-    const response = await authFetch(`${API_URL}/students/stats/overview`, {}, 5000);
+    const response = await authFetch(`${API_URL}/education/students/stats/overview`, {}, 5000);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const data = await parseJsonSafe<any>(response);
     return data ?? { success: false, error: 'Invalid API response from student stats endpoint' };

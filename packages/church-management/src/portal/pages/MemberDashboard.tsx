@@ -24,10 +24,8 @@ import { useNavigate } from '../../shims/react-router-dom';
 import { portalAuthService } from '../services/portalAuth';
 import { portalApolloClient } from '../services/portalApollo';
 import {
-  GET_MEMBER_DASHBOARD_QUERY,
   UPDATE_MEMBER_PROFILE_MUTATION,
   SUBMIT_HELPDESK_TICKET_MUTATION,
-  GET_CHURCH_SETTINGS_QUERY,
 } from '../services/portalQueries';
 import jsPDF from '../../shims/jspdf';
 import autoTable from '../../shims/jspdf-autotable';
@@ -388,14 +386,10 @@ const MemberDashboard: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      const { data } = await portalApolloClient.query({
-        query: GET_MEMBER_DASHBOARD_QUERY,
-        variables: { memberId: currentUser.id },
-        fetchPolicy: 'network-only',
-      });
-      setMemberData(data.membersCollection?.edges?.[0]?.node ?? null);
-      setTransactions(data.transactionsCollection?.edges?.map((e: { node: Transaction }) => e.node) ?? []);
-      setAttendance(data.attendance_recordsCollection?.edges?.map((e: { node: AttendanceRecord }) => e.node) ?? []);
+      const data = await portalAuthService.getDashboard();
+      setMemberData(data.member as unknown as MemberData);
+      setTransactions(data.transactions as unknown as Transaction[]);
+      setAttendance(data.attendance as unknown as AttendanceRecord[]);
     } catch {
       setError('Failed to load dashboard. Please try again.');
     } finally {
@@ -407,20 +401,16 @@ const MemberDashboard: React.FC = () => {
     fetchDashboard();
   }, [fetchDashboard]);
 
-  // Fetch church info from DB (first branch = main church)
+  // Load tenant branding through the public tenant-aware API.
   useEffect(() => {
-    portalApolloClient
-      .query({ query: GET_CHURCH_SETTINGS_QUERY, fetchPolicy: 'network-only' })
-      .then((res) => {
-        const node = res.data?.church_settingsCollection?.edges?.[0]?.node;
-        if (node) {
-          setChurchInfo({
-            name: node.name || '',
-            address: node.address || '',
-            phone: node.phone || '',
-            email: node.email || '',
-          });
-        }
+    portalAuthService.getChurchConfig()
+      .then(({ config }) => {
+        setChurchInfo({
+          name: config.churchName || '',
+          address: config.contact?.address || '',
+          phone: config.contact?.phone || '',
+          email: config.contact?.email || '',
+        });
       })
       .catch(() => {
         /* silently fail */

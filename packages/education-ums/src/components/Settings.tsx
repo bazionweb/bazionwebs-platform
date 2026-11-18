@@ -18,8 +18,42 @@ import {
   ShieldCheck,
 } from '../shims/lucide-react';
 import { authFetch } from "../services/authService";
+import { API_URL } from "../services/config";
 import { useUIStore } from "../stores/uiStore";
 import { useDialogStore } from "../stores/dialogStore";
+
+interface InstitutionProfile {
+  name: string;
+  legal_name: string;
+  admissions_email: string;
+  registrar_email: string;
+  finance_email: string;
+  admin_email: string;
+  phones: string[];
+  address: string;
+  website_url: string;
+}
+
+interface RegulatoryEvidence {
+  id: string;
+  title: string;
+  evidence_type: string;
+  authority: string;
+  reference_number: string | null;
+  status: "received" | "pending_review" | "verified" | "expired" | "superseded" | "withdrawn" | "rejected";
+  issued_on: string | null;
+  expires_on: string | null;
+  evidence_url: string | null;
+  notes: string;
+  created_at: string;
+}
+
+async function requestEducationData<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const response = await authFetch(`${API_URL}${path}`, init);
+  const body = await response.json().catch(() => ({})) as { success?: boolean; data?: T; error?: string; message?: string };
+  if (!response.ok || !body.success) throw new Error(body.message ?? body.error ?? `Request failed (${response.status}).`);
+  return body.data as T;
+}
 
 const Settings: React.FC = () => {
   const currentLogo = useUIStore((s) => s.logo);
@@ -34,6 +68,90 @@ const Settings: React.FC = () => {
     "Settings saved successfully",
   );
   const [logoPreview, setLogoPreview] = useState<string | null>(currentLogo);
+  const [institutionProfile, setInstitutionProfile] = useState<InstitutionProfile | null>(null);
+  const [regulatoryEvidence, setRegulatoryEvidence] = useState<RegulatoryEvidence[]>([]);
+  const [institutionError, setInstitutionError] = useState("");
+  const [institutionLoading, setInstitutionLoading] = useState(false);
+  const [institutionSaving, setInstitutionSaving] = useState(false);
+  const [evidenceSaving, setEvidenceSaving] = useState(false);
+  const [evidenceDraft, setEvidenceDraft] = useState({
+    title: "", evidence_type: "", authority: "", reference_number: "", status: "received" as RegulatoryEvidence["status"],
+    issued_on: "", expires_on: "", evidence_url: "", notes: "",
+  });
+
+  const loadInstitutionRecords = async () => {
+    setInstitutionLoading(true);
+    setInstitutionError("");
+    try {
+      const [profile, evidence] = await Promise.all([
+        requestEducationData<InstitutionProfile>("/education/institution"),
+        requestEducationData<RegulatoryEvidence[]>("/education/regulatory-evidence"),
+      ]);
+      setInstitutionProfile(profile);
+      setRegulatoryEvidence(evidence);
+    } catch (cause) {
+      setInstitutionError(cause instanceof Error ? cause.message : "Could not load institution records.");
+    } finally {
+      setInstitutionLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === "institution") void loadInstitutionRecords();
+  }, [activeTab]);
+
+  const saveInstitutionProfile = async () => {
+    if (!institutionProfile) return;
+    setInstitutionSaving(true);
+    setInstitutionError("");
+    try {
+      const saved = await requestEducationData<InstitutionProfile>("/education/institution", {
+        method: "PATCH", body: JSON.stringify(institutionProfile),
+      });
+      setInstitutionProfile(saved);
+      setToastMessage("Institution contacts saved");
+      setShowToast(true);
+      setTimeout(() => setShowToast(false), 3000);
+    } catch (cause) {
+      setInstitutionError(cause instanceof Error ? cause.message : "Could not save institution contacts.");
+    } finally {
+      setInstitutionSaving(false);
+    }
+  };
+
+  const addRegulatoryEvidence = async () => {
+    setEvidenceSaving(true);
+    setInstitutionError("");
+    try {
+      await requestEducationData<RegulatoryEvidence>("/education/regulatory-evidence", {
+        method: "POST", body: JSON.stringify({
+          ...evidenceDraft,
+          reference_number: evidenceDraft.reference_number || null,
+          issued_on: evidenceDraft.issued_on || null,
+          expires_on: evidenceDraft.expires_on || null,
+          evidence_url: evidenceDraft.evidence_url || null,
+        }),
+      });
+      setEvidenceDraft({ title: "", evidence_type: "", authority: "", reference_number: "", status: "received", issued_on: "", expires_on: "", evidence_url: "", notes: "" });
+      await loadInstitutionRecords();
+    } catch (cause) {
+      setInstitutionError(cause instanceof Error ? cause.message : "Could not save the evidence record.");
+    } finally {
+      setEvidenceSaving(false);
+    }
+  };
+
+  const updateEvidenceStatus = async (id: string, status: RegulatoryEvidence["status"]) => {
+    setInstitutionError("");
+    try {
+      await requestEducationData<RegulatoryEvidence>(`/education/regulatory-evidence/${encodeURIComponent(id)}`, {
+        method: "PATCH", body: JSON.stringify({ status }),
+      });
+      await loadInstitutionRecords();
+    } catch (cause) {
+      setInstitutionError(cause instanceof Error ? cause.message : "Could not update the evidence status.");
+    }
+  };
 
   // Password Management State
   const [passwordData, setPasswordData] = useState({
@@ -399,6 +517,7 @@ const Settings: React.FC = () => {
           <TabButton id="general" label="General" icon={Globe} />
           <TabButton id="notifications" label="Notifications" icon={Bell} />
           <TabButton id="security" label="Security" icon={Shield} />
+          <TabButton id="institution" label="Institution & Evidence" icon={Database} />
           <TabButton id="controlled-accounts" label="Controlled Accounts" icon={UserPlus} />
         </div>
 
@@ -562,6 +681,87 @@ const Settings: React.FC = () => {
                   </button>
                 </div>
               </div>
+            </div>
+          )}
+
+          {activeTab === "institution" && (
+            <div className="space-y-10 max-w-5xl">
+              <section className="space-y-5">
+                <div>
+                  <h3 className="text-sm font-black text-[#4B0082] dark:text-purple-300 uppercase tracking-widest">Institution identity and contacts</h3>
+                  <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">This profile is scoped to the BMI or BEMI institution selected by the verified host.</p>
+                </div>
+                {institutionError && <div role="alert" className="rounded-none border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300">{institutionError}</div>}
+                {institutionLoading && <p className="text-sm text-gray-500">Loading institution records…</p>}
+                {!institutionLoading && institutionProfile && (
+                  <>
+                    <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+                      {([
+                        ["name", "Institution name", "text"], ["legal_name", "Legal entity", "text"],
+                        ["admissions_email", "Admissions email", "email"], ["registrar_email", "Registrar email", "email"],
+                        ["finance_email", "Finance email", "email"], ["admin_email", "Administrator email", "email"],
+                        ["website_url", "Institution website", "url"],
+                      ] as const).map(([key, label, type]) => (
+                        <label key={key} className="space-y-2">
+                          <span className="text-[10px] font-black uppercase tracking-widest text-gray-500 dark:text-gray-400">{label}</span>
+                          <input type={type} value={institutionProfile[key] ?? ""} onChange={(event) => setInstitutionProfile({ ...institutionProfile, [key]: event.target.value })}
+                            className="w-full border border-gray-200 px-4 py-3 text-sm font-medium outline-none focus:border-[#4B0082] dark:border-gray-600 dark:bg-gray-700 dark:text-white" />
+                        </label>
+                      ))}
+                      <label className="space-y-2">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-gray-500 dark:text-gray-400">Phone numbers (one per line)</span>
+                        <textarea rows={3} value={institutionProfile.phones.join("\n")} onChange={(event) => setInstitutionProfile({ ...institutionProfile, phones: event.target.value.split("\n").map((phone) => phone.trim()).filter(Boolean).slice(0, 12) })}
+                          className="w-full border border-gray-200 px-4 py-3 text-sm outline-none focus:border-[#4B0082] dark:border-gray-600 dark:bg-gray-700 dark:text-white" />
+                      </label>
+                      <label className="space-y-2 md:col-span-2">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-gray-500 dark:text-gray-400">Campus / head office address</span>
+                        <textarea rows={3} value={institutionProfile.address ?? ""} onChange={(event) => setInstitutionProfile({ ...institutionProfile, address: event.target.value })}
+                          className="w-full border border-gray-200 px-4 py-3 text-sm outline-none focus:border-[#4B0082] dark:border-gray-600 dark:bg-gray-700 dark:text-white" />
+                      </label>
+                    </div>
+                    <button type="button" onClick={() => void saveInstitutionProfile()} disabled={institutionSaving}
+                      className="inline-flex items-center gap-2 bg-[#4B0082] px-6 py-3 text-xs font-black uppercase tracking-widest text-white disabled:opacity-60">
+                      {institutionSaving ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />} Save institution profile
+                    </button>
+                  </>
+                )}
+              </section>
+
+              <section className="space-y-5 border-t border-gray-100 pt-8 dark:border-gray-700">
+                <div>
+                  <h3 className="text-sm font-black text-[#4B0082] dark:text-purple-300 uppercase tracking-widest">Regulatory evidence register</h3>
+                  <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">Record source documents and review status. Adding a record does not publish or change accreditation wording.</p>
+                </div>
+                <form onSubmit={(event) => { event.preventDefault(); void addRegulatoryEvidence(); }} className="grid grid-cols-1 gap-4 rounded-none border border-gray-200 bg-gray-50 p-5 dark:border-gray-700 dark:bg-gray-900/40 md:grid-cols-2">
+                  <input required maxLength={240} placeholder="Evidence title" value={evidenceDraft.title} onChange={(event) => setEvidenceDraft({ ...evidenceDraft, title: event.target.value })} className="border border-gray-200 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-white" />
+                  <input required maxLength={80} placeholder="Evidence type (e.g. registration certificate)" value={evidenceDraft.evidence_type} onChange={(event) => setEvidenceDraft({ ...evidenceDraft, evidence_type: event.target.value })} className="border border-gray-200 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-white" />
+                  <input required maxLength={240} placeholder="Issuing authority" value={evidenceDraft.authority} onChange={(event) => setEvidenceDraft({ ...evidenceDraft, authority: event.target.value })} className="border border-gray-200 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-white" />
+                  <input maxLength={120} placeholder="Reference number (optional)" value={evidenceDraft.reference_number} onChange={(event) => setEvidenceDraft({ ...evidenceDraft, reference_number: event.target.value })} className="border border-gray-200 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-white" />
+                  <select value={evidenceDraft.status} onChange={(event) => setEvidenceDraft({ ...evidenceDraft, status: event.target.value as RegulatoryEvidence["status"] })} className="border border-gray-200 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-white">
+                    {(["received", "pending_review", "verified", "expired", "superseded", "withdrawn", "rejected"] as const).map((status) => <option key={status} value={status}>{status.replaceAll("_", " ")}</option>)}
+                  </select>
+                  <div className="grid grid-cols-2 gap-3">
+                    <label className="text-xs text-gray-500">Issued on<input type="date" value={evidenceDraft.issued_on} onChange={(event) => setEvidenceDraft({ ...evidenceDraft, issued_on: event.target.value })} className="mt-1 w-full border border-gray-200 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-white" /></label>
+                    <label className="text-xs text-gray-500">Expires on<input type="date" value={evidenceDraft.expires_on} onChange={(event) => setEvidenceDraft({ ...evidenceDraft, expires_on: event.target.value })} className="mt-1 w-full border border-gray-200 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-white" /></label>
+                  </div>
+                  <input type="url" placeholder="Evidence link (optional, HTTPS URL)" value={evidenceDraft.evidence_url} onChange={(event) => setEvidenceDraft({ ...evidenceDraft, evidence_url: event.target.value })} className="border border-gray-200 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-white" />
+                  <textarea maxLength={8000} placeholder="Notes" value={evidenceDraft.notes} onChange={(event) => setEvidenceDraft({ ...evidenceDraft, notes: event.target.value })} className="border border-gray-200 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-white" />
+                  <div className="md:col-span-2"><button disabled={evidenceSaving || institutionLoading} className="inline-flex items-center gap-2 bg-gray-900 px-5 py-2.5 text-xs font-black uppercase tracking-widest text-white disabled:opacity-60 dark:bg-white dark:text-gray-900">{evidenceSaving ? <Loader2 size={14} className="animate-spin" /> : <ShieldCheck size={14} />} Add evidence record</button></div>
+                </form>
+                <div className="space-y-3">
+                  {regulatoryEvidence.length === 0 && !institutionLoading && <p className="rounded-none border border-dashed border-gray-300 p-5 text-sm text-gray-500 dark:border-gray-600">No regulatory evidence records have been entered for this institution.</p>}
+                  {regulatoryEvidence.map((record) => (
+                    <article key={record.id} className="grid grid-cols-1 gap-3 border border-gray-200 p-4 dark:border-gray-700 md:grid-cols-[1fr_auto]">
+                      <div><h4 className="font-bold text-gray-900 dark:text-white">{record.title}</h4><p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{record.evidence_type} · {record.authority}{record.reference_number ? ` · Ref ${record.reference_number}` : ""}</p>
+                        {(record.issued_on || record.expires_on) && <p className="mt-1 text-xs text-gray-500">{record.issued_on ? `Issued ${record.issued_on}` : ""}{record.expires_on ? ` · Expires ${record.expires_on}` : ""}</p>}
+                        {record.evidence_url && <a href={record.evidence_url} target="_blank" rel="noopener noreferrer" className="mt-2 inline-block text-xs font-bold text-[#4B0082] underline">Open evidence source</a>}
+                        {record.notes && <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">{record.notes}</p>}
+                      </div>
+                      <label className="text-xs text-gray-500">Review status<select value={record.status} onChange={(event) => void updateEvidenceStatus(record.id, event.target.value as RegulatoryEvidence["status"])} className="mt-1 block w-full border border-gray-200 px-3 py-2 text-sm capitalize dark:border-gray-600 dark:bg-gray-800 dark:text-white">{(["received", "pending_review", "verified", "expired", "superseded", "withdrawn", "rejected"] as const).map((status) => <option key={status} value={status}>{status.replaceAll("_", " ")}</option>)}</select></label>
+                    </article>
+                  ))}
+                </div>
+              </section>
             </div>
           )}
 

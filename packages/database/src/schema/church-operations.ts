@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import {
   boolean,
   date,
+  foreignKey,
   index,
   integer,
   jsonb,
@@ -147,6 +148,110 @@ export const churchInventoryAssetEvents = pgTable("church_inventory_asset_events
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
   index("church_asset_events_tenant_asset_idx").on(table.tenantId, table.assetId),
+]);
+
+export const hkmBranches = pgTable("hkm_branches", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id, { onDelete: "restrict" }),
+  name: varchar("name", { length: 160 }).notNull(),
+  location: varchar("location", { length: 240 }).notNull().default(""),
+  pastorName: varchar("pastor_name", { length: 160 }).notNull().default(""),
+  contactPhone: varchar("contact_phone", { length: 40 }).notNull().default(""),
+  contactEmail: varchar("contact_email", { length: 254 }).notNull().default(""),
+  status: varchar("status", { length: 24 }).notNull().default("active"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  uniqueIndex("hkm_branches_id_tenant_uq").on(t.id, t.tenantId),
+  uniqueIndex("hkm_branches_tenant_name_uq").on(t.tenantId, t.name),
+  index("hkm_branches_tenant_status_idx").on(t.tenantId, t.status),
+]);
+
+export const hkmMembers = pgTable("hkm_members", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id, { onDelete: "restrict" }),
+  branchId: uuid("branch_id").notNull(),
+  membershipNumber: varchar("membership_number", { length: 48 }).notNull(),
+  firstName: varchar("first_name", { length: 100 }).notNull(),
+  lastName: varchar("last_name", { length: 100 }).notNull(),
+  title: varchar("title", { length: 80 }).notNull().default(""),
+  email: varchar("email", { length: 254 }).notNull(),
+  phone: varchar("phone", { length: 40 }).notNull().default(""),
+  department: varchar("department", { length: 120 }).notNull().default(""),
+  gender: varchar("gender", { length: 24 }).notNull().default("Male"),
+  avatarUrl: text("avatar_url"),
+  avatarTransform: jsonb("avatar_transform").$type<{ scale: number; positionX: number; positionY: number } | null>(),
+  address: text("address"),
+  occupation: varchar("occupation", { length: 160 }),
+  maritalStatus: varchar("marital_status", { length: 24 }),
+  joinedAt: date("joined_at"),
+  status: varchar("status", { length: 24 }).notNull().default("active"),
+  role: varchar("role", { length: 80 }).notNull().default("Member"),
+  dateOfBirth: date("date_of_birth"),
+  baptismDate: date("baptism_date"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  uniqueIndex("hkm_members_id_tenant_uq").on(t.id, t.tenantId),
+  uniqueIndex("hkm_members_tenant_membership_number_uq").on(t.tenantId, t.membershipNumber),
+  uniqueIndex("hkm_members_tenant_email_uq").on(t.tenantId, t.email),
+  foreignKey({ columns: [t.branchId, t.tenantId], foreignColumns: [hkmBranches.id, hkmBranches.tenantId], name: "hkm_members_branch_tenant_fk" }).onDelete("restrict"),
+  index("hkm_members_tenant_status_idx").on(t.tenantId, t.status),
+  index("hkm_members_tenant_name_idx").on(t.tenantId, t.lastName, t.firstName),
+]);
+
+export const hkmAttendanceRecords = pgTable("hkm_attendance_records", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id, { onDelete: "restrict" }),
+  branchId: uuid("branch_id").notNull(),
+  serviceDate: date("service_date").notNull(),
+  serviceType: varchar("service_type", { length: 120 }).notNull(),
+  countMen: integer("count_men").notNull().default(0),
+  countWomen: integer("count_women").notNull().default(0),
+  countChildren: integer("count_children").notNull().default(0),
+  recordedBy: varchar("recorded_by", { length: 128 }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  foreignKey({ columns: [t.branchId, t.tenantId], foreignColumns: [hkmBranches.id, hkmBranches.tenantId], name: "hkm_attendance_branch_tenant_fk" }).onDelete("restrict"),
+  index("hkm_attendance_tenant_date_idx").on(t.tenantId, t.serviceDate),
+]);
+
+export const hkmMemberAttendanceRecords = pgTable("hkm_member_attendance_records", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id, { onDelete: "restrict" }),
+  memberId: uuid("member_id").notNull(),
+  branchId: uuid("branch_id").notNull(),
+  serviceDate: date("service_date").notNull(),
+  serviceType: varchar("service_type", { length: 120 }).notNull(),
+  status: varchar("status", { length: 16 }).notNull(),
+  recordedBy: varchar("recorded_by", { length: 128 }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  foreignKey({ columns: [t.memberId, t.tenantId], foreignColumns: [hkmMembers.id, hkmMembers.tenantId], name: "hkm_member_attendance_member_tenant_fk" }).onDelete("restrict"),
+  foreignKey({ columns: [t.branchId, t.tenantId], foreignColumns: [hkmBranches.id, hkmBranches.tenantId], name: "hkm_member_attendance_branch_tenant_fk" }).onDelete("restrict"),
+  uniqueIndex("hkm_member_attendance_identity_uq").on(t.tenantId, t.memberId, t.serviceDate, t.serviceType),
+  index("hkm_member_attendance_tenant_service_idx").on(t.tenantId, t.serviceDate, t.serviceType),
+]);
+
+export const hkmGivingTransactions = pgTable("hkm_giving_transactions", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id, { onDelete: "restrict" }),
+  memberId: uuid("member_id").notNull(),
+  branchId: uuid("branch_id").notNull(),
+  amountMinor: integer("amount_minor").notNull(),
+  currency: varchar("currency", { length: 3 }).notNull().default("KES"),
+  givingType: varchar("giving_type", { length: 48 }).notNull(),
+  transactionDate: timestamp("transaction_date", { withTimezone: true }).notNull().defaultNow(),
+  paymentMethod: varchar("payment_method", { length: 40 }).notNull().default("manual"),
+  receiptNumber: varchar("receipt_number", { length: 80 }).notNull(),
+  paymentStatus: varchar("payment_status", { length: 24 }).notNull().default("verified"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  foreignKey({ columns: [t.memberId, t.tenantId], foreignColumns: [hkmMembers.id, hkmMembers.tenantId], name: "hkm_giving_member_tenant_fk" }).onDelete("restrict"),
+  foreignKey({ columns: [t.branchId, t.tenantId], foreignColumns: [hkmBranches.id, hkmBranches.tenantId], name: "hkm_giving_branch_tenant_fk" }).onDelete("restrict"),
+  uniqueIndex("hkm_giving_tenant_receipt_uq").on(t.tenantId, t.receiptNumber),
+  index("hkm_giving_tenant_member_date_idx").on(t.tenantId, t.memberId, t.transactionDate),
 ]);
 
 export const ministrySiteSettingsVersions = pgTable("ministry_site_settings_versions", {

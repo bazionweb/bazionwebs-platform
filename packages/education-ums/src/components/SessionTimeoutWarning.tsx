@@ -1,5 +1,5 @@
 import React, { useEffect, useCallback } from 'react';
-import { isTokenExpiringSoon, refreshAccessToken, logout } from '../services/authService';
+import { isTokenExpiringSoon, verifySession, logout } from '../services/authService';
 
 interface SessionTimeoutWarningProps {
   onSessionExpired?: () => void;
@@ -18,13 +18,11 @@ const SessionTimeoutWarning: React.FC<SessionTimeoutWarningProps> = ({ onSession
   const silentRefresh = useCallback(async () => {
     if (!isTokenExpiringSoon()) return; // Nothing to do yet
 
-    const newToken = await refreshAccessToken();
-    if (!newToken) {
-      // Refresh token itself has expired — genuine session end
+    const sessionIsValid = await verifySession();
+    if (!sessionIsValid) {
       await logout();
       onSessionExpired?.();
     }
-    // If refresh succeeded, _memoryToken is already updated — user notices nothing
   }, [onSessionExpired]);
 
   useEffect(() => {

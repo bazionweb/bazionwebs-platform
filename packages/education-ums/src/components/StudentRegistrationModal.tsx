@@ -66,7 +66,7 @@ const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> = ({
       setLoadingPrograms(true);
       try {
         const [programsRes, centers] = await Promise.all([
-          authFetch(`${API_URL}/catalog/programs`, {}, 5000).then(r => r.json()),
+          authFetch(`${API_URL}/education/catalog/programs`, {}, 5000).then(r => r.json()),
           getAllStudyCenters()
         ]);
         
