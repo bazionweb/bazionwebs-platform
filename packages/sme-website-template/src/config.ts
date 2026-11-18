@@ -4,10 +4,11 @@ import {
   WEBSITE_CONFIGURATION_VERSION,
   createWhiteLabeledPackageConfig,
   websiteConfigurationSchema,
+  websiteResourceUrlSchema,
   type WhiteLabelPaletteId,
 } from "@bazion/website-contracts";
 
-export const SME_WEBSITE_TEMPLATE_VERSION = "1.0.0" as const;
+export const SME_WEBSITE_TEMPLATE_VERSION = "1.1.0" as const;
 
 export const smeBusinessServiceSchema = z.object({
   id: z.string().trim().min(1).max(80).regex(/^[a-z][a-z0-9-]*$/),
@@ -15,12 +16,21 @@ export const smeBusinessServiceSchema = z.object({
   description: z.string().trim().min(10).max(600),
 }).strict();
 
+export const smeBusinessContentBlocksSchema = z.object({
+  faqs: z.array(z.object({ question: z.string().trim().min(2).max(240), answer: z.string().trim().min(2).max(3000) }).strict()).max(40).default([]),
+  testimonials: z.array(z.object({ id: z.string().trim().min(1).max(80), quote: z.string().trim().min(2).max(2000), author: z.string().trim().min(1).max(160), role: z.string().trim().max(160).optional() }).strict()).max(40).default([]),
+  gallery: z.array(z.object({ id: z.string().trim().min(1).max(80), imageUrl: websiteResourceUrlSchema, alt: z.string().trim().min(2).max(240), caption: z.string().trim().max(300).optional() }).strict()).max(60).default([]),
+  events: z.array(z.object({ id: z.string().trim().min(1).max(80), title: z.string().trim().min(2).max(180), startsAt: z.string().trim().min(1).max(80), description: z.string().trim().max(2000).optional(), href: websiteResourceUrlSchema.optional() }).strict()).max(60).default([]),
+  media: z.array(z.object({ id: z.string().trim().min(1).max(80), title: z.string().trim().min(2).max(180), href: websiteResourceUrlSchema, description: z.string().trim().max(1000).optional() }).strict()).max(60).default([]),
+}).strict().default({ faqs: [], testimonials: [], gallery: [], events: [], media: [] });
+
 export const smeBusinessContentSchema = z.object({
   name: z.string().trim().min(2).max(160),
   tagline: z.string().trim().max(180).default(""),
   introduction: z.string().trim().min(10).max(1200),
   about: z.string().trim().min(20).max(6000),
   services: z.array(smeBusinessServiceSchema).min(1).max(12),
+  content: smeBusinessContentBlocksSchema,
   contact: z.object({
     email: z.string().trim().email().max(254).optional(),
     telephone: z.string().trim().max(30).optional(),
@@ -31,7 +41,7 @@ export const smeBusinessContentSchema = z.object({
 }).strict();
 
 export const smeWebsiteTemplateConfigSchema = z.object({
-  schemaVersion: z.literal(SME_WEBSITE_TEMPLATE_VERSION).default(SME_WEBSITE_TEMPLATE_VERSION),
+  schemaVersion: z.literal(WEBSITE_CONFIGURATION_VERSION).default(WEBSITE_CONFIGURATION_VERSION),
   website: websiteConfigurationSchema.default(websiteConfigurationSchema.parse({})),
   business: smeBusinessContentSchema,
 }).strict();

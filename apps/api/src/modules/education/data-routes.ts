@@ -250,7 +250,16 @@ function publicEducationWebsiteConfig(row: typeof educationInstitutions.$inferSe
     adminEmail: row.adminEmail,
     phones: row.phones,
     address: row.address,
-  });
+  }, { tenantId: row.tenantId });
+}
+
+function publicEducationTemplateStatus(row: typeof educationInstitutions.$inferSelect) {
+  return {
+    id: row.websiteTemplateId,
+    configuredVersion: row.websiteTemplateVersion,
+    currentVersion: SCHOOL_PORTAL_TEMPLATE_VERSION,
+    updateMode: "automatic" as const,
+  };
 }
 
 function publicRegulatoryEvidence(row: typeof educationRegulatoryEvidence.$inferSelect) {
@@ -349,7 +358,11 @@ export async function educationDataRoutes(app: FastifyInstance, options: RouteOp
       const [row] = await tx.select().from(educationInstitutions).where(and(
         eq(educationInstitutions.id, institutionId), eq(educationInstitutions.tenantId, tenantId),
       )).limit(1);
-      return row ? { ...publicInstitution(row), website_config: publicEducationWebsiteConfig(row) } : null;
+      return row ? {
+        ...publicInstitution(row),
+        website_config: publicEducationWebsiteConfig(row),
+        website_template: publicEducationTemplateStatus(row),
+      } : null;
     });
     return profile ? reply.send({ success: true, data: profile }) : reply.code(404).send({ success: false, error: "EDUCATION_INSTITUTION_NOT_FOUND" });
   });
@@ -365,7 +378,7 @@ export async function educationDataRoutes(app: FastifyInstance, options: RouteOp
         eq(educationInstitutions.id, institutionId), eq(educationInstitutions.tenantId, tenantId),
       )).limit(1).for("update");
       if (!existing) return null;
-      const existingWebsiteConfig = resolveEducationInstitutionWebsiteConfig(key, existing.websiteOverrides);
+      const existingWebsiteConfig = resolveEducationInstitutionWebsiteConfig(key, existing.websiteOverrides, undefined, { tenantId });
       const nextWebsiteConfig = input.website_overrides === undefined
         ? undefined
         : deepMergeCascade(existingWebsiteConfig, input.website_overrides);
@@ -380,14 +393,18 @@ export async function educationDataRoutes(app: FastifyInstance, options: RouteOp
         ...(input.address !== undefined ? { address: input.address } : {}),
         ...(input.website_url !== undefined ? { websiteUrl: input.website_url } : {}),
         ...(nextWebsiteConfig ? {
-          websiteOverrides: createEducationInstitutionWebsiteOverlay(key, nextWebsiteConfig) as unknown as Record<string, unknown>,
+          websiteOverrides: createEducationInstitutionWebsiteOverlay(key, nextWebsiteConfig, { tenantId }) as unknown as Record<string, unknown>,
           websiteTemplateId: "school-portal",
           websiteTemplateVersion: SCHOOL_PORTAL_TEMPLATE_VERSION,
           websiteConfigurationSchemaVersion: EDUCATION_CONFIGURATION_VERSION,
         } : {}),
         updatedAt: new Date(),
       }).where(and(eq(educationInstitutions.id, institutionId), eq(educationInstitutions.tenantId, tenantId))).returning();
-      return row ? { ...publicInstitution(row), website_config: publicEducationWebsiteConfig(row) } : null;
+      return row ? {
+        ...publicInstitution(row),
+        website_config: publicEducationWebsiteConfig(row),
+        website_template: publicEducationTemplateStatus(row),
+      } : null;
     });
     return profile ? reply.send({ success: true, data: profile }) : reply.code(404).send({ success: false, error: "EDUCATION_INSTITUTION_NOT_FOUND" });
   });

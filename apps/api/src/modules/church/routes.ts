@@ -265,6 +265,7 @@ export async function churchRoutes(app: FastifyInstance, options: RouteOptions) 
     const currentTemplate = packageDescriptor && typeof resolvedTemplateId === "string"
       ? packageDescriptor.templates.find((templateDescriptor) => templateDescriptor.id === resolvedTemplateId)
       : undefined;
+    const formsLeadsEnabled = await isTenantModuleEnabled(tenantId, "forms-leads");
     return reply
       .header("Cache-Control", "no-store")
       .send({
@@ -276,6 +277,7 @@ export async function churchRoutes(app: FastifyInstance, options: RouteOptions) 
           currentVersion: currentTemplate.version,
           updateMode: overlay?.updateMode ?? (legacyPinned ? "pinned" : "automatic"),
         } : null,
+        capabilities: { formsLeadsEnabled },
       });
   });
 

@@ -6,16 +6,21 @@ import { EducationShell } from "../../components/education/education-shell";
 import { BmiAboutPage } from "@bazion/education-template";
 import { SmeAboutPage, SmeWebsiteShell, isSmeWebsitePageEnabled } from "@bazion/sme-website-template";
 import { getPublicTenantWebsiteConfig } from "../../lib/server-website-config";
+import { renderConfiguredTemplatePage } from "../../lib/configured-template-page";
+import { isEducationInstitutionWebsitePageEnabled } from "@bazion/education-contracts";
 
 export default async function AboutPageRoute() {
   const education = await resolveEducationTenant();
   if (education.isEducation) {
+    if (!isEducationInstitutionWebsitePageEnabled(education.tenantConfig, "/about")) notFound();
     return (
       <EducationShell>
         <BmiAboutPage />
       </EducationShell>
     );
   }
+  const configuredPage = await renderConfiguredTemplatePage("/about");
+  if (configuredPage) return configuredPage;
   const websiteConfig = await getPublicTenantWebsiteConfig();
   if (websiteConfig && websiteConfig.packageId !== "church-ministry"
     && isSmeWebsitePageEnabled(websiteConfig.smeConfig, "about")) {

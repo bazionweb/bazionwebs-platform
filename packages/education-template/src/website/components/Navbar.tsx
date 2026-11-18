@@ -6,41 +6,42 @@ import { usePathname } from "next/navigation";
 import type { SchoolPortalConfig } from "@bazion/education-contracts";
 import { useEducationTenant } from "../context/EducationTenantContext";
 
-const navLinks = [
-  { name: "Academics", href: "/academics" },
-  { name: "Admissions", href: "/admissions" },
-  {
-    name: "Institutes",
-    href: "/institutes",
-    isDropdown: true,
-    sublinks: [
-      {
+export interface NavbarProps {
+  tenantConfig?: SchoolPortalConfig;
+}
+
+type EducationNavLink = {
+  name: string;
+  href: string;
+  isDropdown?: boolean;
+  sublinks?: Array<{ name: string; subtitle: string; badge: string; href: string; icon: string }>;
+};
+
+export default function Navbar({ tenantConfig }: NavbarProps = {}) {
+  const config = useEducationTenant(tenantConfig);
+  const enabledPaths = new Set(config.website?.pages.filter((page) => page.enabled).map((page) => page.path) ?? []);
+  const navLinks: EducationNavLink[] = (config.website?.navigation ?? []).flatMap((item) => {
+    const isInternal = item.href.startsWith("/");
+    if (isInternal && !enabledPaths.has(item.href)) return [];
+    if (item.id !== "institutes") return [{ name: item.label, href: item.href }];
+    const sublinks = [
+      ...(enabledPaths.has("/institutes/bemi") ? [{
         name: "BEMI Training Institute",
         subtitle: "Kenya Registered Entity & Pan-Africa Hub",
         badge: "Africa Hub",
         href: "/institutes/bemi",
         icon: "🌍",
-      },
-      {
+      }] : []),
+      ...(enabledPaths.has("/institutes") ? [{
         name: "All BMI Institutes & Campuses",
         subtitle: "Collegiate network & institutional directory",
         badge: "Directory",
         href: "/institutes",
         icon: "🏛️",
-      },
-    ],
-  },
-  { name: "Accreditation", href: "/accreditation" },
-  { name: "About", href: "/about" },
-  { name: "Contact", href: "/contact" },
-];
-
-export interface NavbarProps {
-  tenantConfig?: SchoolPortalConfig;
-}
-
-export default function Navbar({ tenantConfig }: NavbarProps = {}) {
-  const config = useEducationTenant(tenantConfig);
+      }] : []),
+    ];
+    return [{ name: item.label, href: item.href, isDropdown: sublinks.length > 0, sublinks }];
+  });
   const isBmiDefault =
     config.shortName === "BMI University" ||
     config.institutionName === "Bethel Ministries International University";
