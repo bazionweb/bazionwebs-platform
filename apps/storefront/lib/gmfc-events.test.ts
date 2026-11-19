@@ -49,3 +49,4 @@ describe("gmfc-events auto-hide and date-awareness", () => {
     expect(highlights).toEqual([]);
   });
 });
+
