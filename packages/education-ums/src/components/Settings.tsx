@@ -32,7 +32,18 @@ interface InstitutionProfile {
   phones: string[];
   address: string;
   website_url: string;
+  website_config: {
+    tagline: string;
+    description: string;
+    branding: { primaryColor: string; secondaryColor: string; accentColor: string; logoUrl: string };
+  };
 }
+
+type EducationWebsiteOverrideDraft = {
+  tagline?: string;
+  description?: string;
+  branding?: Partial<InstitutionProfile["website_config"]["branding"]>;
+};
 
 interface RegulatoryEvidence {
   id: string;
@@ -69,6 +80,7 @@ const Settings: React.FC = () => {
   );
   const [logoPreview, setLogoPreview] = useState<string | null>(currentLogo);
   const [institutionProfile, setInstitutionProfile] = useState<InstitutionProfile | null>(null);
+  const [websiteOverrideDraft, setWebsiteOverrideDraft] = useState<EducationWebsiteOverrideDraft>({});
   const [regulatoryEvidence, setRegulatoryEvidence] = useState<RegulatoryEvidence[]>([]);
   const [institutionError, setInstitutionError] = useState("");
   const [institutionLoading, setInstitutionLoading] = useState(false);
@@ -82,6 +94,7 @@ const Settings: React.FC = () => {
   const loadInstitutionRecords = async () => {
     setInstitutionLoading(true);
     setInstitutionError("");
+    setWebsiteOverrideDraft({});
     try {
       const [profile, evidence] = await Promise.all([
         requestEducationData<InstitutionProfile>("/education/institution"),
@@ -105,11 +118,32 @@ const Settings: React.FC = () => {
     setInstitutionSaving(true);
     setInstitutionError("");
     try {
+      const website_overrides = {
+        ...(websiteOverrideDraft.tagline !== undefined ? { tagline: websiteOverrideDraft.tagline } : {}),
+        ...(websiteOverrideDraft.description !== undefined ? { description: websiteOverrideDraft.description } : {}),
+        ...(websiteOverrideDraft.branding ? { branding: websiteOverrideDraft.branding } : {}),
+      };
+      const profileFields = {
+        name: institutionProfile.name,
+        legal_name: institutionProfile.legal_name,
+        admissions_email: institutionProfile.admissions_email,
+        registrar_email: institutionProfile.registrar_email,
+        finance_email: institutionProfile.finance_email,
+        admin_email: institutionProfile.admin_email,
+        phones: institutionProfile.phones,
+        address: institutionProfile.address,
+        website_url: institutionProfile.website_url,
+      };
       const saved = await requestEducationData<InstitutionProfile>("/education/institution", {
-        method: "PATCH", body: JSON.stringify(institutionProfile),
+        method: "PATCH",
+        body: JSON.stringify({
+          ...profileFields,
+          ...(Object.keys(website_overrides).length ? { website_overrides } : {}),
+        }),
       });
       setInstitutionProfile(saved);
-      setToastMessage("Institution contacts saved");
+      setWebsiteOverrideDraft({});
+      setToastMessage("Institution website and contacts saved");
       setShowToast(true);
       setTimeout(() => setShowToast(false), 3000);
     } catch (cause) {
@@ -718,6 +752,55 @@ const Settings: React.FC = () => {
                         <textarea rows={3} value={institutionProfile.address ?? ""} onChange={(event) => setInstitutionProfile({ ...institutionProfile, address: event.target.value })}
                           className="w-full border border-gray-200 px-4 py-3 text-sm outline-none focus:border-[#4B0082] dark:border-gray-600 dark:bg-gray-700 dark:text-white" />
                       </label>
+                    </div>
+                    <div className="space-y-5 border-t border-gray-100 pt-6 dark:border-gray-700">
+                      <div>
+                        <h4 className="text-xs font-black uppercase tracking-widest text-gray-700 dark:text-gray-200">Public website template</h4>
+                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Only fields you change become institution overrides. Untouched fields continue receiving template updates.</p>
+                      </div>
+                      <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+                        <label className="space-y-2">
+                          <span className="text-[10px] font-black uppercase tracking-widest text-gray-500 dark:text-gray-400">Website tagline</span>
+                          <input maxLength={400} value={institutionProfile.website_config.tagline} onChange={(event) => {
+                            const tagline = event.target.value;
+                            setInstitutionProfile({ ...institutionProfile, website_config: { ...institutionProfile.website_config, tagline } });
+                            setWebsiteOverrideDraft((current) => ({ ...current, tagline }));
+                          }} className="w-full border border-gray-200 px-4 py-3 text-sm outline-none focus:border-[#4B0082] dark:border-gray-600 dark:bg-gray-700 dark:text-white" />
+                        </label>
+                        <label className="space-y-2 md:col-span-2">
+                          <span className="text-[10px] font-black uppercase tracking-widest text-gray-500 dark:text-gray-400">Website description</span>
+                          <textarea rows={3} maxLength={4000} value={institutionProfile.website_config.description} onChange={(event) => {
+                            const description = event.target.value;
+                            setInstitutionProfile({ ...institutionProfile, website_config: { ...institutionProfile.website_config, description } });
+                            setWebsiteOverrideDraft((current) => ({ ...current, description }));
+                          }} className="w-full border border-gray-200 px-4 py-3 text-sm outline-none focus:border-[#4B0082] dark:border-gray-600 dark:bg-gray-700 dark:text-white" />
+                        </label>
+                        {(["primaryColor", "secondaryColor", "accentColor"] as const).map((field) => (
+                          <label key={field} className="space-y-2">
+                            <span className="text-[10px] font-black uppercase tracking-widest text-gray-500 dark:text-gray-400">{field.replace("Color", " color")}</span>
+                            <div className="flex gap-3">
+                              <input type="color" value={institutionProfile.website_config.branding[field]} onChange={(event) => {
+                                const value = event.target.value;
+                                setInstitutionProfile({ ...institutionProfile, website_config: { ...institutionProfile.website_config, branding: { ...institutionProfile.website_config.branding, [field]: value } } });
+                                setWebsiteOverrideDraft((current) => ({ ...current, branding: { ...current.branding, [field]: value } }));
+                              }} className="h-11 w-14 border border-gray-200 bg-white p-1 dark:border-gray-600 dark:bg-gray-700" />
+                              <input maxLength={7} pattern="^#[0-9a-fA-F]{6}$" value={institutionProfile.website_config.branding[field]} onChange={(event) => {
+                                const value = event.target.value;
+                                setInstitutionProfile({ ...institutionProfile, website_config: { ...institutionProfile.website_config, branding: { ...institutionProfile.website_config.branding, [field]: value } } });
+                                setWebsiteOverrideDraft((current) => ({ ...current, branding: { ...current.branding, [field]: value } }));
+                              }} className="min-w-0 flex-1 border border-gray-200 px-4 py-3 text-sm uppercase outline-none focus:border-[#4B0082] dark:border-gray-600 dark:bg-gray-700 dark:text-white" />
+                            </div>
+                          </label>
+                        ))}
+                        <label className="space-y-2 md:col-span-2">
+                          <span className="text-[10px] font-black uppercase tracking-widest text-gray-500 dark:text-gray-400">Logo URL</span>
+                          <input type="url" maxLength={2048} value={institutionProfile.website_config.branding.logoUrl} onChange={(event) => {
+                            const logoUrl = event.target.value;
+                            setInstitutionProfile({ ...institutionProfile, website_config: { ...institutionProfile.website_config, branding: { ...institutionProfile.website_config.branding, logoUrl } } });
+                            setWebsiteOverrideDraft((current) => ({ ...current, branding: { ...current.branding, logoUrl } }));
+                          }} className="w-full border border-gray-200 px-4 py-3 text-sm outline-none focus:border-[#4B0082] dark:border-gray-600 dark:bg-gray-700 dark:text-white" />
+                        </label>
+                      </div>
                     </div>
                     <button type="button" onClick={() => void saveInstitutionProfile()} disabled={institutionSaving}
                       className="inline-flex items-center gap-2 bg-[#4B0082] px-6 py-3 text-xs font-black uppercase tracking-widest text-white disabled:opacity-60">

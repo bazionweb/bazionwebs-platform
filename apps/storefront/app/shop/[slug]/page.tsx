@@ -5,6 +5,8 @@ import { notFound } from "next/navigation";
 import { fetchTenantPublicData } from "../../../lib/server-tenant-api";
 import { ProductPurchaseButton } from "../product-purchase-button";
 import "../shop.css";
+import { SmeWebsiteShell, isSmeWebsitePageEnabled } from "@bazion/sme-website-template";
+import { getPublicTenantWebsiteConfig } from "../../../lib/server-website-config";
 
 type Currency = "KES" | "USD" | "EUR" | "GBP" | "CAD" | "AUD" | "NZD" | "CHF" | "SGD" | "ZAR" | "NGN" | "GHS" | "INR" | "AED" | "BRL" | "MXN" | "SAR" | "CNY" | "HKD" | "SEK" | "NOK" | "DKK" | "PLN" | "THB" | "PHP";
 type Product = {
@@ -22,17 +24,19 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 }
 
 export default async function ProductPage({ params }: { params: Promise<{ slug: string }> }) {
-  const [{ slug }, storeResponse, productResponse] = await Promise.all([
+  const [{ slug }, storeResponse, productResponse, website] = await Promise.all([
     params,
     fetchTenantPublicData<{ store: Store; paymentProvider: "mpesa" | "mock" }>("/v1/storefront"),
     params.then(({ slug }) => fetchTenantPublicData<{ product: Product }>(`/v1/products/${encodeURIComponent(slug)}`)),
+    getPublicTenantWebsiteConfig(),
   ]);
+  if (website?.packageId === "ecommerce" && !isSmeWebsitePageEnabled(website.smeConfig, "shop")) notFound();
   if (!productResponse?.product || !storeResponse?.store) notFound();
   const product = productResponse.product;
   const store = storeResponse.store;
   const paymentUnavailable = storeResponse.paymentProvider === "mpesa" && product.currency !== "KES";
   const formattedPrice = new Intl.NumberFormat(store.locale, { style: "currency", currency: product.currency }).format(product.priceMinor / 100);
-  return <main className="store-shell">
+  const productPage = <main className="store-shell">
     <header className="store-nav"><a className="store-brand" href="/"><span className="store-mark" aria-hidden="true">✳</span><span>{store.storeName}</span></a><nav aria-label="Store navigation"><Link href="/shop">All products</Link><a href="/shop#basket">Your basket</a></nav></header>
     <nav className="product-breadcrumb" aria-label="Breadcrumb"><Link href="/shop">Shop</Link><span aria-hidden="true">/</span><span>{product.category}</span><span aria-hidden="true">/</span><span>{product.name}</span></nav>
     <section className="product-detail-grid">
@@ -41,4 +45,7 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
     </section>
     <footer className="store-footer"><a className="store-brand" href="/"><span className="store-mark" aria-hidden="true">✳</span><span>{store.storeName}</span></a>{store.supportEmail && <a className="store-support-link" href={`mailto:${store.supportEmail}`}>Questions? Email us</a>}<span>© {new Date().getFullYear()} {store.storeName}</span></footer>
   </main>;
+  return website?.packageId === "ecommerce"
+    ? <SmeWebsiteShell config={website.smeConfig} currentPath="/shop">{productPage}</SmeWebsiteShell>
+    : productPage;
 }

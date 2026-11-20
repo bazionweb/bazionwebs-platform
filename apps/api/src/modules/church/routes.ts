@@ -34,7 +34,17 @@ import {
 } from "@bazion/database";
 import { registerChurchOperationsRoutes } from "./operations-routes.js";
 import { registerChurchSiteSettingsVersionsRoutes } from "./site-settings-routes.js";
-import { resolveEffectiveChurchSiteSettings, type ResolveChurchSiteOptions } from "@bazion/church-ministry-template";
+import {
+  createChurchSiteSettingsOverlay,
+  resolveEffectiveChurchSiteSettings,
+  type ResolveChurchSiteOptions,
+} from "@bazion/church-ministry-template";
+import {
+  isTenantTemplateOverlay,
+  migrateLegacyWhiteLabelPackageConfig,
+  platformWhiteLabelPackageCatalog,
+  resolveWhiteLabelPackageOverlay,
+} from "@bazion/website-contracts";
 import { requireActiveTenantPermission } from "@bazion/auth";
 import type { AppConfig } from "../../config.js";
 import { withTenantTransaction, type TenantTransaction } from "../../lib/database.js";
@@ -118,7 +128,7 @@ export async function churchRoutes(app: FastifyInstance, options: RouteOptions) 
 
   const ministrySiteSettingsRepository = {
     load: (tenantId: string) => withTenantTransaction(tenantId, async (tx) => {
-      const [tenant] = await tx.select({ name: tenants.name }).from(tenants).where(eq(tenants.id, tenantId)).limit(1);
+      const [tenant] = await tx.select({ slug: tenants.slug, name: tenants.name }).from(tenants).where(eq(tenants.id, tenantId)).limit(1);
       const [profile] = await tx.select().from(ministryProfiles).where(eq(ministryProfiles.tenantId, tenantId)).limit(1);
       const leaders = await tx.select().from(leadershipProfiles)
         .where(and(eq(leadershipProfiles.tenantId, tenantId), eq(leadershipProfiles.status, "active")))
@@ -126,6 +136,7 @@ export async function churchRoutes(app: FastifyInstance, options: RouteOptions) 
       const [storedSettings] = await tx.select({ settingValue: ministrySettings.settingValue }).from(ministrySettings)
         .where(and(eq(ministrySettings.tenantId, tenantId), eq(ministrySettings.settingKey, "public_site"))).limit(1);
       return {
+        tenantSlug: tenant?.slug ?? null,
         tenantName: tenant?.name ?? null,
         profile: profile ?? null,
         storedSettings: storedSettings?.settingValue ?? null,
@@ -165,7 +176,12 @@ export async function churchRoutes(app: FastifyInstance, options: RouteOptions) 
           },
         });
 
-        const settingValue = JSON.stringify(settings);
+        const [tenant] = await tx.select({ slug: tenants.slug }).from(tenants).where(eq(tenants.id, tenantId)).limit(1);
+        const settingValue = JSON.stringify(createChurchSiteSettingsOverlay({
+          tenantSlug: tenant?.slug ?? "tenant",
+          ministryName: profile.ministryName,
+          settings,
+        }));
         await tx.insert(ministrySettings).values({ tenantId, settingKey: "public_site", settingValue, updatedAt })
           .onConflictDoUpdate({
             target: [ministrySettings.tenantId, ministrySettings.settingKey],
@@ -181,6 +197,87 @@ export async function churchRoutes(app: FastifyInstance, options: RouteOptions) 
   // ─────────────────────────────────────────────────────────────────────────────
   // PUBLIC CHURCH ROUTES
   // ─────────────────────────────────────────────────────────────────────────────
+
+  // Public, tenant-routed effective white-label package configuration.
+  app.get("/public/website/config", async (request, reply) => {
+    const tenantId = await tenantForRequest(request);
+    const source = await withTenantTransaction(tenantId, async (tx) => {
+      const [tenant] = await tx.select({ slug: tenants.slug }).from(tenants)
+        .where(eq(tenants.id, tenantId)).limit(1);
+      const [row] = await tx
+        .select({ settingValue: ministrySettings.settingValue })
+        .from(ministrySettings)
+        .where(and(
+          eq(ministrySettings.tenantId, tenantId),
+          eq(ministrySettings.settingKey, "package_whitelabel_config"),
+        ))
+        .limit(1);
+      return { tenantSlug: tenant?.slug ?? null, settingValue: row?.settingValue ?? null };
+    });
+
+    if (!source.settingValue) return reply.code(404).header("Cache-Control", "no-store").send({ error: "WEBSITE_CONFIG_NOT_FOUND" });
+
+    let stored: unknown;
+    try {
+      stored = JSON.parse(source.settingValue) as unknown;
+    } catch {
+      return reply.code(503).header("Cache-Control", "no-store").send({ error: "WEBSITE_CONFIG_INVALID" });
+    }
+
+    const migratedOverlay = source.tenantSlug
+      ? migrateLegacyWhiteLabelPackageConfig(stored, source.tenantSlug)
+      : null;
+    if (migratedOverlay) {
+      const migratedValue = JSON.stringify(migratedOverlay);
+      await withTenantTransaction(tenantId, async (tx) => tx.update(ministrySettings)
+        .set({ settingValue: migratedValue, updatedAt: new Date() })
+        .where(and(
+          eq(ministrySettings.tenantId, tenantId),
+          eq(ministrySettings.settingKey, "package_whitelabel_config"),
+          eq(ministrySettings.settingValue, source.settingValue!),
+        )));
+      stored = migratedOverlay;
+    }
+
+    const configuration = source.tenantSlug
+      ? resolveWhiteLabelPackageOverlay(stored, source.tenantSlug)
+      : null;
+    if (!configuration || typeof configuration !== "object" || Array.isArray(configuration)) {
+      return reply.code(503).header("Cache-Control", "no-store").send({ error: "WEBSITE_CONFIG_INVALID" });
+    }
+
+    const overlay = isTenantTemplateOverlay(stored) ? stored : null;
+    const configurationRecord = configuration as Record<string, unknown>;
+    const resolvedPackageId = overlay?.packageId ?? configurationRecord.packageId;
+    const resolvedTemplateId = overlay?.templateId ?? configurationRecord.templateId;
+    const resolvedTemplateVersion = configurationRecord.templateVersion;
+    const legacyStored = objectValue(stored);
+    const legacyPackageSettings = objectValue(legacyStored?.packageSettings) ?? legacyStored;
+    const legacyPinned = legacyStored?.updateMode === "pinned"
+      || legacyPackageSettings?.updateMode === "pinned"
+      || typeof legacyStored?.repoUrl === "string"
+      || typeof legacyStored?.sourceRepoUrl === "string"
+      || typeof legacyPackageSettings?.repoUrl === "string"
+      || typeof legacyPackageSettings?.sourceRepoUrl === "string";
+    const packageDescriptor = typeof resolvedPackageId === "string"
+      ? platformWhiteLabelPackageCatalog.find((item) => item.packageId === resolvedPackageId)
+      : undefined;
+    const currentTemplate = packageDescriptor && typeof resolvedTemplateId === "string"
+      ? packageDescriptor.templates.find((templateDescriptor) => templateDescriptor.id === resolvedTemplateId)
+      : undefined;
+    return reply
+      .header("Cache-Control", "no-store")
+      .send({
+        configuration,
+        template: currentTemplate ? {
+          id: currentTemplate.id,
+          configuredVersion: overlay?.templateVersion
+            ?? (typeof resolvedTemplateVersion === "string" ? resolvedTemplateVersion : currentTemplate.version),
+          currentVersion: currentTemplate.version,
+          updateMode: overlay?.updateMode ?? (legacyPinned ? "pinned" : "automatic"),
+        } : null,
+      });
+  });
 
   // Local development media is served through the same tenant host and public API rewrite.
   // In production, image URLs point to the configured public storage/CDN domain.
@@ -227,12 +324,59 @@ export async function churchRoutes(app: FastifyInstance, options: RouteOptions) 
         .from(ministrySettings)
         .where(and(eq(ministrySettings.tenantId, tenantId), eq(ministrySettings.settingKey, "public_site")))
         .limit(1);
-      const siteSettings = storedSiteSettings?.settingValue
-        ? parseStoredSiteSettings(storedSiteSettings.settingValue, {
-            tenantSlug: tenant?.slug,
-            tenantName: tenant?.name,
-          })
-        : null;
+      let siteSettings: ReturnType<typeof parseStoredSiteSettings> | null = null;
+      if (storedSiteSettings?.settingValue) {
+        const resolveOptions = {
+          tenantSlug: tenant?.slug,
+          tenantName: profile?.ministryName ?? tenant?.name,
+        };
+        let legacySettings: unknown = null;
+        try {
+          legacySettings = JSON.parse(storedSiteSettings.settingValue) as unknown;
+        } catch {
+          // Keep the existing resolver's safe template fallback for invalid legacy JSON.
+        }
+
+        const parsedLegacySettings = !isTenantTemplateOverlay(legacySettings)
+          && objectValue(legacySettings)?.updateMode !== "pinned"
+          ? churchPublicSiteSettingsSchema.safeParse(legacySettings)
+          : null;
+        let settingsToNormalize: ReturnType<typeof parseStoredSiteSettings> | null = null;
+        let updateMode: "automatic" | "pinned" = "automatic";
+        if (parsedLegacySettings?.success) {
+          settingsToNormalize = resolveEffectiveChurchSiteSettings(parsedLegacySettings.data, resolveOptions);
+        } else if (isTenantTemplateOverlay(legacySettings)
+          && legacySettings.packageId === "church-ministry"
+          && !legacySettings.context
+          && tenant?.slug) {
+          const resolvedOverlay = resolveEffectiveChurchSiteSettings(legacySettings, resolveOptions);
+          if (resolvedOverlay.schemaVersion === legacySettings.configurationSchemaVersion) {
+            settingsToNormalize = resolvedOverlay;
+            updateMode = legacySettings.updateMode;
+          }
+        }
+
+        if (settingsToNormalize && tenant?.slug) {
+          const migratedOverlay = createChurchSiteSettingsOverlay({
+            tenantSlug: tenant.slug,
+            ministryName: profile?.ministryName ?? tenant.name,
+            settings: settingsToNormalize,
+            updateMode,
+          });
+          const migratedValue = JSON.stringify(migratedOverlay);
+          // Compare-and-swap prevents a public read from overwriting an admin edit made concurrently.
+          await tx.update(ministrySettings)
+            .set({ settingValue: migratedValue, updatedAt: new Date() })
+            .where(and(
+              eq(ministrySettings.tenantId, tenantId),
+              eq(ministrySettings.settingKey, "public_site"),
+              eq(ministrySettings.settingValue, storedSiteSettings.settingValue),
+            ));
+          siteSettings = resolveEffectiveChurchSiteSettings(migratedOverlay, resolveOptions);
+        } else {
+          siteSettings = parseStoredSiteSettings(storedSiteSettings.settingValue, resolveOptions);
+        }
+      }
 
       return reply.send({
         tenant: tenant ?? null,
@@ -1032,13 +1176,15 @@ export async function churchRoutes(app: FastifyInstance, options: RouteOptions) 
   app.get("/admin/church/site-settings", async (request, reply) => {
     const context = await requireActiveTenantPermission(request.raw.headers, { store: ["read"] });
     await assertChurchEnabled(context.tenantId);
-    const result = await getMinistrySiteSettings(ministrySiteSettingsRepository, context.tenantId);
-    return reply.send({
-      ...result,
-      settings: resolveEffectiveChurchSiteSettings(result.settings, {
-        tenantName: result.profile.ministryName,
+    const result = await getMinistrySiteSettings(
+      ministrySiteSettingsRepository,
+      context.tenantId,
+      (snapshot) => resolveEffectiveChurchSiteSettings(snapshot.storedSettings, {
+        tenantSlug: snapshot.tenantSlug,
+        tenantName: snapshot.profile?.ministryName ?? snapshot.tenantName,
       }),
-    });
+    );
+    return reply.send(result);
   });
 
   // PUT /v1/admin/church/site-settings

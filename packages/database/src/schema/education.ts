@@ -7,6 +7,10 @@ export const educationInstitutions = pgTable("education_institutions", {
   admissionsEmail: varchar("admissions_email", { length: 254 }), registrarEmail: varchar("registrar_email", { length: 254 }),
   financeEmail: varchar("finance_email", { length: 254 }), adminEmail: varchar("admin_email", { length: 254 }),
   phones: jsonb("phones").$type<string[]>().notNull().default([]), address: text("address"), websiteUrl: varchar("website_url", { length: 2048 }),
+  websiteTemplateId: varchar("website_template_id", { length: 120 }).notNull().default("school-portal"),
+  websiteTemplateVersion: varchar("website_template_version", { length: 64 }).notNull().default("1.0.0"),
+  websiteConfigurationSchemaVersion: varchar("website_configuration_schema_version", { length: 64 }).notNull().default("1.0.0"),
+  websiteOverrides: jsonb("website_overrides").$type<Record<string, unknown>>().notNull().default({}),
   status: varchar("status", { length: 24 }).notNull().default("active"), createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [uniqueIndex("education_institutions_tenant_key_uq").on(t.tenantId, t.institutionKey), uniqueIndex("education_institutions_id_tenant_uq").on(t.id, t.tenantId), index("education_institutions_tenant_status_idx").on(t.tenantId, t.status)]);

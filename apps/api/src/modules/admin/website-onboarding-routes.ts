@@ -3,19 +3,22 @@ import { and, desc, eq, inArray, max } from "drizzle-orm";
 import { z } from "zod";
 import { PostgresAuditEventWriter } from "@bazion/audit";
 import { requirePlatformRole } from "@bazion/auth";
-import { getPlatformTenant, updatePlatformTenantModuleEntitlement } from "@bazion/auth/server";
+import { getPlatformTenant, updatePlatformTenantModuleEntitlements } from "@bazion/auth/server";
 import {
   churchTemplateCatalog,
   createWhiteLabeledChurchConfig,
+  createChurchSiteSettingsOverlay,
   extractWhiteLabelTemplateFromRepoSource,
   type ChurchTheme,
 } from "@bazion/church-ministry-template";
 import { smeWebsiteTemplateConfigSchema } from "@bazion/sme-website-template";
 import {
+  buildWhiteLabelPackageOverlay,
   createWhiteLabeledPackageConfig,
   extractWhiteLabelFromRepoSource,
   generateByowDokployCompose,
   platformWhiteLabelPackageCatalog,
+  resolveWhiteLabelPackageOverlay,
   universalThemePalettes,
   type WhiteLabelPackageId,
   type WhiteLabelPaletteId,
@@ -266,16 +269,12 @@ function buildOptionalSocial(social: z.infer<typeof brandSocialSchema>) {
 }
 
 async function enablePackageModules(tenantId: string, modules: readonly string[], actorUserId: string) {
-  await Promise.all(
-    modules.map((moduleId) =>
-      updatePlatformTenantModuleEntitlement({
-        tenantId,
-        moduleId,
-        enabled: true,
-        actorUserId,
-      }).catch(() => undefined),
-    ),
-  );
+  await updatePlatformTenantModuleEntitlements({
+    tenantId,
+    moduleIds: modules,
+    enabled: true,
+    actorUserId,
+  });
 }
 
 async function persistPackageSettingKey(
@@ -305,12 +304,21 @@ async function persistPackageSettingKey(
 
 async function persistChurchSiteSettings(params: {
   tenantId: string;
+  tenantSlug: string;
   actorEmail: string;
   note: string;
   siteSettingsInput: ReturnType<typeof createWhiteLabeledChurchConfig>["siteSettingsInput"];
   packageSettings: unknown;
+  updateMode?: "automatic" | "pinned";
 }): Promise<number> {
   const { profile, settings } = params.siteSettingsInput;
+  const settingsOverlay = createChurchSiteSettingsOverlay({
+    tenantSlug: params.tenantSlug,
+    ministryName: profile.ministryName,
+    settings,
+    ...(params.updateMode ? { updateMode: params.updateMode } : {}),
+  });
+  const settingsValue = JSON.stringify(settingsOverlay);
   const now = new Date();
 
   return withTenantTransaction(params.tenantId, async (tx) => {
@@ -334,7 +342,7 @@ async function persistChurchSiteSettings(params: {
     await tx.insert(ministrySiteSettingsVersions).values({
       tenantId: params.tenantId,
       versionNumber: nextVersion,
-      settings,
+      settings: settingsOverlay,
       profile,
       status: "published",
       publishedAt: now,
@@ -376,7 +384,7 @@ async function persistChurchSiteSettings(params: {
       });
 
     for (const [settingKey, settingValue] of [
-      ["public_site", JSON.stringify(settings)],
+      ["public_site", settingsValue],
       ["package_whitelabel_config", JSON.stringify(params.packageSettings)],
     ] as const) {
       await tx
@@ -490,7 +498,7 @@ export async function websiteOnboardingRoutes(app: FastifyInstance): Promise<voi
         palettes: universalThemePalettes,
         templates: churchTemplateCatalog,
         currentProfile: snapshot.profileRow ?? null,
-        activePackageConfig: parseJsonSafe(packageRow?.settingValue),
+        activePackageConfig: resolveWhiteLabelPackageOverlay(parseJsonSafe(packageRow?.settingValue)),
         hasStoredSiteSettings: snapshot.settingsRows.some(
           (r) => r.settingKey === "public_site" && Boolean(r.settingValue),
         ),
@@ -559,6 +567,10 @@ export async function websiteOnboardingRoutes(app: FastifyInstance): Promise<voi
         ...(normalizedOfferings ? { offerings: normalizedOfferings } : {}),
         includeStarterContent: body.includeStarterContent,
       });
+      const packageOverlay = buildWhiteLabelPackageOverlay(universal, {
+        tenantSlug: tenant.slug,
+        brandName,
+      });
 
       await enablePackageModules(tenantId, universal.assignableModules, operator.userId);
 
@@ -590,19 +602,18 @@ export async function websiteOnboardingRoutes(app: FastifyInstance): Promise<voi
         churchConfig = generatedChurch.config;
         versionNumber = await persistChurchSiteSettings({
           tenantId,
+          tenantSlug: tenant.slug,
           actorEmail: operator.userId,
           note: `Applied white-label package ${universal.packageDescriptor.packageId} (${universal.template.id})`,
           siteSettingsInput: generatedChurch.siteSettingsInput,
-          packageSettings: universal.packageSettings,
+          packageSettings: packageOverlay,
         });
       } else {
         if (universal.packageDescriptor.packageId === "sme-website") {
           smeWebsiteTemplateConfigSchema.parse(universal.smeConfig);
         }
         await persistPackageSettingKey(tenantId, "package_whitelabel_config", {
-          ...universal.packageSettings,
-          smeConfig: universal.smeConfig,
-          website: universal.website,
+          ...packageOverlay,
         });
       }
 
@@ -620,6 +631,7 @@ export async function websiteOnboardingRoutes(app: FastifyInstance): Promise<voi
           metadata: {
             packageId: universal.packageDescriptor.packageId,
             templateId: universal.template.id,
+            templateVersion: universal.template.version,
             paletteId: universal.palette.id,
             ...(versionNumber !== null ? { versionNumber } : {}),
           },
@@ -724,6 +736,11 @@ export async function websiteOnboardingRoutes(app: FastifyInstance): Promise<voi
       });
 
       const resolvedPackageId = universalExtract.inferredPackageId;
+      const importedPackageOverlay = buildWhiteLabelPackageOverlay(
+        universalExtract.generated,
+        { tenantSlug: tenant.slug, brandName: targetName },
+        "pinned",
+      );
       const byowCompose = generateByowDokployCompose({
         tenantId,
         tenantSlug: tenant.slug,
@@ -775,16 +792,16 @@ export async function websiteOnboardingRoutes(app: FastifyInstance): Promise<voi
           if (resolvedPackageId === "church-ministry" && churchSiteSettingsInput) {
             versionNumber = await persistChurchSiteSettings({
               tenantId,
+              tenantSlug: tenant.slug,
               actorEmail: operator.userId,
               note: `White-labeled repository import (${body.repoUrl})`,
               siteSettingsInput: churchSiteSettingsInput,
-              packageSettings: universalExtract.generated.packageSettings,
+              packageSettings: importedPackageOverlay,
+              updateMode: "pinned",
             });
           } else {
             await persistPackageSettingKey(tenantId, "package_whitelabel_config", {
-              ...universalExtract.generated.packageSettings,
-              smeConfig: universalExtract.generated.smeConfig,
-              website: universalExtract.generated.website,
+              ...importedPackageOverlay,
             });
           }
         } else {
@@ -806,6 +823,8 @@ export async function websiteOnboardingRoutes(app: FastifyInstance): Promise<voi
           metadata: {
             packageId: resolvedPackageId,
             mode: body.mode,
+            templateId: universalExtract.generated.template.id,
+            templateVersion: universalExtract.generated.template.version,
             framework: universalExtract.detectedFramework,
             appliedToTenant: body.applyToTenant,
             variableCount: universalExtract.whiteLabelVariables.length,

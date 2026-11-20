@@ -176,6 +176,12 @@ describe("Church & Ministry Module Routes", () => {
             builder.orderBy = vi.fn(async () => rows);
             return builder;
           }),
+        update: vi.fn(() => {
+          const builder: any = {};
+          builder.set = vi.fn(() => builder);
+          builder.where = vi.fn(async () => []);
+          return builder;
+        }),
         };
         return cb(tx);
       });
@@ -521,6 +527,13 @@ describe("Church & Ministry Module Routes", () => {
       const writes: Array<Record<string, unknown>> = [];
       mocks.withTenantTransaction.mockImplementation(async (_id: string, cb: any) => {
         const tx = {
+          select: vi.fn(() => {
+            const builder: any = {};
+            builder.from = vi.fn(() => builder);
+            builder.where = vi.fn(() => builder);
+            builder.limit = vi.fn(async () => [{ slug: "harbour-church" }]);
+            return builder;
+          }),
           insert: vi.fn(() => {
             const builder: any = {};
             builder.values = vi.fn((values: Record<string, unknown>) => { writes.push(values); return builder; });
@@ -545,7 +558,10 @@ describe("Church & Ministry Module Routes", () => {
       expect(response.statusCode).toBe(200);
       expect(writes).toHaveLength(2);
       expect(writes[0]?.logoAssetUrl).toBe("/images/logo.svg");
-      expect(JSON.parse(String(writes[1]?.settingValue)).hero.title).toBe("Come as you are");
+      const savedOverlay = JSON.parse(String(writes[1]?.settingValue));
+      expect(savedOverlay.formatVersion).toBe(1);
+      expect(savedOverlay.context.tenantSlug).toBe("harbour-church");
+      expect(savedOverlay.overrides.hero.title).toBe("Come as you are");
       expect(mocks.withTenantTransaction).toHaveBeenCalledTimes(1);
     });
 

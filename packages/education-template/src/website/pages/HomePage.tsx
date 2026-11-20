@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import Link from "next/link";
 import { PROGRAMS as FALLBACK_PROGRAMS, API_WORKER_URL } from "../lib/contracts-bridge";
+import { useEducationTenant } from "../context/EducationTenantContext";
 
 const slides = [
   { bg: "/images/home-hero/home-hero-1-graduation.jpg", tagline: "Empowering Christ-Centered Scholars & Global Leaders" },
@@ -12,6 +13,7 @@ const slides = [
 ];
 
 export default function HomePage() {
+  const tenantConfig = useEducationTenant();
   const [current, setCurrent] = useState(0);
   const [activeTab, setActiveTab] = useState("bachelors");
   const [verifyCode, setVerifyCode] = useState("");
@@ -226,7 +228,7 @@ export default function HomePage() {
               backdropFilter: "blur(12px)",
               boxShadow: "0 4px 20px rgba(0,0,0,0.3)",
             }}>
-              <span>✦</span> {slides[current].tagline}
+              <span>✦</span> {tenantConfig.tagline || slides[current].tagline}
             </span>
           </div>
 

@@ -4,6 +4,7 @@ import { isTenantWebsitePageEnabled } from "../../lib/server-site-pages";
 import { resolveEducationTenant } from "../../lib/education-tenant";
 import { EducationShell } from "../../components/education/education-shell";
 import { BmiTermsPage } from "@bazion/education-template";
+import { renderConfiguredTemplatePage } from "../../lib/configured-template-page";
 
 export default async function TermsPageRoute() {
   const education = await resolveEducationTenant();
@@ -14,6 +15,8 @@ export default async function TermsPageRoute() {
       </EducationShell>
     );
   }
+  const configuredPage = await renderConfiguredTemplatePage("/terms");
+  if (configuredPage) return configuredPage;
   if (!await isTenantWebsitePageEnabled("terms")) notFound();
   return <TermsPageContent />;
 }

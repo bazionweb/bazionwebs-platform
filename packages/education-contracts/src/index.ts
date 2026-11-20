@@ -120,13 +120,19 @@ export type { DegreeLevel, LevelPricingConfig } from './finance.js';
 // White-label tenant configuration helpers
 export {
   EDUCATION_CONFIGURATION_VERSION,
+  SCHOOL_PORTAL_TEMPLATE_VERSION,
   schoolPortalConfigSchema,
   schoolEducationConfigInputSchema,
+  educationInstitutionWebsiteOverridesSchema,
   bmiUniversityTenantConfig,
   bemiTrainingInstituteTenantConfig,
   createWhiteLabeledEducationConfig,
+  resolveEducationInstitutionWebsiteConfig,
+  createEducationInstitutionWebsiteOverlay,
 } from './whitelabel.js';
 export type {
   SchoolPortalConfig,
   CreateWhiteLabeledEducationInput,
+  EducationInstitutionKey,
+  EducationInstitutionWebsiteProfile,
 } from './whitelabel.js';

@@ -394,6 +394,9 @@ importers:
       '@bazion/education-ums':
         specifier: workspace:*
         version: link:../../packages/education-ums
+      '@bazion/sme-website-template':
+        specifier: workspace:*
+        version: link:../../packages/sme-website-template
       '@bazion/ui':
         specifier: workspace:*
         version: link:../../packages/ui

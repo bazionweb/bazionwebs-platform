@@ -131,6 +131,7 @@ export interface PackageTemplateOffering {
 
 export interface PackageTemplateDescriptor {
   id: string;
+  version: string;
   name: string;
   tagline: string;
   defaultPalette: WhiteLabelPaletteId;
@@ -174,6 +175,7 @@ export const platformWhiteLabelPackageCatalog: readonly WhiteLabelPackageDescrip
     templates: [
       {
         id: "sme-corporate-authority",
+        version: "1.0.0",
         name: "Corporate & Authority Showcase",
         tagline: "Clean executive hero, company credentials, services grid & quote enquiry form",
         defaultPalette: "corporate-slate",
@@ -193,6 +195,7 @@ export const platformWhiteLabelPackageCatalog: readonly WhiteLabelPackageDescrip
       },
       {
         id: "sme-local-services",
+        version: "1.0.0",
         name: "Local Service Business & Trades",
         tagline: "High-converting local trust layout with WhatsApp click-to-chat, service areas & FAQs",
         defaultPalette: "emerald-growth",
@@ -225,6 +228,7 @@ export const platformWhiteLabelPackageCatalog: readonly WhiteLabelPackageDescrip
     templates: [
       {
         id: "ecommerce-modern-retail",
+        version: "1.0.0",
         name: "Modern Online Storefront",
         tagline: "Featured collections, fast search, product detail cards & seamless M-Pesa checkout",
         defaultPalette: "emerald-growth",
@@ -246,6 +250,7 @@ export const platformWhiteLabelPackageCatalog: readonly WhiteLabelPackageDescrip
       },
       {
         id: "ecommerce-d2c-flagship",
+        version: "1.0.0",
         name: "D2C Brand & Catalogue Flagship",
         tagline: "Editorial product storytelling, customer reviews & multi-currency support",
         defaultPalette: "sanctuary-charcoal",
@@ -277,6 +282,7 @@ export const platformWhiteLabelPackageCatalog: readonly WhiteLabelPackageDescrip
     templates: [
       {
         id: "pro-advisory-practice",
+        version: "1.0.0",
         name: "Advisory & Legal Practice",
         tagline: "Partner bios, practice areas, client intake & consultation scheduler",
         defaultPalette: "royal-navy",
@@ -296,6 +302,7 @@ export const platformWhiteLabelPackageCatalog: readonly WhiteLabelPackageDescrip
       },
       {
         id: "pro-studio-booking",
+        version: "1.0.0",
         name: "Studio & Appointment Service",
         tagline: "Service menu, portfolio gallery & online slot reservation",
         defaultPalette: "corporate-slate",
@@ -327,6 +334,7 @@ export const platformWhiteLabelPackageCatalog: readonly WhiteLabelPackageDescrip
     templates: [
       {
         id: "clinic-medical-center",
+        version: "1.0.0",
         name: "Outpatient Clinic & Medical Center",
         tagline: "Clinical departments, doctor profiles, insurance partners & triage contact",
         defaultPalette: "medical-teal",
@@ -357,6 +365,7 @@ export const platformWhiteLabelPackageCatalog: readonly WhiteLabelPackageDescrip
     templates: [
       {
         id: "school-academy-heritage",
+        version: "1.0.0",
         name: "Academy & Admissions Portal",
         tagline: "Curriculum overview, campus facilities, term events & admissions enquiry",
         defaultPalette: "royal-navy",
@@ -378,6 +387,7 @@ export const platformWhiteLabelPackageCatalog: readonly WhiteLabelPackageDescrip
       },
       {
         id: "oxford-imperial-university",
+        version: "1.0.0",
         name: "Higher Education & University Campus",
         tagline: "Faculty departments, research, international admissions & campus life",
         defaultPalette: "royal-navy",
@@ -415,6 +425,7 @@ export const platformWhiteLabelPackageCatalog: readonly WhiteLabelPackageDescrip
     templates: [
       {
         id: "ngo-impact-foundation",
+        version: "1.0.0",
         name: "Community Impact & Donor Portal",
         tagline: "Program stories, field outreach updates, transparency report & partner support",
         defaultPalette: "living-waters",
@@ -444,6 +455,7 @@ export const platformWhiteLabelPackageCatalog: readonly WhiteLabelPackageDescrip
     templates: [
       {
         id: "saas-product-launch",
+        version: "1.0.0",
         name: "SaaS Product & Demo Funnel",
         tagline: "Clear problem-solution hero, feature pillars, security trust bar & demo booking",
         defaultPalette: "corporate-slate",
@@ -476,6 +488,7 @@ export const platformWhiteLabelPackageCatalog: readonly WhiteLabelPackageDescrip
     templates: [
       {
         id: "enterprise-group-holding",
+        version: "1.0.0",
         name: "Multi-Division Group Holding",
         tagline: "Subsidiary divisions, governance statements, executive leadership & tender desk",
         defaultPalette: "sanctuary-charcoal",
@@ -505,6 +518,7 @@ export const platformWhiteLabelPackageCatalog: readonly WhiteLabelPackageDescrip
     templates: [
       {
         id: "gmfc-revival-signature",
+        version: "1.0.0",
         name: "GMFC Revival & Apostolic Signature",
         tagline: "Editorial portrait leadership cards, M-Pesa giving card, sermons & outreach hub",
         defaultPalette: "maroon-gold",
@@ -534,6 +548,7 @@ export const platformWhiteLabelPackageCatalog: readonly WhiteLabelPackageDescrip
       },
       {
         id: "church-ministry",
+        version: "1.0.0",
         name: "Modern Sanctuary & Community",
         tagline: "Warm emerald & bronze layout highlighting small groups and community care",
         defaultPalette: "forest-bronze",
@@ -556,6 +571,7 @@ export const platformWhiteLabelPackageCatalog: readonly WhiteLabelPackageDescrip
       },
       {
         id: "royal-cathedral",
+        version: "1.0.0",
         name: "Royal Cathedral & Heritage",
         tagline: "Dignified navy & amber aesthetic for regional assemblies and campuses",
         defaultPalette: "royal-navy",
@@ -578,6 +594,7 @@ export const platformWhiteLabelPackageCatalog: readonly WhiteLabelPackageDescrip
       },
       {
         id: "hkm-kingdom-cms",
+        version: "1.0.0",
         name: "HKM Kingdom CMS & Member Portal",
         tagline: "Dual Church Administration CMS and Self-Service Member Portal with PIN/Password authentication",
         defaultPalette: "forest-bronze",
@@ -783,6 +800,7 @@ export interface UniversalWhiteLabelOutput {
     schemaVersion: "1.0.0";
     packageId: WhiteLabelPackageId;
     templateId: string;
+    templateVersion: string;
     paletteId: WhiteLabelPaletteId;
     tenantSlug: string;
     organization: {
@@ -979,6 +997,7 @@ export function createWhiteLabeledPackageConfig(
       schemaVersion: "1.0.0",
       packageId: resolvedPackage.packageId,
       templateId: template.id,
+      templateVersion: template.version,
       paletteId: palette.id,
       tenantSlug,
       organization: {
@@ -1014,6 +1033,201 @@ export function createWhiteLabeledPackageConfig(
       offerings: rawOfferings,
     },
   };
+}
+
+function whiteLabelPackagePayload(output: UniversalWhiteLabelOutput) {
+  return {
+    ...output.packageSettings,
+    website: output.website,
+    smeConfig: output.smeConfig,
+  };
+}
+
+/** Stores only tenant-owned changes while retaining an immutable tenant snapshot for pinned sources. */
+export function buildWhiteLabelPackageOverlay(
+  output: UniversalWhiteLabelOutput,
+  context: { tenantSlug: string; brandName: string },
+  updateMode: "automatic" | "pinned" = "automatic",
+): TenantTemplateOverlay {
+  const baseOutput = createWhiteLabeledPackageConfig({
+    packageId: output.packageDescriptor.packageId,
+    templateId: output.template.id,
+    tenantSlug: context.tenantSlug,
+    brandName: context.brandName,
+  });
+  return buildTenantTemplateOverlay({
+    packageId: output.packageDescriptor.packageId,
+    templateId: output.template.id,
+    templateVersion: output.template.version,
+    configurationSchemaVersion: output.packageSettings.schemaVersion,
+    updateMode,
+    context,
+    base: whiteLabelPackagePayload(baseOutput),
+    effective: whiteLabelPackagePayload(output),
+  });
+}
+
+/** Converts pre-overlay generated package snapshots once, using the release's known template baseline. */
+export function migrateLegacyWhiteLabelPackageConfig(
+  stored: unknown,
+  expectedTenantSlug?: string,
+): TenantTemplateOverlay | null {
+  if (!isPlainRecord(stored) || isTenantTemplateOverlay(stored)) return null;
+
+  const packageSettings = isPlainRecord(stored.packageSettings) ? stored.packageSettings : stored;
+  if (stored.updateMode === "pinned"
+    || packageSettings.updateMode === "pinned"
+    || typeof stored.repoUrl === "string"
+    || typeof stored.sourceRepoUrl === "string"
+    || typeof packageSettings.repoUrl === "string"
+    || typeof packageSettings.sourceRepoUrl === "string"
+    || Object.hasOwn(stored, "byowCompose")
+    || Object.hasOwn(packageSettings, "byowCompose")) return null;
+
+  const packageDescriptor = isPlainRecord(stored.packageDescriptor) ? stored.packageDescriptor : null;
+  const templateDescriptor = isPlainRecord(stored.template) ? stored.template : null;
+  const business = isPlainRecord(stored.smeConfig) && isPlainRecord(stored.smeConfig.business)
+    ? stored.smeConfig.business
+    : null;
+  const organization = isPlainRecord(packageSettings.organization) ? packageSettings.organization : null;
+  const packageId = packageSettings.packageId
+    ?? packageDescriptor?.packageId
+    ?? stored.packageId;
+  const templateId = packageSettings.templateId
+    ?? templateDescriptor?.id
+    ?? stored.templateId;
+  const storedTenantSlug = packageSettings.tenantSlug
+    ?? stored.tenantSlug;
+  // Never normalize a configuration copied from a different tenant into this tenant's overlay.
+  if (expectedTenantSlug && typeof storedTenantSlug === "string" && storedTenantSlug !== expectedTenantSlug) {
+    return null;
+  }
+  const tenantSlug = expectedTenantSlug ?? storedTenantSlug;
+  const brandName = organization?.name
+    ?? business?.name
+    ?? stored.brandName;
+
+  if (typeof packageId !== "string" || typeof templateId !== "string"
+    || typeof tenantSlug !== "string" || typeof brandName !== "string") return null;
+
+  const descriptor = platformWhiteLabelPackageCatalog.find((item) => item.packageId === packageId);
+  const template = descriptor?.templates.find((item) => item.id === templateId);
+  if (!descriptor || !template) return null;
+
+  const base = createWhiteLabeledPackageConfig({
+    packageId: descriptor.packageId,
+    templateId: template.id,
+    tenantSlug,
+    brandName,
+  });
+  const allowedFields = [
+    "schemaVersion", "packageId", "templateId", "templateVersion", "paletteId", "tenantSlug",
+    "organization", "branding", "contact", "payment", "social", "offerings",
+  ] as const;
+  const legacyPayload: Record<string, unknown> = Object.create(null) as Record<string, unknown>;
+  for (const key of allowedFields) {
+    if (Object.hasOwn(packageSettings, key)) legacyPayload[key] = packageSettings[key];
+  }
+  const website = stored.website ?? packageSettings.website;
+  const smeConfig = stored.smeConfig ?? packageSettings.smeConfig;
+  if (website !== undefined) legacyPayload.website = website;
+  if (smeConfig !== undefined) legacyPayload.smeConfig = smeConfig;
+
+  const preserveLegacySnapshot = (templateValue: unknown, legacyValue: unknown): unknown => {
+    if (!isPlainRecord(templateValue) || !isPlainRecord(legacyValue)) {
+      return structuredCloneSafe(legacyValue);
+    }
+    const merged: Record<string, unknown> = Object.create(null) as Record<string, unknown>;
+    for (const key of Object.keys(templateValue)) {
+      if (unsafeMergeKeys.has(key)) continue;
+      merged[key] = Object.hasOwn(legacyValue, key)
+        ? preserveLegacySnapshot(templateValue[key], legacyValue[key])
+        : structuredCloneSafe(templateValue[key]);
+    }
+    for (const key of Object.keys(legacyValue)) {
+      if (!unsafeMergeKeys.has(key) && !Object.hasOwn(templateValue, key)) {
+        merged[key] = structuredCloneSafe(legacyValue[key]);
+      }
+    }
+    return merged;
+  };
+  const effective = preserveLegacySnapshot(whiteLabelPackagePayload(base), legacyPayload) as Record<string, unknown>;
+  const parsedWebsite = websiteConfigurationSchema.safeParse(effective.website);
+  if (!parsedWebsite.success || !isPlainRecord(effective.smeConfig)) return null;
+
+  return buildTenantTemplateOverlay({
+    packageId: descriptor.packageId,
+    templateId: template.id,
+    templateVersion: template.version,
+    configurationSchemaVersion: base.packageSettings.schemaVersion,
+    updateMode: "automatic",
+    context: { tenantSlug, brandName },
+    base: whiteLabelPackagePayload(base),
+    effective: { ...effective, website: parsedWebsite.data },
+  });
+}
+
+/** Rebuilds a current package template with the tenant's isolated overlay; legacy values remain readable. */
+export function resolveWhiteLabelPackageOverlay(stored: unknown, expectedTenantSlug?: string): unknown {
+  const overlay = isTenantTemplateOverlay(stored)
+    ? stored
+    : migrateLegacyWhiteLabelPackageConfig(stored, expectedTenantSlug);
+  if (!overlay) {
+    if (!expectedTenantSlug) return stored;
+    if (!isPlainRecord(stored)) return null;
+    const packageSettings = isPlainRecord(stored.packageSettings) ? stored.packageSettings : stored;
+    const storedTenantSlug = packageSettings.tenantSlug ?? stored.tenantSlug;
+    if (storedTenantSlug !== expectedTenantSlug) return null;
+    const packageDescriptor = isPlainRecord(stored.packageDescriptor) ? stored.packageDescriptor : null;
+    const templateDescriptor = isPlainRecord(stored.template) ? stored.template : null;
+    const packageId = packageSettings.packageId ?? packageDescriptor?.packageId ?? stored.packageId;
+    const templateId = packageSettings.templateId ?? templateDescriptor?.id ?? stored.templateId;
+    if (typeof packageId !== "string" || typeof templateId !== "string") return null;
+    const descriptor = platformWhiteLabelPackageCatalog.find((item) => item.packageId === packageId);
+    const template = descriptor?.templates.find((item) => item.id === templateId);
+    if (!descriptor || !template) return null;
+
+    // Keep external repo and importer metadata private; only return public template fields.
+    const publicSettings: Record<string, unknown> = Object.create(null) as Record<string, unknown>;
+    for (const key of [
+      "schemaVersion", "packageId", "templateId", "templateVersion", "paletteId", "tenantSlug",
+      "organization", "branding", "contact", "payment", "social", "offerings",
+    ]) {
+      if (Object.hasOwn(packageSettings, key)) publicSettings[key] = packageSettings[key];
+    }
+    const legacyWebsite = stored.website ?? packageSettings.website;
+    const legacySmeConfig = stored.smeConfig ?? packageSettings.smeConfig;
+    const website = websiteConfigurationSchema.safeParse(legacyWebsite);
+    if (!website.success || !isPlainRecord(legacySmeConfig)) return null;
+    return {
+      ...publicSettings,
+      packageId: descriptor.packageId,
+      templateId: template.id,
+      templateVersion: packageSettings.templateVersion ?? templateDescriptor?.version ?? template.version,
+      website: website.data,
+      smeConfig: legacySmeConfig,
+    };
+  }
+  if (expectedTenantSlug && overlay.context?.tenantSlug !== expectedTenantSlug) return null;
+  const packageId = overlay.packageId as WhiteLabelPackageId | undefined;
+  const templateId = overlay.templateId;
+  const context = overlay.context;
+  const packageDescriptor = platformWhiteLabelPackageCatalog.find((item) => item.packageId === packageId);
+  if (!packageDescriptor || !context) return null;
+  const template = packageDescriptor.templates.find((item) => item.id === templateId);
+  if (!template) return null;
+
+  const base = createWhiteLabeledPackageConfig({
+    packageId: packageDescriptor.packageId,
+    templateId: template.id,
+    tenantSlug: context.tenantSlug,
+    brandName: context.brandName,
+  });
+  if (overlay.configurationSchemaVersion !== base.packageSettings.schemaVersion) return null;
+  const effective = resolveTenantTemplateOverlay(whiteLabelPackagePayload(base), overlay);
+  const website = websiteConfigurationSchema.safeParse(effective.website);
+  if (!website.success) return null;
+  return { ...effective, website: website.data };
 }
 
 export interface UniversalRepoVariable {
@@ -1417,6 +1631,236 @@ function structuredCloneSafe<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
 }
 
+const unsafeMergeKeys = new Set(["__proto__", "prototype", "constructor"]);
+
+export interface TenantTemplateOverlay {
+  formatVersion: 1;
+  packageId?: string;
+  templateId: string;
+  templateVersion: string;
+  configurationSchemaVersion: string;
+  updateMode: "automatic" | "pinned";
+  context?: { tenantSlug: string; brandName: string };
+  overrides: unknown;
+  snapshot?: unknown;
+  removedItems: Array<{ path: string[]; ids: string[] }>;
+  removedFields: string[][];
+}
+
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const prototype = Object.getPrototypeOf(value);
+  return prototype === Object.prototype || prototype === null;
+}
+
+function isKeyedRecordArray(value: unknown): value is Array<Record<string, unknown> & { id: string }> {
+  return Array.isArray(value)
+    && value.length > 0
+    && value.every((item) => isPlainRecord(item) && typeof item.id === "string" && item.id.length > 0);
+}
+
+function valuesEqual(left: unknown, right: unknown): boolean {
+  if (Object.is(left, right)) return true;
+  if (Array.isArray(left) || Array.isArray(right)) {
+    return Array.isArray(left)
+      && Array.isArray(right)
+      && left.length === right.length
+      && left.every((item, index) => valuesEqual(item, right[index]));
+  }
+  if (isPlainRecord(left) || isPlainRecord(right)) {
+    if (!isPlainRecord(left) || !isPlainRecord(right)) return false;
+    const leftKeys = Object.keys(left).filter((key) => !unsafeMergeKeys.has(key)).sort();
+    const rightKeys = Object.keys(right).filter((key) => !unsafeMergeKeys.has(key)).sort();
+    return leftKeys.length === rightKeys.length
+      && leftKeys.every((key, index) => key === rightKeys[index] && valuesEqual(left[key], right[key]));
+  }
+  return false;
+}
+
+/**
+ * Produces a tenant-owned delta against a template snapshot. Keyed template items
+ * are stored as changed fields and custom items; removals are explicit tombstones.
+ */
+export function buildTenantTemplateOverlay(params: {
+  packageId?: string;
+  templateId: string;
+  templateVersion: string;
+  configurationSchemaVersion: string;
+  base: unknown;
+  effective: unknown;
+  updateMode?: "automatic" | "pinned";
+  context?: { tenantSlug: string; brandName: string };
+}): TenantTemplateOverlay {
+  const removedItems: TenantTemplateOverlay["removedItems"] = [];
+  const removedFields: string[][] = [];
+
+  const diff = (base: unknown, effective: unknown, path: string[]): unknown => {
+    if (valuesEqual(base, effective)) return undefined;
+
+    if (isKeyedRecordArray(base) && Array.isArray(effective)) {
+      if (effective.every((item) => isPlainRecord(item) && typeof item.id === "string" && item.id.length > 0)) {
+        const baseById = new Map(base.map((item) => [item.id, item]));
+        const effectiveById = new Map((effective as Array<Record<string, unknown> & { id: string }>).map((item) => [item.id, item]));
+        const changedItems: unknown[] = [];
+        for (const item of effective as Array<Record<string, unknown> & { id: string }>) {
+          const prior = baseById.get(item.id);
+          const itemDelta = prior ? diff(prior, item, [...path, `@${item.id}`]) : item;
+          if (itemDelta !== undefined) {
+            changedItems.push(prior && isPlainRecord(itemDelta) ? { id: item.id, ...itemDelta } : itemDelta);
+          }
+        }
+        const removedIds = base.filter((item) => !effectiveById.has(item.id)).map((item) => item.id);
+        if (removedIds.length) removedItems.push({ path, ids: removedIds });
+        return changedItems.length ? changedItems : undefined;
+      }
+      return effective;
+    }
+
+    if (Array.isArray(base) || Array.isArray(effective)) return effective;
+
+    if (isPlainRecord(base) && isPlainRecord(effective)) {
+      const result: Record<string, unknown> = Object.create(null) as Record<string, unknown>;
+      for (const key of Object.keys(base)) {
+        if (!unsafeMergeKeys.has(key) && !Object.hasOwn(effective, key)) {
+          removedFields.push([...path, key]);
+        }
+      }
+      for (const key of Object.keys(effective)) {
+        if (unsafeMergeKeys.has(key)) continue;
+        const delta = Object.hasOwn(base, key)
+          ? diff(base[key], effective[key], [...path, key])
+          : effective[key];
+        if (delta !== undefined) result[key] = delta;
+      }
+      return Object.keys(result).length ? result : undefined;
+    }
+
+    return effective;
+  };
+
+  return {
+    formatVersion: 1,
+    ...(params.packageId ? { packageId: params.packageId } : {}),
+    templateId: params.templateId,
+    templateVersion: params.templateVersion,
+    configurationSchemaVersion: params.configurationSchemaVersion,
+    updateMode: params.updateMode ?? "automatic",
+    ...(params.context ? { context: params.context } : {}),
+    overrides: diff(params.base, params.effective, []) ?? Object.create(null),
+    ...(params.updateMode === "pinned" ? { snapshot: structuredCloneSafe(params.effective) } : {}),
+    removedItems,
+    removedFields,
+  };
+}
+
+export function isTenantTemplateOverlay(value: unknown): value is TenantTemplateOverlay {
+  if (!isPlainRecord(value)) return false;
+  const isValidPath = (path: unknown): path is string[] =>
+    Array.isArray(path)
+    && path.length <= 32
+    && path.every((segment) => typeof segment === "string" && segment.length > 0 && !unsafeMergeKeys.has(segment));
+  const removedItemsValid = Array.isArray(value.removedItems)
+    && value.removedItems.length <= 500
+    && value.removedItems.every((item) => isPlainRecord(item)
+      && isValidPath(item.path)
+      && Array.isArray(item.ids)
+      && item.ids.length <= 500
+      && item.ids.every((id) => typeof id === "string" && id.length > 0));
+  const removedFieldsValid = Array.isArray(value.removedFields)
+    && value.removedFields.length <= 1000
+    && value.removedFields.every(isValidPath);
+  const validContext = value.context === undefined
+    || (isPlainRecord(value.context)
+      && typeof value.context.tenantSlug === "string"
+      && value.context.tenantSlug.length <= 160
+      && typeof value.context.brandName === "string"
+      && value.context.brandName.length <= 180);
+  const validPinnedSnapshot = value.updateMode !== "pinned" || Object.hasOwn(value, "snapshot");
+
+  return value.formatVersion === 1
+    && (value.packageId === undefined || typeof value.packageId === "string")
+    && typeof value.templateId === "string"
+    && value.templateId.length > 0
+    && value.templateId.length <= 160
+    && typeof value.templateVersion === "string"
+    && /^\d+\.\d+\.\d+$/.test(value.templateVersion)
+    && typeof value.configurationSchemaVersion === "string"
+    && /^\d+\.\d+\.\d+$/.test(value.configurationSchemaVersion)
+    && (value.updateMode === "automatic" || value.updateMode === "pinned")
+    && validContext
+    && validPinnedSnapshot
+    && isPlainRecord(value.overrides)
+    && removedItemsValid
+    && removedFieldsValid;
+}
+
+function applyRemovedItems<T>(value: T, removals: TenantTemplateOverlay["removedItems"]): T {
+  const result = structuredCloneSafe(value);
+  for (const removal of removals) {
+    if (!Array.isArray(removal.path) || !Array.isArray(removal.ids)) continue;
+    let cursor: unknown = result;
+    for (const segment of removal.path) {
+      if (segment.startsWith("@")) {
+        const id = segment.slice(1);
+        cursor = Array.isArray(cursor) ? cursor.find((item) => isPlainRecord(item) && item.id === id) : undefined;
+      } else {
+        cursor = isPlainRecord(cursor) && !unsafeMergeKeys.has(segment) ? cursor[segment] : undefined;
+      }
+      if (cursor === undefined) break;
+    }
+    if (!Array.isArray(cursor) || removal.path.length === 0) continue;
+
+    const removed = new Set(removal.ids.filter((id) => typeof id === "string"));
+    const filtered = cursor.filter((item) => !isPlainRecord(item) || typeof item.id !== "string" || !removed.has(item.id));
+    let parent: unknown = result;
+    for (const segment of removal.path.slice(0, -1)) {
+      if (segment.startsWith("@")) {
+        const id = segment.slice(1);
+        parent = Array.isArray(parent) ? parent.find((item) => isPlainRecord(item) && item.id === id) : undefined;
+      } else {
+        parent = isPlainRecord(parent) && !unsafeMergeKeys.has(segment) ? parent[segment] : undefined;
+      }
+    }
+    const finalSegment = removal.path.at(-1);
+    if (isPlainRecord(parent) && finalSegment && !unsafeMergeKeys.has(finalSegment)) parent[finalSegment] = filtered;
+  }
+  return result;
+}
+
+function applyRemovedFields<T>(value: T, removals: TenantTemplateOverlay["removedFields"]): T {
+  const result = structuredCloneSafe(value);
+  for (const path of removals) {
+    if (!Array.isArray(path) || path.length === 0) continue;
+    let parent: unknown = result;
+    for (const segment of path.slice(0, -1)) {
+      if (segment.startsWith("@")) {
+        const id = segment.slice(1);
+        parent = Array.isArray(parent) ? parent.find((item) => isPlainRecord(item) && item.id === id) : undefined;
+      } else {
+        parent = isPlainRecord(parent) && !unsafeMergeKeys.has(segment) ? parent[segment] : undefined;
+      }
+      if (parent === undefined) break;
+    }
+    const finalSegment = path.at(-1);
+    if (isPlainRecord(parent) && finalSegment && !unsafeMergeKeys.has(finalSegment)) {
+      delete parent[finalSegment];
+    }
+  }
+  return result;
+}
+
+/** Resolves a current template snapshot plus a versioned tenant overlay or legacy settings. */
+export function resolveTenantTemplateOverlay<T>(base: T, stored: unknown): T {
+  if (isTenantTemplateOverlay(stored)) {
+    if (stored.updateMode === "pinned" && stored.snapshot !== undefined) {
+      return structuredCloneSafe(stored.snapshot) as T;
+    }
+    const merged = deepMergeCascade(base, stored.overrides);
+    return applyRemovedFields(applyRemovedItems(merged, stored.removedItems), stored.removedFields);
+  }
+  return deepMergeCascade(base, stored);
+}
+
 /**
  * Recursively cascades base prototype/template data with tenant sparse overrides.
  *
@@ -1450,13 +1894,13 @@ export function deepMergeCascade<T>(base: T, overrides?: unknown): T {
     const isKeyedArray =
       base.length > 0 &&
       base.every(
-        (item) => item && typeof item === "object" && typeof (item as { id?: unknown }).id === "string",
+        (item) => isPlainRecord(item) && typeof (item as { id?: unknown }).id === "string",
       );
 
     if (isKeyedArray) {
       const overrideMap = new Map<string, unknown>();
       for (const item of overrides) {
-        if (item && typeof item === "object" && typeof (item as { id?: unknown }).id === "string") {
+        if (isPlainRecord(item) && typeof (item as { id?: unknown }).id === "string") {
           overrideMap.set((item as { id: string }).id, item);
         }
       }
@@ -1476,8 +1920,7 @@ export function deepMergeCascade<T>(base: T, overrides?: unknown): T {
 
       for (const overrideItem of overrides) {
         if (
-          overrideItem &&
-          typeof overrideItem === "object" &&
+          isPlainRecord(overrideItem) &&
           typeof (overrideItem as { id?: unknown }).id === "string"
         ) {
           const id = (overrideItem as { id: string }).id;
@@ -1494,13 +1937,13 @@ export function deepMergeCascade<T>(base: T, overrides?: unknown): T {
     return structuredCloneSafe(overrides) as unknown as T;
   }
 
-  const result: Record<string, unknown> = {};
+  const result: Record<string, unknown> = Object.create(null) as Record<string, unknown>;
   const baseObj = base as Record<string, unknown>;
   const overrideObj =
-    typeof overrides === "object" && overrides !== null ? (overrides as Record<string, unknown>) : {};
+    isPlainRecord(overrides) ? overrides : {};
 
   for (const key of Object.keys(baseObj)) {
-    if (key in overrideObj && overrideObj[key] !== undefined) {
+    if (!unsafeMergeKeys.has(key) && Object.hasOwn(overrideObj, key) && overrideObj[key] !== undefined) {
       result[key] = deepMergeCascade(baseObj[key], overrideObj[key]);
     } else {
       result[key] = structuredCloneSafe(baseObj[key]);
@@ -1508,7 +1951,7 @@ export function deepMergeCascade<T>(base: T, overrides?: unknown): T {
   }
 
   for (const key of Object.keys(overrideObj)) {
-    if (!(key in baseObj) && overrideObj[key] !== undefined) {
+    if (!unsafeMergeKeys.has(key) && !Object.hasOwn(baseObj, key) && overrideObj[key] !== undefined) {
       result[key] = structuredCloneSafe(overrideObj[key]);
     }
   }

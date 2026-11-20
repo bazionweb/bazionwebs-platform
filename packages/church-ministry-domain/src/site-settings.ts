@@ -6,6 +6,7 @@ import {
 } from "@bazion/church-ministry-contracts";
 
 export interface MinistrySiteSettingsSnapshot {
+  tenantSlug?: string | null;
   tenantName: string | null;
   profile: {
     ministryName: string | null;
@@ -60,10 +61,16 @@ function parseStoredSettings(value: string | null): ChurchPublicSiteSettings {
 }
 
 /** Loads a tenant's ministry site editor state through the repository port. */
-export async function getMinistrySiteSettings(repository: MinistrySiteSettingsRepository, tenantId: string) {
+export async function getMinistrySiteSettings(
+  repository: MinistrySiteSettingsRepository,
+  tenantId: string,
+  resolveStoredSettings?: (snapshot: MinistrySiteSettingsSnapshot) => ChurchPublicSiteSettings,
+) {
   if (!tenantId.trim()) throw new Error("A tenant context is required to read ministry site settings.");
   const snapshot = await repository.load(tenantId);
-  const settings = parseStoredSettings(snapshot.storedSettings);
+  const settings = resolveStoredSettings
+    ? resolveStoredSettings(snapshot)
+    : parseStoredSettings(snapshot.storedSettings);
   if (!snapshot.storedSettings) {
     settings.leadership = snapshot.leaders.map((leader) => ({
       name: leader.name,

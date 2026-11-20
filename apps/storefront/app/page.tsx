@@ -5,6 +5,11 @@ import { resolveEducationTenant } from "../lib/education-tenant";
 import { EducationShell } from "../components/education/education-shell";
 import { BmiHomePage, BemiInstitutePage } from "@bazion/education-template";
 import { ShopStorefront } from "./shop/shop-storefront";
+import {
+  SmeHomePage,
+  SmeWebsiteShell,
+} from "@bazion/sme-website-template";
+import { getPublicTenantWebsiteConfig } from "../lib/server-website-config";
 import "./shop/shop.css";
 
 type Currency = "KES" | "USD" | "EUR" | "GBP" | "CAD" | "AUD" | "NZD" | "CHF" | "SGD" | "ZAR" | "NGN" | "GHS" | "INR" | "AED" | "BRL" | "MXN" | "SAR" | "CNY" | "HKD" | "SEK" | "NOK" | "DKK" | "PLN" | "THB" | "PHP";
@@ -26,6 +31,13 @@ export async function generateMetadata(): Promise<Metadata> {
     return {
       title: education.tenantConfig.institutionName,
       description: education.tenantConfig.description,
+    };
+  }
+  const websiteConfig = await getPublicTenantWebsiteConfig();
+  if (websiteConfig && websiteConfig.packageId !== "church-ministry" && websiteConfig.packageId !== "ecommerce") {
+    return {
+      title: websiteConfig.smeConfig.website.seo.title || websiteConfig.smeConfig.business.name,
+      description: websiteConfig.smeConfig.website.seo.description || websiteConfig.smeConfig.business.tagline,
     };
   }
   const response = await fetchTenantPublicData<{ store: Store }>("/v1/storefront");
@@ -50,11 +62,24 @@ export default async function HomePage() {
     );
   }
 
+  const websiteConfig = await getPublicTenantWebsiteConfig();
+  if (websiteConfig && websiteConfig.packageId !== "church-ministry" && websiteConfig.packageId !== "ecommerce") {
+    return (
+      <SmeWebsiteShell config={websiteConfig.smeConfig}>
+        <SmeHomePage config={websiteConfig.smeConfig} />
+      </SmeWebsiteShell>
+    );
+  }
+
   const response = await fetchTenantPublicData<{ store: Omit<Store, "paymentProvider">; paymentProvider: Store["paymentProvider"] }>("/v1/storefront");
   if (!response?.store?.isHomePage) return <ChurchHomePage />;
   const store = { ...response.store, paymentProvider: response.paymentProvider };
   const catalog = await fetchTenantPublicData<{ items: Product[]; categories: string[] }>(
     `/v1/products?limit=100&sort=featured&currency=${encodeURIComponent(store.paymentProvider === "mpesa" ? "KES" : store.defaultCurrency)}`,
   );
-  return <ShopStorefront initialProducts={catalog?.items ?? []} categories={catalog?.categories ?? []} store={store} homeHref="/" />;
+  const storefront = <ShopStorefront initialProducts={catalog?.items ?? []} categories={catalog?.categories ?? []} store={store} homeHref="/" />;
+  if (websiteConfig?.packageId === "ecommerce") {
+    return <SmeWebsiteShell config={websiteConfig.smeConfig}>{storefront}</SmeWebsiteShell>;
+  }
+  return storefront;
 }
