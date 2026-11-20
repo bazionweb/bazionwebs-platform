@@ -788,8 +788,10 @@ export class PdfDocumentAdapter implements IDocumentGenerator {
     page.drawText(meta?.secondaryAuthorizedTitle || 'Institutional Authority', { x: 418, y: y - 24, size: 8, font: helvetica, color: PdfDocumentAdapter.DARK_GRAY });
 
     // Microprint verification footer
-    page.drawText(`VERIFICATION CODE: ${verificationCode} • VALIDATE AUTHENTICITY AT: ${VERIFY_BASE_URL}`, {
-      x: PdfDocumentAdapter.centerX(`VERIFICATION CODE: ${verificationCode} • VALIDATE AUTHENTICITY AT: ${VERIFY_BASE_URL}`, helvetica, 7),
+    const verifyUrl = meta?.verificationBaseUrl || '/verify';
+    const verifyText = `VERIFICATION CODE: ${verificationCode} • VALIDATE AUTHENTICITY AT: ${verifyUrl}`;
+    page.drawText(verifyText, {
+      x: PdfDocumentAdapter.centerX(verifyText, helvetica, 7),
       y: 46,
       size: 7,
       font: helvetica,
