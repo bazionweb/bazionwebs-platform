@@ -1,7 +1,8 @@
-import { useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useApolloClient } from '../shims/apollo';
 import { toTitleCase } from '../utils/stringFormatter';
 import { Transaction, TransactionCategory } from '../components/financeData';
+import { hkmApiRequest, HkmIdMap } from '../services/hkmApi';
 import {
   GET_TRANSACTIONS_QUERY,
   ADD_TRANSACTION_MUTATION,
@@ -15,6 +16,7 @@ import { ADD_PROVISIONING_QUEUE_MUTATION, GET_PROVISIONING_QUEUE_QUERY } from '.
 import { sendPinNotification } from '../services/pinNotificationService';
 import { generateOrgEmail, createAlias, loadImprovMXConfig, checkAliasExists } from '../services/improvmxService';
 import { computeRegistrationStatus, generateMemberPin, MemberContact } from '../services/provisioning';
+import { useTenantConfig } from '../context/TenantContext';
 interface SupabaseMember {
   id: string;
   first_name: string;
@@ -67,16 +69,62 @@ function transformTransaction(SupabaseTx: SupabaseTransaction): Transaction {
 }
 
 export function useTransactions() {
+  const tenantConfig = useTenantConfig();
   const { data, loading, error, fetchMore } = useQuery(GET_TRANSACTIONS_QUERY, {
     fetchPolicy: 'cache-and-network',
     nextFetchPolicy: 'cache-and-network',
     errorPolicy: 'all',
   });
 
+  const txIdMapRef = useRef(new HkmIdMap());
+  const apiReadyRef = useRef(false);
+  const [apiRows, setApiRows] = useState<Array<{
+    id: string;
+    date: string;
+    category: string;
+    type: 'Income' | 'Expense';
+    amount: number;
+    description?: string;
+    memberId?: string;
+    memberName?: string;
+    memberPhone?: string;
+    nonMemberName?: string;
+    isAnonymous?: boolean;
+  }> | null>(null);
+  const [apiLoading, setApiLoading] = useState(true);
+
+  const refresh = useCallback(async () => {
+    try {
+      const rows = await hkmApiRequest<Array<{
+        id: string;
+        date: string;
+        category: string;
+        type: 'Income' | 'Expense';
+        amount: number;
+        description?: string;
+        memberId?: string;
+        memberName?: string;
+        memberPhone?: string;
+        nonMemberName?: string;
+        isAnonymous?: boolean;
+      }>>('/api/church/hkm/transactions');
+      apiReadyRef.current = true;
+      setApiRows(rows);
+    } catch {
+      // Keep Apollo fallback when API endpoint is unavailable (e.g. standalone unit tests)
+    } finally {
+      setApiLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
   const pageInfo = data?.transactionsCollection?.pageInfo;
-  const hasNextPage = !!pageInfo?.hasNextPage;
+  const hasNextPage = apiReadyRef.current ? false : !!pageInfo?.hasNextPage;
   const fetchNextPage = async () => {
-    if (!hasNextPage || !pageInfo?.endCursor) return;
+    if (apiReadyRef.current || !hasNextPage || !pageInfo?.endCursor) return;
     await fetchMore({
       variables: {
         after: pageInfo.endCursor,
@@ -102,6 +150,21 @@ export function useTransactions() {
   const [addProvisioningQueueMutation] = useMutation(ADD_PROVISIONING_QUEUE_MUTATION);
 
   const transactions: Transaction[] = useMemo(() => {
+    if (apiRows !== null) {
+      return apiRows.map((row) => ({
+        id: txIdMapRef.current.numericId(row.id),
+        date: row.date,
+        category: row.category as TransactionCategory,
+        type: row.type,
+        amount: Number(row.amount),
+        description: row.description || '',
+        memberId: row.memberId,
+        nonMemberName: row.nonMemberName,
+        isAnonymous: row.isAnonymous || false,
+        contributorName: row.memberName,
+        contributorPhone: row.memberPhone,
+      }));
+    }
     console.warn('[useTransactions] Query data:', data, 'Error:', error);
     if (!data?.transactionsCollection?.edges) {
       console.warn('[useTransactions] No transactions in data', { data, loading, error });
@@ -111,7 +174,7 @@ export function useTransactions() {
     return data.transactionsCollection.edges.map((edge: { node: SupabaseTransaction }) =>
       transformTransaction(edge.node),
     );
-  }, [data, error, loading]);
+  }, [apiRows, data, error, loading]);
 
   const addTransaction = async (transaction: Omit<Transaction, 'id'> | Transaction) => {
     console.warn('[useTransactions] addTransaction called', {
@@ -122,6 +185,25 @@ export function useTransactions() {
       memberId: transaction.memberId,
     });
     try {
+      if (apiReadyRef.current) {
+        await hkmApiRequest('/api/church/hkm/transactions', {
+          method: 'POST',
+          body: JSON.stringify({
+            date: transaction.date,
+            category: transaction.category,
+            givingType: transaction.category,
+            type: transaction.type,
+            transactionKind: transaction.type,
+            amount: transaction.amount,
+            description: toTitleCase(transaction.description),
+            memberId: transaction.memberId || null,
+            nonMemberName: toTitleCase(transaction.nonMemberName) || null,
+            isAnonymous: transaction.isAnonymous || false,
+          }),
+        });
+        await refresh();
+        return;
+      }
       console.warn('[useTransactions] Sending GraphQL mutation...');
       const result = await addTransactionMutation({
         variables: {
@@ -344,6 +426,20 @@ export function useTransactions() {
                 email: memberNode.email,
                 pin: generatedPin,
                 orgEmail: orgEmail,
+                branding: {
+                  name: tenantConfig.churchName,
+                  shortName: tenantConfig.shortName,
+                  tagline: tenantConfig.tagline,
+                  logoUrl: tenantConfig.logoUrl,
+                  primaryColor: tenantConfig.primaryColor,
+                  secondaryColor: tenantConfig.secondaryColor,
+                  accentColor: tenantConfig.accentColor,
+                  websiteUrl: tenantConfig.websiteUrl,
+                  portalUrl: tenantConfig.portalUrl,
+                  contactEmail: tenantConfig.contact?.email,
+                  contactPhone: tenantConfig.contact?.phone,
+                  address: tenantConfig.contact?.address,
+                },
               });
 
               try {
@@ -418,6 +514,29 @@ export function useTransactions() {
 
   const updateTransaction = async (id: number, updates: Partial<Transaction>) => {
     try {
+      if (apiReadyRef.current) {
+        const payload: Record<string, unknown> = {};
+        if (updates.date !== undefined) payload.date = updates.date;
+        if (updates.category !== undefined) {
+          payload.category = updates.category;
+          payload.givingType = updates.category;
+        }
+        if (updates.type !== undefined) {
+          payload.type = updates.type;
+          payload.transactionKind = updates.type;
+        }
+        if (updates.amount !== undefined) payload.amount = updates.amount;
+        if (updates.description !== undefined) payload.description = toTitleCase(updates.description);
+        if (updates.memberId !== undefined) payload.memberId = updates.memberId || null;
+        if (updates.nonMemberName !== undefined) payload.nonMemberName = toTitleCase(updates.nonMemberName) || null;
+        if (updates.isAnonymous !== undefined) payload.isAnonymous = updates.isAnonymous;
+        await hkmApiRequest(`/api/church/hkm/transactions/${encodeURIComponent(txIdMapRef.current.resolve(id))}`, {
+          method: 'PATCH',
+          body: JSON.stringify(payload),
+        });
+        await refresh();
+        return;
+      }
       const payload: Record<string, unknown> = {};
       if (updates.date !== undefined) payload.date = updates.date;
       if (updates.category !== undefined) payload.category = updates.category;
@@ -461,6 +580,13 @@ export function useTransactions() {
 
   const deleteTransaction = async (id: number, transaction?: Transaction) => {
     try {
+      if (apiReadyRef.current) {
+        await hkmApiRequest(`/api/church/hkm/transactions/${encodeURIComponent(txIdMapRef.current.resolve(id))}`, {
+          method: 'DELETE',
+        });
+        await refresh();
+        return;
+      }
       const result = await deleteTransactionMutation({
         variables: { id },
       });
@@ -546,8 +672,8 @@ export function useTransactions() {
     setData: (_newTransactions: Transaction[]) => {
       console.warn('setData called on Supabase subscription - data is managed by GraphQL');
     },
-    loading,
-    error: error || connectionError,
+    loading: apiRows !== null ? apiLoading : loading,
+    error: apiReadyRef.current ? null : (error || connectionError),
     hasNextPage,
     fetchNextPage,
     addTransaction,

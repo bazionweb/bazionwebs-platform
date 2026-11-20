@@ -100,6 +100,14 @@ export function UmsApp({ basename = "/ums", tenantConfig }: UmsAppProps) {
         logo: tenantConfig.branding?.logoUrl,
         institutionName: tenantConfig.institutionName,
         shortName: tenantConfig.shortName,
+        primaryColor: tenantConfig.branding?.primaryColor,
+        secondaryColor: tenantConfig.branding?.secondaryColor,
+        accentColor: tenantConfig.branding?.accentColor,
+        tagline: tenantConfig.tagline,
+        accreditationLabel: tenantConfig.accreditationLabel,
+        address: tenantConfig.contact?.address,
+        contactEmail: tenantConfig.contact?.registrarEmail,
+        contactPhone: tenantConfig.contact?.phones?.[0],
       });
     }
   }, [tenantConfig]);

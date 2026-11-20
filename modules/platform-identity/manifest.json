@@ -3,7 +3,7 @@
   "name": "Platform identity and tenant access",
   "version": "1.0.0",
   "owner": "platform",
-  "status": "partial",
+  "status": "stable",
   "entrypoints": {
     "domain": "packages/platform-identity",
     "api": "packages/auth"
@@ -16,9 +16,26 @@
     { "name": "platform_members", "owner": "platform-identity", "tenantScoped": false, "rls": "not-applicable", "migration": "0002_auth_tenant_registry.sql" },
     { "name": "tenant_module_entitlements", "owner": "platform-identity", "tenantScoped": false, "rls": "not-applicable", "migration": "0007_platform_tenant_control_plane.sql" },
     { "name": "tenant_platform_settings", "owner": "platform-identity", "tenantScoped": false, "rls": "not-applicable", "migration": "0007_platform_tenant_control_plane.sql" },
-    { "name": "tenant_database_bindings", "owner": "platform-identity", "tenantScoped": false, "rls": "not-applicable", "migration": "0013_tenant_database_routing.sql" }
+    { "name": "tenant_database_bindings", "owner": "platform-identity", "tenantScoped": false, "rls": "not-applicable", "migration": "0013_tenant_database_routing.sql" },
+    { "name": "federated_identity_links", "owner": "platform-identity", "tenantScoped": false, "rls": "not-applicable", "migration": "0020_phase5_identity_oidc_bff.sql" },
+    { "name": "identity_link_collisions", "owner": "platform-identity", "tenantScoped": false, "rls": "not-applicable", "migration": "0020_phase5_identity_oidc_bff.sql" },
+    { "name": "oidc_clients", "owner": "platform-identity", "tenantScoped": false, "rls": "not-applicable", "migration": "0020_phase5_identity_oidc_bff.sql" },
+    { "name": "oidc_authorization_codes", "owner": "platform-identity", "tenantScoped": false, "rls": "not-applicable", "migration": "0020_phase5_identity_oidc_bff.sql" },
+    { "name": "oidc_bff_auth_transactions", "owner": "platform-identity", "tenantScoped": false, "rls": "not-applicable", "migration": "0020_phase5_identity_oidc_bff.sql" },
+    { "name": "oidc_bff_sessions", "owner": "platform-identity", "tenantScoped": false, "rls": "not-applicable", "migration": "0020_phase5_identity_oidc_bff.sql" },
+    { "name": "commercial_order_claim_proofs", "owner": "platform-identity", "tenantScoped": false, "rls": "not-applicable", "migration": "0020_phase5_identity_oidc_bff.sql" },
+    { "name": "account_email_change_requests", "owner": "platform-identity", "tenantScoped": false, "rls": "not-applicable", "migration": "0020_phase5_identity_oidc_bff.sql" },
+    { "name": "service_identities", "owner": "platform-identity", "tenantScoped": false, "rls": "not-applicable", "migration": "0034_complete_partial_modules.sql" }
   ],
-  "migrations": ["0001_initial.sql", "0002_auth_tenant_registry.sql", "0006_tenant_lifecycle.sql", "0007_platform_tenant_control_plane.sql", "0013_tenant_database_routing.sql"],
+  "migrations": [
+    "0001_initial.sql",
+    "0002_auth_tenant_registry.sql",
+    "0006_tenant_lifecycle.sql",
+    "0007_platform_tenant_control_plane.sql",
+    "0013_tenant_database_routing.sql",
+    "0020_phase5_identity_oidc_bff.sql",
+    "0034_complete_partial_modules.sql"
+  ],
   "permissions": [
     {
       "resource": "organization",
@@ -59,7 +76,8 @@
     "Better Auth"
   ],
   "tests": [
-    "packages/auth/src"
+    "packages/auth/src",
+    "packages/platform-identity/src/index.test.ts"
   ],
   "docs": [
     "docs/architecture/authentication-and-tenant-isolation.md",

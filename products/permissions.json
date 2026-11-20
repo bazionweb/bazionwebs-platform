@@ -336,6 +336,78 @@
       "action": "delete",
       "roles": ["owner", "admin"],
       "description": "remove student records and archive programs for the active institution."
+    },
+    {
+      "id": "tenant.audit.read",
+      "moduleId": "audit",
+      "scope": "tenant",
+      "resource": "audit",
+      "action": "read",
+      "roles": ["owner", "admin"],
+      "description": "read append-only security and business audit events within the active tenant."
+    },
+    {
+      "id": "tenant.audit.export",
+      "moduleId": "audit",
+      "scope": "tenant",
+      "resource": "audit",
+      "action": "export",
+      "roles": ["owner"],
+      "description": "export tenant audit events in CSV or JSON format."
+    },
+    {
+      "id": "tenant.analytics.export",
+      "moduleId": "analytics",
+      "scope": "tenant",
+      "resource": "analytics",
+      "action": "export",
+      "roles": ["owner", "admin"],
+      "description": "export tenant website and product analytics events."
+    },
+    {
+      "id": "tenant.analytics.delete",
+      "moduleId": "analytics",
+      "scope": "tenant",
+      "resource": "analytics",
+      "action": "delete",
+      "roles": ["owner", "admin"],
+      "description": "purge tenant analytics events and manage retention policies."
+    },
+    {
+      "id": "tenant.enquiry.update",
+      "moduleId": "forms-leads",
+      "scope": "tenant",
+      "resource": "enquiry",
+      "action": "update",
+      "roles": ["owner", "admin"],
+      "description": "triage and update website enquiry lifecycle status and assignment."
+    },
+    {
+      "id": "tenant.media.read",
+      "moduleId": "media-storage",
+      "scope": "tenant",
+      "resource": "media",
+      "action": "read",
+      "roles": ["owner", "admin", "catalogManager", "contentEditor", "viewer"],
+      "description": "list tenant media library assets and storage usage metrics."
+    },
+    {
+      "id": "tenant.media.create",
+      "moduleId": "media-storage",
+      "scope": "tenant",
+      "resource": "media",
+      "action": "create",
+      "roles": ["owner", "admin", "catalogManager", "contentEditor"],
+      "description": "upload and optimize media assets into tenant storage."
+    },
+    {
+      "id": "tenant.media.delete",
+      "moduleId": "media-storage",
+      "scope": "tenant",
+      "resource": "media",
+      "action": "delete",
+      "roles": ["owner", "admin"],
+      "description": "delete unreferenced media assets from tenant storage."
     }
   ]
 }

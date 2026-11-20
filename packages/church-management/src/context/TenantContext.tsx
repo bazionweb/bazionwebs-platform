@@ -7,7 +7,11 @@ export interface ChurchManagementTenantConfig {
   shortName: string;
   tagline: string;
   logoUrl: string;
+  websiteUrl?: string;
+  portalUrl?: string;
   primaryColor?: string;
+  secondaryColor?: string;
+  accentColor?: string;
   contact?: {
     address?: string;
     phone?: string;
@@ -21,7 +25,11 @@ export const defaultHkmTenantConfig: ChurchManagementTenantConfig = {
   shortName: "HKM Church",
   tagline: "Church Management & Member Discipleship Portal",
   logoUrl: "/hkm-logo.webp",
+  websiteUrl: "https://hkmministries.org",
+  portalUrl: "https://hkmministries.org/portal/login",
   primaryColor: "#16a34a",
+  secondaryColor: "#0f172a",
+  accentColor: "#d4af37",
   contact: {
     address: "Nairobi Central & Multi-Branch Regional Campuses",
     phone: "+254 700 000 001",

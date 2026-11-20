@@ -108,6 +108,7 @@ const settings = {
   navigation: globalMissionConfig.navigation,
   pages: globalMissionConfig.pages,
   hero,
+  statistics: globalMissionConfig.statistics,
   serviceTimes: globalMissionConfig.serviceTimes,
   locations: globalMissionConfig.locations,
   visitorInfo: globalMissionConfig.visitorInfo,

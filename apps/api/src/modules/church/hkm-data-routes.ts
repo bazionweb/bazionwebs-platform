@@ -6,7 +6,12 @@ import { z } from "zod";
 import { auth, isVerifiedTenantHost } from "@bazion/auth/server";
 import { getActiveTenantContext, getCurrentIdentity, requireActiveTenantPermission } from "@bazion/auth";
 import {
+  churchContactMessages,
+  churchInventoryAssetEvents,
   churchInventoryAssets,
+  hkmSmsLogs,
+  hkmVisitorFollowUps,
+  hkmVisitors,
   hkmAttendanceRecords,
   hkmBranches,
   hkmGivingTransactions,
@@ -21,7 +26,6 @@ import { resolveRequestTenantId } from "../../lib/tenant-resolution.js";
 import { isTenantModuleEnabled } from "../../lib/tenant-modules.js";
 import { assertTenantNotInMaintenance } from "../../lib/tenant-maintenance.js";
 
-const HKM_TENANT_ID = "00000000-0000-4000-8000-000000000077";
 const branchInput = z.object({
   name: z.string().trim().min(2).max(160), location: z.string().trim().max(240).optional(),
   pastorName: z.string().trim().max(160).optional(), contactPhone: z.string().trim().max(40).optional(),
@@ -55,9 +59,27 @@ const memberAttendanceBatchInput = z.object({
   records: z.array(z.object({ memberId: z.string().uuid(), status: z.enum(["Present", "Absent", "Late"]) })).max(5000),
 }).strict();
 const givingInput = z.object({
-  memberId: z.string().uuid().optional(), member_id: z.string().uuid().optional(), branchId: z.string().uuid().optional(), branch_id: z.string().uuid().optional(),
-  amount: z.coerce.number().positive().max(10_000_000), givingType: z.string().trim().min(2).max(48).optional(), transactionType: z.string().trim().min(2).max(48).optional(), category: z.string().trim().min(2).max(48).optional(),
-  transactionDate: z.string().datetime().optional(), transactionDateLegacy: z.string().datetime().optional(), paymentMethod: z.string().trim().max(40).optional(), receiptNumber: z.string().trim().max(80).optional(), paymentStatus: z.enum(["pending", "verified", "failed"]).optional(),
+  memberId: z.string().uuid().nullable().optional(),
+  member_id: z.string().uuid().nullable().optional(),
+  branchId: z.string().uuid().optional(),
+  branch_id: z.string().uuid().optional(),
+  amount: z.coerce.number().positive().max(10_000_000),
+  givingType: z.string().trim().min(2).max(48).optional(),
+  transactionType: z.string().trim().min(2).max(48).optional(),
+  category: z.string().trim().min(2).max(48).optional(),
+  transactionKind: z.enum(["income", "expense", "Income", "Expense"]).optional(),
+  type: z.enum(["income", "expense", "Income", "Expense"]).optional(),
+  description: z.string().trim().max(2000).nullable().optional(),
+  nonMemberName: z.string().trim().max(160).nullable().optional(),
+  non_member_name: z.string().trim().max(160).nullable().optional(),
+  isAnonymous: z.boolean().optional(),
+  is_anonymous: z.boolean().optional(),
+  transactionDate: z.string().trim().min(4).max(64).optional(),
+  transactionDateLegacy: z.string().trim().min(4).max(64).optional(),
+  date: z.string().trim().min(4).max(64).optional(),
+  paymentMethod: z.string().trim().max(40).optional(),
+  receiptNumber: z.string().trim().max(80).optional(),
+  paymentStatus: z.enum(["pending", "verified", "failed"]).optional(),
 }).passthrough();
 const assetInput = z.object({
   name: z.string().trim().min(2).max(160), assetTag: z.string().trim().min(2).max(60).optional(), category: z.string().trim().min(2).max(80),
@@ -103,9 +125,8 @@ function attendanceDto(row: typeof hkmAttendanceRecords.$inferSelect) {
 export async function hkmDataRoutes(app: FastifyInstance, options: { config: AppConfig }): Promise<void> {
   async function tenantFor(request: FastifyRequest): Promise<string> {
     const tenantId = await resolveRequestTenantId(request, options.config);
-    if (tenantId !== HKM_TENANT_ID) throw fail("HKM records are not available on this tenant.", 404, "HKM_TENANT_NOT_FOUND");
     if (options.config.NODE_ENV === "production" && !(await isVerifiedTenantHost(request.hostname))) {
-      throw fail("A verified HKM domain is required.", 404, "HKM_HOST_NOT_VERIFIED");
+      throw fail("A verified domain is required for church operations.", 404, "HKM_HOST_NOT_VERIFIED");
     }
     if (!(await isTenantModuleEnabled(tenantId, "church-ministry"))) throw fail("Church management is not enabled for this tenant.", 404, "CHURCH_MODULE_DISABLED");
     await assertTenantNotInMaintenance(tenantId);
@@ -362,17 +383,75 @@ export async function hkmDataRoutes(app: FastifyInstance, options: { config: App
     return deleted ? reply.send({ success: true, data: { deleted: true } }) : reply.code(404).send({ success: false, error: "ATTENDANCE_RECORD_NOT_FOUND" });
   });
 
+  function parseDateOrNow(raw?: string | null): Date {
+    if (!raw) return new Date();
+    const parsedDate = new Date(raw.length === 10 ? `${raw}T12:00:00.000Z` : raw);
+    if (Number.isNaN(parsedDate.getTime())) throw fail("Invalid transaction date.", 400, "INVALID_DATE");
+    return parsedDate;
+  }
+
+  function formatMaintenanceDescription(type: string, cost: number, status: string, description: string): string {
+    const cleanDesc = description.trim();
+    return `[${type}|${cost}|${status}] ${cleanDesc}`.trim();
+  }
+
+  function parseMaintenanceEvent(event: typeof churchInventoryAssetEvents.$inferSelect) {
+    const match = event.description.match(/^\[([^|\]]+)\|([^|\]]+)\|([^|\]]+)\]\s*(.*)$/);
+    const costValue = match ? Number.parseFloat(match[2] ?? "0") : 0;
+    return {
+      id: event.id,
+      equipmentId: event.assetId,
+      date: event.occurredAt.toISOString().split("T")[0] ?? "",
+      type: match?.[1] ?? "Inspection",
+      cost: Number.isFinite(costValue) ? costValue : 0,
+      status: match?.[3] ?? "Completed",
+      description: match?.[4] ?? event.description,
+      recordedBy: event.recordedBy,
+    };
+  }
+
+  function transactionDto(giving: typeof hkmGivingTransactions.$inferSelect, member: typeof hkmMembers.$inferSelect | null) {
+    const contributorName = giving.isAnonymous
+      ? "Anonymous"
+      : member
+        ? `${member.firstName} ${member.lastName}`.trim()
+        : (giving.nonMemberName ?? undefined);
+    return {
+      id: giving.id,
+      date: giving.transactionDate.toISOString().split("T")[0],
+      category: giving.givingType,
+      type: giving.transactionKind === "expense" ? "Expense" : "Income",
+      transactionKind: giving.transactionKind === "expense" ? "Expense" : "Income",
+      amount: giving.amountMinor / 100,
+      description: giving.description ?? "",
+      memberId: giving.memberId ?? undefined,
+      member_id: giving.memberId ?? undefined,
+      memberName: contributorName ?? "Anonymous",
+      memberPhone: member?.phone ?? undefined,
+      nonMemberName: giving.nonMemberName ?? undefined,
+      isAnonymous: giving.isAnonymous,
+      transactionType: giving.givingType,
+      givingType: giving.givingType,
+      transactionDate: giving.transactionDate.toISOString(),
+      paymentMethod: giving.paymentMethod,
+      receiptNumber: giving.receiptNumber,
+      branchId: giving.branchId,
+      paymentStatus: giving.paymentStatus,
+    };
+  }
+
   app.get("/api/church/hkm/transactions", async (request, reply) => {
     const { tenantId } = await adminContext(request, "read");
-    const rows = await withTenantTransaction(tenantId, (tx) => tx.select({ giving: hkmGivingTransactions, member: hkmMembers }).from(hkmGivingTransactions)
-      .innerJoin(hkmMembers, and(eq(hkmMembers.id, hkmGivingTransactions.memberId), eq(hkmMembers.tenantId, tenantId)))
-      .where(eq(hkmGivingTransactions.tenantId, tenantId)).orderBy(desc(hkmGivingTransactions.transactionDate)).limit(500));
-    return reply.send({ success: true, data: rows.map(({ giving, member }) => ({
-      id: giving.id, memberId: giving.memberId, member_id: giving.memberId, memberName: `${member.firstName} ${member.lastName}`,
-      amount: giving.amountMinor / 100, transactionType: giving.givingType, givingType: giving.givingType,
-      transactionDate: giving.transactionDate.toISOString(), paymentMethod: giving.paymentMethod,
-      receiptNumber: giving.receiptNumber, branchId: giving.branchId, paymentStatus: giving.paymentStatus,
-    })) });
+    const rows = await withTenantTransaction(tenantId, (tx) =>
+      tx
+        .select({ giving: hkmGivingTransactions, member: hkmMembers })
+        .from(hkmGivingTransactions)
+        .leftJoin(hkmMembers, and(eq(hkmMembers.id, hkmGivingTransactions.memberId), eq(hkmMembers.tenantId, tenantId)))
+        .where(eq(hkmGivingTransactions.tenantId, tenantId))
+        .orderBy(desc(hkmGivingTransactions.transactionDate))
+        .limit(500),
+    );
+    return reply.send({ success: true, data: rows.map(({ giving, member }) => transactionDto(giving, member)) });
   });
 
   app.post("/api/church/hkm/transactions", async (request, reply) => {
@@ -380,18 +459,51 @@ export async function hkmDataRoutes(app: FastifyInstance, options: { config: App
     if (!parsed.success) return reply.code(400).send({ success: false, error: "INVALID_INPUT", details: parsed.error.flatten() });
     const { tenantId } = await adminContext(request, "update");
     const input = parsed.data;
-    const memberId = input.memberId ?? input.member_id;
-    const branchId = input.branchId ?? input.branch_id;
-    if (!memberId || !branchId) return reply.code(400).send({ success: false, error: "MEMBER_AND_BRANCH_REQUIRED" });
+    const memberId = input.memberId ?? input.member_id ?? null;
+    const explicitBranchId = input.branchId ?? input.branch_id ?? null;
+    const transactionKindRaw = (input.transactionKind ?? input.type ?? "income").toLowerCase();
+    const transactionKind = transactionKindRaw === "expense" ? "expense" : "income";
+    const isAnonymous = Boolean(input.isAnonymous ?? input.is_anonymous ?? false);
+    const nonMemberName = (input.nonMemberName ?? input.non_member_name ?? null)?.trim() || null;
+    const txDate = parseDateOrNow(input.transactionDate ?? input.transactionDateLegacy ?? input.date);
     const receiptNumber = input.receiptNumber?.trim() || `HKM-${Date.now()}-${randomUUID().slice(0, 8).toUpperCase()}`;
+
     try {
       const [row] = await withTenantTransaction(tenantId, async (tx) => {
-        const [member] = await tx.select().from(hkmMembers).where(and(eq(hkmMembers.id, memberId), eq(hkmMembers.tenantId, tenantId), eq(hkmMembers.status, "active"))).limit(1);
-        if (!member || member.branchId !== branchId) throw fail("An active member in the selected branch is required.", 400, "HKM_MEMBER_NOT_FOUND");
+        let resolvedBranchId = explicitBranchId;
+        if (memberId) {
+          const [member] = await tx.select().from(hkmMembers).where(and(eq(hkmMembers.id, memberId), eq(hkmMembers.tenantId, tenantId))).limit(1);
+          if (!member) throw fail("Selected member was not found.", 400, "HKM_MEMBER_NOT_FOUND");
+          if (resolvedBranchId && member.branchId !== resolvedBranchId) {
+            throw fail("An active member in the selected branch is required.", 400, "HKM_MEMBER_NOT_FOUND");
+          }
+          resolvedBranchId = resolvedBranchId ?? member.branchId;
+        } else if (!resolvedBranchId) {
+          const [defaultBranch] = await tx
+            .select({ id: hkmBranches.id })
+            .from(hkmBranches)
+            .where(and(eq(hkmBranches.tenantId, tenantId), eq(hkmBranches.status, "active")))
+            .orderBy(asc(hkmBranches.createdAt))
+            .limit(1);
+          resolvedBranchId = defaultBranch?.id ?? null;
+        }
+
+        if (!resolvedBranchId) throw fail("Create an active church branch before recording transactions.", 400, "BRANCH_REQUIRED");
+
         return tx.insert(hkmGivingTransactions).values({
-          tenantId, memberId, branchId, amountMinor: Math.round(input.amount * 100), givingType: input.givingType ?? input.transactionType ?? input.category ?? "Offering",
-          transactionDate: input.transactionDate ? new Date(input.transactionDate) : new Date(), paymentMethod: input.paymentMethod ?? "manual",
-          receiptNumber, paymentStatus: input.paymentStatus ?? "verified",
+          tenantId,
+          memberId,
+          branchId: resolvedBranchId,
+          amountMinor: Math.round(input.amount * 100),
+          givingType: input.givingType ?? input.transactionType ?? input.category ?? "Offering",
+          transactionKind,
+          description: input.description ?? null,
+          nonMemberName,
+          isAnonymous,
+          transactionDate: txDate,
+          paymentMethod: input.paymentMethod ?? "manual",
+          receiptNumber,
+          paymentStatus: input.paymentStatus ?? "verified",
         }).returning();
       });
       return reply.code(201).send({ success: true, transaction: row });
@@ -401,14 +513,70 @@ export async function hkmDataRoutes(app: FastifyInstance, options: { config: App
     }
   });
 
+  app.patch<{ Params: { id: string } }>("/api/church/hkm/transactions/:id", async (request, reply) => {
+    const { tenantId } = await adminContext(request, "update");
+    const patchSchema = givingInput.partial();
+    const parsed = patchSchema.safeParse(request.body);
+    if (!parsed.success) return reply.code(400).send({ success: false, error: "INVALID_INPUT", details: parsed.error.flatten() });
+    const input = parsed.data;
+    const patch: Record<string, unknown> = { updatedAt: new Date() };
+    if (input.amount !== undefined) patch.amountMinor = Math.round(input.amount * 100);
+    if (input.givingType !== undefined || input.transactionType !== undefined || input.category !== undefined) {
+      patch.givingType = input.givingType ?? input.transactionType ?? input.category;
+    }
+    if (input.transactionKind !== undefined || input.type !== undefined) {
+      patch.transactionKind = (input.transactionKind ?? input.type)!.toLowerCase() === "expense" ? "expense" : "income";
+    }
+    if (input.description !== undefined) patch.description = input.description;
+    if (input.memberId !== undefined || input.member_id !== undefined) patch.memberId = input.memberId ?? input.member_id ?? null;
+    if (input.nonMemberName !== undefined || input.non_member_name !== undefined) {
+      patch.nonMemberName = (input.nonMemberName ?? input.non_member_name ?? null)?.trim() || null;
+    }
+    if (input.isAnonymous !== undefined || input.is_anonymous !== undefined) {
+      patch.isAnonymous = Boolean(input.isAnonymous ?? input.is_anonymous);
+    }
+    if (input.transactionDate !== undefined || input.transactionDateLegacy !== undefined || input.date !== undefined) {
+      patch.transactionDate = parseDateOrNow(input.transactionDate ?? input.transactionDateLegacy ?? input.date);
+    }
+    if (input.paymentStatus !== undefined) patch.paymentStatus = input.paymentStatus;
+
+    const [updated] = await withTenantTransaction(tenantId, (tx) =>
+      tx.update(hkmGivingTransactions).set(patch).where(and(eq(hkmGivingTransactions.tenantId, tenantId), eq(hkmGivingTransactions.id, request.params.id))).returning(),
+    );
+    if (!updated) return reply.code(404).send({ success: false, error: "TRANSACTION_NOT_FOUND" });
+    return reply.send({ success: true, transaction: updated });
+  });
+
+  app.delete<{ Params: { id: string } }>("/api/church/hkm/transactions/:id", async (request, reply) => {
+    const { tenantId } = await adminContext(request, "update");
+    const [deleted] = await withTenantTransaction(tenantId, (tx) =>
+      tx.delete(hkmGivingTransactions).where(and(eq(hkmGivingTransactions.tenantId, tenantId), eq(hkmGivingTransactions.id, request.params.id))).returning({ id: hkmGivingTransactions.id }),
+    );
+    if (!deleted) return reply.code(404).send({ success: false, error: "TRANSACTION_NOT_FOUND" });
+    return reply.send({ success: true });
+  });
+
   app.get("/api/church/hkm/equipment", async (request, reply) => {
     const { tenantId } = await adminContext(request, "read");
-    const assets = await withTenantTransaction(tenantId, (tx) => tx.select().from(churchInventoryAssets).where(eq(churchInventoryAssets.tenantId, tenantId)).orderBy(asc(churchInventoryAssets.name)));
+    const { assets, events } = await withTenantTransaction(tenantId, async (tx) => {
+      const [assetRows, eventRows] = await Promise.all([
+        tx.select().from(churchInventoryAssets).where(eq(churchInventoryAssets.tenantId, tenantId)).orderBy(asc(churchInventoryAssets.name)),
+        tx.select().from(churchInventoryAssetEvents).where(and(eq(churchInventoryAssetEvents.tenantId, tenantId), eq(churchInventoryAssetEvents.eventType, "maintenance"))).orderBy(desc(churchInventoryAssetEvents.occurredAt)),
+      ]);
+      return { assets: assetRows, events: eventRows };
+    });
+    const maintenanceByAsset = new Map<string, ReturnType<typeof parseMaintenanceEvent>[]>();
+    for (const event of events) {
+      const list = maintenanceByAsset.get(event.assetId) ?? [];
+      list.push(parseMaintenanceEvent(event));
+      maintenanceByAsset.set(event.assetId, list);
+    }
     return reply.send({ success: true, data: assets.map((asset) => ({
       id: asset.id, name: asset.name, category: asset.category, location: asset.location,
       status: asset.status, condition: asset.condition, serialNumber: asset.assetTag, serial_number: asset.assetTag,
       purchase_price: asset.purchaseValueMinor === null ? null : asset.purchaseValueMinor / 100,
       purchase_date: asset.acquiredOn, description: asset.notes ?? "", assetTag: asset.assetTag,
+      maintenanceRecords: maintenanceByAsset.get(asset.id) ?? [],
     })) });
   });
 
@@ -432,6 +600,396 @@ export async function hkmDataRoutes(app: FastifyInstance, options: { config: App
       if ((error as { code?: string }).code === "23505") return reply.code(409).send({ success: false, error: "ASSET_TAG_ALREADY_EXISTS" });
       throw error;
     }
+  });
+
+  app.patch<{ Params: { id: string } }>("/api/church/hkm/equipment/:id", async (request, reply) => {
+    const parsed = assetInput.partial().safeParse(request.body);
+    if (!parsed.success) return reply.code(400).send({ success: false, error: "INVALID_INPUT", details: parsed.error.flatten() });
+    const { tenantId } = await adminContext(request, "update");
+    const input = parsed.data;
+    const patch: Record<string, unknown> = { updatedAt: new Date() };
+    if (input.name !== undefined) patch.name = input.name;
+    if (input.category !== undefined) patch.category = input.category;
+    if (input.location !== undefined) patch.location = input.location;
+    if (input.condition !== undefined) patch.condition = input.condition.toLowerCase().replaceAll(" ", "_");
+    if (input.status !== undefined) patch.status = input.status.toLowerCase().replaceAll(" ", "_");
+    if (input.notes !== undefined || input.description !== undefined) patch.notes = input.notes ?? input.description ?? null;
+    if (input.purchaseValueMinor !== undefined || input.purchase_price !== undefined) {
+      patch.purchaseValueMinor = input.purchaseValueMinor ?? (input.purchase_price === undefined ? null : Math.round(input.purchase_price * 100));
+    }
+    if (input.acquiredOn !== undefined || input.purchase_date !== undefined) patch.acquiredOn = input.acquiredOn ?? input.purchase_date ?? null;
+
+    const [updated] = await withTenantTransaction(tenantId, (tx) =>
+      tx.update(churchInventoryAssets).set(patch).where(and(eq(churchInventoryAssets.tenantId, tenantId), eq(churchInventoryAssets.id, request.params.id))).returning(),
+    );
+    if (!updated) return reply.code(404).send({ success: false, error: "EQUIPMENT_NOT_FOUND" });
+    return reply.send({ success: true, data: updated });
+  });
+
+  app.delete<{ Params: { id: string } }>("/api/church/hkm/equipment/:id", async (request, reply) => {
+    const { tenantId } = await adminContext(request, "update");
+    const [deleted] = await withTenantTransaction(tenantId, (tx) =>
+      tx.delete(churchInventoryAssets).where(and(eq(churchInventoryAssets.tenantId, tenantId), eq(churchInventoryAssets.id, request.params.id))).returning({ id: churchInventoryAssets.id }),
+    );
+    if (!deleted) return reply.code(404).send({ success: false, error: "EQUIPMENT_NOT_FOUND" });
+    return reply.send({ success: true });
+  });
+
+  app.get<{ Params: { id: string } }>("/api/church/hkm/equipment/:id/maintenance", async (request, reply) => {
+    const { tenantId } = await adminContext(request, "read");
+    const rows = await withTenantTransaction(tenantId, (tx) =>
+      tx
+        .select()
+        .from(churchInventoryAssetEvents)
+        .where(and(
+          eq(churchInventoryAssetEvents.tenantId, tenantId),
+          eq(churchInventoryAssetEvents.assetId, request.params.id),
+          eq(churchInventoryAssetEvents.eventType, "maintenance"),
+        ))
+        .orderBy(desc(churchInventoryAssetEvents.occurredAt)),
+    );
+    return reply.send({ success: true, data: rows.map(parseMaintenanceEvent) });
+  });
+
+  app.post<{ Params: { id: string } }>("/api/church/hkm/equipment/:id/maintenance", async (request, reply) => {
+    const { tenantId, context } = await adminContext(request, "update");
+    const maintenanceSchema = z.object({
+      date: z.string().trim().min(4).max(64).optional(),
+      type: z.string().trim().min(2).max(80).default("Inspection"),
+      cost: z.coerce.number().min(0).default(0),
+      description: z.string().trim().max(4000).default(""),
+      status: z.string().trim().min(2).max(40).default("Pending"),
+    });
+    const parsed = maintenanceSchema.safeParse(request.body);
+    if (!parsed.success) return reply.code(400).send({ success: false, error: "INVALID_INPUT", details: parsed.error.flatten() });
+
+    const event = await withTenantTransaction(tenantId, async (tx) => {
+      const [asset] = await tx
+        .select({ id: churchInventoryAssets.id })
+        .from(churchInventoryAssets)
+        .where(and(eq(churchInventoryAssets.tenantId, tenantId), eq(churchInventoryAssets.id, request.params.id)))
+        .limit(1);
+      if (!asset) return null;
+      const [created] = await tx
+        .insert(churchInventoryAssetEvents)
+        .values({
+          tenantId,
+          assetId: asset.id,
+          eventType: "maintenance",
+          description: formatMaintenanceDescription(parsed.data.type, parsed.data.cost, parsed.data.status, parsed.data.description),
+          occurredAt: parseDateOrNow(parsed.data.date),
+          recordedBy: context.email,
+        })
+        .returning();
+      return created;
+    });
+    if (!event) return reply.code(404).send({ success: false, error: "EQUIPMENT_NOT_FOUND" });
+    return reply.code(201).send({ success: true, data: parseMaintenanceEvent(event) });
+  });
+
+  app.patch<{ Params: { eventId: string } }>("/api/church/hkm/equipment/maintenance/:eventId", async (request, reply) => {
+    const { tenantId } = await adminContext(request, "update");
+    const maintenancePatchSchema = z.object({
+      date: z.string().trim().min(4).max(64).optional(),
+      type: z.string().trim().min(2).max(80).optional(),
+      cost: z.coerce.number().min(0).optional(),
+      description: z.string().trim().max(4000).optional(),
+      status: z.string().trim().min(2).max(40).optional(),
+    });
+    const parsed = maintenancePatchSchema.safeParse(request.body);
+    if (!parsed.success) return reply.code(400).send({ success: false, error: "INVALID_INPUT", details: parsed.error.flatten() });
+
+    const updated = await withTenantTransaction(tenantId, async (tx) => {
+      const [existing] = await tx
+        .select()
+        .from(churchInventoryAssetEvents)
+        .where(and(eq(churchInventoryAssetEvents.tenantId, tenantId), eq(churchInventoryAssetEvents.id, request.params.eventId)))
+        .limit(1);
+      if (!existing) return null;
+      const prev = parseMaintenanceEvent(existing);
+      const nextDescription = formatMaintenanceDescription(
+        parsed.data.type ?? prev.type,
+        parsed.data.cost ?? prev.cost,
+        parsed.data.status ?? prev.status,
+        parsed.data.description ?? prev.description,
+      );
+      const [row] = await tx
+        .update(churchInventoryAssetEvents)
+        .set({
+          description: nextDescription,
+          ...(parsed.data.date ? { occurredAt: parseDateOrNow(parsed.data.date) } : {}),
+        })
+        .where(and(eq(churchInventoryAssetEvents.tenantId, tenantId), eq(churchInventoryAssetEvents.id, existing.id)))
+        .returning();
+      return row;
+    });
+    if (!updated) return reply.code(404).send({ success: false, error: "MAINTENANCE_RECORD_NOT_FOUND" });
+    return reply.send({ success: true, data: parseMaintenanceEvent(updated) });
+  });
+
+  app.delete<{ Params: { eventId: string } }>("/api/church/hkm/equipment/maintenance/:eventId", async (request, reply) => {
+    const { tenantId } = await adminContext(request, "update");
+    const [deleted] = await withTenantTransaction(tenantId, (tx) =>
+      tx
+        .delete(churchInventoryAssetEvents)
+        .where(and(eq(churchInventoryAssetEvents.tenantId, tenantId), eq(churchInventoryAssetEvents.id, request.params.eventId)))
+        .returning({ id: churchInventoryAssetEvents.id }),
+    );
+    if (!deleted) return reply.code(404).send({ success: false, error: "MAINTENANCE_RECORD_NOT_FOUND" });
+    return reply.send({ success: true });
+  });
+
+  app.get("/api/church/hkm/visitors", async (request, reply) => {
+    const { tenantId } = await adminContext(request, "read");
+    const { visitors, followUps } = await withTenantTransaction(tenantId, async (tx) => {
+      const [visitorRows, followUpRows] = await Promise.all([
+        tx.select().from(hkmVisitors).where(eq(hkmVisitors.tenantId, tenantId)).orderBy(desc(hkmVisitors.visitDate), desc(hkmVisitors.createdAt)),
+        tx.select().from(hkmVisitorFollowUps).where(eq(hkmVisitorFollowUps.tenantId, tenantId)).orderBy(desc(hkmVisitorFollowUps.date), desc(hkmVisitorFollowUps.createdAt)),
+      ]);
+      return { visitors: visitorRows, followUps: followUpRows };
+    });
+
+    const followUpsByVisitor = new Map<string, Array<{
+      id: string;
+      visitorId: string;
+      date: string;
+      interactionType: string;
+      notes: string;
+      nextFollowUpDate?: string | undefined;
+      outcome: string;
+    }>>();
+    for (const fu of followUps) {
+      const list = followUpsByVisitor.get(fu.visitorId) ?? [];
+      list.push({
+        id: fu.id,
+        visitorId: fu.visitorId,
+        date: fu.date,
+        interactionType: fu.method,
+        notes: fu.notes,
+        nextFollowUpDate: fu.nextFollowUpDate ?? undefined,
+        outcome: fu.outcome,
+      });
+      followUpsByVisitor.set(fu.visitorId, list);
+    }
+
+    return reply.send({
+      success: true,
+      data: visitors.map((v) => {
+        const initials = v.name.split(/\s+/).filter(Boolean).map((p) => p[0]?.toUpperCase() ?? "").join("").slice(0, 2) || "V";
+        return {
+          id: v.id,
+          name: v.name,
+          initials,
+          phone: v.phone ?? "",
+          email: v.email ?? undefined,
+          heardFrom: v.howHeard ?? "",
+          firstVisit: v.visitDate,
+          registeredDate: v.createdAt.toISOString().split("T")[0],
+          status: v.followUpStatus,
+          followUps: followUpsByVisitor.get(v.id) ?? [],
+        };
+      }),
+    });
+  });
+
+  app.post("/api/church/hkm/visitors", async (request, reply) => {
+    const { tenantId } = await adminContext(request, "update");
+    const visitorSchema = z.object({
+      name: z.string().trim().min(2).max(160),
+      phone: z.string().trim().max(40).optional(),
+      email: z.string().trim().email().max(254).optional().nullable(),
+      heardFrom: z.string().trim().max(80).optional(),
+      howHeard: z.string().trim().max(80).optional(),
+      firstVisit: z.string().trim().min(4).max(32).optional(),
+      visitDate: z.string().trim().min(4).max(32).optional(),
+      status: z.string().trim().max(32).optional(),
+      notes: z.string().max(4000).optional(),
+    });
+    const parsed = visitorSchema.safeParse(request.body);
+    if (!parsed.success) return reply.code(400).send({ success: false, error: "INVALID_INPUT", details: parsed.error.flatten() });
+    const d = parsed.data;
+    const visitDate = (d.visitDate ?? d.firstVisit ?? new Date().toISOString()).slice(0, 10);
+    const [created] = await withTenantTransaction(tenantId, (tx) =>
+      tx
+        .insert(hkmVisitors)
+        .values({
+          tenantId,
+          name: d.name,
+          phone: d.phone ?? null,
+          email: d.email ? d.email.toLowerCase() : null,
+          howHeard: d.howHeard ?? d.heardFrom ?? null,
+          visitDate,
+          followUpStatus: d.status ?? "New",
+          notes: d.notes ?? null,
+        })
+        .returning(),
+    );
+    return reply.code(201).send({ success: true, data: created });
+  });
+
+  app.patch<{ Params: { id: string } }>("/api/church/hkm/visitors/:id", async (request, reply) => {
+    const { tenantId } = await adminContext(request, "update");
+    const visitorPatchSchema = z.object({
+      name: z.string().trim().min(2).max(160).optional(),
+      phone: z.string().trim().max(40).optional().nullable(),
+      email: z.string().trim().email().max(254).optional().nullable(),
+      heardFrom: z.string().trim().max(80).optional().nullable(),
+      howHeard: z.string().trim().max(80).optional().nullable(),
+      firstVisit: z.string().trim().min(4).max(32).optional(),
+      visitDate: z.string().trim().min(4).max(32).optional(),
+      status: z.string().trim().max(32).optional(),
+      convertedToMember: z.boolean().optional(),
+      notes: z.string().max(4000).optional().nullable(),
+    });
+    const parsed = visitorPatchSchema.safeParse(request.body);
+    if (!parsed.success) return reply.code(400).send({ success: false, error: "INVALID_INPUT", details: parsed.error.flatten() });
+    const d = parsed.data;
+    const patch: Record<string, unknown> = { updatedAt: new Date() };
+    if (d.name !== undefined) patch.name = d.name;
+    if (d.phone !== undefined) patch.phone = d.phone;
+    if (d.email !== undefined) patch.email = d.email ? d.email.toLowerCase() : null;
+    if (d.howHeard !== undefined || d.heardFrom !== undefined) patch.howHeard = d.howHeard ?? d.heardFrom ?? null;
+    if (d.visitDate !== undefined || d.firstVisit !== undefined) patch.visitDate = (d.visitDate ?? d.firstVisit)!.slice(0, 10);
+    if (d.status !== undefined) {
+      patch.followUpStatus = d.status;
+      if (d.status === "Converted") patch.convertedToMember = true;
+    }
+    if (d.convertedToMember !== undefined) patch.convertedToMember = d.convertedToMember;
+    if (d.notes !== undefined) patch.notes = d.notes;
+
+    const [updated] = await withTenantTransaction(tenantId, (tx) =>
+      tx.update(hkmVisitors).set(patch).where(and(eq(hkmVisitors.tenantId, tenantId), eq(hkmVisitors.id, request.params.id))).returning(),
+    );
+    if (!updated) return reply.code(404).send({ success: false, error: "VISITOR_NOT_FOUND" });
+    return reply.send({ success: true, data: updated });
+  });
+
+  app.delete<{ Params: { id: string } }>("/api/church/hkm/visitors/:id", async (request, reply) => {
+    const { tenantId } = await adminContext(request, "update");
+    const [deleted] = await withTenantTransaction(tenantId, (tx) =>
+      tx.delete(hkmVisitors).where(and(eq(hkmVisitors.tenantId, tenantId), eq(hkmVisitors.id, request.params.id))).returning({ id: hkmVisitors.id }),
+    );
+    if (!deleted) return reply.code(404).send({ success: false, error: "VISITOR_NOT_FOUND" });
+    return reply.send({ success: true });
+  });
+
+  app.post<{ Params: { id: string } }>("/api/church/hkm/visitors/:id/follow-ups", async (request, reply) => {
+    const { tenantId, context } = await adminContext(request, "update");
+    const followUpSchema = z.object({
+      date: z.string().trim().min(4).max(32).optional(),
+      interactionType: z.string().trim().min(2).max(40).optional(),
+      method: z.string().trim().min(2).max(40).optional(),
+      notes: z.string().trim().min(1).max(4000),
+      outcome: z.string().trim().max(80).default("Reached"),
+      nextFollowUpDate: z.string().trim().min(4).max(32).optional().nullable(),
+    });
+    const parsed = followUpSchema.safeParse(request.body);
+    if (!parsed.success) return reply.code(400).send({ success: false, error: "INVALID_INPUT", details: parsed.error.flatten() });
+    const d = parsed.data;
+    const created = await withTenantTransaction(tenantId, async (tx) => {
+      const [visitor] = await tx
+        .select({ id: hkmVisitors.id })
+        .from(hkmVisitors)
+        .where(and(eq(hkmVisitors.tenantId, tenantId), eq(hkmVisitors.id, request.params.id)))
+        .limit(1);
+      if (!visitor) return null;
+      const [followUp] = await tx
+        .insert(hkmVisitorFollowUps)
+        .values({
+          tenantId,
+          visitorId: visitor.id,
+          date: (d.date ?? new Date().toISOString()).slice(0, 10),
+          method: d.method ?? d.interactionType ?? "Phone Call",
+          notes: d.notes,
+          outcome: d.outcome,
+          nextFollowUpDate: d.nextFollowUpDate ? d.nextFollowUpDate.slice(0, 10) : null,
+          followedUpBy: context.email,
+        })
+        .returning();
+      return followUp;
+    });
+    if (!created) return reply.code(404).send({ success: false, error: "VISITOR_NOT_FOUND" });
+    return reply.code(201).send({ success: true, data: created });
+  });
+
+  app.delete<{ Params: { followUpId: string } }>("/api/church/hkm/visitors/follow-ups/:followUpId", async (request, reply) => {
+    const { tenantId } = await adminContext(request, "update");
+    const [deleted] = await withTenantTransaction(tenantId, (tx) =>
+      tx
+        .delete(hkmVisitorFollowUps)
+        .where(and(eq(hkmVisitorFollowUps.tenantId, tenantId), eq(hkmVisitorFollowUps.id, request.params.followUpId)))
+        .returning({ id: hkmVisitorFollowUps.id }),
+    );
+    if (!deleted) return reply.code(404).send({ success: false, error: "FOLLOW_UP_NOT_FOUND" });
+    return reply.send({ success: true });
+  });
+
+  app.get("/api/church/hkm/sms", async (request, reply) => {
+    const { tenantId } = await adminContext(request, "read");
+    const query = request.query as { since?: string };
+    const filters = [eq(hkmSmsLogs.tenantId, tenantId)];
+    if (query.since && /^\d{4}-\d{2}-\d{2}$/.test(query.since)) {
+      filters.push(sql`${hkmSmsLogs.sentAt} >= ${new Date(`${query.since}T00:00:00.000Z`)}`);
+    }
+    const logs = await withTenantTransaction(tenantId, (tx) =>
+      tx.select().from(hkmSmsLogs).where(and(...filters)).orderBy(desc(hkmSmsLogs.sentAt)).limit(500),
+    );
+    return reply.send({
+      success: true,
+      data: logs.map((row) => ({
+        id: row.id,
+        recipientCount: row.recipientCount,
+        message: row.message,
+        status: row.status === "Pending" || row.status === "Failed" ? row.status : "Sent",
+        date: row.sentAt.toISOString().split("T")[0],
+        recipients: row.recipients,
+        recipientGroup: row.recipientGroup,
+        sentBy: row.sentBy,
+      })),
+    });
+  });
+
+  app.post("/api/church/hkm/sms", async (request, reply) => {
+    const { tenantId, context } = await adminContext(request, "update");
+    const smsSchema = z.object({
+      recipients: z.array(z.string().trim().max(40)).max(2000).default([]),
+      recipientGroup: z.string().trim().max(120).optional(),
+      recipientCount: z.coerce.number().int().min(1).max(100000).optional(),
+      message: z.string().trim().min(1).max(2000),
+      status: z.enum(["Sent", "Pending", "Failed"]).default("Sent"),
+      branchId: z.string().uuid().optional().nullable(),
+      date: z.string().trim().max(64).optional(),
+    });
+    const parsed = smsSchema.safeParse(request.body);
+    if (!parsed.success) return reply.code(400).send({ success: false, error: "INVALID_INPUT", details: parsed.error.flatten() });
+    const d = parsed.data;
+    const countValue = d.recipientCount ?? Math.max(1, d.recipients.length);
+    const [created] = await withTenantTransaction(tenantId, (tx) =>
+      tx
+        .insert(hkmSmsLogs)
+        .values({
+          tenantId,
+          recipients: d.recipients,
+          recipientGroup: d.recipientGroup ?? null,
+          message: d.message,
+          status: d.status,
+          sentBy: context.email,
+          recipientCount: countValue,
+          branchId: d.branchId ?? null,
+          sentAt: d.date ? parseDateOrNow(d.date) : new Date(),
+        })
+        .returning(),
+    );
+    return reply.code(201).send({ success: true, data: created });
+  });
+
+  app.delete<{ Params: { id: string } }>("/api/church/hkm/sms/:id", async (request, reply) => {
+    const { tenantId } = await adminContext(request, "update");
+    const [deleted] = await withTenantTransaction(tenantId, (tx) =>
+      tx.delete(hkmSmsLogs).where(and(eq(hkmSmsLogs.tenantId, tenantId), eq(hkmSmsLogs.id, request.params.id))).returning({ id: hkmSmsLogs.id }),
+    );
+    if (!deleted) return reply.code(404).send({ success: false, error: "SMS_LOG_NOT_FOUND" });
+    return reply.send({ success: true });
   });
 
   app.get("/api/church/hkm/stats", async (request, reply) => {
@@ -497,20 +1055,114 @@ export async function hkmDataRoutes(app: FastifyInstance, options: { config: App
 
   app.get("/api/church/hkm/portal/dashboard", async (request, reply) => {
     const { tenantId, member } = await portalMember(request);
-    const transactions = await withTenantTransaction(tenantId, (tx) => tx.select().from(hkmGivingTransactions).where(and(
-      eq(hkmGivingTransactions.tenantId, tenantId), eq(hkmGivingTransactions.memberId, member.id), eq(hkmGivingTransactions.paymentStatus, "verified"),
-    )).orderBy(desc(hkmGivingTransactions.transactionDate)).limit(250));
+    const { transactions, attendance } = await withTenantTransaction(tenantId, async (tx) => {
+      const [txRows, attRows] = await Promise.all([
+        tx.select().from(hkmGivingTransactions).where(and(
+          eq(hkmGivingTransactions.tenantId, tenantId), eq(hkmGivingTransactions.memberId, member.id), eq(hkmGivingTransactions.paymentStatus, "verified"),
+        )).orderBy(desc(hkmGivingTransactions.transactionDate)).limit(250),
+        tx.select().from(hkmMemberAttendanceRecords).where(and(
+          eq(hkmMemberAttendanceRecords.tenantId, tenantId), eq(hkmMemberAttendanceRecords.memberId, member.id),
+        )).orderBy(desc(hkmMemberAttendanceRecords.serviceDate)).limit(100),
+      ]);
+      return { transactions: txRows, attendance: attRows };
+    });
     return reply.header("cache-control", "no-store").send({
       member: {
-        id: member.id, first_name: member.firstName, last_name: member.lastName, email: member.email,
-        phone: member.phone, department: member.role, status: member.status, joined_at: member.createdAt.toISOString(),
+        id: member.id,
+        first_name: member.firstName,
+        last_name: member.lastName,
+        email: member.email,
+        phone: member.phone,
+        department: member.department || member.role,
+        address: member.address ?? "",
+        occupation: member.occupation ?? "",
+        marital_status: member.maritalStatus ?? "",
+        avatar: member.avatarUrl ?? "",
+        status: member.status,
+        joined_at: member.createdAt.toISOString(),
       },
       transactions: transactions.map((row) => ({
         id: row.id, date: row.transactionDate.toISOString(), category: row.givingType,
         amount: row.amountMinor / 100, description: row.receiptNumber,
       })),
-      attendance: [],
+      attendance: attendance.map((row) => ({
+        id: row.id,
+        date: row.serviceDate,
+        service: row.serviceType,
+        status: row.status,
+      })),
     });
+  });
+
+  app.patch("/api/church/hkm/portal/me", async (request, reply) => {
+    const { tenantId, member } = await portalMember(request);
+    const profilePatchSchema = z.object({
+      phone: z.string().trim().max(40).optional(),
+      email: z.string().trim().email().max(254).optional(),
+      address: z.string().trim().max(1000).nullable().optional(),
+      occupation: z.string().trim().max(160).nullable().optional(),
+      maritalStatus: z.string().trim().max(24).nullable().optional(),
+      marital_status: z.string().trim().max(24).nullable().optional(),
+      avatarUrl: z.string().trim().max(10000).nullable().optional(),
+      avatar: z.string().trim().max(10000).nullable().optional(),
+    });
+    const parsed = profilePatchSchema.safeParse(request.body);
+    if (!parsed.success) return reply.code(400).send({ error: "INVALID_INPUT", details: parsed.error.flatten() });
+    const d = parsed.data;
+    const patch: Record<string, unknown> = { updatedAt: new Date() };
+    if (d.phone !== undefined) patch.phone = d.phone;
+    if (d.email !== undefined) patch.email = d.email.toLowerCase();
+    if (d.address !== undefined) patch.address = d.address;
+    if (d.occupation !== undefined) patch.occupation = d.occupation;
+    if (d.maritalStatus !== undefined || d.marital_status !== undefined) {
+      patch.maritalStatus = d.maritalStatus ?? d.marital_status ?? null;
+    }
+    if (d.avatarUrl !== undefined || d.avatar !== undefined) patch.avatarUrl = d.avatarUrl ?? d.avatar ?? null;
+
+    try {
+      const [updated] = await withTenantTransaction(tenantId, (tx) =>
+        tx.update(hkmMembers).set(patch).where(and(eq(hkmMembers.tenantId, tenantId), eq(hkmMembers.id, member.id))).returning(),
+      );
+      if (!updated) return reply.code(404).send({ error: "HKM_MEMBER_NOT_FOUND" });
+      return reply.send({ success: true, member: memberDto(updated) });
+    } catch (error) {
+      if ((error as { code?: string }).code === "23505") {
+        return reply.code(409).send({ error: "EMAIL_IN_USE", message: "That email address is already registered to another member." });
+      }
+      throw error;
+    }
+  });
+
+  app.post("/api/church/hkm/portal/helpdesk", async (request, reply) => {
+    const { tenantId, member } = await portalMember(request);
+    const ticketSchema = z.object({
+      department: z.string().trim().max(60).optional(),
+      subject: z.string().trim().min(2).max(200),
+      message: z.string().trim().min(2).max(4000).optional(),
+      body: z.string().trim().min(2).max(4000).optional(),
+    });
+    const parsed = ticketSchema.safeParse(request.body);
+    const bodyText = parsed.success ? (parsed.data.message ?? parsed.data.body) : undefined;
+    if (!parsed.success || !bodyText) {
+      return reply.code(400).send({ error: "INVALID_INPUT", message: "Subject and message body are required." });
+    }
+    const [ticket] = await withTenantTransaction(tenantId, (tx) =>
+      tx
+        .insert(churchContactMessages)
+        .values({
+          tenantId,
+          fullName: `${member.firstName} ${member.lastName}`.trim().slice(0, 160),
+          email: member.email,
+          telephone: member.phone || null,
+          subject: parsed.data.subject,
+          message: bodyText,
+          category: (parsed.data.department || "Member Portal Helpdesk").slice(0, 60),
+          status: "new",
+          consentAt: new Date(),
+        })
+        .returning(),
+    );
+    return reply.code(201).send({ success: true, ticket });
   });
 
   app.get("/api/church/hkm/portal/giving-history", async (request, reply) => {

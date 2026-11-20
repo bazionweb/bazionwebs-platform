@@ -1,12 +1,21 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { and, desc, eq, sql } from "drizzle-orm";
+import { PostgresAuditEventWriter } from "@bazion/audit";
 import { siteEnquiries, siteEnquiryPolicies } from "@bazion/database";
-import { prepareSiteEnquiry, siteEnquiryPolicyInputSchema, websiteEnquirySchema } from "@bazion/forms";
+import {
+  prepareSiteEnquiry,
+  siteEnquiryPolicyInputSchema,
+  siteEnquiryStatusSchema,
+  siteEnquiryUpdateSchema,
+  websiteEnquirySchema,
+} from "@bazion/forms";
 import { requireActiveTenantPermission } from "@bazion/auth";
 import type { AppConfig } from "../../config.js";
-import { withTenantTransaction } from "../../lib/database.js";
+import { pool, withTenantTransaction } from "../../lib/database.js";
 import { resolveRequestTenantId } from "../../lib/tenant-resolution.js";
 import { isTenantModuleEnabled } from "../../lib/tenant-modules.js";
+
+const auditWriter = new PostgresAuditEventWriter(pool);
 
 interface RouteOptions {
   config: AppConfig;
@@ -99,13 +108,35 @@ export async function formsLeadsRoutes(app: FastifyInstance, { config }: RouteOp
     return reply.code(201).send({ success: true, message: "Thank you. Your enquiry has been received." });
   });
 
+  app.get("/public/site/enquiry-policy", async (request, reply) => {
+    const tenantId = await resolveRequestTenantId(request, config);
+    await assertFormsLeadsEnabled(tenantId);
+    const [policy] = await withTenantTransaction(tenantId, (tx) => tx.select({
+      enabled: siteEnquiryPolicies.enabled,
+      privacyNotice: siteEnquiryPolicies.privacyNotice,
+      privacyNoticeVersion: siteEnquiryPolicies.privacyNoticeVersion,
+      publishedAt: siteEnquiryPolicies.publishedAt,
+    }).from(siteEnquiryPolicies).where(eq(siteEnquiryPolicies.tenantId, tenantId)).limit(1));
+    reply.header("Cache-Control", "no-store");
+    if (!policy?.enabled || !policy.publishedAt) {
+      return reply.send({ enabled: false, privacyNotice: "", privacyNoticeVersion: policy?.privacyNoticeVersion ?? "1.0.0" });
+    }
+    return reply.send({
+      enabled: true,
+      privacyNotice: policy.privacyNotice,
+      privacyNoticeVersion: policy.privacyNoticeVersion,
+    });
+  });
+
   app.get("/admin/site/enquiry-policy", async (request, reply) => {
     const context = await requireActiveTenantPermission(request.headers, { enquiryPolicy: ["read"] });
+    await assertFormsLeadsEnabled(context.tenantId);
     const [policy] = await withTenantTransaction(context.tenantId, (tx) => tx.select({
       enabled: siteEnquiryPolicies.enabled,
       privacyNotice: siteEnquiryPolicies.privacyNotice,
       privacyNoticeVersion: siteEnquiryPolicies.privacyNoticeVersion,
       retentionDays: siteEnquiryPolicies.retentionDays,
+      routingEmail: siteEnquiryPolicies.routingEmail,
       publishedAt: siteEnquiryPolicies.publishedAt,
       updatedAt: siteEnquiryPolicies.updatedAt,
     }).from(siteEnquiryPolicies).where(eq(siteEnquiryPolicies.tenantId, context.tenantId)).limit(1));
@@ -115,6 +146,7 @@ export async function formsLeadsRoutes(app: FastifyInstance, { config }: RouteOp
 
   app.put("/admin/site/enquiry-policy", async (request, reply) => {
     const context = await requireActiveTenantPermission(request.headers, { enquiryPolicy: ["update"] });
+    await assertFormsLeadsEnabled(context.tenantId);
     const parsed = siteEnquiryPolicyInputSchema.safeParse(request.body);
     if (!parsed.success) {
       return reply.code(400).send({
@@ -124,29 +156,64 @@ export async function formsLeadsRoutes(app: FastifyInstance, { config }: RouteOp
     }
     const updatedAt = new Date();
     const publishedAt = parsed.data.enabled ? updatedAt : null;
+    const values = {
+      enabled: parsed.data.enabled,
+      privacyNotice: parsed.data.privacyNotice,
+      privacyNoticeVersion: parsed.data.privacyNoticeVersion,
+      retentionDays: parsed.data.retentionDays,
+      routingEmail: parsed.data.routingEmail?.trim() || null,
+      publishedAt,
+      updatedAt,
+    };
     const [policy] = await withTenantTransaction(context.tenantId, (tx) => tx.insert(siteEnquiryPolicies)
-      .values({ tenantId: context.tenantId, ...parsed.data, publishedAt, updatedAt })
+      .values({ tenantId: context.tenantId, ...values })
       .onConflictDoUpdate({
         target: siteEnquiryPolicies.tenantId,
-        set: { ...parsed.data, publishedAt, updatedAt },
+        set: values,
       })
       .returning({
         enabled: siteEnquiryPolicies.enabled,
         privacyNotice: siteEnquiryPolicies.privacyNotice,
         privacyNoticeVersion: siteEnquiryPolicies.privacyNoticeVersion,
         retentionDays: siteEnquiryPolicies.retentionDays,
+        routingEmail: siteEnquiryPolicies.routingEmail,
         publishedAt: siteEnquiryPolicies.publishedAt,
         updatedAt: siteEnquiryPolicies.updatedAt,
       }));
+    try {
+      await auditWriter.append({
+        actorType: "user",
+        actorId: context.userId ?? "admin",
+        actorRole: context.roles?.join(",") ?? null,
+        tenantId: context.tenantId,
+        action: "forms.enquiry_policy.updated",
+        resourceType: "site_enquiry_policies",
+        resourceId: context.tenantId,
+        outcome: "succeeded",
+        requestId: request.id,
+        metadata: { enabled: parsed.data.enabled, retentionDays: parsed.data.retentionDays },
+      });
+    } catch { /* non-fatal */ }
     reply.header("Cache-Control", "no-store");
     return reply.send({ policy });
   });
 
-  const listEnquiries = async (request: FastifyRequest<{ Querystring: { limit?: string; cursor?: string } }>, reply: FastifyReply, exportMode = false) => {
+  const listEnquiries = async (
+    request: FastifyRequest<{ Querystring: { limit?: string; cursor?: string; status?: string } }>,
+    reply: FastifyReply,
+    exportMode = false,
+  ) => {
     const context = await requireActiveTenantPermission(request.headers, { enquiry: [exportMode ? "export" : "read"] });
 
     const limit = parsePageSize(request.query.limit);
     const cursor = parseCursor(request.query.cursor);
+    const statusFilter = request.query.status?.trim();
+    const validStatus = statusFilter && statusFilter !== "all"
+      ? siteEnquiryStatusSchema.safeParse(statusFilter)
+      : null;
+    if (validStatus && !validStatus.success) {
+      return reply.code(400).send({ error: "INVALID_STATUS", message: "Invalid enquiry status filter." });
+    }
     if (limit === undefined) return reply.code(400).send({ error: "INVALID_PAGE_SIZE", message: `Page size must be between 1 and ${MAX_PAGE_SIZE}.` });
     if (cursor === undefined) return reply.code(400).send({ error: "INVALID_CURSOR", message: "The enquiry export cursor is invalid." });
 
@@ -159,16 +226,20 @@ export async function formsLeadsRoutes(app: FastifyInstance, { config }: RouteOp
         telephone: siteEnquiries.telephone,
         subject: siteEnquiries.subject,
         message: siteEnquiries.message,
+        status: siteEnquiries.status,
+        assignedTo: siteEnquiries.assignedTo,
         privacyConsentAt: siteEnquiries.privacyConsentAt,
         privacyNoticeVersion: siteEnquiries.privacyNoticeVersion,
         retentionExpiresAt: siteEnquiries.retentionExpiresAt,
         createdAt: siteEnquiries.createdAt,
+        updatedAt: siteEnquiries.updatedAt,
         cursorTimestamp: sql<string>`${siteEnquiries.createdAt}::text`,
       })
       .from(siteEnquiries)
       .where(and(
         eq(siteEnquiries.tenantId, context.tenantId),
         sql`${siteEnquiries.retentionExpiresAt} > now()`,
+        ...(validStatus?.success ? [eq(siteEnquiries.status, validStatus.data)] : []),
         ...(cursor ? [sql`(${siteEnquiries.createdAt} < ${cursor.createdAt}::timestamptz OR (${siteEnquiries.createdAt} = ${cursor.createdAt}::timestamptz AND ${siteEnquiries.id} < ${cursor.id}::uuid))`] : []),
       ))
       .orderBy(desc(siteEnquiries.createdAt), desc(siteEnquiries.id))
@@ -186,22 +257,71 @@ export async function formsLeadsRoutes(app: FastifyInstance, { config }: RouteOp
       telephone: row.telephone,
       subject: row.subject,
       message: row.message,
+      status: row.status ?? "new",
+      assignedTo: row.assignedTo ?? null,
       privacyConsentAt: row.privacyConsentAt,
       privacyNoticeVersion: row.privacyNoticeVersion,
       retentionExpiresAt: row.retentionExpiresAt,
       createdAt: row.createdAt,
+      updatedAt: row.updatedAt ?? row.createdAt,
     }));
     reply.header("Cache-Control", "no-store");
     if (exportMode) {
       reply.header("Content-Disposition", "attachment; filename=site-enquiries-page.json");
+      try {
+        await auditWriter.append({
+          actorType: "user",
+          actorId: context.userId ?? "admin",
+          actorRole: context.roles?.join(",") ?? null,
+          tenantId: context.tenantId,
+          action: "forms.enquiries.exported",
+          resourceType: "site_enquiries",
+          outcome: "succeeded",
+          requestId: request.id,
+          metadata: { count: enquiries.length },
+        });
+      } catch { /* non-fatal */ }
     }
     return reply.send({ enquiries, nextCursor, hasMore });
   };
 
-  app.get<{ Querystring: { limit?: string; cursor?: string } }>("/admin/site/enquiries", (request, reply) =>
+  app.get<{ Querystring: { limit?: string; cursor?: string; status?: string } }>("/admin/site/enquiries", (request, reply) =>
     listEnquiries(request, reply));
-  app.get<{ Querystring: { limit?: string; cursor?: string } }>("/admin/site/enquiries/export", (request, reply) =>
+  app.get<{ Querystring: { limit?: string; cursor?: string; status?: string } }>("/admin/site/enquiries/export", (request, reply) =>
     listEnquiries(request, reply, true));
+
+  app.patch<{ Params: { id: string } }>("/admin/site/enquiries/:id", async (request, reply) => {
+    const context = await requireActiveTenantPermission(request.headers, { enquiry: ["update"] });
+    if (!UUID_PATTERN.test(request.params.id)) return reply.code(404).send({ error: "ENQUIRY_NOT_FOUND" });
+    const parsed = siteEnquiryUpdateSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.code(400).send({ error: "INVALID_INPUT", details: parsed.error.flatten() });
+    }
+    const [updated] = await withTenantTransaction(context.tenantId, (tx) => tx.update(siteEnquiries)
+      .set({
+        ...(parsed.data.status !== undefined ? { status: parsed.data.status } : {}),
+        ...(parsed.data.assignedTo !== undefined ? { assignedTo: parsed.data.assignedTo } : {}),
+        updatedAt: new Date(),
+      })
+      .where(and(eq(siteEnquiries.id, request.params.id), eq(siteEnquiries.tenantId, context.tenantId)))
+      .returning());
+    if (!updated) return reply.code(404).send({ error: "ENQUIRY_NOT_FOUND" });
+    try {
+      await auditWriter.append({
+        actorType: "user",
+        actorId: context.userId ?? "admin",
+        actorRole: context.roles?.join(",") ?? null,
+        tenantId: context.tenantId,
+        action: "forms.enquiry.updated",
+        resourceType: "site_enquiries",
+        resourceId: request.params.id,
+        outcome: "succeeded",
+        requestId: request.id,
+        metadata: { status: updated.status },
+      });
+    } catch { /* non-fatal */ }
+    return reply.send({ enquiry: updated });
+  });
 
   app.delete<{ Params: { id: string } }>("/admin/site/enquiries/:id", async (request, reply) => {
     const context = await requireActiveTenantPermission(request.headers, { enquiry: ["delete"] });
@@ -211,6 +331,19 @@ export async function formsLeadsRoutes(app: FastifyInstance, { config }: RouteOp
       .where(and(eq(siteEnquiries.id, request.params.id), eq(siteEnquiries.tenantId, context.tenantId)))
       .returning({ id: siteEnquiries.id }));
     if (!deleted) return reply.code(404).send({ error: "ENQUIRY_NOT_FOUND" });
+    try {
+      await auditWriter.append({
+        actorType: "user",
+        actorId: context.userId ?? "admin",
+        actorRole: context.roles?.join(",") ?? null,
+        tenantId: context.tenantId,
+        action: "forms.enquiry.deleted",
+        resourceType: "site_enquiries",
+        resourceId: request.params.id,
+        outcome: "succeeded",
+        requestId: request.id,
+      });
+    } catch { /* non-fatal */ }
     return reply.send({ success: true });
   });
 }

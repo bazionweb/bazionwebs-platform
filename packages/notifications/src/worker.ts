@@ -6,16 +6,12 @@ import {
   PostgresNotificationOutbox,
   type OutboxDelivery,
 } from "./outbox.js";
+import { HttpSmsNotificationAdapter, SmtpEmailNotificationAdapter } from "./providers.js";
 
 function required(name: string): string {
   const value = process.env[name]?.trim();
   if (!value) throw new Error(`Missing required notification worker environment variable: ${name}`);
   return value;
-}
-
-function escapeHtml(value: string): string {
-  return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;").replaceAll("'", "&#39;");
 }
 
 const encryptionKey = Buffer.from(required("NOTIFICATION_ENCRYPTION_KEY"), "base64");
@@ -75,28 +71,23 @@ for (const signal of ["SIGINT", "SIGTERM"] as const) {
   });
 }
 
+const emailAdapter = new SmtpEmailNotificationAdapter(transport, emailFrom);
+const smsAdapter = new HttpSmsNotificationAdapter({
+  webhookUrl: process.env.NOTIFICATION_SMS_WEBHOOK_URL,
+  bearerToken: process.env.NOTIFICATION_SMS_WEBHOOK_TOKEN,
+  senderId: process.env.NOTIFICATION_SMS_SENDER_ID,
+});
+
 async function deliver(delivery: OutboxDelivery): Promise<void> {
-  if (delivery.channel !== "email") {
-    throw new Error("UNSUPPORTED_NOTIFICATION_CHANNEL");
+  if (delivery.channel === "email") {
+    await emailAdapter.send(delivery);
+    return;
   }
-
-  const intro = typeof delivery.payload.variables.intro === "string"
-    ? delivery.payload.variables.intro
-    : "You have a new notification from Bazion Web.";
-  const url = typeof delivery.payload.variables.url === "string"
-    ? delivery.payload.variables.url
-    : "";
-  const text = url ? `${intro}\n\n${url}\n\nIf you did not request this, you can ignore this email.`
-    : `${intro}\n\nIf you did not request this, you can ignore this email.`;
-  const html = `<p>${escapeHtml(intro)}</p>${url ? `<p><a href="${escapeHtml(url)}">Continue to Bazion Web</a></p>` : ""}<p>If you did not request this, you can ignore this email.</p>`;
-
-  await transport.sendMail({
-    from: emailFrom,
-    to: delivery.payload.to,
-    subject: delivery.payload.subject ?? "Notification from Bazion Web",
-    text,
-    html,
-  });
+  if (delivery.channel === "sms") {
+    await smsAdapter.send(delivery);
+    return;
+  }
+  throw new Error("UNSUPPORTED_NOTIFICATION_CHANNEL");
 }
 
 function sleep(milliseconds: number): Promise<void> {

@@ -41,7 +41,7 @@ export async function getCourses(filters?: {
     if (filters?.moduleId) params.append('module_id', filters.moduleId);
 
     const queryString = params.toString();
-    const url = `${API_URL}/courses${queryString ? `?${queryString}` : ''}`;
+    const url = `${API_URL}/education/courses${queryString ? `?${queryString}` : ''}`;
     const response = await authFetch(url);
     const status = response.status;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -87,7 +87,7 @@ export async function getCourses(filters?: {
 
 export async function createCourse(data: Partial<Course>): Promise<CourseResponse> {
   try {
-    const response = await authFetch(`${API_URL}/courses`, {
+    const response = await authFetch(`${API_URL}/education/courses`, {
       method: 'POST',
       body: JSON.stringify(data),
     });
@@ -99,7 +99,7 @@ export async function createCourse(data: Partial<Course>): Promise<CourseRespons
 
 export async function updateCourse(id: string, data: Partial<Course>): Promise<CourseResponse> {
   try {
-    const response = await authFetch(`${API_URL}/courses/${id}`, {
+    const response = await authFetch(`${API_URL}/education/courses/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(data),
     });
@@ -111,7 +111,7 @@ export async function updateCourse(id: string, data: Partial<Course>): Promise<C
 
 export async function deleteCourse(id: string): Promise<CourseResponse> {
   try {
-    const response = await authFetch(`${API_URL}/courses/${id}`, { method: 'DELETE' });
+    const response = await authFetch(`${API_URL}/education/courses/${id}`, { method: 'DELETE' });
     const result = await parseJsonSafe<CourseResponse>(response);
     return result ?? { success: false, error: 'Failed to parse delete course response' };
   } catch { return { success: false, error: 'Failed to delete course'  };
@@ -121,7 +121,7 @@ export async function deleteCourse(id: string): Promise<CourseResponse> {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function getCourseStats(): Promise<any> {
   try {
-    const response = await authFetch(`${API_URL}/courses/stats/overview`);
+    const response = await authFetch(`${API_URL}/education/courses/stats/overview`);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const data = await parseJsonSafe<any>(response);
     return data ?? { success: false, error: 'Failed to parse course statistics response' };

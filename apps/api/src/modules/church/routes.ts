@@ -493,9 +493,15 @@ export async function churchRoutes(app: FastifyInstance, options: RouteOptions) 
         const now = new Date();
 
         if (filter === "upcoming") {
-          conditions.push(and(eq(churchEvents.status, "upcoming"), sql`${churchEvents.startsAt} >= ${now}`)!);
+          conditions.push(and(
+            sql`${churchEvents.status} <> 'completed'`,
+            sql`coalesce(${churchEvents.endsAt}, ${churchEvents.startsAt} + interval '1 day') >= ${now}`,
+          )!);
         } else if (filter === "past") {
-          conditions.push(or(eq(churchEvents.status, "completed"), sql`${churchEvents.startsAt} < ${now}`)!);
+          conditions.push(or(
+            eq(churchEvents.status, "completed"),
+            sql`coalesce(${churchEvents.endsAt}, ${churchEvents.startsAt} + interval '1 day') < ${now}`,
+          )!);
         }
 
         const events = await tx
@@ -1408,6 +1414,65 @@ export async function churchRoutes(app: FastifyInstance, options: RouteOptions) 
     return reply.send({ success: true });
   });
 
+  // PUT /v1/admin/church/sermons/:id
+  app.put<{ Params: { id: string } }>("/admin/church/sermons/:id", async (request, reply) => {
+    const context = await requireActiveTenantPermission(request.raw.headers, { store: ["update"] });
+    await assertChurchEnabled(context.tenantId);
+
+    const sermonUpdateSchema = z.object({
+      title: z.string().trim().min(3).max(200).optional(),
+      slug: z.string().trim().min(3).max(140).regex(/^[a-z0-9-]+$/).optional(),
+      speaker: z.string().trim().min(2).max(160).optional(),
+      description: z.string().trim().max(5000).nullable().optional(),
+      categoryId: z.string().uuid().nullable().optional(),
+      youtubeVideoId: z.string().trim().min(5).max(64).nullable().optional(),
+      thumbnailUrl: sermonInputSchema.shape.thumbnailUrl.nullable().optional(),
+      scriptureReference: z.string().trim().max(160).nullable().optional(),
+      publishedAt: z.string().datetime().nullable().optional(),
+      status: z.enum(["draft", "published", "archived"]).optional(),
+    });
+    const parsed = sermonUpdateSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.code(400).send({ error: "VALIDATION_ERROR", details: parsed.error.issues });
+    }
+
+    const patch: Record<string, unknown> = { updatedAt: new Date() };
+    if (parsed.data.title !== undefined) patch.title = parsed.data.title;
+    if (parsed.data.slug !== undefined) patch.slug = parsed.data.slug;
+    if (parsed.data.speaker !== undefined) patch.speaker = parsed.data.speaker;
+    if (parsed.data.description !== undefined) patch.description = parsed.data.description;
+    if (parsed.data.categoryId !== undefined) patch.categoryId = parsed.data.categoryId;
+    if (parsed.data.youtubeVideoId !== undefined) patch.youtubeVideoId = parsed.data.youtubeVideoId;
+    if (parsed.data.thumbnailUrl !== undefined) patch.thumbnailUrl = parsed.data.thumbnailUrl;
+    if (parsed.data.scriptureReference !== undefined) patch.scriptureReference = parsed.data.scriptureReference;
+    if (parsed.data.publishedAt !== undefined) {
+      patch.publishedAt = parsed.data.publishedAt ? new Date(parsed.data.publishedAt) : null;
+    }
+    if (parsed.data.status !== undefined) {
+      patch.status = parsed.data.status;
+      if (parsed.data.publishedAt === undefined && parsed.data.status === "published") {
+        patch.publishedAt = new Date();
+      }
+    }
+
+    try {
+      const [updated] = await withTenantTransaction(context.tenantId, (tx) =>
+        tx
+          .update(sermons)
+          .set(patch)
+          .where(and(eq(sermons.tenantId, context.tenantId), eq(sermons.id, request.params.id)))
+          .returning(),
+      );
+      if (!updated) return reply.code(404).send({ error: "SERMON_NOT_FOUND", message: "Sermon not found." });
+      return reply.send({ sermon: updated });
+    } catch (error) {
+      if (isUniqueConstraintViolation(error)) {
+        return reply.code(409).send({ error: "SERMON_SLUG_EXISTS", message: "A sermon with this URL slug already exists. Choose another slug." });
+      }
+      throw error;
+    }
+  });
+
   // GET /v1/admin/church/events
   app.get("/admin/church/events", async (request, reply) => {
     const context = await requireActiveTenantPermission(request.raw.headers, { store: ["read"] });
@@ -1496,6 +1561,79 @@ export async function churchRoutes(app: FastifyInstance, options: RouteOptions) 
     return reply.send({ success: true });
   });
 
+  // PUT /v1/admin/church/events/:id
+  app.put<{ Params: { id: string } }>("/admin/church/events/:id", async (request, reply) => {
+    const context = await requireActiveTenantPermission(request.raw.headers, { store: ["update"] });
+    await assertChurchEnabled(context.tenantId);
+
+    const eventUpdateSchema = z.object({
+      title: z.string().trim().min(3).max(200).optional(),
+      slug: z.string().trim().min(3).max(140).regex(/^[a-z0-9-]+$/).optional(),
+      description: z.string().trim().max(5000).nullable().optional(),
+      posterUrl: sermonInputSchema.shape.thumbnailUrl.nullable().optional(),
+      venue: z.string().trim().max(180).nullable().optional(),
+      address: z.string().trim().max(500).nullable().optional(),
+      startsAt: z.string().datetime().optional(),
+      endsAt: z.string().datetime().nullable().optional(),
+      registrationEnabled: z.boolean().optional(),
+      registrationCapacity: z.number().int().positive().nullable().optional(),
+      status: z.enum(["upcoming", "in_progress", "completed", "cancelled"]).optional(),
+    });
+    const parsed = eventUpdateSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.code(400).send({ error: "VALIDATION_ERROR", details: parsed.error.issues });
+    }
+
+    try {
+      return await withTenantTransaction(context.tenantId, async (tx) => {
+        const [existing] = await tx
+          .select()
+          .from(churchEvents)
+          .where(and(eq(churchEvents.tenantId, context.tenantId), eq(churchEvents.id, request.params.id)))
+          .limit(1);
+        if (!existing) {
+          return reply.code(404).send({ error: "EVENT_NOT_FOUND", message: "Event not found." });
+        }
+
+        const nextStartsAt = parsed.data.startsAt ? new Date(parsed.data.startsAt) : existing.startsAt;
+        const nextEndsAt = parsed.data.endsAt !== undefined
+          ? (parsed.data.endsAt ? new Date(parsed.data.endsAt) : null)
+          : existing.endsAt;
+        if (nextEndsAt && nextEndsAt < nextStartsAt) {
+          return reply.code(400).send({
+            error: "VALIDATION_ERROR",
+            message: "Event end time must be after its start time.",
+          });
+        }
+
+        const patch: Record<string, unknown> = { updatedAt: new Date() };
+        if (parsed.data.title !== undefined) patch.title = parsed.data.title;
+        if (parsed.data.slug !== undefined) patch.slug = parsed.data.slug;
+        if (parsed.data.description !== undefined) patch.description = parsed.data.description;
+        if (parsed.data.posterUrl !== undefined) patch.posterUrl = parsed.data.posterUrl;
+        if (parsed.data.venue !== undefined) patch.venue = parsed.data.venue;
+        if (parsed.data.address !== undefined) patch.address = parsed.data.address;
+        if (parsed.data.startsAt !== undefined) patch.startsAt = nextStartsAt;
+        if (parsed.data.endsAt !== undefined) patch.endsAt = nextEndsAt;
+        if (parsed.data.registrationEnabled !== undefined) patch.registrationEnabled = parsed.data.registrationEnabled;
+        if (parsed.data.registrationCapacity !== undefined) patch.registrationCapacity = parsed.data.registrationCapacity;
+        if (parsed.data.status !== undefined) patch.status = parsed.data.status;
+
+        const [updated] = await tx
+          .update(churchEvents)
+          .set(patch)
+          .where(and(eq(churchEvents.tenantId, context.tenantId), eq(churchEvents.id, request.params.id)))
+          .returning();
+        return reply.send({ event: updated });
+      });
+    } catch (error) {
+      if (isUniqueConstraintViolation(error)) {
+        return reply.code(409).send({ error: "EVENT_SLUG_EXISTS", message: "An event with this URL slug already exists. Choose another slug." });
+      }
+      throw error;
+    }
+  });
+
   // GET /v1/admin/church/registrations
   app.get("/admin/church/registrations", async (request, reply) => {
     const context = await requireActiveTenantPermission(request.raw.headers, { churchprivate: ["read"] });
@@ -1546,6 +1684,80 @@ export async function churchRoutes(app: FastifyInstance, options: RouteOptions) 
         .orderBy(desc(churchDonations.createdAt));
 
       return reply.send({ donations: rows });
+    });
+  });
+
+  // POST /v1/admin/church/donations/:id/reconcile
+  app.post<{ Params: { id: string } }>("/admin/church/donations/:id/reconcile", async (request, reply) => {
+    const context = await requireActiveTenantPermission(request.raw.headers, { churchprivate: ["update"] });
+    await assertChurchEnabled(context.tenantId);
+
+    const reconcileSchema = z.object({
+      paymentStatus: z.enum(["verified", "failed"]),
+      providerReference: z.string().trim().min(1).max(160).optional(),
+    });
+    const parsed = reconcileSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.code(400).send({ error: "VALIDATION_ERROR", details: parsed.error.issues });
+    }
+
+    return withTenantTransaction(context.tenantId, async (tx) => {
+      const [donation] = await tx
+        .select()
+        .from(churchDonations)
+        .where(and(eq(churchDonations.tenantId, context.tenantId), eq(churchDonations.id, request.params.id)))
+        .for("update")
+        .limit(1);
+
+      if (!donation) {
+        return reply.code(404).send({ error: "DONATION_NOT_FOUND", message: "Donation not found." });
+      }
+
+      if (donation.paymentStatus === parsed.data.paymentStatus) {
+        return reply.send({ donation, alreadyReconciled: true });
+      }
+
+      const [updated] = await tx
+        .update(churchDonations)
+        .set({ paymentStatus: parsed.data.paymentStatus })
+        .where(and(eq(churchDonations.tenantId, context.tenantId), eq(churchDonations.id, donation.id)))
+        .returning();
+
+      await tx
+        .update(churchPaymentTransactions)
+        .set({
+          transactionStatus: parsed.data.paymentStatus === "verified" ? "succeeded" : "failed",
+          verifiedAt: parsed.data.paymentStatus === "verified" ? new Date() : null,
+          ...(parsed.data.providerReference ? { providerReference: parsed.data.providerReference } : {}),
+        })
+        .where(
+          and(
+            eq(churchPaymentTransactions.tenantId, context.tenantId),
+            eq(churchPaymentTransactions.donationId, donation.id),
+          ),
+        );
+
+      if (donation.campaignId) {
+        if (parsed.data.paymentStatus === "verified" && donation.paymentStatus !== "verified") {
+          await tx
+            .update(donationCampaigns)
+            .set({
+              raisedAmountMinor: sql`${donationCampaigns.raisedAmountMinor} + ${donation.amountMinor}`,
+              updatedAt: new Date(),
+            })
+            .where(and(eq(donationCampaigns.tenantId, context.tenantId), eq(donationCampaigns.id, donation.campaignId)));
+        } else if (parsed.data.paymentStatus === "failed" && donation.paymentStatus === "verified") {
+          await tx
+            .update(donationCampaigns)
+            .set({
+              raisedAmountMinor: sql`GREATEST(0, ${donationCampaigns.raisedAmountMinor} - ${donation.amountMinor})`,
+              updatedAt: new Date(),
+            })
+            .where(and(eq(donationCampaigns.tenantId, context.tenantId), eq(donationCampaigns.id, donation.campaignId)));
+        }
+      }
+
+      return reply.send({ donation: updated });
     });
   });
 

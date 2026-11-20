@@ -3,7 +3,7 @@
   "name": "Education UMS",
   "version": "0.1.0",
   "owner": "education",
-  "status": "partial",
+  "status": "stable",
   "entrypoints": {
     "domain": "packages/database/src/schema/education.ts",
     "api": "apps/api/src/modules/education/data-routes.ts",
@@ -20,12 +20,31 @@
     { "name": "education_programs", "owner": "education-ums", "tenantScoped": true, "rls": "forced", "migration": "0028_education_institution_records.sql" },
     { "name": "education_terms", "owner": "education-ums", "tenantScoped": true, "rls": "forced", "migration": "0028_education_institution_records.sql" },
     { "name": "education_students", "owner": "education-ums", "tenantScoped": true, "rls": "forced", "migration": "0028_education_institution_records.sql" },
-    { "name": "education_regulatory_evidence", "owner": "education-ums", "tenantScoped": true, "rls": "forced", "migration": "0030_education_institution_contacts_evidence.sql" }
+    { "name": "education_regulatory_evidence", "owner": "education-ums", "tenantScoped": true, "rls": "forced", "migration": "0030_education_institution_contacts_evidence.sql" },
+    { "name": "education_study_centers", "owner": "education-ums", "tenantScoped": true, "rls": "forced", "migration": "0034_complete_partial_modules.sql" },
+    { "name": "education_staff", "owner": "education-ums", "tenantScoped": true, "rls": "forced", "migration": "0034_complete_partial_modules.sql" },
+    { "name": "education_courses", "owner": "education-ums", "tenantScoped": true, "rls": "forced", "migration": "0034_complete_partial_modules.sql" },
+    { "name": "education_course_sections", "owner": "education-ums", "tenantScoped": true, "rls": "forced", "migration": "0034_complete_partial_modules.sql" },
+    { "name": "education_applications", "owner": "education-ums", "tenantScoped": true, "rls": "forced", "migration": "0034_complete_partial_modules.sql" },
+    { "name": "education_application_logs", "owner": "education-ums", "tenantScoped": true, "rls": "forced", "migration": "0034_complete_partial_modules.sql" },
+    { "name": "education_enrollments", "owner": "education-ums", "tenantScoped": true, "rls": "forced", "migration": "0034_complete_partial_modules.sql" },
+    { "name": "education_grades", "owner": "education-ums", "tenantScoped": true, "rls": "forced", "migration": "0034_complete_partial_modules.sql" },
+    { "name": "education_grade_appeals", "owner": "education-ums", "tenantScoped": true, "rls": "forced", "migration": "0034_complete_partial_modules.sql" },
+    { "name": "education_finance_transactions", "owner": "education-ums", "tenantScoped": true, "rls": "forced", "migration": "0034_complete_partial_modules.sql" },
+    { "name": "education_library_items", "owner": "education-ums", "tenantScoped": true, "rls": "forced", "migration": "0034_complete_partial_modules.sql" }
   ],
-  "migrations": ["0028_education_institution_records.sql", "0030_education_institution_contacts_evidence.sql"],
+  "migrations": [
+    "0028_education_institution_records.sql",
+    "0030_education_institution_contacts_evidence.sql",
+    "0033_education_website_template_overlays.sql",
+    "0034_complete_partial_modules.sql"
+  ],
   "events": [],
   "jobs": [],
-  "tests": ["packages/education-ums/src/index.test.tsx"],
+  "tests": [
+    "packages/education-ums/src/index.test.tsx",
+    "apps/api/src/modules/education/data-routes.test.ts"
+  ],
   "docs": [],
   "operations": {
     "logs": true,

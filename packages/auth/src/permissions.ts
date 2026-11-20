@@ -9,9 +9,11 @@ export const statement = {
   customer: ["read", "update"],
   store: ["read", "update"],
   churchprivate: ["read", "update"],
-  enquiry: ["read", "export", "delete"],
+  enquiry: ["read", "update", "export", "delete"],
   enquiryPolicy: ["read", "update"],
-  analytics: ["read"],
+  analytics: ["read", "export", "delete"],
+  audit: ["read", "export"],
+  media: ["read", "create", "delete"],
   education: ["read", "create", "update", "delete"],
 } as const;
 
@@ -26,9 +28,11 @@ export const owner = ac.newRole({
   customer: ["read", "update"],
   store: ["read", "update"],
   churchprivate: ["read", "update"],
-  enquiry: ["read", "export", "delete"],
+  enquiry: ["read", "update", "export", "delete"],
   enquiryPolicy: ["read", "update"],
-  analytics: ["read"],
+  analytics: ["read", "export", "delete"],
+  audit: ["read", "export"],
+  media: ["read", "create", "delete"],
   education: ["read", "create", "update", "delete"],
 });
 
@@ -40,15 +44,18 @@ export const admin = ac.newRole({
   customer: ["read", "update"],
   store: ["read", "update"],
   churchprivate: ["read", "update"],
-  enquiry: ["read", "export", "delete"],
+  enquiry: ["read", "update", "export", "delete"],
   enquiryPolicy: ["read", "update"],
-  analytics: ["read"],
+  analytics: ["read", "export", "delete"],
+  audit: ["read"],
+  media: ["read", "create", "delete"],
   education: ["read", "create", "update", "delete"],
 });
 
 export const member = ac.newRole({});
 export const catalogManager = ac.newRole({
   product: ["read", "create", "update", "delete"],
+  media: ["read", "create"],
 });
 export const orderManager = ac.newRole({
   order: ["read", "update"],
@@ -56,6 +63,7 @@ export const orderManager = ac.newRole({
 });
 export const contentEditor = ac.newRole({
   store: ["read", "update"],
+  media: ["read", "create"],
 });
 export const viewer = ac.newRole({
   product: ["read"],
@@ -63,6 +71,7 @@ export const viewer = ac.newRole({
   customer: ["read"],
   store: ["read"],
   analytics: ["read"],
+  media: ["read"],
 });
 
 export const organizationRoles = {
@@ -89,9 +98,11 @@ export const rolePermissionMap = {
     customer: ["read", "update"],
     store: ["read", "update"],
     churchprivate: ["read", "update"],
-    enquiry: ["read", "export", "delete"],
+    enquiry: ["read", "update", "export", "delete"],
     enquiryPolicy: ["read", "update"],
-    analytics: ["read"],
+    analytics: ["read", "export", "delete"],
+    audit: ["read", "export"],
+    media: ["read", "create", "delete"],
     education: ["read", "create", "update", "delete"],
   },
   admin: {
@@ -102,21 +113,30 @@ export const rolePermissionMap = {
     customer: ["read", "update"],
     store: ["read", "update"],
     churchprivate: ["read", "update"],
-    enquiry: ["read", "export", "delete"],
+    enquiry: ["read", "update", "export", "delete"],
     enquiryPolicy: ["read", "update"],
-    analytics: ["read"],
+    analytics: ["read", "export", "delete"],
+    audit: ["read"],
+    media: ["read", "create", "delete"],
     education: ["read", "create", "update", "delete"],
   },
   member: {},
-  catalogManager: { product: ["read", "create", "update", "delete"] },
+  catalogManager: {
+    product: ["read", "create", "update", "delete"],
+    media: ["read", "create"],
+  },
   orderManager: { order: ["read", "update"], customer: ["read"] },
-  contentEditor: { store: ["read", "update"] },
+  contentEditor: {
+    store: ["read", "update"],
+    media: ["read", "create"],
+  },
   viewer: {
     product: ["read"],
     order: ["read"],
     customer: ["read"],
     store: ["read"],
     analytics: ["read"],
+    media: ["read"],
   },
 } as const;
 

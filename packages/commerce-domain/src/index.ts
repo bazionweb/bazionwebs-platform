@@ -3,8 +3,8 @@ import { DomainError } from "./errors.js";
 export { DomainError } from "./errors.js";
 export { availableStock, canReserveStock, canSetStockOnHand, canSetStockTracking, releaseStockReservation, reserveStock } from "./inventory.js";
 export type { InventoryBalance, InventoryPosition } from "./inventory.js";
-export { planPaymentSettlement } from "./payment-settlement.js";
-export type { CommerceOrderStatus, CommercePaymentStatus, PaymentSettlementPlan } from "./payment-settlement.js";
+export { planOrderStatusTransition, planPaymentSettlement } from "./payment-settlement.js";
+export type { CommerceOrderStatus, CommercePaymentStatus, OrderTransitionPlan, PaymentSettlementPlan } from "./payment-settlement.js";
 
 export type CurrencyCode = "KES" | "USD" | "EUR" | "GBP" | "CAD" | "AUD" | "NZD" | "CHF" | "SGD" | "ZAR" | "NGN" | "GHS" | "INR" | "AED" | "BRL" | "MXN" | "SAR" | "CNY" | "HKD" | "SEK" | "NOK" | "DKK" | "PLN" | "THB" | "PHP";
 

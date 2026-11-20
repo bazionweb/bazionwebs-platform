@@ -5,6 +5,7 @@
  */
 
 import React, { useState, useMemo, useCallback } from "react";
+import { PlatformBrandBadge } from "./PlatformBrandBadge";
 import {
   Search,
   Printer,
@@ -27,6 +28,7 @@ import {
 import { Student, Course } from "../types";
 import { documentService } from "../services/documentService";
 import { getHtml2Pdf } from "../services/pdfService";
+import { useUIStore } from "../stores/uiStore";
 import type {
   RegistrationCard as RegistrationCardType,
   DocumentSecurityFeatures,
@@ -62,6 +64,12 @@ export const RegistrationCard: React.FC<RegistrationCardProps> = ({
   courses,
   logo,
 }) => {
+  const institutionName = useUIStore((state) => state.institutionName);
+  const shortName = useUIStore((state) => state.shortName);
+  const configuredLogo = useUIStore((state) => state.logo);
+  const primaryColor = useUIStore((state) => state.primaryColor);
+  const accentColor = useUIStore((state) => state.accentColor);
+  const documentLogo = logo || configuredLogo;
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [showCard, setShowCard] = useState(false);
@@ -363,8 +371,9 @@ export const RegistrationCard: React.FC<RegistrationCardProps> = ({
               <div
                 id="modern-registration-card"
                 className="bg-white rounded-2xl shadow-2xl overflow-hidden border border-slate-200"
+                style={{ "--institution-primary": primaryColor, "--institution-accent": accentColor } as React.CSSProperties}
               >
-                <div className="h-2 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600" />
+                <div className="h-2" style={{ background: `linear-gradient(90deg, ${primaryColor}, ${accentColor}, ${primaryColor})` }} />
 
                 <div className="p-8">
                   {/* Header */}
@@ -372,14 +381,14 @@ export const RegistrationCard: React.FC<RegistrationCardProps> = ({
                     <div className="flex items-center gap-4">
                       <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-slate-900 to-slate-800 flex items-center justify-center shadow-xl">
                         <img
-                          src={logo}
-                          alt="BMI"
+                          src={documentLogo}
+                          alt={shortName}
                           className="w-10 h-10 object-contain brightness-0 invert"
                         />
                       </div>
                       <div>
                         <h2 className="text-xl font-black text-slate-900 tracking-tight">
-                          BMI University
+                          {institutionName}
                         </h2>
                         <p className="text-sm text-slate-500 font-medium">
                           Course Registration Card
@@ -387,7 +396,7 @@ export const RegistrationCard: React.FC<RegistrationCardProps> = ({
                       </div>
                     </div>
                     <div className="text-right">
-                      <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-amber-500 to-orange-600 text-white font-bold text-xs shadow-lg">
+                      <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-white font-bold text-xs shadow-lg" style={{ backgroundColor: primaryColor }}>
                         <ShieldCheck size={14} />
                         {generatedCard.registrationStatus === "complete"
                           ? "Registered"
@@ -560,12 +569,13 @@ export const RegistrationCard: React.FC<RegistrationCardProps> = ({
                       <p className="text-[10px] text-slate-400">
                         Registration confirmed by academic advisor
                       </p>
-                      <p className="text-xs text-slate-500">BMI University</p>
+                      <p className="text-xs text-slate-500">{institutionName}</p>
                     </div>
                   </div>
                 </div>
 
-                <div className="h-2 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600" />
+                <div className="flex justify-end px-8 py-2"><PlatformBrandBadge compact /></div>
+                <div className="h-2" style={{ background: `linear-gradient(90deg, ${primaryColor}, ${accentColor}, ${primaryColor})` }} />
               </div>
             </div>
           ) : (

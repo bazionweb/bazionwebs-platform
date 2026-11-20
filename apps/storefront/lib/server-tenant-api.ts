@@ -1,8 +1,8 @@
 import { cookies, headers } from "next/headers";
 import { cache } from "react";
 import { extractTenantSlugFromHost } from "@bazion/auth";
+import { getServerApiBaseUrl } from "./server-api-base-url";
 
-const apiBaseUrl = (process.env.API_BASE_URL ?? "http://localhost:4000").replace(/\/$/, "");
 const devFallbackApiBaseUrl = "http://localhost:4000";
 
 export async function getTenantRequestContext(): Promise<{ origin: string; headers: HeadersInit } | null> {
@@ -48,6 +48,7 @@ export const fetchTenantPublicData = cache(async function fetchTenantPublicData<
   const tenantContext = await getTenantRequestContext();
   if (!tenantContext) return null;
 
+  const apiBaseUrl = getServerApiBaseUrl();
   try {
     const response = await fetchFromApi(apiBaseUrl, path, tenantContext.headers);
     if (!response.ok) return null;

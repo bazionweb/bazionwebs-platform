@@ -304,13 +304,17 @@ export const siteEnquiries = pgTable("site_enquiries", {
   telephone: varchar("telephone", { length: 30 }),
   subject: varchar("subject", { length: 200 }),
   message: text("message").notNull(),
+  status: varchar("status", { length: 24 }).notNull().default("new"),
+  assignedTo: varchar("assigned_to", { length: 128 }),
   privacyConsentAt: timestamp("privacy_consent_at", { withTimezone: true }).notNull(),
   privacyNoticeVersion: varchar("privacy_notice_version", { length: 40 }).notNull(),
   retentionExpiresAt: timestamp("retention_expires_at", { withTimezone: true }).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
   check("site_enquiries_contact_ck", sql`${table.email} is not null or ${table.telephone} is not null`),
   check("site_enquiries_retention_ck", sql`${table.retentionExpiresAt} > ${table.createdAt}`),
+  check("site_enquiries_status_ck", sql`${table.status} in ('new', 'in_progress', 'responded', 'archived')`),
   index("site_enquiries_tenant_created_idx").on(table.tenantId, table.createdAt, table.id),
   index("site_enquiries_expiration_idx").on(table.tenantId, table.retentionExpiresAt),
 ]);
@@ -321,6 +325,7 @@ export const siteEnquiryPolicies = pgTable("site_enquiry_policies", {
   privacyNotice: text("privacy_notice").notNull().default(""),
   privacyNoticeVersion: varchar("privacy_notice_version", { length: 40 }).notNull().default("1.0.0"),
   retentionDays: integer("retention_days").notNull().default(180),
+  routingEmail: varchar("routing_email", { length: 254 }),
   publishedAt: timestamp("published_at", { withTimezone: true }),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
@@ -355,4 +360,75 @@ export const churchNewsletterSubscribers = pgTable("church_newsletter_subscriber
 }, (table) => [
   uniqueIndex("church_newsletter_tenant_email_uq").on(table.tenantId, sql`lower(${table.email})`),
 ]);
+
+/** Append-only platform security and administrative audit trail. */
+export const platformAuditEvents = pgTable("platform_audit_events", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull().defaultNow(),
+  tenantId: uuid("tenant_id").references(() => tenants.id, { onDelete: "restrict" }),
+  actorType: varchar("actor_type", { length: 16 }).notNull(),
+  actorId: varchar("actor_id", { length: 128 }).notNull(),
+  actorRole: varchar("actor_role", { length: 64 }),
+  action: varchar("action", { length: 128 }).notNull(),
+  resourceType: varchar("resource_type", { length: 80 }).notNull(),
+  resourceId: varchar("resource_id", { length: 128 }),
+  outcome: varchar("outcome", { length: 16 }).notNull(),
+  requestId: varchar("request_id", { length: 128 }),
+  metadata: jsonb("metadata").$type<Record<string, string | number | boolean | null>>().notNull().default({}),
+}, (table) => [
+  check("platform_audit_events_actor_type_ck", sql`${table.actorType} in ('user', 'service', 'system')`),
+  check("platform_audit_events_outcome_ck", sql`${table.outcome} in ('succeeded', 'denied', 'failed')`),
+  index("platform_audit_events_occurred_idx").on(table.occurredAt),
+]);
+
+/** Durable tenant-scoped media metadata and quota accounting. */
+export const tenantMediaAssets = pgTable("tenant_media_assets", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+  objectKey: varchar("object_key", { length: 512 }).notNull(),
+  publicUrl: text("public_url").notNull(),
+  filename: varchar("filename", { length: 255 }).notNull(),
+  contentType: varchar("content_type", { length: 64 }).notNull(),
+  sizeBytes: bigint("size_bytes", { mode: "number" }).notNull().default(0),
+  originalSizeBytes: bigint("original_size_bytes", { mode: "number" }).notNull().default(0),
+  width: integer("width"),
+  height: integer("height"),
+  checksumSha256: varchar("checksum_sha256", { length: 64 }),
+  optimized: boolean("optimized").notNull().default(false),
+  uploadedBy: varchar("uploaded_by", { length: 128 }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("tenant_media_assets_tenant_key_uq").on(table.tenantId, table.objectKey),
+  index("tenant_media_assets_tenant_created_idx").on(table.tenantId, table.createdAt),
+  check("tenant_media_assets_size_ck", sql`${table.sizeBytes} >= 0`),
+]);
+
+/** Tenant-scoped product and website analytics events. */
+export const analyticsEvents = pgTable("analytics_events", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+  eventName: varchar("event_name", { length: 80 }).notNull(),
+  path: varchar("path", { length: 512 }).notNull().default("/"),
+  actorId: varchar("actor_id", { length: 128 }),
+  propertiesJson: jsonb("properties_json").$type<Record<string, string | number | boolean | null>>().notNull().default({}),
+  occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull().defaultNow(),
+  retentionExpiresAt: timestamp("retention_expires_at", { withTimezone: true }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index("analytics_events_tenant_occurred_idx").on(table.tenantId, table.occurredAt),
+  index("analytics_events_tenant_name_idx").on(table.tenantId, table.eventName, table.occurredAt),
+  index("analytics_events_retention_idx").on(table.tenantId, table.retentionExpiresAt),
+]);
+
+/** Tenant analytics retention and collection policy. */
+export const analyticsPolicies = pgTable("analytics_policies", {
+  tenantId: uuid("tenant_id").primaryKey().references(() => tenants.id, { onDelete: "cascade" }),
+  enabled: boolean("enabled").notNull().default(true),
+  retentionDays: integer("retention_days").notNull().default(90),
+  updatedBy: varchar("updated_by", { length: 128 }),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  check("analytics_policies_retention_ck", sql`${table.retentionDays} between 1 and 3650`),
+]);
+
 

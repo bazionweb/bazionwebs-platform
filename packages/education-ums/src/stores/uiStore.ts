@@ -30,6 +30,14 @@ interface UIState {
   logo: string;
   institutionName: string;
   shortName: string;
+  primaryColor: string;
+  secondaryColor: string;
+  accentColor: string;
+  tagline: string;
+  accreditationLabel: string;
+  address: string;
+  contactEmail: string;
+  contactPhone: string;
   isSidebarOpen: boolean;
   isSidebarCollapsed: boolean;
   expandedGroups: string[];
@@ -39,7 +47,19 @@ interface UIState {
   setTheme: (theme: 'light' | 'dark') => void;
   toggleTheme: () => void;
   setLogo: (logo: string) => void;
-  setInstitutionBranding: (branding: { logo?: string; institutionName?: string; shortName?: string }) => void;
+  setInstitutionBranding: (branding: {
+    logo?: string;
+    institutionName?: string;
+    shortName?: string;
+    primaryColor?: string;
+    secondaryColor?: string;
+    accentColor?: string;
+    tagline?: string;
+    accreditationLabel?: string;
+    address?: string;
+    contactEmail?: string;
+    contactPhone?: string;
+  }) => void;
   openSidebar: () => void;
   closeSidebar: () => void;
   toggleSidebar: () => void;
@@ -58,6 +78,14 @@ export const useUIStore = create<UIState>((set, get) => ({
   logo: '/BMI.svg',
   institutionName: 'Bethel Ministries International University',
   shortName: 'BMI University',
+  primaryColor: '#0E1D38',
+  secondaryColor: '#172A4D',
+  accentColor: '#C5A048',
+  tagline: 'Excellence in faith and knowledge',
+  accreditationLabel: 'Accredited Higher Education',
+  address: 'Mukurwe-ini Plaza, Nyeri County, Kenya',
+  contactEmail: 'registrar@bmiuniversities.org',
+  contactPhone: '+254 721 341 793',
   isSidebarOpen: false,
   isSidebarCollapsed: loadPersisted<boolean>(STORAGE_KEY, false),
   expandedGroups: loadPersisted<string[]>(STORAGE_KEY, []),
@@ -85,6 +113,14 @@ export const useUIStore = create<UIState>((set, get) => ({
       logo: branding.logo ?? state.logo,
       institutionName: branding.institutionName ?? state.institutionName,
       shortName: branding.shortName ?? state.shortName,
+      primaryColor: branding.primaryColor ?? state.primaryColor,
+      secondaryColor: branding.secondaryColor ?? state.secondaryColor,
+      accentColor: branding.accentColor ?? state.accentColor,
+      tagline: branding.tagline ?? state.tagline,
+      accreditationLabel: branding.accreditationLabel ?? state.accreditationLabel,
+      address: branding.address ?? state.address,
+      contactEmail: branding.contactEmail ?? state.contactEmail,
+      contactPhone: branding.contactPhone ?? state.contactPhone,
     })),
 
   openSidebar: () => set({ isSidebarOpen: true }),

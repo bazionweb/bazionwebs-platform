@@ -3,7 +3,7 @@
   "name": "Transactional email, SMS and delivery outbox",
   "version": "0.1.0",
   "owner": "platform",
-  "status": "partial",
+  "status": "stable",
   "entrypoints": {
     "adapter": "packages/notifications",
     "worker": "packages/notifications/src/worker.ts"
@@ -25,7 +25,13 @@
     "recovery": "Restore PostgreSQL outbox and the matching AES-256-GCM key; reclaim expired worker leases and inspect dead letters before requeue.",
     "enableDisable": "Disable delivery only via an operations change; retain durable enqueue or fail authentication email callbacks rather than dropping messages."
   },
+  "providers": [
+    "PostgreSQL encrypted outbox",
+    "SMTP transactional email",
+    "Webhook/HTTP SMS gateway"
+  ],
   "tests": [
+    "packages/notifications/src/outbox.test.ts",
     "packages/notifications/src/outbox.integration.test.ts"
   ],
   "docs": [

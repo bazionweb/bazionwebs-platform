@@ -1,7 +1,8 @@
-import { useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery } from '../shims/apollo';
 import { toTitleCase, formatEmail } from '../utils/stringFormatter';
 import { Visitor, FollowUp, VisitorStatus } from '../components/visitorData';
+import { hkmApiRequest, HkmIdMap } from '../services/hkmApi';
 import {
   GET_VISITORS_QUERY,
   ADD_VISITOR_MUTATION,
@@ -12,8 +13,31 @@ import {
   DELETE_FOLLOW_UP_MUTATION,
 } from '../services/graphql/visitors';
 
+interface ApiFollowUpRecord {
+  id: string;
+  visitorId: string;
+  date: string;
+  interactionType: string;
+  notes: string;
+  nextFollowUpDate?: string;
+  outcome: string;
+}
+
+interface ApiVisitorRecord {
+  id: string;
+  name: string;
+  initials: string;
+  phone: string;
+  email?: string;
+  heardFrom: string;
+  firstVisit: string;
+  registeredDate: string;
+  status: string;
+  followUps?: ApiFollowUpRecord[];
+}
+
 export function useVisitors() {
-  const { data, loading, error } = useQuery(GET_VISITORS_QUERY, {
+  const { data: apolloData, loading: apolloLoading, error: apolloError } = useQuery(GET_VISITORS_QUERY, {
     fetchPolicy: 'cache-and-network',
     notifyOnNetworkStatusChange: false,
     errorPolicy: 'all',
@@ -35,9 +59,56 @@ export function useVisitors() {
     refetchQueries: [{ query: GET_VISITORS_QUERY }],
   });
 
+  const visitorIdMapRef = useRef(new HkmIdMap());
+  const followUpIdMapRef = useRef(new HkmIdMap());
+  const apiReadyRef = useRef(false);
+  const [apiRows, setApiRows] = useState<ApiVisitorRecord[] | null>(null);
+  const [apiLoading, setApiLoading] = useState(true);
+
+  const refresh = useCallback(async () => {
+    try {
+      const rows = await hkmApiRequest<ApiVisitorRecord[]>('/api/church/hkm/visitors');
+      apiReadyRef.current = true;
+      setApiRows(rows);
+    } catch {
+      // Keep Apollo fallback when API endpoint is unavailable (e.g. standalone unit tests)
+    } finally {
+      setApiLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
   const visitors: Visitor[] = useMemo(() => {
-    if (!data?.visitorsCollection?.edges) return [];
-    return data.visitorsCollection.edges.map((edge: { node: Record<string, unknown> }): Visitor => {
+    if (apiRows !== null) {
+      return apiRows.map((v): Visitor => {
+        const visitorNumId = visitorIdMapRef.current.numericId(v.id);
+        return {
+          id: visitorNumId,
+          name: v.name,
+          initials: v.initials || '',
+          phone: v.phone || '',
+          email: v.email || undefined,
+          heardFrom: v.heardFrom || '',
+          firstVisit: v.firstVisit || '',
+          registeredDate: v.registeredDate || '',
+          status: v.status as VisitorStatus,
+          followUps: (v.followUps ?? []).map((f) => ({
+            id: followUpIdMapRef.current.numericId(f.id),
+            visitorId: visitorNumId,
+            date: f.date,
+            interactionType: f.interactionType as FollowUp['interactionType'],
+            notes: f.notes || '',
+            nextFollowUpDate: f.nextFollowUpDate || undefined,
+            outcome: f.outcome || '',
+          })),
+        };
+      });
+    }
+    if (!apolloData?.visitorsCollection?.edges) return [];
+    return apolloData.visitorsCollection.edges.map((edge: { node: Record<string, unknown> }): Visitor => {
       const v = edge.node as {
         id: number;
         name: string;
@@ -87,10 +158,25 @@ export function useVisitors() {
           }) || [],
       };
     });
-  }, [data]);
+  }, [apiRows, apolloData]);
 
   const addVisitor = async (visitor: Partial<Visitor>) => {
     const { initials, registeredDate, ...rest } = visitor;
+    if (apiReadyRef.current) {
+      await hkmApiRequest('/api/church/hkm/visitors', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: toTitleCase(rest.name),
+          phone: rest.phone || '',
+          email: rest.email ? formatEmail(rest.email) : null,
+          heardFrom: toTitleCase(rest.heardFrom),
+          firstVisit: rest.firstVisit,
+          status: rest.status || 'New',
+        }),
+      });
+      await refresh();
+      return;
+    }
     await addVisitorMutation({
       variables: {
         object: {
@@ -98,17 +184,9 @@ export function useVisitors() {
           name: toTitleCase(rest.name),
           phone: rest.phone || '',
           email: rest.email ? formatEmail(rest.email) : undefined,
-          initials:
-            initials ||
-            (rest.name
-              ? rest.name
-                  .split(' ')
-                  .map((n) => n[0])
-                  .join('')
-                  .toUpperCase()
-              : ''),
           heard_from: toTitleCase(rest.heardFrom),
           first_visit: rest.firstVisit,
+          initials: initials || (rest.name ? rest.name.split(' ').map((n) => n[0]).join('').toUpperCase() : ''),
           registered_date: registeredDate || new Date().toISOString().split('T')[0],
           status: rest.status || 'New',
         },
@@ -117,7 +195,22 @@ export function useVisitors() {
   };
 
   const updateVisitor = async (id: number, updates: Partial<Visitor>) => {
-    const { ...rest } = updates;
+    const { id: _id, followUps: _fu, ...rest } = updates;
+    if (apiReadyRef.current) {
+      const payload: Record<string, unknown> = {};
+      if (rest.name !== undefined) payload.name = toTitleCase(rest.name);
+      if (rest.phone !== undefined) payload.phone = rest.phone;
+      if (rest.email !== undefined) payload.email = rest.email ? formatEmail(rest.email) : null;
+      if (rest.heardFrom !== undefined) payload.heardFrom = toTitleCase(rest.heardFrom);
+      if (rest.firstVisit !== undefined) payload.firstVisit = rest.firstVisit;
+      if (rest.status !== undefined) payload.status = rest.status;
+      await hkmApiRequest(`/api/church/hkm/visitors/${encodeURIComponent(visitorIdMapRef.current.resolve(id))}`, {
+        method: 'PATCH',
+        body: JSON.stringify(payload),
+      });
+      await refresh();
+      return;
+    }
     const set: Record<string, unknown> = {};
     if (rest.name) set.name = toTitleCase(rest.name);
     if (rest.phone) set.phone = rest.phone;
@@ -133,12 +226,34 @@ export function useVisitors() {
   };
 
   const deleteVisitor = async (id: number) => {
+    if (apiReadyRef.current) {
+      await hkmApiRequest(`/api/church/hkm/visitors/${encodeURIComponent(visitorIdMapRef.current.resolve(id))}`, {
+        method: 'DELETE',
+      });
+      await refresh();
+      return;
+    }
     await deleteVisitorMutation({
       variables: { id },
     });
   };
 
   const addFollowUp = async (followUp: Omit<FollowUp, 'id'>) => {
+    if (apiReadyRef.current) {
+      const visitorUuid = visitorIdMapRef.current.resolve(followUp.visitorId);
+      await hkmApiRequest(`/api/church/hkm/visitors/${encodeURIComponent(visitorUuid)}/follow-ups`, {
+        method: 'POST',
+        body: JSON.stringify({
+          date: followUp.date,
+          interactionType: followUp.interactionType,
+          notes: followUp.notes,
+          nextFollowUpDate: followUp.nextFollowUpDate ?? null,
+          outcome: followUp.outcome,
+        }),
+      });
+      await refresh();
+      return;
+    }
     await addFollowUpMutation({
       variables: {
         object: {
@@ -167,6 +282,14 @@ export function useVisitors() {
   };
 
   const deleteFollowUp = async (id: number) => {
+    if (apiReadyRef.current) {
+      const followUpUuid = followUpIdMapRef.current.resolve(id);
+      await hkmApiRequest(`/api/church/hkm/visitors/follow-ups/${encodeURIComponent(followUpUuid)}`, {
+        method: 'DELETE',
+      });
+      await refresh();
+      return;
+    }
     await deleteFollowUpMutation({
       variables: { id },
     });
@@ -174,14 +297,14 @@ export function useVisitors() {
 
   return {
     data: visitors,
-    loading,
-    error,
+    loading: apiRows !== null ? apiLoading : apolloLoading,
+    error: apiReadyRef.current ? undefined : apolloError,
     addVisitor,
     updateVisitor,
     deleteVisitor,
     addFollowUp,
     updateFollowUp,
     deleteFollowUp,
-    setData: () => {}, // Compatibility with old hooks if needed
+    setData: () => {},
   };
 }

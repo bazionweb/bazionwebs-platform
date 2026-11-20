@@ -13,9 +13,10 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.seed.json --noEmit",
     "migrate": "tsx scripts/migrate.ts",
     "migrate:global-mission": "tsx scripts/migrate-global-mission.ts",
+    "seed:global-mission": "tsx scripts/seed-global-mission.ts",
     "migrate:bmi": "tsx scripts/migrate-bmi.ts",
     "migrate:bmi:apply": "tsx scripts/migrate-bmi.ts --apply",
     "migrate:hkm": "tsx scripts/migrate-hkm.ts",
@@ -25,6 +26,7 @@
     "preflight": "tsx src/production-preflight.ts"
   },
   "dependencies": {
+    "@bazion/church-ministry-contracts": "workspace:*",
     "@bazion/church-ministry-template": "workspace:*",
     "drizzle-orm": "^0.45.4",
     "pg": "^8.23.1"

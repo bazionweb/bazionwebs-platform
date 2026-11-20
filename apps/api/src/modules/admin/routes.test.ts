@@ -32,18 +32,32 @@ const mocks = vi.hoisted(() => ({
   cancelInvitation: vi.fn(),
   updateMemberRole: vi.fn(),
   removeMember: vi.fn(),
+  updateOrganization: vi.fn(),
   appendAuditEvent: vi.fn(),
+  listAuditEvents: vi.fn(),
+  createPlatformServiceIdentity: vi.fn(),
+  listPlatformServiceIdentities: vi.fn(),
+  revokePlatformServiceIdentity: vi.fn(),
+  listPlatformMembers: vi.fn(),
+  upsertPlatformMember: vi.fn(),
+  updatePlatformMemberStatus: vi.fn(),
 }));
 
-vi.mock("@bazion/audit", () => ({ PostgresAuditEventWriter: class { append(event: unknown) { return mocks.appendAuditEvent(event); } } }));
+vi.mock("@bazion/audit", () => ({
+  PostgresAuditEventWriter: class { append(event: unknown) { return mocks.appendAuditEvent(event); } },
+  PostgresAuditEventReader: class { list(filters: unknown) { return mocks.listAuditEvents(filters); } },
+  serializeAuditEventsCsv: (events: Array<{ id: string }>) => `id\n${events.map((e) => e.id).join("\n")}\n`,
+  serializeAuditEventsJson: (events: unknown[]) => JSON.stringify({ count: events.length, items: events }),
+}));
 vi.mock("@bazion/auth", () => ({ requireActiveTenantPermission: mocks.requirePermission, requirePlatformRole: mocks.requirePlatformRole, requirePlatformPermission: mocks.requirePlatformPermission, normalizeTenantHostname: (hostname: string) => { const value = hostname.trim().toLowerCase().replace(/\.$/, ""); return /^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$/.test(value) ? value : null; } }));
-vi.mock("@bazion/auth/server", () => ({ reconcileProvisioningTenants: mocks.reconcileProvisioningTenants, listPlatformTenants: mocks.listPlatformTenants, getPlatformTenant: mocks.getPlatformTenant, transitionPlatformTenant: mocks.transitionPlatformTenant, transferPlatformTenantOwner: mocks.transferPlatformTenantOwner, listPlatformTenantOwnerCandidates: mocks.listPlatformTenantOwnerCandidates, assignVerifiedTenantAdminByEmail: mocks.assignVerifiedTenantAdminByEmail, getPlatformTenantModuleEntitlements: mocks.getPlatformTenantModuleEntitlements, updatePlatformTenantModuleEntitlement: mocks.updatePlatformTenantModuleEntitlement, isPlatformTenantModuleEnabled: mocks.isPlatformTenantModuleEnabled, getPlatformTenantSettings: mocks.getPlatformTenantSettings, updatePlatformTenantSettings: mocks.updatePlatformTenantSettings, countPlatformTenantMembers: mocks.countPlatformTenantMembers, listPlatformTenantDomains: mocks.listPlatformTenantDomains, createPlatformTenantDomain: mocks.createPlatformTenantDomain, getPlatformTenantDomainChallenge: mocks.getPlatformTenantDomainChallenge, activatePlatformTenantDomain: mocks.activatePlatformTenantDomain, disablePlatformTenantDomain: mocks.disablePlatformTenantDomain, auth: { api: {
+vi.mock("@bazion/auth/server", () => ({ reconcileProvisioningTenants: mocks.reconcileProvisioningTenants, listPlatformTenants: mocks.listPlatformTenants, getPlatformTenant: mocks.getPlatformTenant, transitionPlatformTenant: mocks.transitionPlatformTenant, transferPlatformTenantOwner: mocks.transferPlatformTenantOwner, listPlatformTenantOwnerCandidates: mocks.listPlatformTenantOwnerCandidates, assignVerifiedTenantAdminByEmail: mocks.assignVerifiedTenantAdminByEmail, getPlatformTenantModuleEntitlements: mocks.getPlatformTenantModuleEntitlements, updatePlatformTenantModuleEntitlement: mocks.updatePlatformTenantModuleEntitlement, isPlatformTenantModuleEnabled: mocks.isPlatformTenantModuleEnabled, getPlatformTenantSettings: mocks.getPlatformTenantSettings, updatePlatformTenantSettings: mocks.updatePlatformTenantSettings, countPlatformTenantMembers: mocks.countPlatformTenantMembers, listPlatformTenantDomains: mocks.listPlatformTenantDomains, createPlatformTenantDomain: mocks.createPlatformTenantDomain, getPlatformTenantDomainChallenge: mocks.getPlatformTenantDomainChallenge, activatePlatformTenantDomain: mocks.activatePlatformTenantDomain, disablePlatformTenantDomain: mocks.disablePlatformTenantDomain, createPlatformServiceIdentity: mocks.createPlatformServiceIdentity, listPlatformServiceIdentities: mocks.listPlatformServiceIdentities, revokePlatformServiceIdentity: mocks.revokePlatformServiceIdentity, listPlatformMembers: mocks.listPlatformMembers, upsertPlatformMember: mocks.upsertPlatformMember, updatePlatformMemberStatus: mocks.updatePlatformMemberStatus, auth: { api: {
   listMembers: mocks.listMembers,
   listInvitations: mocks.listInvitations,
   createInvitation: mocks.createInvitation,
   cancelInvitation: mocks.cancelInvitation,
   updateMemberRole: mocks.updateMemberRole,
   removeMember: mocks.removeMember,
+  updateOrganization: mocks.updateOrganization,
 } } }));
 vi.mock("./domain-verification.js", () => ({ verifyTenantDomainTxt: mocks.verifyTenantDomainTxt }));
 vi.mock("../../lib/database.js", () => ({ pool: { query: mocks.query }, withTenantTransaction: vi.fn() }));
@@ -899,6 +913,46 @@ describe("platform tenant custom domains", () => {
       expect(response.statusCode).toBe(200);
       expect(mocks.disablePlatformTenantDomain).toHaveBeenCalledWith(tenantId, domainId);
       expect(response.json().domain.status).toBe("disabled");
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("manages service identities, platform members, tenant audit export, and organization updates", async () => {
+    mocks.requirePlatformRole.mockResolvedValue({ userId: "platform-owner", email: "owner@bazion.test", role: "platform_owner" });
+    mocks.requirePermission.mockResolvedValue(context);
+    mocks.createPlatformServiceIdentity.mockResolvedValueOnce({
+      identity: { id: "si-1", name: "Sync Key", keyPrefix: "bzn_sk_1234", scopes: ["audit:read"], status: "active" },
+      token: "bzn_sk_1234_secret",
+    });
+    mocks.listPlatformMembers.mockResolvedValueOnce([{ userId: "pm-1", email: "owner@bazion.test", role: "platform_owner", status: "active" }]);
+    mocks.listAuditEvents.mockResolvedValueOnce({ items: [{ id: "audit-1" }], total: 1, limit: 500, offset: 0 });
+    mocks.updateOrganization.mockResolvedValueOnce({ id: "org-alpha", name: "Alpha Renamed" });
+
+    const app = await makeApp();
+    try {
+      const siRes = await app.inject({
+        method: "POST",
+        url: "/v1/admin/platform/service-identities",
+        payload: { name: "Sync Key", scopes: ["audit:read"] },
+      });
+      expect(siRes.statusCode).toBe(201);
+      expect(siRes.json().token).toBe("bzn_sk_1234_secret");
+
+      const pmRes = await app.inject({ method: "GET", url: "/v1/admin/platform/members" });
+      expect(pmRes.statusCode).toBe(200);
+      expect(pmRes.json().items).toHaveLength(1);
+
+      const exportRes = await app.inject({ method: "GET", url: "/v1/admin/audit/export?format=csv" });
+      expect(exportRes.statusCode).toBe(200);
+      expect(exportRes.body).toContain("audit-1");
+
+      const orgRes = await app.inject({
+        method: "PATCH",
+        url: "/v1/admin/organization",
+        payload: { name: "Alpha Renamed" },
+      });
+      expect(orgRes.statusCode).toBe(200);
     } finally {
       await app.close();
     }

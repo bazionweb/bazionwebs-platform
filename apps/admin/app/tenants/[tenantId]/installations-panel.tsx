@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { assertOk, pulse } from "@bazion/ui";
 
 export interface TenantInstallationItem {
@@ -38,6 +39,7 @@ export function TenantInstallationsPanel(props: {
   status: number;
   platformRole?: string | null;
 }) {
+  const router = useRouter();
   const [items, setItems] = useState<TenantInstallationItem[]>(props.initialItems);
   const [reason, setReason] = useState("");
   const [confirmDestructive, setConfirmDestructive] = useState(false);
@@ -54,6 +56,7 @@ export function TenantInstallationsPanel(props: {
     const body = await res.json().catch(() => null);
     if (res.ok && body?.items) {
       setItems(body.items);
+      router.refresh();
     }
   }
 

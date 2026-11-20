@@ -1,4 +1,5 @@
 import React from 'react';
+import { PlatformBrandBadge } from '../PlatformBrandBadge';
 import { ShieldAlert, Mail, MessageCircle, X } from '../../shims/lucide-react';
 import { Transaction, Student } from '../../types';
 
@@ -158,6 +159,9 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
                     </div>
                   </div>
 
+                  <div className="px-10 py-3 flex justify-end border-t border-gray-100 bg-white">
+                    <PlatformBrandBadge compact />
+                  </div>
                   <div className="p-10 border-t-2 border-gray-900 flex flex-wrap gap-4 items-center justify-between bg-white">
                     <div className="flex gap-4">
                       <button

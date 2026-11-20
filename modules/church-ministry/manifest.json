@@ -3,7 +3,7 @@
   "name": "Church and ministry public content and operations",
   "version": "1.1.0",
   "owner": "church-ministry",
-  "status": "partial",
+  "status": "stable",
   "entrypoints": {
     "domain": "packages/church-ministry-domain",
     "contracts": "packages/church-ministry-contracts",
@@ -44,7 +44,10 @@
     { "name": "hkm_members", "owner": "church-ministry", "tenantScoped": true, "rls": "forced", "migration": "0029_hkm_member_records.sql" },
     { "name": "hkm_attendance_records", "owner": "church-ministry", "tenantScoped": true, "rls": "forced", "migration": "0029_hkm_member_records.sql" },
     { "name": "hkm_member_attendance_records", "owner": "church-ministry", "tenantScoped": true, "rls": "forced", "migration": "0032_hkm_member_attendance.sql" },
-    { "name": "hkm_giving_transactions", "owner": "church-ministry", "tenantScoped": true, "rls": "forced", "migration": "0029_hkm_member_records.sql" }
+    { "name": "hkm_giving_transactions", "owner": "church-ministry", "tenantScoped": true, "rls": "forced", "migration": "0029_hkm_member_records.sql" },
+    { "name": "hkm_visitors", "owner": "church-ministry", "tenantScoped": true, "rls": "forced", "migration": "0034_complete_partial_modules.sql" },
+    { "name": "hkm_visitor_follow_ups", "owner": "church-ministry", "tenantScoped": true, "rls": "forced", "migration": "0034_complete_partial_modules.sql" },
+    { "name": "hkm_sms_logs", "owner": "church-ministry", "tenantScoped": true, "rls": "forced", "migration": "0034_complete_partial_modules.sql" }
   ],
   "migrations": [
     "0008_church_ministry_domain.sql",
@@ -54,7 +57,8 @@
     "0027_church_site_settings_versions.sql",
     "0029_hkm_member_records.sql",
     "0031_hkm_member_profile_fields.sql",
-    "0032_hkm_member_attendance.sql"
+    "0032_hkm_member_attendance.sql",
+    "0034_complete_partial_modules.sql"
   ],
   "providers": ["Safaricom Daraja M-Pesa STK Push for donations; requires merchant credentials and provider callback verification"],
   "dependencies": ["platform-identity", "media-storage"],
@@ -75,7 +79,8 @@
     "packages/church-ministry-domain/src/site-settings.test.ts",
     "packages/church-ministry-domain/src/operations.test.ts",
     "packages/church-ministry-contracts/src/index.test.ts",
-    "packages/church-ministry-contracts/src/operations.test.ts"
+    "packages/church-ministry-contracts/src/operations.test.ts",
+    "packages/church-management/src/index.test.tsx"
   ],
   "docs": ["docs/church-ministry-platform.md"]
 }

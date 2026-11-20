@@ -39,6 +39,7 @@ export const requiredDatabaseMigrations = [
   "0031_hkm_member_profile_fields.sql",
   "0032_hkm_member_attendance.sql",
   "0033_education_website_template_overlays.sql",
+  "0034_complete_partial_modules.sql",
 ] as const;
 
 /** Current tenant database release marker; updates automatically with the registry. */
