@@ -401,16 +401,16 @@ export function TenantWebsiteOnboardingPanel({
   }
 
   return (
-    <section className="panel">
-      <div className="panel-head">
+    <section className="panel website-onboarding-panel">
+      <div className="website-onboarding-head">
         <div>
           <p className="eyebrow">UNIVERSAL PACKAGE WHITE-LABELING &amp; BYOW</p>
           <h2>Platform package templates &amp; custom website onboarding</h2>
           <p className="muted">
-            White-label any Bazion package (SME, E-Commerce, Booking, Clinic, School, NGO, SaaS, Enterprise, or Church), onboard tenants with ready websites (BYOW), or scrub &amp; import external GitHub repos.
+            Start from a Bazion package or bring a website repository. Set the tenant brand, then apply the setup that fits.
           </p>
         </div>
-        <span className="count">
+        <span className="count website-onboarding-status">
           {resolvedPkgBadge
             ? `PKG: ${resolvedPkgBadge.toUpperCase()}`
             : initial?.latestPublishedVersion
@@ -425,317 +425,271 @@ export function TenantWebsiteOnboardingPanel({
         </p>
       )}
 
-      <div className="actions" style={{ marginBottom: 16 }}>
+      <div className="website-onboarding-tabs" role="group" aria-label="Website onboarding method">
         <button
           type="button"
-          className={activeTab === "template" ? "primary" : "secondary"}
+          aria-pressed={activeTab === "template"}
+          className={`website-onboarding-tab${activeTab === "template" ? " is-active" : ""}`}
           onClick={() => setActiveTab("template")}
         >
-          1. Universal Package White-Label Studio
+          <span className="website-tab-step">01</span>
+          <span className="website-tab-copy">
+            <strong>Start from a package</strong>
+            <small>Choose a ready-made site and brand it</small>
+          </span>
         </button>
         <button
           type="button"
-          className={activeTab === "byow" ? "primary" : "secondary"}
+          aria-pressed={activeTab === "byow"}
+          className={`website-onboarding-tab${activeTab === "byow" ? " is-active" : ""}`}
           onClick={() => setActiveTab("byow")}
         >
-          2. BYOW &amp; GitHub Repo White-Label Importer
+          <span className="website-tab-step">02</span>
+          <span className="website-tab-copy">
+            <strong>Bring a website repo</strong>
+            <small>Import and configure a GitHub project</small>
+          </span>
         </button>
       </div>
 
       {activeTab === "template" ? (
-        <form onSubmit={handleApplyTemplate} style={{ display: "grid", gap: 12 }}>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
-            <label>
-              Platform Solution Package
-              <select
-                value={packageId}
-                onChange={(e) => handlePackageChange(e.target.value)}
-              >
-                {packages.map((item) => (
-                  <option key={item.packageId} value={item.packageId}>
-                    {item.name} ({item.category})
-                  </option>
+        <div>
+          <form onSubmit={handleApplyTemplate} className="website-onboarding-form">
+            <fieldset className="website-onboarding-group">
+              <legend>Package &amp; visual style</legend>
+              <p className="website-group-hint">Choose the starting site, page layout, and color palette.</p>
+              <div className="website-field-grid website-field-grid--three">
+                <label className="website-field">
+                  Platform solution package
+                  <select value={packageId} onChange={(e) => handlePackageChange(e.target.value)}>
+                    {packages.map((item) => (
+                      <option key={item.packageId} value={item.packageId}>
+                        {item.name} ({item.category})
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="website-field">
+                  Website template
+                  <select value={templateId} onChange={(e) => handleTemplateChange(e.target.value)}>
+                    {activePackage.templates.map((item) => (
+                      <option key={item.id} value={item.id}>{item.name}</option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="website-field">
+                  Brand palette
+                  <select value={paletteId} onChange={(e) => setPaletteId(e.target.value)}>
+                    {palettes.map((item) => (
+                      <option key={item.id} value={item.id}>{item.name}</option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+            </fieldset>
+
+            <fieldset className="website-onboarding-group">
+              <legend>Brand identity</legend>
+              <p className="website-group-hint">These details replace the starter brand across the tenant website.</p>
+              <div className="website-field-grid">
+                <label className="website-field">
+                  Brand or organization name
+                  <input type="text" value={brandName} onChange={(e) => setBrandName(e.target.value)} required />
+                </label>
+
+                <label className="website-field">
+                  Tagline or positioning statement
+                  <input type="text" value={tagline} onChange={(e) => setTagline(e.target.value)} />
+                </label>
+              </div>
+            </fieldset>
+
+            <details className="website-advanced-options website-optional-details">
+              <summary>
+                <span><strong>Contact and payment details</strong><small>Optional email, phone, address, and M-Pesa info</small></span>
+                <span className="website-advanced-indicator">Add details</span>
+              </summary>
+              <div className="website-optional-grid">
+                <div className="website-optional-group">
+                  <h3>Contact</h3>
+                  <div className="website-field-grid">
+                    <label className="website-field">
+                      Contact email
+                      <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="hello@company.example" />
+                    </label>
+                    <label className="website-field">
+                      Primary phone
+                      <input type="text" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+254 700 000000" />
+                    </label>
+                    <label className="website-field website-field--wide">
+                      Location or HQ address
+                      <input type="text" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="City / Road / Suite" />
+                    </label>
+                  </div>
+                </div>
+                <div className="website-optional-group">
+                  <h3>Payments</h3>
+                  <div className="website-field-grid">
+                    <label className="website-field">
+                      M-Pesa Paybill
+                      <input type="text" value={mpesaPaybill} onChange={(e) => setMpesaPaybill(e.target.value)} placeholder="e.g. 522522" />
+                    </label>
+                    <label className="website-field">
+                      Account or payment reference
+                      <input type="text" value={accountNo} onChange={(e) => setAccountNo(e.target.value)} placeholder="e.g. INVOICE or TITHE" />
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </details>
+
+            <div className="website-module-summary">
+              <div>
+                <strong>Included modules</strong>
+                <p>Automatically enabled for {activePackage.name}.</p>
+              </div>
+              <div className="website-module-chips">
+                {activePackage.assignableModules.map((module) => (
+                  <span key={module}>{module}</span>
                 ))}
-              </select>
-            </label>
+              </div>
+            </div>
 
-            <label>
-              White-Label Template
-              <select
-                value={templateId}
-                onChange={(e) => handleTemplateChange(e.target.value)}
-              >
-                {activePackage.templates.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label>
-              Brand Palette Preset
-              <select
-                value={paletteId}
-                onChange={(e) => setPaletteId(e.target.value)}
-              >
-                {palettes.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label>
-              Brand / Organization Name
+            <label className="website-starter-option">
               <input
-                type="text"
-                value={brandName}
-                onChange={(e) => setBrandName(e.target.value)}
-                required
+                type="checkbox"
+                checked={includeStarterContent}
+                onChange={(e) => setIncludeStarterContent(e.target.checked)}
               />
+              <span>
+                <strong>Include starter content</strong>
+                <small>Add sample pages, copy, and offerings with the tenant’s brand applied.</small>
+              </span>
             </label>
 
-            <label>
-              Tagline / Positioning Statement
-              <input
-                type="text"
-                value={tagline}
-                onChange={(e) => setTagline(e.target.value)}
-              />
-            </label>
-
-            <label>
-              Contact Email (optional)
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="hello@company.example"
-              />
-            </label>
-
-            <label>
-              Primary Phone (optional)
-              <input
-                type="text"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder="+254 700 000000"
-              />
-            </label>
-
-            <label>
-              Location / HQ Address (optional)
-              <input
-                type="text"
-                value={address}
-                onChange={(e) => setAddress(e.target.value)}
-                placeholder="City / Road / Suite"
-              />
-            </label>
-
-            <label>
-              Payment / M-Pesa Paybill (optional)
-              <input
-                type="text"
-                value={mpesaPaybill}
-                onChange={(e) => setMpesaPaybill(e.target.value)}
-                placeholder="e.g. 522522"
-              />
-            </label>
-
-            <label>
-              Account / Payment Reference (optional)
-              <input
-                type="text"
-                value={accountNo}
-                onChange={(e) => setAccountNo(e.target.value)}
-                placeholder="e.g. INVOICE or TITHE"
-              />
-            </label>
-          </div>
-
-          <p className="muted" style={{ margin: 0 }}>
-            Modules auto-enabled for <strong>{activePackage.name}</strong>:{" "}
-            {activePackage.assignableModules.join(", ")}
-          </p>
-
-          <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <input
-              type="checkbox"
-              checked={includeStarterContent}
-              onChange={(e) => setIncludeStarterContent(e.target.checked)}
-            />
-            Include white-labeled starter pages, copy, and sample offerings for this package
-          </label>
-
-          <div>
-            <button
-              type="submit"
-              className="primary"
-              disabled={busy || tenantStatus === "closed"}
-            >
-              {busy ? "White-labeling package…" : `Apply ${activePackage.name} Template`}
-            </button>
-          </div>
-        </form>
+            <div className="website-form-footer">
+              <p>Review the package and brand details before applying them to this tenant.</p>
+              <button type="submit" className="primary website-onboarding-submit" disabled={busy || tenantStatus === "closed"}>
+                {busy ? "White-labeling package…" : `Apply ${activePackage.name} Template`}
+              </button>
+            </div>
+          </form>
+        </div>
       ) : (
-        <form onSubmit={handleImportRepo} style={{ display: "grid", gap: 12 }}>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
-            <label>
-              GitHub Repository URL
-              <input
-                type="url"
-                value={repoUrl}
-                onChange={(e) => setRepoUrl(e.target.value)}
-                placeholder="https://github.com/org/website-repo"
-                required
-              />
+        <div>
+          <form onSubmit={handleImportRepo} className="website-onboarding-form">
+            <fieldset className="website-onboarding-group">
+              <legend>Source repository</legend>
+              <p className="website-group-hint">Connect the public GitHub repository and branch that contain the website.</p>
+              <div className="website-field-grid">
+                <label className="website-field">
+                  GitHub repository URL
+                  <input type="url" value={repoUrl} onChange={(e) => setRepoUrl(e.target.value)} placeholder="https://github.com/org/website-repo" required />
+                </label>
+
+                <label className="website-field">
+                  Branch
+                  <input type="text" value={branch} onChange={(e) => setBranch(e.target.value)} required />
+                </label>
+              </div>
+            </fieldset>
+
+            <fieldset className="website-onboarding-group">
+              <legend>Import settings</legend>
+              <p className="website-group-hint">Choose how the repo should be prepared and hosted for this tenant.</p>
+              <div className="website-field-grid website-field-grid--three">
+                <label className="website-field">
+                  Target platform package
+                  <select value={repoPackageMode} onChange={(e) => setRepoPackageMode(e.target.value)}>
+                    <option value="auto">Auto-detect from repository</option>
+                    {packages.map((item) => (
+                      <option key={item.packageId} value={item.packageId}>{item.name}</option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="website-field">
+                  Onboarding mode
+                  <select value={importMode} onChange={(e) => setImportMode(e.target.value as "whitelabel-storefront" | "byow-compose")}>
+                    <option value="whitelabel-storefront">Shared platform package</option>
+                    <option value="byow-compose">Dedicated website deployment</option>
+                  </select>
+                </label>
+
+                <label className="website-field">
+                  Source framework
+                  <select
+                    value={framework}
+                    onChange={(e) => setFramework(e.target.value as "nextjs" | "react-vite" | "astro" | "remix" | "wordpress" | "static" | "custom-docker")}
+                  >
+                    <option value="nextjs">Next.js</option>
+                    <option value="react-vite">React / Vite</option>
+                    <option value="astro">Astro</option>
+                    <option value="remix">Remix</option>
+                    <option value="wordpress">WordPress container</option>
+                    <option value="static">Static Nginx site</option>
+                    <option value="custom-docker">Custom Dockerfile</option>
+                  </select>
+                </label>
+
+                <label className="website-field">
+                  Target brand name
+                  <input type="text" value={brandName} onChange={(e) => setBrandName(e.target.value)} required />
+                </label>
+
+                <label className="website-field">
+                  Target primary domain <span className="website-optional">Optional</span>
+                  <input type="text" value={primaryDomain} onChange={(e) => setPrimaryDomain(e.target.value)} placeholder="app.company.com" />
+                </label>
+              </div>
+            </fieldset>
+
+            <details className="website-advanced-options">
+              <summary>
+                <span><strong>Advanced source overrides</strong><small>Optional config and style files</small></span>
+                <span className="website-advanced-indicator">Show</span>
+              </summary>
+              <div className="website-field-grid">
+                <label className="website-field">
+                  Source config override <span className="website-optional">config.ts / site.ts</span>
+                  <textarea rows={5} value={configTs} onChange={(e) => setConfigTs(e.target.value)} placeholder='export const SITE_CONFIG = { companyName: "...", email: "..." }' />
+                </label>
+
+                <label className="website-field">
+                  Source style override <span className="website-optional">tokens.css / globals.css</span>
+                  <textarea rows={5} value={tokensCss} onChange={(e) => setTokensCss(e.target.value)} placeholder=":root { --color-primary: #1E293B; --color-accent: #0F766E; }" />
+                </label>
+              </div>
+            </details>
+
+            <label className="website-starter-option">
+              <input type="checkbox" checked={applyToTenant} onChange={(e) => setApplyToTenant(e.target.checked)} />
+              <span>
+                <strong>Save settings to this tenant</strong>
+                <small>Store the white-label package settings or generated deployment blueprint in the workspace.</small>
+              </span>
             </label>
 
-            <label>
-              Branch
-              <input
-                type="text"
-                value={branch}
-                onChange={(e) => setBranch(e.target.value)}
-                required
-              />
-            </label>
-
-            <label>
-              Target Platform Package
-              <select
-                value={repoPackageMode}
-                onChange={(e) => setRepoPackageMode(e.target.value)}
-              >
-                <option value="auto">Auto-Detect Package from Repo Source</option>
-                {packages.map((item) => (
-                  <option key={item.packageId} value={item.packageId}>
-                    {item.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label>
-              Onboarding Mode
-              <select
-                value={importMode}
-                onChange={(e) =>
-                  setImportMode(e.target.value as "whitelabel-storefront" | "byow-compose")
-                }
-              >
-                <option value="whitelabel-storefront">
-                  White-Label into Shared Platform Package
-                </option>
-                <option value="byow-compose">
-                  Dedicated BYOW Dokploy Compose Stack (Ready Website)
-                </option>
-              </select>
-            </label>
-
-            <label>
-              Source Framework
-              <select
-                value={framework}
-                onChange={(e) =>
-                  setFramework(
-                    e.target.value as
-                      | "nextjs"
-                      | "react-vite"
-                      | "astro"
-                      | "remix"
-                      | "wordpress"
-                      | "static"
-                      | "custom-docker",
-                  )
-                }
-              >
-                <option value="nextjs">Next.js</option>
-                <option value="react-vite">React / Vite</option>
-                <option value="astro">Astro</option>
-                <option value="remix">Remix</option>
-                <option value="wordpress">WordPress Container</option>
-                <option value="static">Static Nginx Site</option>
-                <option value="custom-docker">Custom Dockerfile</option>
-              </select>
-            </label>
-
-            <label>
-              Target Brand Name
-              <input
-                type="text"
-                value={brandName}
-                onChange={(e) => setBrandName(e.target.value)}
-                required
-              />
-            </label>
-
-            <label>
-              Target Primary Domain (optional)
-              <input
-                type="text"
-                value={primaryDomain}
-                onChange={(e) => setPrimaryDomain(e.target.value)}
-                placeholder="app.company.com"
-              />
-            </label>
-          </div>
-
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 12 }}>
-            <label>
-              Optional Source `config.ts` / `site.ts` Override
-              <textarea
-                rows={4}
-                value={configTs}
-                onChange={(e) => setConfigTs(e.target.value)}
-                placeholder='export const SITE_CONFIG = { companyName: "...", email: "..." }'
-              />
-            </label>
-
-            <label>
-              Optional Source `tokens.css` / `globals.css` Override
-              <textarea
-                rows={4}
-                value={tokensCss}
-                onChange={(e) => setTokensCss(e.target.value)}
-                placeholder=":root { --color-primary: #1E293B; --color-accent: #0F766E; }"
-              />
-            </label>
-          </div>
-
-          <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <input
-              type="checkbox"
-              checked={applyToTenant}
-              onChange={(e) => setApplyToTenant(e.target.checked)}
-            />
-            Save white-labeled package settings / BYOW compose blueprint to this tenant workspace
-          </label>
-
-          <div>
-            <button
-              type="submit"
-              className="primary"
-              disabled={busy || tenantStatus === "closed"}
-            >
-              {busy ? "Analyzing & white-labeling…" : "Import, White-Label & Generate Blueprint"}
-            </button>
-          </div>
-        </form>
+            <div className="website-form-footer">
+              <p>The repository is analyzed before the tenant setup is saved.</p>
+              <button type="submit" className="primary website-onboarding-submit" disabled={busy || tenantStatus === "closed"}>
+                {busy ? "Analyzing & white-labeling…" : "Import repository and prepare site"}
+              </button>
+            </div>
+          </form>
+        </div>
       )}
 
       {feedback && (
-        <p className="feedback" role="status" style={{ marginTop: 12 }}>
+        <p className="feedback website-onboarding-feedback" role="status">
           {feedback}
         </p>
       )}
 
       {variables.length > 0 && (
-        <div style={{ marginTop: 20 }}>
+        <div className="website-onboarding-result">
           <div className="panel-head">
             <div>
               <p className="eyebrow">WHITE-LABEL EXTRACTION</p>
@@ -771,7 +725,7 @@ export function TenantWebsiteOnboardingPanel({
       )}
 
       {blueprint && (
-        <div style={{ marginTop: 20 }}>
+        <div className="website-onboarding-result">
           <div className="panel-head">
             <div>
               <p className="eyebrow">
@@ -782,17 +736,7 @@ export function TenantWebsiteOnboardingPanel({
             </div>
             <span className="count">PORT {blueprint.internalPort}</span>
           </div>
-          <pre
-            style={{
-              background: "#0f172a",
-              color: "#e2e8f0",
-              padding: "14px 16px",
-              borderRadius: "8px",
-              overflowX: "auto",
-              fontSize: "12px",
-              lineHeight: 1.5,
-            }}
-          >
+          <pre className="website-blueprint-preview">
             {blueprint.composeYaml}
           </pre>
         </div>
