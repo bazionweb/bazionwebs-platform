@@ -8,6 +8,7 @@ import {
   churchTemplateCatalog,
   createWhiteLabeledChurchConfig,
   createChurchSiteSettingsOverlay,
+  inferChurchTemplateId,
   extractWhiteLabelTemplateFromRepoSource,
   type ChurchTheme,
 } from "@bazion/church-ministry-template";
@@ -523,22 +524,23 @@ export async function websiteOnboardingRoutes(app: FastifyInstance): Promise<voi
         : null;
       const churchTemplateId = storedSiteOverlay?.templateId
         ?? storedSiteRecord?.templateId
-        ?? nestedSiteOverrides?.templateId;
+        ?? nestedSiteOverrides?.templateId
+        ?? (storedSiteSettings ? inferChurchTemplateId(storedSiteSettings, tenant.slug) : undefined);
       const currentChurchTemplate = churchTemplateCatalog.find((item) => item.id === churchTemplateId);
       const churchConfiguredVersion = storedSiteOverlay?.templateVersion
         ?? (typeof storedSiteRecord?.templateVersion === "string" ? storedSiteRecord.templateVersion : undefined)
         ?? (typeof nestedSiteOverrides?.templateVersion === "string" ? nestedSiteOverrides.templateVersion : undefined)
         ?? (currentChurchTemplate ? "1.0.0" : undefined);
-      const websiteTemplateRelease = currentTemplate ? {
-        templateId: currentTemplate.id,
-        configuredVersion: configuredVersion ?? currentTemplate.version,
-        currentVersion: currentTemplate.version,
-        updateMode: overlay?.updateMode ?? (hasPinnedSource ? "pinned" as const : "automatic" as const),
-      } : currentChurchTemplate ? {
+      const websiteTemplateRelease = currentChurchTemplate ? {
         templateId: currentChurchTemplate.id,
         configuredVersion: churchConfiguredVersion ?? currentChurchTemplate.version,
         currentVersion: currentChurchTemplate.version,
         updateMode: storedSiteOverlay?.updateMode ?? (storedSiteRecord?.updateMode === "pinned" ? "pinned" as const : "automatic" as const),
+      } : currentTemplate ? {
+        templateId: currentTemplate.id,
+        configuredVersion: configuredVersion ?? currentTemplate.version,
+        currentVersion: currentTemplate.version,
+        updateMode: overlay?.updateMode ?? (hasPinnedSource ? "pinned" as const : "automatic" as const),
       } : null;
 
       return reply.send({
