@@ -102,6 +102,10 @@ for (const directory of directories("templates")) {
       fail(`${path} references an unsafe or missing source path: ${sourcePath}`);
     }
   }
+  if (template.readinessChecklist &&
+      (!safeRepoPath(template.readinessChecklist) || !existsSync(join(root, template.readinessChecklist)))) {
+    fail(`${path} references an unsafe or missing readiness checklist: ${template.readinessChecklist}`);
+  }
   if (safeRepoPath(template.configuration.sourcePath) && existsSync(join(root, template.configuration.sourcePath))) {
     const source = readFileSync(join(root, template.configuration.sourcePath), "utf8");
     for (const schemaName of template.configuration.schemaNames) {

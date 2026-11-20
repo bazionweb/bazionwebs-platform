@@ -1,0 +1,28 @@
+http:
+  routers:
+    bazion-tenant-preview-namespaced-http:
+      rule: 'HostRegexp(`^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?[.]preview[.]bazionweb[.]com$`)'
+      entryPoints:
+        - web
+      middlewares:
+        - redirect-to-https@file
+      service: bazion-tenant-preview-namespaced
+      priority: 1
+    bazion-tenant-preview-namespaced-https:
+      rule: 'HostRegexp(`^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?[.]preview[.]bazionweb[.]com$`)'
+      entryPoints:
+        - websecure
+      service: bazion-tenant-preview-namespaced
+      priority: 1
+      tls: {}
+  services:
+    bazion-tenant-preview-namespaced:
+      loadBalancer:
+        servers:
+          - url: http://storefront:3000
+        passHostHeader: true
+
+tls:
+  certificates:
+    - certFile: /etc/dokploy/traefik/dynamic/certificates/tenant-preview/origin-cert.pem
+      keyFile: /etc/dokploy/traefik/dynamic/certificates/tenant-preview/origin-key.pem

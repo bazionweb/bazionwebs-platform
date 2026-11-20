@@ -12,16 +12,19 @@ on:
 permissions:
   contents: read
 
-# PR runs are grouped by PR number so pushes to the same PR serialize.
-# Do not cancel an active run: migrations, tests and builds should finish and
-# report their result. A newer pending run may replace an older pending run.
+# Superseding commits cancel stale PR validation to avoid spending runner time
+# on code that is no longer the PR head. Do not cancel main image publishing.
 concurrency:
   group: validate-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   validate:
     name: Install, migrate, typecheck, test and build
+    # Main pushes publish images after the required PR check already passed.
+    # Protect main and require this check before merging; workflow_dispatch
+    # still runs validation before publishing when manually started on main.
+    if: github.event_name != 'push'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
@@ -82,10 +85,9 @@ jobs:
           printf 'owner=%s\n' "${BAZIONWEB_REPO%%/*}" >> "$GITHUB_OUTPUT"
           printf 'name=%s\n' "${BAZIONWEB_REPO#*/}" >> "$GITHUB_OUTPUT"
 
-      - name: Check out pull request head
+      - name: Check out the pull request merge candidate
         uses: actions/checkout@v6
         with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
 
       - name: Create read-only token for the Bazionweb repository
@@ -107,16 +109,17 @@ jobs:
           token: ${{ steps.bazionweb-app-token.outputs.token }}
           persist-credentials: false
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v7
-        with:
-          node-version: 26
-          package-manager-cache: false
-
       - name: Set up pnpm
         uses: pnpm/action-setup@v6
         with:
           version: 12.18.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 26
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
 
       - name: Install workspace dependencies from the committed lockfile
         run: pnpm install --frozen-lockfile
@@ -147,7 +150,7 @@ jobs:
       - name: Apply matching Better Auth schema
         run: pnpm --filter @bazion/auth migrate
 
-      - name: Start isolated Bazionweb test PostgreSQL and apply Prisma migrations
+      - name: Start isolated Bazionweb test PostgreSQL
         run: |
           node --input-type=module -e '
             const databaseUrl = new URL(process.env.BAZIONWEB_TEST_DATABASE_URL);
@@ -167,7 +170,18 @@ jobs:
             fi
             sleep 2
           done
-          npm --prefix .bazionweb ci --ignore-scripts
+      - name: Cache Bazionweb npm packages
+        uses: actions/setup-node@v7
+        with:
+          node-version: 26
+          cache: npm
+          cache-dependency-path: .bazionweb/package-lock.json
+
+      - name: Install Bazionweb dependencies from the committed lockfile
+        run: npm --prefix .bazionweb ci --ignore-scripts
+
+      - name: Apply Bazionweb Prisma migrations and generate its client
+        run: |
           DATABASE_URL="$BAZIONWEB_TEST_DATABASE_URL" DATABASE_URL_UNPOOLED="$BAZIONWEB_TEST_DATABASE_URL" npm --prefix .bazionweb --workspace=@bazionweb/api run prisma:migrate
           DATABASE_URL="$BAZIONWEB_TEST_DATABASE_URL" npm --prefix .bazionweb --workspace=@bazionweb/api run prisma:generate
 
@@ -188,7 +202,15 @@ jobs:
   publish-container-images:
     name: Build and publish ${{ matrix.image }} image
     needs: validate
-    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    # On main pushes validation was required before merge, so publish directly.
+    # Manual dispatch on main preserves the previous validate-then-publish flow.
+    if: >-
+      always() &&
+      github.ref == 'refs/heads/main' &&
+      (
+        (github.event_name == 'push' && needs.validate.result == 'skipped') ||
+        (github.event_name == 'workflow_dispatch' && needs.validate.result == 'success')
+      )
     runs-on: ubuntu-latest
     timeout-minutes: 45
     permissions:

@@ -30,7 +30,7 @@
     "schemaVersion": "1.0.0",
     "sourcePath": "packages/church-ministry-contracts/src/index.ts"
   },
-  "databaseSchemaVersion": "0032_hkm_member_attendance.sql",
+  "databaseSchemaVersion": "0033_education_website_template_overlays.sql",
   "readiness": {
     "implemented": [
       "Better Auth administrator sessions and active-tenant permission checks",
