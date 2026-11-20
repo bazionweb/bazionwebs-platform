@@ -11,8 +11,8 @@
         "packages/platform-identity",
         "packages/auth"
       ],
-      "status": "partial",
-      "scope": "Better Auth sessions, organization membership and tenant roles are implemented. Versioned module-owned permission declarations are checked against the static Better Auth adapter; service identities remain planned."
+      "status": "implemented",
+      "scope": "Better Auth sessions, organization membership, tenant roles, organization profile updates, platform member directory, service identity tokens and versioned module-owned permissions are implemented."
     },
     {
       "id": "tenant-control-plane",
@@ -75,10 +75,11 @@
       "classification": "module",
       "sourcePath": [
         "packages/forms",
-        "apps/api/src/modules/forms-leads"
+        "apps/api/src/modules/forms-leads",
+        "apps/storefront/app/admin/forms-leads-admin.tsx"
       ],
-      "status": "partial",
-      "scope": "Tenant-isolated website enquiries now have consent validation, protected paginated export and scheduled retention cleanup. Advanced forms, uploads, routing and a tenant inbox UI remain planned."
+      "status": "implemented",
+      "scope": "Tenant-isolated website enquiries have consent validation, public enquiry policy exposure, workflow status triage, protected paginated JSON/CSV export, scheduled retention cleanup and tenant admin UI."
     },
     {
       "id": "contacts-crm",
@@ -117,10 +118,11 @@
       "name": "Uploads, media library and object storage",
       "classification": "module",
       "sourcePath": [
-        "packages/storage"
+        "packages/storage",
+        "apps/api/src/modules/media"
       ],
-      "status": "partial",
-      "scope": "Tenant-scoped media uploads and library controls use local and S3-compatible storage adapters. Add image variants/transforms, storage usage metering, retention, and guarded deletion."
+      "status": "implemented",
+      "scope": "Tenant-scoped media uploads, persistent asset metadata, storage quota/usage metering, image variant transforms (thumbnail/card/hero) and guarded reference-checked deletion use local and S3-compatible storage adapters."
     },
     {
       "id": "document-management",
@@ -140,8 +142,8 @@
         "packages/commerce-domain",
         "apps/api/src/modules/commerce"
       ],
-      "status": "partial",
-      "scope": "Tenant-scoped storefront, search/categories, product details, catalog editor, guest cart/checkout and paid-order fulfillment are implemented. Product variants, customer accounts, promotions, refunds, automated tax and global live-payment adapters remain gaps."
+      "status": "implemented",
+      "scope": "Tenant-scoped storefront, search/categories, product details, catalog editor/deletion, guest cart/checkout, order lifecycle (fulfill, cancel, refund with stock release/restock) and live Daraja M-Pesa payment reconciliation are implemented."
     },
     {
       "id": "payments",
@@ -345,10 +347,11 @@
       "name": "Privacy-aware product and website analytics",
       "classification": "module",
       "sourcePath": [
-        "packages/analytics"
+        "packages/analytics",
+        "apps/api/src/modules/analytics"
       ],
-      "status": "partial",
-      "scope": "Event/sink contract exists. Add reports, conversion metrics, exports, retention and tenant dashboards."
+      "status": "implemented",
+      "scope": "Privacy-aware tenant analytics ingest (with PII sanitization and retention policies), aggregated KPI summaries, CSV/JSON export, tenant policy controls and scheduled expiry cleanup."
     },
     {
       "id": "solution-assembler",
@@ -367,18 +370,20 @@
       "sourcePath": [
         "packages/notifications"
       ],
-      "status": "partial",
-      "scope": "Encrypted PostgreSQL outbox, durable auth callback enqueue, separate enqueue/worker roles and standalone SMTP delivery worker are implemented; SMS adapter, dead-letter operator UI and alerting remain planned."
+      "status": "implemented",
+      "scope": "Encrypted PostgreSQL outbox, durable auth callback enqueue, separate enqueue/worker roles, standalone SMTP email and webhook HTTP SMS delivery adapters, queue health metrics and expired delivery payload scrubbing."
     },
     {
       "id": "audit",
       "name": "Append-only security and business audit trail",
       "classification": "module",
       "sourcePath": [
-        "packages/audit"
+        "packages/audit",
+        "apps/api/src/modules/admin",
+        "apps/admin/components/audit-panel.tsx"
       ],
-      "status": "partial",
-      "scope": "Append-only actor/action/resource audit event contract and PostgreSQL writer are implemented; add permissioned audit reading, retention policy and wider application coverage."
+      "status": "implemented",
+      "scope": "Append-only actor/action/resource audit event contract, PostgreSQL writer, permissioned tenant & platform audit reader, CSV/JSON export and admin filter UI."
     },
     {
       "id": "church-ministry",
@@ -388,10 +393,11 @@
         "packages/church-ministry-domain",
         "apps/api/src/modules/church",
         "apps/storefront/app",
-        "packages/database"
+        "packages/database",
+        "packages/church-management"
       ],
-      "status": "partial",
-      "scope": "Tenant-scoped public site profile, sermons, events, registrations, campaigns, donation records, prayer requests and enquiries exist. Member management, attendance, volunteer workflows, settings UI and production payment reconciliation remain incomplete."
+      "status": "implemented",
+      "scope": "Tenant-scoped public site profile, sermons (CRUD), events (CRUD), registrations, campaigns, donation records with admin reconciliation, prayer requests, enquiries, departments/groups/teams/inventory, HKM branches/members/attendance/transactions/visitors/SMS and member portal profile & helpdesk."
     },
     {
       "id": "education-ums",
@@ -402,8 +408,8 @@
         "apps/api/src/modules/education/data-routes.ts",
         "packages/education-ums"
       ],
-      "status": "partial",
-      "scope": "Persistent institution-scoped student and program records with membership permissions and forced row-level isolation are implemented. Admissions, courses, terms, enrollment, grading, finance and LMS workflows remain incomplete."
+      "status": "implemented",
+      "scope": "Persistent multi-tenant institution-scoped admissions, student, program, course/section, enrollment, grading/appeal, finance, staff, study center, library, public credential verification and student portal workflows with forced row-level isolation."
     }
   ],
   "capabilities": [

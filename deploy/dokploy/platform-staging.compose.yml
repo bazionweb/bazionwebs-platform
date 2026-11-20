@@ -20,7 +20,7 @@ x-api-environment: &api-environment
   LOG_LEVEL: info
   TENANT_DATABASE_SECRET_BACKEND: docker
   HOSTING_SECRET_DIRECTORY: /run/secrets
-  TENANT_DATABASE_SCHEMA_VERSION: 0025_installation_changes.sql
+  TENANT_DATABASE_SCHEMA_VERSION: 0034_complete_partial_modules.sql
   TENANT_RESOLUTION_MODE: verified_domain
   CORS_ORIGINS: https://platform-staging.bazionweb.com,https://church-staging.bazionweb.com,https://staging.bazionweb.com
   BETTER_AUTH_URL: https://platform-api-staging.bazionweb.com

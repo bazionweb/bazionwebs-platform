@@ -7,6 +7,9 @@ import {
   type ChurchSiteSettingsInput,
   type ChurchTheme,
 } from "@bazion/church-ministry-contracts";
+import { legacyChurchSiteSettingsV1 } from "./legacy-church-v1.js";
+
+const unsafeLegacyMergeKeys = new Set(["__proto__", "prototype", "constructor"]);
 import {
   deepMergeCascade,
   buildTenantTemplateOverlay,
@@ -67,7 +70,7 @@ export interface WhiteLabelTemplateDescriptor {
 export const churchTemplateCatalog: WhiteLabelTemplateDescriptor[] = [
   {
     id: "gmfc-revival-signature",
-    version: "1.0.0",
+    version: "1.1.0",
     name: "GMFC Revival & Apostolic Signature",
     tagline: "Editorial church design with portrait leadership cards, M-Pesa giving hub, sermons & outreach",
     description:
@@ -87,7 +90,7 @@ export const churchTemplateCatalog: WhiteLabelTemplateDescriptor[] = [
   },
   {
     id: "church-ministry",
-    version: "1.0.0",
+    version: "1.1.0",
     name: "Modern Sanctuary & Community",
     tagline: "Warm emerald & bronze layout built around small groups, ministries & welcoming guests",
     description:
@@ -106,7 +109,7 @@ export const churchTemplateCatalog: WhiteLabelTemplateDescriptor[] = [
   },
   {
     id: "royal-cathedral",
-    version: "1.0.0",
+    version: "1.1.0",
     name: "Royal Cathedral & Heritage",
     tagline: "Dignified navy & amber aesthetic for multi-campus ministries and regional fellowships",
     description:
@@ -125,7 +128,7 @@ export const churchTemplateCatalog: WhiteLabelTemplateDescriptor[] = [
   },
   {
     id: "hkm-kingdom-cms",
-    version: "1.0.0",
+    version: "1.1.0",
     name: "HKM Kingdom CMS & Member Portal",
     tagline: "Integrated Church Administration CMS and Self-Service Member Portal with PIN/Password authentication",
     description:
@@ -580,6 +583,7 @@ export function createWhiteLabeledChurchConfig(
       subtitle: config.hero.subtitle,
       rotatorWords: config.hero.rotatorWords ?? [],
     },
+    statistics: config.statistics,
     serviceTimes: config.serviceTimes,
     locations: config.locations,
     visitorInfo: config.visitorInfo,
@@ -684,6 +688,57 @@ export function inferChurchTemplateId(rawInput: unknown, tenantSlug?: string | n
   return "gmfc-revival-signature";
 }
 
+function replaceLegacyTemplateTokens<T>(value: T, tenantSlug: string, ministryName: string): T {
+  if (typeof value === "string") {
+    return value.replaceAll("Legacy Baseline", ministryName).replaceAll("legacy-baseline", tenantSlug) as T;
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) => replaceLegacyTemplateTokens(item, tenantSlug, ministryName)) as T;
+  }
+  if (value && typeof value === "object") {
+    const result: Record<string, unknown> = Object.create(null) as Record<string, unknown>;
+    for (const [key, child] of Object.entries(value)) {
+      if (!unsafeLegacyMergeKeys.has(key)) result[key] = replaceLegacyTemplateTokens(child, tenantSlug, ministryName);
+    }
+    return result as T;
+  }
+  return value;
+}
+
+function legacySnapshotDefaults<T>(baseline: T, stored: unknown): T {
+  if (!stored || typeof stored !== "object" || Array.isArray(stored)) {
+    return structuredClone(stored === undefined ? baseline : stored) as T;
+  }
+  if (!baseline || typeof baseline !== "object" || Array.isArray(baseline)) return structuredClone(stored) as T;
+  const result: Record<string, unknown> = Object.create(null) as Record<string, unknown>;
+  const storedRecord = stored as Record<string, unknown>;
+  for (const [key, value] of Object.entries(baseline)) {
+    if (unsafeLegacyMergeKeys.has(key)) continue;
+    result[key] = Object.hasOwn(storedRecord, key)
+      ? legacySnapshotDefaults(value, storedRecord[key])
+      : structuredClone(value);
+  }
+  for (const [key, value] of Object.entries(storedRecord)) {
+    if (!unsafeLegacyMergeKeys.has(key) && !Object.hasOwn(result, key)) result[key] = structuredClone(value);
+  }
+  return result as T;
+}
+
+function legacyTemplateSimilarity(baseline: unknown, stored: unknown): number {
+  if (Array.isArray(baseline) && Array.isArray(stored)) {
+    const storedJson = new Set(stored.map((item) => JSON.stringify(item)));
+    return (baseline.length === stored.length ? 1 : 0)
+      + baseline.reduce((score, item) => score + (storedJson.has(JSON.stringify(item)) ? 2 : 0), 0);
+  }
+  if (baseline && typeof baseline === "object" && stored && typeof stored === "object"
+    && !Array.isArray(baseline) && !Array.isArray(stored)) {
+    const storedRecord = stored as Record<string, unknown>;
+    return Object.entries(baseline as Record<string, unknown>).reduce((score, [key, value]) =>
+      score + (Object.hasOwn(storedRecord, key) ? legacyTemplateSimilarity(value, storedRecord[key]) : 0), 0);
+  }
+  return Object.is(baseline, stored) ? 1 : 0;
+}
+
 export function createChurchSiteSettingsOverlay(input: {
   tenantSlug: string;
   ministryName: string;
@@ -746,17 +801,27 @@ export function resolveEffectiveChurchSiteSettings(
     parsedRaw = rawInput as Record<string, unknown>;
   }
   const isVersionedOverlay = isTenantTemplateOverlay(parsedRaw);
+  const legacyFullSnapshot = !isVersionedOverlay
+    && Boolean(parsedRaw)
+    && ["navigation", "pages", "hero"].every((key) => Object.hasOwn(parsedRaw!, key));
 
   // 1. Generate live canonical template defaults as the prototype foundation
   const canonical = createWhiteLabeledChurchConfig({
     tenantSlug,
     ministryName,
     templateId,
-    includeStarterContent: options?.includeStarterContent ?? isVersionedOverlay,
+    includeStarterContent: options?.includeStarterContent ?? (isVersionedOverlay || legacyFullSnapshot),
   });
   const canonicalSettings = canonical.siteSettingsInput.settings;
 
   const expectedTenantSlug = (options?.tenantSlug ?? "").trim().toLowerCase().replace(/[^a-z0-9-]/g, "-");
+  if (!isVersionedOverlay
+    && parsedRaw
+    && typeof parsedRaw.tenantSlug === "string"
+    && expectedTenantSlug
+    && parsedRaw.tenantSlug.trim().toLowerCase() !== expectedTenantSlug) {
+    return { ...canonicalSettings, templateId };
+  }
   if (isVersionedOverlay
     && isTenantTemplateOverlay(parsedRaw)
     && parsedRaw.context
@@ -774,17 +839,57 @@ export function resolveEffectiveChurchSiteSettings(
   }
 
   // 2. Extract overrides (support sparse delta format `{ overrides: { ... } }` or legacy full JSON)
-  const overrides =
-    isVersionedOverlay
-      ? parsedRaw
-      : "overrides" in parsedRaw && typeof parsedRaw.overrides === "object" && parsedRaw.overrides !== null
-      ? (parsedRaw.overrides as Record<string, unknown>)
-      : parsedRaw;
-
-  // 3. Cascade tenant overrides on top of the live canonical template
-  const cascaded = isTenantTemplateOverlay(overrides)
-    ? resolveTenantTemplateOverlay(canonicalSettings, overrides)
-    : deepMergeCascade(canonicalSettings, overrides);
+  let cascaded: ChurchPublicSiteSettings;
+  if (legacyFullSnapshot && parsedRaw) {
+    const legacyCatalog = legacyChurchSiteSettingsV1 as Record<string, unknown>;
+    const starterBaselineCandidate = replaceLegacyTemplateTokens(
+      legacyCatalog[`${templateId}:starter`], tenantSlug, ministryName,
+    );
+    const emptyBaselineCandidate = replaceLegacyTemplateTokens(
+      legacyCatalog[`${templateId}:empty`], tenantSlug, ministryName,
+    );
+    const legacyKey = `${templateId}:${legacyTemplateSimilarity(starterBaselineCandidate, parsedRaw)
+      >= legacyTemplateSimilarity(emptyBaselineCandidate, parsedRaw) ? "starter" : "empty"}`;
+    const closestLegacyBaseline = replaceLegacyTemplateTokens(
+      legacyCatalog[legacyKey],
+      tenantSlug,
+      ministryName,
+    );
+    // Compare against the v1 starter baseline for both legacy modes. Empty legacy sample
+    // arrays then become explicit removals instead of inheriting future starter content.
+    const legacyStarterBaseline = replaceLegacyTemplateTokens(
+      legacyCatalog[`${templateId}:starter`],
+      tenantSlug,
+      ministryName,
+    );
+    const legacyEffective = churchPublicSiteSettingsSchema.safeParse(
+      legacySnapshotDefaults(closestLegacyBaseline, parsedRaw),
+    );
+    if (legacyEffective.success) {
+      const baselineOverlay = buildTenantTemplateOverlay({
+        packageId: "church-ministry",
+        templateId,
+        templateVersion: "1.0.0",
+        configurationSchemaVersion: legacyEffective.data.schemaVersion,
+        context: { tenantSlug, brandName: ministryName },
+        base: legacyStarterBaseline,
+        effective: legacyEffective.data,
+      });
+      cascaded = resolveTenantTemplateOverlay(canonicalSettings, baselineOverlay);
+    } else {
+      cascaded = deepMergeCascade(canonicalSettings, parsedRaw);
+    }
+  } else {
+    const overrides =
+      isVersionedOverlay
+        ? parsedRaw
+        : "overrides" in parsedRaw && typeof parsedRaw.overrides === "object" && parsedRaw.overrides !== null
+        ? (parsedRaw.overrides as Record<string, unknown>)
+        : parsedRaw;
+    cascaded = isTenantTemplateOverlay(overrides)
+      ? resolveTenantTemplateOverlay(canonicalSettings, overrides)
+      : deepMergeCascade(canonicalSettings, overrides);
+  }
   cascaded.templateId = templateId;
 
   // 4. Validate through schema

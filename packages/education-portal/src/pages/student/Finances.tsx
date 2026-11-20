@@ -1,7 +1,12 @@
 import { useState, useEffect } from 'react';
 import { api } from '../../lib/api';
+import { useTenantConfig } from '../../context/TenantContext';
+import { PlatformBrandStamp } from '../../components/PlatformBrandStamp';
 
 export default function Finances() {
+  const tenantConfig = useTenantConfig();
+  const institutionName = tenantConfig.institutionName;
+  const legalEntityName = tenantConfig.legalEntityName || institutionName;
   const [data, setData] = useState<any>(null);
   const [dashboardData, setDashboardData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -41,7 +46,7 @@ export default function Finances() {
         api.payments.verify(reference)
           .then((v) => {
             if (v.verified) {
-              setAlert({ type: 'success', msg: `Payment verified! Receipt logged under BEMI TRAINING INSTITUTE (ref: ${v.reference}).` });
+              setAlert({ type: 'success', msg: `Payment verified! Receipt logged under ${legalEntityName} (ref: ${v.reference}).` });
             } else {
               setAlert({ type: 'danger', msg: `Payment not yet confirmed (status: ${v.status}). If debited, it will reconcile automatically via webhook.` });
             }
@@ -60,7 +65,7 @@ export default function Finances() {
       if (checkoutUrl) {
         setAlert({
           type: 'success',
-          msg: `Redirecting to secure Paystack checkout — payee: ${result.merchant || 'BEMI TRAINING INSTITUTE'}. Complete payment to clear this invoice.`,
+          msg: `Redirecting to secure Paystack checkout — payee: ${result.merchant || legalEntityName}. Complete payment to clear this invoice.`,
         });
         window.location.href = checkoutUrl;
         return;
@@ -94,6 +99,7 @@ export default function Finances() {
 
   return (
     <div style={{ maxWidth: 1140, margin: '0 auto' }}>
+      <style>{`@media print { body * { visibility: hidden !important; } #official-receipt, #official-receipt * { visibility: visible !important; } #official-receipt { position: fixed !important; inset: 0 auto auto 0 !important; width: 100% !important; max-width: none !important; max-height: none !important; overflow: visible !important; box-shadow: none !important; border: 0 !important; padding: 1rem !important; } #official-receipt .no-print { display: none !important; } }`}</style>
       
       {/* ─── Header Section ─── */}
       <div style={{ marginBottom: '1.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
@@ -106,7 +112,7 @@ export default function Finances() {
           </div>
           <p style={{ color: 'var(--slate)', fontSize: '0.95rem', marginTop: '0.25rem' }}>
             Authoritative USD Pricing with dynamic KES settlement powered by <strong>Central Bank of Kenya</strong> indicative rates.
-            Payments processed by <strong>BEMI TRAINING INSTITUTE</strong> (trading as BMI University) via Paystack.
+            Payments processed by <strong>{legalEntityName}</strong> via Paystack.
           </p>
         </div>
       </div>
@@ -312,7 +318,7 @@ export default function Finances() {
               )}
             </div>
             <div style={{ padding: '0.85rem', background: 'var(--bg)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-              🔒 Secured by <strong>Paystack</strong>. Payee on checkout &amp; bank statement: <strong>BEMI TRAINING INSTITUTE</strong> (trading as BMI University).
+              🔒 Secured by <strong>Paystack</strong>. Payee on checkout &amp; bank statement: <strong>{legalEntityName}</strong>.
               All amounts are billed in Kenyan Shillings at the official snapshot exchange rate.
             </div>
           </div>
@@ -358,13 +364,14 @@ export default function Finances() {
       {/* ─── Official Receipt Modal ─── */}
       {selectedReceipt && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '1rem' }}>
-          <div className="card" style={{ maxWidth: 640, width: '100%', background: 'white', borderRadius: 'var(--radius-lg)', padding: '2rem', maxHeight: '90vh', overflowY: 'auto' }}>
-            <div style={{ borderBottom: '2px solid var(--gold)', paddingBottom: '1rem', marginBottom: '1.25rem', textAlign: 'center' }}>
+          <div id="official-receipt" className="card" style={{ maxWidth: 640, width: '100%', background: 'white', borderRadius: 'var(--radius-lg)', padding: '2rem', maxHeight: '90vh', overflowY: 'auto' }}>
+            <div style={{ borderBottom: `2px solid ${tenantConfig.branding.accentColor}`, paddingBottom: '1rem', marginBottom: '1.25rem', textAlign: 'center' }}>
+              {tenantConfig.branding.logoUrl && <img src={tenantConfig.branding.logoUrl} alt={`${tenantConfig.shortName} logo`} style={{ height: 48, maxWidth: 180, objectFit: 'contain', margin: '0 auto 0.5rem' }} />}
               <h2 style={{ fontSize: '1.4rem', color: 'var(--navy)', margin: 0, fontWeight: 900 }}>
-                BEMI TRAINING INSTITUTE
+                {legalEntityName}
               </h2>
               <div style={{ fontSize: '0.85rem', color: 'var(--slate)', fontWeight: 600 }}>
-                trading as BMI University • Office of Student Accounts
+                {institutionName} • Office of Student Accounts
               </div>
               <div style={{ fontSize: '0.8rem', color: 'var(--slate)' }}>
                 Official Financial Transaction Receipt
@@ -393,7 +400,7 @@ export default function Finances() {
                 <span>Locked Exchange Rate:</span>
                 <span>1 USD = {selectedReceipt.exchangeRate} KES ({selectedReceipt.exchangeRateSource})</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1.1rem', fontWeight: 900, color: '#065f46' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1.1rem', fontWeight: 900, color: tenantConfig.branding.primaryColor }}>
                 <span>Total Amount Paid:</span>
                 <span>KES {Number(selectedReceipt.amountBilling || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
               </div>
@@ -418,12 +425,13 @@ export default function Finances() {
             )}
 
             <div style={{ fontSize: '0.75rem', color: 'var(--slate)', textAlign: 'center', marginBottom: '1.5rem', borderTop: '1px solid #e2e8f0', paddingTop: '0.75rem' }}>
-              Payment received by BEMI TRAINING INSTITUTE (trading as BMI University).
+              Payment received by {legalEntityName}. {tenantConfig.contact.address}
             </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1rem' }}><PlatformBrandStamp compact /></div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
-              <button className="btn btn-outline btn-sm" onClick={() => setSelectedReceipt(null)}>Close</button>
-              <button className="btn btn-gold btn-sm" onClick={() => window.print()}>🖨️ Print Official Receipt</button>
+              <button className="btn btn-outline btn-sm no-print" onClick={() => setSelectedReceipt(null)}>Close</button>
+              <button className="btn btn-gold btn-sm no-print" onClick={() => window.print()}>🖨️ Print Official Receipt</button>
             </div>
           </div>
         </div>
@@ -467,7 +475,8 @@ export default function Finances() {
           <div className="card" style={{ maxWidth: 680, width: '100%', background: 'white', borderRadius: 'var(--radius-lg)', padding: '2rem', maxHeight: '90vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '2px solid var(--navy)', paddingBottom: '0.75rem', marginBottom: '1.25rem' }}>
               <div>
-                <h3 style={{ fontSize: '1.3rem', color: 'var(--navy)', margin: 0, fontWeight: 900 }}>
+                {tenantConfig.branding.logoUrl && <img src={tenantConfig.branding.logoUrl} alt={`${tenantConfig.shortName} logo`} style={{ height: 42, maxWidth: 160, objectFit: 'contain', marginBottom: '0.4rem' }} />}
+                <h3 style={{ fontSize: '1.3rem', color: tenantConfig.branding.primaryColor, margin: 0, fontWeight: 900 }}>
                   IRS Form 1098-T Tuition Statement
                 </h3>
                 <div style={{ fontSize: '0.8rem', color: 'var(--slate)' }}>Department of the Treasury — Internal Revenue Service</div>
@@ -480,9 +489,9 @@ export default function Finances() {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.25rem' }}>
               <div style={{ padding: '0.85rem', background: 'var(--bg)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}>
                 <div style={{ fontSize: '0.75rem', color: 'var(--slate)', fontWeight: 700 }}>FILER'S Name & Address</div>
-                <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--navy)', marginTop: '0.2rem' }}>BEMI TRAINING INSTITUTE</div>
-                <div style={{ fontSize: '0.8rem', color: 'var(--slate)' }}>Trading as BMI University • Office of Student Accounts & Bursar</div>
-                <div style={{ fontSize: '0.8rem', color: 'var(--slate)' }}>EIN: 56-1234567 • Tel: 704-607-5540</div>
+                <div style={{ fontSize: '0.85rem', fontWeight: 700, color: tenantConfig.branding.primaryColor, marginTop: '0.2rem' }}>{legalEntityName}</div>
+                <div style={{ fontSize: '0.8rem', color: 'var(--slate)' }}>{institutionName} • Office of Student Accounts & Bursar</div>
+                <div style={{ fontSize: '0.8rem', color: 'var(--slate)' }}>{tenantConfig.contact.address} • {tenantConfig.contact.phones[0]}</div>
               </div>
 
               <div style={{ padding: '0.85rem', background: 'var(--bg)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}>
@@ -518,6 +527,7 @@ export default function Finances() {
                 <button className="btn btn-gold btn-sm" onClick={() => window.print()}>🖨️ Print Form 1098-T</button>
               </div>
             </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.75rem' }}><PlatformBrandStamp compact /></div>
           </div>
         </div>
       )}

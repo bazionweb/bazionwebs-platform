@@ -14,15 +14,15 @@ COPY --parents apps/*/package.json packages/*/package.json templates/package.jso
 FROM postgres:18.7-alpine3.24 AS database
 COPY packages/database/init/001-create-roles.sh /docker-entrypoint-initdb.d/001-create-roles.sh
 
-# The migration target is an operator-run, one-shot image. It runs the
-# application and Better Auth schemas with the least-privilege migration role.
+# The migration target is an operator-run, one-shot image. It applies the
+# application and Better Auth schemas, then safely seeds the GMFC tenant.
 FROM workspace AS migrate
 RUN --mount=type=cache,id=bazion-pnpm-store,target=/root/.local/share/pnpm/store/v11 \
     pnpm install --frozen-lockfile --filter @bazion/database... --filter @bazion/auth...
 COPY --chown=node:node . .
 ENV NODE_ENV=production
 USER node
-CMD ["sh", "-ec", "pnpm --filter @bazion/database migrate && pnpm --filter @bazion/auth migrate"]
+CMD ["sh", "-ec", "pnpm --filter @bazion/database migrate && pnpm --filter @bazion/auth migrate && pnpm --filter @bazion/database seed:global-mission"]
 
 FROM workspace AS api-build
 RUN --mount=type=cache,id=bazion-pnpm-store,target=/root/.local/share/pnpm/store/v11 \

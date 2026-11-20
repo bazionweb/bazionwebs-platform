@@ -1,11 +1,43 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { isIP } from "node:net";
-import { PostgresAuditEventWriter, type AuditEvent } from "@bazion/audit";
+import { z } from "zod";
+import {
+  PostgresAuditEventReader,
+  PostgresAuditEventWriter,
+  serializeAuditEventsCsv,
+  serializeAuditEventsJson,
+  type AuditEvent,
+} from "@bazion/audit";
 import { fromNodeHeaders } from "better-auth/node";
-import { count, eq } from "drizzle-orm";
+import { count, eq, sql } from "drizzle-orm";
 import { requireActiveTenantPermission, requirePlatformRole, requirePlatformPermission, normalizeTenantHostname, type ActiveTenantContext } from "@bazion/auth";
-import { auth, reconcileProvisioningTenants, listPlatformTenants, getPlatformTenant, transitionPlatformTenant, transferPlatformTenantOwner, listPlatformTenantOwnerCandidates, assignVerifiedTenantAdminByEmail, getPlatformTenantModuleEntitlements, updatePlatformTenantModuleEntitlement, getPlatformTenantSettings, updatePlatformTenantSettings, countPlatformTenantMembers, listPlatformTenantDomains, createPlatformTenantDomain, getPlatformTenantDomainChallenge, activatePlatformTenantDomain, disablePlatformTenantDomain } from "@bazion/auth/server";
-import { orders, products } from "@bazion/database";
+import {
+  auth,
+  reconcileProvisioningTenants,
+  listPlatformTenants,
+  getPlatformTenant,
+  transitionPlatformTenant,
+  transferPlatformTenantOwner,
+  listPlatformTenantOwnerCandidates,
+  assignVerifiedTenantAdminByEmail,
+  getPlatformTenantModuleEntitlements,
+  updatePlatformTenantModuleEntitlement,
+  getPlatformTenantSettings,
+  updatePlatformTenantSettings,
+  countPlatformTenantMembers,
+  listPlatformTenantDomains,
+  createPlatformTenantDomain,
+  getPlatformTenantDomainChallenge,
+  activatePlatformTenantDomain,
+  disablePlatformTenantDomain,
+  createPlatformServiceIdentity,
+  listPlatformServiceIdentities,
+  revokePlatformServiceIdentity,
+  listPlatformMembers,
+  upsertPlatformMember,
+  updatePlatformMemberStatus,
+} from "@bazion/auth/server";
+import { orders, products, tenantMediaAssets } from "@bazion/database";
 import { invitationInputSchema, memberListQuerySchema, memberRoleInputSchema, provisioningReconciliationInputSchema, platformTenantListQuerySchema, platformTenantLifecycleInputSchema, platformTenantOwnerTransferInputSchema, platformTenantOwnerCandidatesQuerySchema, platformTenantInitialAdminInputSchema, platformTenantModuleInputSchema, platformTenantSettingsInputSchema, platformTenantAuditQuerySchema, platformTenantDomainInputSchema } from "./policy.js";
 import { pool, withTenantTransaction } from "../../lib/database.js";
 import { isTenantModuleEnabled } from "../../lib/tenant-modules.js";
@@ -545,16 +577,226 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
         const [orderTotal] = await tx.select({ value: count() }).from(orders);
         const [paidOrderTotal] = await tx.select({ value: count() }).from(orders).where(eq(orders.status, "paid"));
         const [pendingOrderTotal] = await tx.select({ value: count() }).from(orders).where(eq(orders.status, "pending_payment"));
+        const [mediaStats] = await tx
+          .select({
+            assetCount: count(),
+            storageBytes: sql<string>`COALESCE(SUM(${tenantMediaAssets.sizeBytes}), 0)::text`,
+          })
+          .from(tenantMediaAssets);
         return {
           products: productTotal?.value ?? 0,
           activeProducts: activeProductTotal?.value ?? 0,
           orders: orderTotal?.value ?? 0,
           paidOrders: paidOrderTotal?.value ?? 0,
           pendingOrders: pendingOrderTotal?.value ?? 0,
+          mediaAssets: mediaStats?.assetCount ?? 0,
+          storageBytes: Number(mediaStats?.storageBytes ?? 0),
         };
       }),
     ]);
     return reply.send({ tenantId, asOf: new Date().toISOString(), members, ...business });
+  });
+
+  // Service Identities (machine principals / API keys)
+  app.get<{ Querystring: { tenantId?: string } }>("/admin/platform/service-identities", async (request, reply) => {
+    await requirePlatformRole(request.headers, ["platform_owner", "platform_admin"]);
+    const tenantId = request.query.tenantId?.trim() || null;
+    const items = await listPlatformServiceIdentities(tenantId);
+    return reply.send({ items });
+  });
+
+  app.post("/admin/platform/service-identities", async (request, reply) => {
+    const operator = await requirePlatformRole(request.headers, ["platform_owner"]);
+    const bodySchema = z.object({
+      tenantId: z.string().uuid().nullable().optional(),
+      name: z.string().trim().min(2).max(120),
+      scopes: z.array(z.string().trim().min(3).max(80)).min(1).max(32),
+      expiresAt: z.string().datetime().nullable().optional(),
+    }).strict();
+    const parsed = bodySchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.code(400).send({ error: "INVALID_INPUT", details: parsed.error.flatten() });
+    }
+    const created = await withAudit(
+      request,
+      {
+        ...userAuditEvent(request, operator, "service_identity", null, {
+          name: parsed.data.name,
+          scopeCount: parsed.data.scopes.length,
+        }),
+        action: "platform.service_identity.created",
+        tenantId: parsed.data.tenantId ?? null,
+      },
+      () => createPlatformServiceIdentity({
+        tenantId: parsed.data.tenantId ?? null,
+        name: parsed.data.name,
+        scopes: parsed.data.scopes,
+        expiresAt: parsed.data.expiresAt ?? null,
+        createdBy: operator.userId,
+      }),
+    );
+    return reply.code(201).send(created);
+  });
+
+  app.post<{ Params: { id: string } }>("/admin/platform/service-identities/:id/revoke", async (request, reply) => {
+    const operator = await requirePlatformRole(request.headers, ["platform_owner"]);
+    const id = request.params.id.trim();
+    const revoked = await withAudit(
+      request,
+      {
+        ...userAuditEvent(request, operator, "service_identity", id),
+        action: "platform.service_identity.revoked",
+      },
+      () => revokePlatformServiceIdentity(id, operator.userId),
+    );
+    if (!revoked) return reply.code(404).send({ error: "SERVICE_IDENTITY_NOT_FOUND" });
+    return reply.send({ identity: revoked });
+  });
+
+  // Platform Members Management (platform_owner only)
+  app.get("/admin/platform/members", async (request, reply) => {
+    await requirePlatformRole(request.headers, ["platform_owner"]);
+    const items = await listPlatformMembers();
+    return reply.send({ items });
+  });
+
+  app.post("/admin/platform/members", async (request, reply) => {
+    const operator = await requirePlatformRole(request.headers, ["platform_owner"]);
+    const bodySchema = z.object({
+      userId: z.string().trim().min(1).max(128),
+      email: z.string().trim().email().max(254),
+      role: z.enum(["platform_owner", "platform_admin", "platform_support"]),
+      status: z.enum(["active", "suspended"]).optional(),
+    }).strict();
+    const parsed = bodySchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.code(400).send({ error: "INVALID_INPUT", details: parsed.error.flatten() });
+    }
+    const member = await withAudit(
+      request,
+      {
+        ...userAuditEvent(request, operator, "platform_member", parsed.data.userId, { assignedRole: parsed.data.role }),
+        action: "platform.member.upserted",
+      },
+      () => upsertPlatformMember(parsed.data),
+    );
+    return reply.code(201).send({ member });
+  });
+
+  app.patch<{ Params: { userId: string } }>("/admin/platform/members/:userId/status", async (request, reply) => {
+    const operator = await requirePlatformRole(request.headers, ["platform_owner"]);
+    const bodySchema = z.object({ status: z.enum(["active", "suspended"]) }).strict();
+    const parsed = bodySchema.safeParse(request.body);
+    if (!parsed.success) return reply.code(400).send({ error: "INVALID_INPUT" });
+    const updated = await withAudit(
+      request,
+      {
+        ...userAuditEvent(request, operator, "platform_member", request.params.userId.trim(), { status: parsed.data.status }),
+        action: "platform.member.status_updated",
+      },
+      () => updatePlatformMemberStatus(request.params.userId.trim(), parsed.data.status),
+    );
+    if (!updated) return reply.code(404).send({ error: "PLATFORM_MEMBER_NOT_FOUND" });
+    return reply.send({ member: updated });
+  });
+
+  // Platform & Tenant Audit Export + Tenant Self-Service Audit
+  app.get<{
+    Querystring: { tenantId?: string; outcome?: string; action?: string; search?: string; format?: string; limit?: string };
+  }>("/admin/platform/audit/export", async (request, reply) => {
+    await requirePlatformRole(request.headers, ["platform_owner", "platform_admin", "platform_support"]);
+    const reader = new PostgresAuditEventReader(pool);
+    const outcome = request.query.outcome?.trim();
+    const format = request.query.format?.trim().toLowerCase() === "json" ? "json" : "csv";
+    const result = await reader.list({
+      ...(request.query.tenantId?.trim() ? { tenantId: request.query.tenantId.trim() } : {}),
+      ...(outcome === "succeeded" || outcome === "denied" || outcome === "failed" ? { outcome } : {}),
+      ...(request.query.action?.trim() ? { action: request.query.action.trim() } : {}),
+      ...(request.query.search?.trim() ? { search: request.query.search.trim() } : {}),
+      limit: Math.min(Math.max(Number(request.query.limit) || 250, 1), 500),
+      offset: 0,
+    });
+    if (format === "json") {
+      return reply
+        .header("Content-Type", "application/json; charset=utf-8")
+        .header("Content-Disposition", 'attachment; filename="platform-audit-export.json"')
+        .header("Cache-Control", "no-store")
+        .send(serializeAuditEventsJson(result.items));
+    }
+    return reply
+      .header("Content-Type", "text/csv; charset=utf-8")
+      .header("Content-Disposition", 'attachment; filename="platform-audit-export.csv"')
+      .header("Cache-Control", "no-store")
+      .send(serializeAuditEventsCsv(result.items));
+  });
+
+  app.get<{ Querystring: { action?: string; outcome?: string; limit?: string; offset?: string } }>(
+    "/admin/audit",
+    async (request, reply) => {
+      const context = await requirePermission(request, { audit: ["read"] });
+      const reader = new PostgresAuditEventReader(pool);
+      const outcome = request.query.outcome?.trim();
+      const result = await reader.list({
+        tenantId: context.tenantId,
+        ...(request.query.action?.trim() ? { action: request.query.action.trim() } : {}),
+        ...(outcome === "succeeded" || outcome === "denied" || outcome === "failed" ? { outcome } : {}),
+        limit: Math.min(Math.max(Number(request.query.limit) || 50, 1), 100),
+        offset: Math.max(Number(request.query.offset) || 0, 0),
+      });
+      return reply.send(result);
+    },
+  );
+
+  app.get<{ Querystring: { action?: string; outcome?: string; format?: string } }>(
+    "/admin/audit/export",
+    async (request, reply) => {
+      const context = await requirePermission(request, { audit: ["export"] });
+      const reader = new PostgresAuditEventReader(pool);
+      const outcome = request.query.outcome?.trim();
+      const format = request.query.format?.trim().toLowerCase() === "json" ? "json" : "csv";
+      const result = await reader.list({
+        tenantId: context.tenantId,
+        ...(request.query.action?.trim() ? { action: request.query.action.trim() } : {}),
+        ...(outcome === "succeeded" || outcome === "denied" || outcome === "failed" ? { outcome } : {}),
+        limit: 500,
+        offset: 0,
+      });
+      if (format === "json") {
+        return reply
+          .header("Content-Type", "application/json; charset=utf-8")
+          .header("Content-Disposition", 'attachment; filename="tenant-audit-export.json"')
+          .header("Cache-Control", "no-store")
+          .send(serializeAuditEventsJson(result.items));
+      }
+      return reply
+        .header("Content-Type", "text/csv; charset=utf-8")
+        .header("Content-Disposition", 'attachment; filename="tenant-audit-export.csv"')
+        .header("Cache-Control", "no-store")
+        .send(serializeAuditEventsCsv(result.items));
+    },
+  );
+
+  // Organization update endpoint enforcing tenant.organization.update
+  app.patch("/admin/organization", async (request, reply) => {
+    const context = await requirePermission(request, { organization: ["update"] });
+    const bodySchema = z.object({ name: z.string().trim().min(2).max(160) }).strict();
+    const parsed = bodySchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.code(400).send({ error: "INVALID_INPUT", details: parsed.error.flatten() });
+    }
+    const updated = await withAudit(
+      request,
+      {
+        ...userAuditEvent(request, { userId: context.userId, role: context.roles.join(",") }, "organization", context.organizationId),
+        action: "tenant.organization.updated",
+        tenantId: context.tenantId,
+      },
+      () => auth.api.updateOrganization({
+        body: { organizationId: context.organizationId, data: { name: parsed.data.name } },
+        headers: authHeaders(request),
+      }),
+    );
+    return reply.send({ organization: updated });
   });
 
   app.patch<{ Params: { tenantId: string } }>("/admin/platform/tenants/:tenantId/lifecycle", async (request, reply) => {

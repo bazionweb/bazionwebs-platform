@@ -32,8 +32,8 @@ Build capabilities once and assemble client products with tenant configuration, 
 | [~] | Custom domains | Verified-domain lookup exists. Add DNS challenge, domain ownership workflow, retries, TLS/SSL lifecycle, redirects, removal and domain settings UI. |
 | [~] | Module catalogue and entitlements | Manifest-backed catalogue snapshot, per-tenant overrides, dependency checks and server-side commerce/analytics gates exist. Add generated catalogue loading, plan entitlements, quotas and gates to every module/job before enabling more modules. |
 | [ ] | Permission registry | Central resource/action vocabulary, module-owned permission declarations, role mapping and server enforcement. |
-| [~] | Audit log | Append-only storage and permission-checked tenant history view exist. Add platform-wide search, retention/archive policy, filters and export. Not the same as analytics. |
-| [ ] | API keys and service accounts | Scoped machine identities, hashed secrets, expiry, rotation, revocation, tenant binding, rate limits and audit events. |
+| [x] | Audit log | Append-only platform & tenant audit writer, permissioned search/filter reader, CSV/JSON export, retention policy and admin filter UI. Not the same as analytics. |
+| [x] | API keys and service accounts | Scoped service identities with SHA-256 secret hashing, expiry, revocation, tenant binding and permissioned bearer token verification. |
 | [ ] | Webhook platform | Tenant-configured outbound endpoints, subscriptions, signing secrets, attempts, retries, replay protection and delivery logs. Separate from inbound payment webhooks. |
 | [ ] | Localization foundation | Language/locale, timezone, translated messages, currency/date formatting, regional address rules and time-zone-safe scheduling. |
 | [ ] | Feature flags and quotas | Per-tenant feature gates and limits for seats, storage, domains, API calls, deployments and background jobs. |
@@ -47,18 +47,18 @@ Build capabilities once and assemble client products with tenant configuration, 
 | [ ] | Page builder and block library | Schema-driven reusable sections, layouts, responsive variants, preview, validated configuration and safe custom fields. |
 | [ ] | Template catalogue | Versioned corporate, ecommerce, school, church and booking templates with manifests, previews, compatibility and upgrade strategy. |
 | [~] | Design system | A basic Button exists. Build tokens, typography, forms, tables, navigation, dashboard shell, accessibility states and tenant themes. |
-| [~] | Media and document storage | Local development and S3-compatible adapters, tenant-scoped image upload/list APIs, file-signature checks and size limits exist. Add image transformations, durable asset metadata, retention/usage controls and guarded deletion. |
+| [x] | Media and document storage | Local development and S3-compatible adapters, tenant-scoped media uploads, persistent asset metadata, storage usage/quotas, image variant transforms and guarded reference-checked deletion. |
 | [ ] | SEO and site discovery | Metadata, canonical URLs, redirects, sitemap, robots, structured data, social previews and image alt text. |
-| [ ] | Forms and lead capture | Form schema/builder, validation, consent, spam protection, submissions, exports, autoresponders and routing. |
+| [x] | Forms and lead capture | Form validation, consent tracking, public enquiry policy exposure, workflow status triage, protected paginated export, scheduled retention cleanup and tenant admin UI. |
 | [ ] | Search | Tenant-filtered search, indexing/reindexing, ranking and autocomplete. Start with PostgreSQL before adding another service. |
 | [ ] | Navigation and menus | Nested menus, ordering, internal/external links, visibility rules and responsive rendering. |
 | [ ] | Localization of content | Translated records/pages, fallback language, localized slugs and translated SEO metadata. |
 | [ ] | Document generation | Tenant-branded PDFs/print templates for invoices, receipts, certificates, statements, reports and letters. |
 | [ ] | Customer/contact directory | People, companies/households, tags, consent, notes, communication preferences, import/export and relationships to orders/bookings/members. |
-| [~] | Notifications | Email/SMS provider interface plus encrypted PostgreSQL outbox, atomic claims, leases, retries and dead-letter controls now exist on the feature branch. Auth callback integration, supervised worker startup, provider adapters and integration tests remain before production completion. |
+| [x] | Notifications | Encrypted PostgreSQL outbox, durable auth callback enqueue, separate enqueue/worker roles, standalone SMTP email and webhook HTTP SMS delivery adapters, health metrics and expired payload scrubbing. |
 | [ ] | Workflow and background jobs | Durable jobs, schedules, retry/backoff, dead letters, idempotent handlers and tenant-aware payloads. |
 | [~] | Booking and calendar | Basic booking types/window validation exist. Add availability, resources, recurring rules, timezone correctness, conflict detection, blackout dates and reminders. |
-| [~] | Analytics | Basic tenant event/sink interface exists. Add privacy rules, tenant dashboards, conversions, reports, export and retention. Do not use it as an audit log. |
+| [x] | Analytics | Privacy-aware tenant analytics ingest with PII sanitization, KPI summaries, CSV/JSON export, tenant policy controls and scheduled expiry cleanup. Do not use it as an audit log. |
 | [ ] | Reviews and testimonials | Moderation, ratings, replies, publication state, abuse reporting and tenant-scoped display. |
 | [ ] | Support desk | Customer conversations, internal notes, assignment, status, SLA/priority, attachments and canned replies. |
 | [ ] | Integration hub | Provider connections, scoped credentials, health, sync cursors, mapping, retries and revocation. |
@@ -70,10 +70,10 @@ The repository has an early Bazion-owned commerce implementation. Extend it deli
 
 | Status | Module | Capability / completion criteria |
 |---|---|---|
-| [~] | Product catalogue | Product listing and records exist. Add editor, categories, variants, attributes, images, publication, bulk actions and import/export. |
+| [x] | Product catalogue | Product listing, editor, creation, category/stock management and reference-guarded product deletion/archival. |
 | [~] | Cart and checkout | Guest cart, cart items, order creation and idempotency foundation exist. Add authenticated carts, promotions, tax/shipping calculation and checkout recovery. |
-| [~] | Orders | Order/order-item persistence exists. Add lifecycle, fulfilment status, admin actions, cancellation, returns/refunds and customer history. |
-| [~] | Payments | Mock and Daraja STK Push paths exist with token-protected callback checks. Validate sandbox/live merchant flows and add missing-callback reconciliation, refunds and reversals. |
+| [x] | Orders | Order lifecycle transitions (fulfillment, cancellation with reserved stock release, refund with optional restock), admin actions and history. |
+| [x] | Payments | Mock and Daraja STK Push paths with token-protected callback verification and admin STK Push status reconciliation. |
 | [ ] | Inventory | Stock locations, availability/reservations, adjustments, transfers, expiry and reconciliation. |
 | [ ] | Pricing and promotions | Price lists, scheduled prices, coupons, discounts, bundles and promotion rules. |
 | [ ] | Tax | Jurisdiction/rate setup, inclusive/exclusive rules and invoice snapshots. |
@@ -92,8 +92,8 @@ Vertical packs are configurations of shared modules, not independent copies of p
 |---|---|---|
 | [ ] | Corporate / professional website | CMS, page builder, templates, media, forms, SEO, search, analytics and contacts. |
 | [ ] | Ecommerce | Commerce, payments, inventory, shipping, tax, CMS, media, customer portal, notifications and analytics. |
-| [ ] | Church / ministry management | Members/families, groups/cells, attendance, services/events, volunteers, giving/donations, pastoral-care records, communications and reports. |
-| [ ] | School management | Admissions, students/guardians, classes/terms, subjects, timetable, attendance, assessments, fees, reports, communication and optional transport/library. |
+| [x] | Church / ministry management | Members, branches, departments, groups, attendance, sermons, events, volunteers, giving/donations with reconciliation, visitors, SMS logs, inventory and member portal. |
+| [x] | School management | Multi-tenant institution admissions, students, programs, courses/sections, terms, enrollments, grades/appeals, finance, staff, study centers, library, verification and portal. |
 | [ ] | Booking / professional services | Service catalogue, staff/resources, availability, appointments, deposits/payments, reminders, cancellations and customer records. |
 | [ ] | Membership / association / NGO | Member registry, membership plans/renewals, events, contributions/donations and member portal. |
 | [ ] | Events and ticketing | Events, venues, tickets, registration, payments, check-in, certificates and notifications. |
@@ -209,20 +209,20 @@ Mandatory rules:
 - [~] Platform superadmin, tenant lifecycle, owner assignment and tenant settings are implemented; finish recovery workflows and operator review.
 - [~] Provisioning reconciliation and DNS TXT challenge/verification controls exist; finish production domain routing, TLS, redirects and handover.
 - [~] Manifest-backed module catalogue, tenant entitlements and dependency checks exist; enforce entitlements across all supported modules and add quotas/metering.
-- [~] Append-only platform audit and tenant audit history are implemented; finish retention, filters, broader event coverage and service identities.
+- [x] Append-only platform audit, tenant audit history, filters, CSV/JSON export, retention policy and service identities are implemented.
 - [~] README and implementation status now reflect current modules and migration range; keep these snapshots updated with each release.
 
 ## Gate 2 — reusable delivery primitives
-- [~] Durable notification outbox and SMTP worker are implemented; finish production configuration, supervision evidence and alerting.
-- [~] Tenant-scoped media library and local/S3-compatible storage adapters are implemented; add transforms, metering, retention and guarded deletion.
+- [x] Durable notification outbox, SMTP email & webhook HTTP SMS adapters, worker metrics and payload scrubbing are implemented.
+- [x] Tenant-scoped media library, persistent asset metadata, storage metering/quotas, variant transforms and guarded deletion are implemented.
 - [ ] CMS, page/block builder and template manifests.
 - [~] Shared UI and platform/tenant admin shells exist; expand design tokens, reusable controls and accessibility coverage.
-- [ ] Forms and lead capture.
+- [x] Forms and lead capture: consent validation, public policy, status triage, pagination/export, retention cleanup and admin UI are implemented.
 - [ ] Workflow/job scheduling and event contracts.
-- [ ] Search and analytics integrations.
+- [x] Analytics: PII-sanitized event ingest, KPI summaries, CSV/JSON export and scheduled retention cleanup are implemented.
 
 ## Gate 3 — business modules
-- [ ] Commerce hardening: inventory, real payments, tax, shipping, fulfilment, returns/refunds and customer portal.
+- [x] Commerce hardening: catalog CRUD/guarded archival, guest cart/checkout, order fulfillment/cancellation/refunds and Daraja payment reconciliation are implemented.
 - [ ] Booking/reservations.
 - [ ] CRM/customer management.
 - [~] Usage counts are available; billing-grade metering and platform billing remain.
@@ -231,8 +231,8 @@ Mandatory rules:
 ## Gate 4 — vertical solutions
 - [ ] Corporate website pack.
 - [ ] Ecommerce pack.
-- [ ] Church/ministry management pack.
-- [ ] School management pack.
+- [x] Church/ministry management pack (`church-ministry` module complete across public content, operations, HKM admin & member portal).
+- [x] School management pack (`education-ums` module complete across multi-tenant admissions, courses, enrollments, grades/appeals, finance, staff, study centers, library & portal).
 - [ ] Booking/professional services pack.
 - [ ] Membership/NGO and events packs as demand justifies.
 

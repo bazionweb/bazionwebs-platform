@@ -35,7 +35,7 @@ describe("commerce API contracts", () => {
     expect(productInputSchema.safeParse({ ...validProduct, stockTracked: false, stockOnHand: 4 }).success).toBe(false);
   });
 
-  it("requires meaningful store settings and only allows order fulfillment", () => {
+  it("validates order status transitions and meaningful store settings", () => {
     const settings = storeSettingsInputSchema.safeParse({
       storeName: "Bazion Shop", tagline: "Books for everyone", supportEmail: "", isHomePage: false,
       locale: "en-KE", timeZone: "Africa/Nairobi", defaultCountryCode: "KE", defaultCurrency: "KES",
@@ -43,6 +43,8 @@ describe("commerce API contracts", () => {
     });
     expect(settings.success).toBe(true);
     expect(orderStatusInputSchema.safeParse({ status: "fulfilled" }).success).toBe(true);
-    expect(orderStatusInputSchema.safeParse({ status: "refunded" }).success).toBe(false);
+    expect(orderStatusInputSchema.safeParse({ status: "cancelled" }).success).toBe(true);
+    expect(orderStatusInputSchema.safeParse({ status: "refunded" }).success).toBe(true);
+    expect(orderStatusInputSchema.safeParse({ status: "pending_payment" }).success).toBe(false);
   });
 });

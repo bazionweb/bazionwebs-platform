@@ -37,6 +37,12 @@ interface InstitutionProfile {
     description: string;
     branding: { primaryColor: string; secondaryColor: string; accentColor: string; logoUrl: string };
   };
+  website_template?: {
+    id: string;
+    configuredVersion: string;
+    currentVersion: string;
+    updateMode: "automatic" | "pinned";
+  };
 }
 
 type EducationWebsiteOverrideDraft = {
@@ -757,6 +763,7 @@ const Settings: React.FC = () => {
                       <div>
                         <h4 className="text-xs font-black uppercase tracking-widest text-gray-700 dark:text-gray-200">Public website template</h4>
                         <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Only fields you change become institution overrides. Untouched fields continue receiving template updates.</p>
+                        {institutionProfile.website_template && <p className="mt-2 text-xs font-semibold text-emerald-700 dark:text-emerald-300">Shared template v{institutionProfile.website_template.currentVersion} · {institutionProfile.website_template.updateMode} updates · stored baseline v{institutionProfile.website_template.configuredVersion}</p>}
                       </div>
                       <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
                         <label className="space-y-2">

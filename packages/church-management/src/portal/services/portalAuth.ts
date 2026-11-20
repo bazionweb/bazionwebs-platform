@@ -131,6 +131,18 @@ export const portalAuthService = {
   async getChurchConfig() {
     const response = await fetch('/api/church/hkm/config', { credentials: 'include' });
     if (!response.ok) throw new Error('Could not load church information.');
-    return await response.json() as { config: { churchName: string; contact?: { address?: string; phone?: string; email?: string } } };
+    return await response.json() as {
+      config: {
+        churchName: string;
+        shortName?: string;
+        tagline?: string;
+        logoUrl?: string;
+        primaryColor?: string;
+        secondaryColor?: string;
+        accentColor?: string;
+        websiteUrl?: string;
+        contact?: { address?: string; phone?: string; email?: string };
+      };
+    };
   },
 };

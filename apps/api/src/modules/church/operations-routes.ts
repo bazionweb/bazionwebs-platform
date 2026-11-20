@@ -240,7 +240,7 @@ export async function registerChurchOperationsRoutes(app: FastifyInstance, optio
         .from(churchDepartments)
         .where(eq(churchDepartments.tenantId, context.tenantId))
         .orderBy(churchDepartments.displayOrder);
-      return reply.send({ departments });
+      return reply.send({ items: departments, departments });
     });
   });
 
@@ -342,7 +342,8 @@ export async function registerChurchOperationsRoutes(app: FastifyInstance, optio
         .where(and(eq(churchGroupMemberships.tenantId, context.tenantId), eq(churchGroupMemberships.status, "active")))
         .groupBy(churchGroupMemberships.groupId);
       const countByGroup = new Map(membershipCounts.map((row) => [row.groupId, row.total]));
-      return reply.send({ groups: groups.map((group) => ({ ...group, memberCount: countByGroup.get(group.id) ?? 0 })) });
+      const mappedGroups = groups.map((group) => ({ ...group, memberCount: countByGroup.get(group.id) ?? 0 }));
+      return reply.send({ items: mappedGroups, groups: mappedGroups });
     });
   });
 
@@ -522,7 +523,7 @@ export async function registerChurchOperationsRoutes(app: FastifyInstance, optio
         .leftJoin(churchDepartments, eq(churchVolunteerTeams.departmentId, churchDepartments.id))
         .where(eq(churchVolunteerTeams.tenantId, context.tenantId))
         .orderBy(desc(churchVolunteerTeams.createdAt));
-      return reply.send({ teams });
+      return reply.send({ items: teams, teams });
     });
   });
 
@@ -687,7 +688,7 @@ export async function registerChurchOperationsRoutes(app: FastifyInstance, optio
         .from(churchInventoryAssets)
         .where(eq(churchInventoryAssets.tenantId, context.tenantId))
         .orderBy(churchInventoryAssets.category, churchInventoryAssets.name);
-      return reply.send({ assets });
+      return reply.send({ items: assets, assets });
     });
   });
 

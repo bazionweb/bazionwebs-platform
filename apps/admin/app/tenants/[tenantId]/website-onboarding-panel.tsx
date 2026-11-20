@@ -6,6 +6,7 @@ import { assertOk, pulse } from "@bazion/ui";
 
 type PackageTemplateItem = {
   id: string;
+  version?: string;
   name: string;
   tagline: string;
   defaultPalette: string;
@@ -67,6 +68,12 @@ export type TenantWebsiteOnboardingData = {
     organization?: { name?: string; tagline?: string };
     contact?: { email?: string; address?: string };
     payment?: { mpesaPaybill?: string; accountNo?: string };
+  } | null;
+  templateRelease?: {
+    templateId: string;
+    configuredVersion: string;
+    currentVersion: string;
+    updateMode: "automatic" | "pinned";
   } | null;
   hasStoredSiteSettings: boolean;
   latestPublishedVersion: {
@@ -474,7 +481,9 @@ export function TenantWebsiteOnboardingPanel({
                   Website template
                   <select value={templateId} onChange={(e) => handleTemplateChange(e.target.value)}>
                     {activePackage.templates.map((item) => (
-                      <option key={item.id} value={item.id}>{item.name}</option>
+                      <option key={item.id} value={item.id}>
+                        {item.name}{item.version ? ` (v${item.version})` : ""}
+                      </option>
                     ))}
                   </select>
                 </label>
@@ -488,6 +497,13 @@ export function TenantWebsiteOnboardingPanel({
                   </select>
                 </label>
               </div>
+              {initial?.templateRelease && (
+                <div className="notice-inline" role="status" style={{ marginTop: 10 }}>
+                  {initial.templateRelease.updateMode === "automatic"
+                    ? `Shared template v${initial.templateRelease.currentVersion} is active for this tenant. Stored baseline: v${initial.templateRelease.configuredVersion}; tenant overrides remain isolated.`
+                    : `This website is pinned to v${initial.templateRelease.configuredVersion}; shared template releases do not change its snapshot.`}
+                </div>
+              )}
             </fieldset>
 
             <fieldset className="website-onboarding-group">

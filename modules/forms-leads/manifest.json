@@ -3,15 +3,16 @@
   "name": "Forms and lead capture",
   "version": "0.1.0",
   "owner": "website",
-  "status": "partial",
+  "status": "stable",
   "entrypoints": {
     "domain": "packages/forms",
-    "api": "apps/api/src/modules/forms-leads"
+    "api": "apps/api/src/modules/forms-leads",
+    "ui": "apps/storefront/app/admin/forms-leads-admin.tsx"
   },
   "implementation": { "mode": "hybrid", "packageName": "@bazion/forms" },
   "tenantModel": "tenant-owned",
   "permissions": [
-    { "resource": "enquiry", "actions": ["read", "export", "delete"] },
+    { "resource": "enquiry", "actions": ["read", "update", "export", "delete"] },
     { "resource": "enquiryPolicy", "actions": ["read", "update"] }
   ],
   "dependencies": ["platform-identity"],
@@ -19,7 +20,7 @@
     { "name": "site_enquiries", "owner": "forms-leads", "tenantScoped": true, "rls": "forced", "migration": "0016_forms_leads_site_enquiries.sql" },
     { "name": "site_enquiry_policies", "owner": "forms-leads", "tenantScoped": true, "rls": "forced", "migration": "0016_forms_leads_site_enquiries.sql" }
   ],
-  "migrations": ["0016_forms_leads_site_enquiries.sql"],
+  "migrations": ["0016_forms_leads_site_enquiries.sql", "0034_complete_partial_modules.sql"],
   "events": [],
   "jobs": ["apps/api/scripts/expire-site-enquiries.ts"],
   "tests": [

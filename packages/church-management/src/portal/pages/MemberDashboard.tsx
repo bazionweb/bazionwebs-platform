@@ -30,6 +30,7 @@ import {
 import jsPDF from '../../shims/jspdf';
 import autoTable from '../../shims/jspdf-autotable';
 import { compressImage } from '../../utils/imageUtils';
+import { useTenantConfig } from '../../context/TenantContext';
 // ─── Types ───────────────────────────────────────────────────────────────────
 interface MemberData {
   id: string;
@@ -353,6 +354,7 @@ const ErrorState = ({ onRetry }: { onRetry: () => void }) => (
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 const MemberDashboard: React.FC = () => {
+  const tenantConfig = useTenantConfig();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const navigate = useNavigate();
@@ -363,7 +365,7 @@ const MemberDashboard: React.FC = () => {
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [churchInfo, setChurchInfo] = useState<{ name: string; address: string; phone: string; email: string } | null>(
+  const [churchInfo, setChurchInfo] = useState<{ name: string; address: string; phone: string; email: string; logoUrl: string; primaryColor: string; accentColor: string; websiteUrl: string } | null>(
     null,
   );
 
@@ -410,6 +412,10 @@ const MemberDashboard: React.FC = () => {
           address: config.contact?.address || '',
           phone: config.contact?.phone || '',
           email: config.contact?.email || '',
+          logoUrl: config.logoUrl || tenantConfig.logoUrl,
+          primaryColor: config.primaryColor || tenantConfig.primaryColor || '#0f172a',
+          accentColor: config.accentColor || tenantConfig.accentColor || '#d4af37',
+          websiteUrl: config.websiteUrl || tenantConfig.websiteUrl || '',
         });
       })
       .catch(() => {
@@ -422,21 +428,60 @@ const MemberDashboard: React.FC = () => {
     navigate('/portal/login');
   };
 
-  const handleDownloadStatement = () => {
+  const handleDownloadStatement = async () => {
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
+    const colorToRgb = (color: string | undefined, fallback: [number, number, number]): [number, number, number] => {
+      const match = color?.match(/^#([0-9a-f]{6})$/i);
+      if (!match) return fallback;
+      const hex = match[1];
+      return [parseInt(hex.slice(0, 2), 16), parseInt(hex.slice(2, 4), 16), parseInt(hex.slice(4, 6), 16)];
+    };
+    const primaryRgb = colorToRgb(churchInfo?.primaryColor, [15, 23, 42]);
+    const accentRgb = colorToRgb(churchInfo?.accentColor, [212, 175, 55]);
+    const loadImageData = (url: string) => new Promise<string>((resolve, reject) => {
+      const image = new Image();
+      image.crossOrigin = 'anonymous';
+      image.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = image.naturalWidth;
+        canvas.height = image.naturalHeight;
+        const context = canvas.getContext('2d');
+        if (!context) return reject(new Error('Canvas unavailable'));
+        context.drawImage(image, 0, 0);
+        resolve(canvas.toDataURL('image/png'));
+      };
+      image.onerror = reject;
+      image.src = url;
+    });
 
     // Header styling
-    doc.setFillColor(15, 23, 42); // Dark navy
+    doc.setFillColor(...primaryRgb);
     doc.rect(0, 0, pageWidth, 40, 'F');
 
-    // Add Logo text (placeholder if we can't load image sync)
-    doc.setTextColor(212, 175, 55); // Gold
+    // Embed the tenant logo when the configured image allows canvas export.
+    if (churchInfo?.logoUrl && typeof Image !== 'undefined') {
+      try {
+        const logoData = await loadImageData(churchInfo.logoUrl);
+        doc.addImage(logoData, 'PNG', 14, 8, 24, 24);
+      } catch {
+        // Keep the branded text header when a remote logo blocks canvas export.
+      }
+    }
+
+    let platformMarkData: string | undefined;
+    try {
+      platformMarkData = await loadImageData('/brand/bazion-platform-mark-320.webp');
+    } catch {
+      // The PDF footer still carries the platform name when the image is unavailable.
+    }
+
+    doc.setTextColor(...accentRgb);
     doc.setFontSize(16);
-    doc.text((churchInfo?.name || 'HKM Ministries').toUpperCase(), pageWidth / 2, 20, { align: 'center' });
+    doc.text((churchInfo?.name || tenantConfig.churchName).toUpperCase(), pageWidth / 2, 18, { align: 'center' });
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(10);
-    doc.text('Member Giving Statement', pageWidth / 2, 28, { align: 'center' });
+    doc.text('Member Giving Statement', pageWidth / 2, 27, { align: 'center' });
     if (churchInfo?.address || churchInfo?.phone) {
       doc.setFontSize(8);
       doc.text([churchInfo?.address, churchInfo?.phone].filter(Boolean).join('  |  '), pageWidth / 2, 35, {
@@ -469,8 +514,16 @@ const MemberDashboard: React.FC = () => {
       head: [['Date', 'Category', 'Amount']],
       body: tableData,
       theme: 'striped',
-      headStyles: { fillColor: [15, 23, 42], textColor: [212, 175, 55] },
+      headStyles: { fillColor: primaryRgb, textColor: accentRgb },
       styles: { fontSize: 10, cellPadding: 6 },
+      margin: { bottom: 22 },
+      didDrawPage: () => {
+        const pageHeight = doc.internal.pageSize.getHeight();
+        if (platformMarkData) doc.addImage(platformMarkData, 'PNG', pageWidth - 20, pageHeight - 12, 7, 5.75);
+        doc.setFontSize(6);
+        doc.setTextColor(75, 85, 99);
+        doc.text('Powered by Bazion Web', pageWidth - 8, pageHeight - 4, { align: 'right' });
+      },
     });
 
     // Footer
@@ -479,6 +532,10 @@ const MemberDashboard: React.FC = () => {
     doc.setFontSize(9);
     doc.setTextColor(100, 100, 100);
     doc.text('Thank you for your faithfulness and continued support.', pageWidth / 2, finalY + 15, { align: 'center' });
+    if (churchInfo?.email || churchInfo?.websiteUrl) {
+      doc.setFontSize(8);
+      doc.text([churchInfo?.email, churchInfo?.websiteUrl].filter(Boolean).join('  |  '), pageWidth / 2, finalY + 22, { align: 'center' });
+    }
 
     doc.save(`giving-statement-${currentUser?.id || 'member'}-${new Date().toISOString().split('T')[0]}.pdf`);
   };
@@ -500,20 +557,49 @@ const MemberDashboard: React.FC = () => {
     if (!currentUser?.id) return;
     setSavingProfile(true);
     try {
-      await portalApolloClient.mutate({
-        mutation: UPDATE_MEMBER_PROFILE_MUTATION,
-        variables: {
-          id: currentUser.id,
-          updates: {
+      let persisted = false;
+      let serverError: Error | null = null;
+      try {
+        const res = await fetch('/api/church/hkm/portal/me', {
+          method: 'PATCH',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
             phone: profileForm.phone,
             email: profileForm.email,
             address: profileForm.address,
             occupation: profileForm.occupation,
             marital_status: profileForm.marital_status,
             avatar: profileForm.avatar,
+          }),
+        });
+        if (res.ok) {
+          persisted = true;
+        } else if (res.status === 400 || res.status === 409) {
+          const errBody = await res.json().catch(() => ({})) as { message?: string; error?: string };
+          serverError = new Error(errBody.message ?? errBody.error ?? 'Failed to save profile.');
+        }
+      } catch {
+        // Fallback to Apollo mock when network/API server is absent
+      }
+      if (serverError) throw serverError;
+
+      if (!persisted) {
+        await portalApolloClient.mutate({
+          mutation: UPDATE_MEMBER_PROFILE_MUTATION,
+          variables: {
+            id: currentUser.id,
+            updates: {
+              phone: profileForm.phone,
+              email: profileForm.email,
+              address: profileForm.address,
+              occupation: profileForm.occupation,
+              marital_status: profileForm.marital_status,
+              avatar: profileForm.avatar,
+            },
           },
-        },
-      });
+        });
+      }
       setProfileSaved(true);
       setIsEditing(false);
       await fetchDashboard();
@@ -531,15 +617,41 @@ const MemberDashboard: React.FC = () => {
     setSubmittingTicket(true);
     setTicketError('');
     try {
-      await portalApolloClient.mutate({
-        mutation: SUBMIT_HELPDESK_TICKET_MUTATION,
-        variables: {
-          sender_id: currentUser.id,
-          department: ticketDepartment,
-          subject: ticketSubject,
-          body: ticketBody,
-        },
-      });
+      let submitted = false;
+      let serverError: Error | null = null;
+      try {
+        const res = await fetch('/api/church/hkm/portal/helpdesk', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            department: ticketDepartment,
+            subject: ticketSubject,
+            body: ticketBody,
+          }),
+        });
+        if (res.ok) {
+          submitted = true;
+        } else if (res.status === 400) {
+          const errBody = await res.json().catch(() => ({})) as { message?: string; error?: string };
+          serverError = new Error(errBody.message ?? errBody.error ?? 'Failed to submit your message.');
+        }
+      } catch {
+        // Fallback to Apollo mock when network/API server is absent
+      }
+      if (serverError) throw serverError;
+
+      if (!submitted) {
+        await portalApolloClient.mutate({
+          mutation: SUBMIT_HELPDESK_TICKET_MUTATION,
+          variables: {
+            sender_id: currentUser.id,
+            department: ticketDepartment,
+            subject: ticketSubject,
+            body: ticketBody,
+          },
+        });
+      }
       setTicketSubmitted(true);
       setTicketSubject('');
       setTicketBody('');

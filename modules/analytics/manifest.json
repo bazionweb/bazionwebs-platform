@@ -1,21 +1,27 @@
 {
   "id": "analytics",
-  "name": "Analytics authorization surface",
+  "name": "Analytics",
   "version": "1.0.0",
   "owner": "analytics",
-  "status": "partial",
+  "status": "stable",
   "entrypoints": {
-    "domain": "packages/analytics"
+    "domain": "packages/analytics",
+    "api": "apps/api/src/modules/analytics"
   },
-  "implementation": { "mode": "workspace-package", "packageName": "@bazion/analytics" },
+  "implementation": { "mode": "hybrid", "packageName": "@bazion/analytics" },
   "tenantModel": "tenant-owned",
-  "tables": [],
-  "migrations": [],
+  "tables": [
+    { "name": "analytics_events", "owner": "analytics", "tenantScoped": true, "rls": "forced", "migration": "0034_complete_partial_modules.sql" },
+    { "name": "analytics_policies", "owner": "analytics", "tenantScoped": true, "rls": "forced", "migration": "0034_complete_partial_modules.sql" }
+  ],
+  "migrations": ["0034_complete_partial_modules.sql"],
   "permissions": [
     {
       "resource": "analytics",
       "actions": [
-        "read"
+        "read",
+        "export",
+        "delete"
       ]
     }
   ],
@@ -25,11 +31,15 @@
   "operations": {
     "logs": true,
     "metrics": true,
-    "retention": "Use documented event retention and tenant export/delete controls.",
+    "retention": "Use documented event retention and tenant export/delete controls via @bazion/api db:expire-analytics-events.",
     "recovery": "Rebuild derived aggregates from retained events where available; restore durable event data from backup.",
     "enableDisable": "Can be disabled per tenant without affecting commerce or identity."
   },
+  "jobs": [
+    "apps/api/scripts/expire-analytics-events.ts"
+  ],
   "tests": [
-    "packages/analytics/src"
+    "packages/analytics/src",
+    "apps/api/src/modules/analytics/routes.test.ts"
   ]
 }

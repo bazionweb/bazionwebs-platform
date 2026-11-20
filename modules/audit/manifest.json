@@ -3,9 +3,11 @@
   "name": "Append-only platform and tenant audit trail",
   "version": "0.1.0",
   "owner": "platform",
-  "status": "partial",
+  "status": "stable",
   "entrypoints": {
-    "adapter": "packages/audit"
+    "adapter": "packages/audit",
+    "api": "apps/api/src/modules/admin",
+    "ui": "apps/admin/components/audit-panel.tsx"
   },
   "implementation": { "mode": "workspace-package", "packageName": "@bazion/audit" },
   "tenantModel": "mixed",
@@ -13,7 +15,12 @@
     { "name": "platform_audit_events", "owner": "audit", "tenantScoped": false, "rls": "not-applicable", "migration": "0005_platform_audit_events.sql" }
   ],
   "migrations": ["0005_platform_audit_events.sql"],
-  "permissions": [],
+  "permissions": [
+    {
+      "resource": "audit",
+      "actions": ["read", "export"]
+    }
+  ],
   "dependencies": [
     "platform-identity"
   ],
@@ -25,7 +32,9 @@
     "enableDisable": "Keep audit recording enabled for privileged operations; do not disable without a documented security exception."
   },
   "tests": [
-    "packages/audit/src/index.test.ts"
+    "packages/audit/src/index.test.ts",
+    "apps/api/src/modules/admin/routes.test.ts",
+    "apps/api/src/modules/admin/troubleshooting.test.ts"
   ],
   "docs": [
     "docs/architecture/permissions-audit-and-module-manifests.md"

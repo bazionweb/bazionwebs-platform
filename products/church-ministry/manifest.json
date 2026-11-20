@@ -30,7 +30,7 @@
     "schemaVersion": "1.0.0",
     "sourcePath": "packages/church-ministry-contracts/src/index.ts"
   },
-  "databaseSchemaVersion": "0033_education_website_template_overlays.sql",
+  "databaseSchemaVersion": "0034_complete_partial_modules.sql",
   "readiness": {
     "implemented": [
       "Better Auth administrator sessions and active-tenant permission checks",

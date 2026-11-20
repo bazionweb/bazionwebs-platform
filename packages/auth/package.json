@@ -33,6 +33,7 @@
   "dependencies": {
     "@bazion/notifications": "workspace:*",
     "@bazion/platform-identity": "workspace:*",
+    "@bazion/ui": "workspace:*",
     "better-auth": "1.7.17",
     "pg": "^8.23.1"
   },

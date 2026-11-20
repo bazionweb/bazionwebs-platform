@@ -13,6 +13,38 @@ const checks = [
 ];
 
 let failed = false;
+
+function isLoopbackHostname(hostname) {
+  const normalized = hostname.toLowerCase().replace(/^\[|\]$/g, "");
+  return normalized === "localhost"
+    || normalized.endsWith(".localhost")
+    || normalized === "::1"
+    || normalized === "::"
+    || normalized === "0.0.0.0"
+    || /^127(?:\.\d{1,3}){3}$/.test(normalized);
+}
+
+const storefrontApiBaseUrl = process.env.API_BASE_URL?.trim();
+if (!storefrontApiBaseUrl) {
+  process.stderr.write("BLOCKER: API_BASE_URL must be set on the storefront runtime for server-side tenant and admin requests.\n");
+  failed = true;
+} else {
+  try {
+    const apiUrl = new URL(storefrontApiBaseUrl);
+    if (!(["http:", "https:"].includes(apiUrl.protocol)) || apiUrl.pathname !== "/" || apiUrl.username || apiUrl.password || apiUrl.search || apiUrl.hash) {
+      process.stderr.write("BLOCKER: API_BASE_URL must be an HTTP(S) origin without credentials, path, query, or fragment.\n");
+      failed = true;
+    }
+    if (isLoopbackHostname(apiUrl.hostname)) {
+      process.stderr.write("BLOCKER: API_BASE_URL cannot point to loopback from a production storefront container.\n");
+      failed = true;
+    }
+  } catch {
+    process.stderr.write("BLOCKER: API_BASE_URL must be a valid absolute HTTP(S) origin.\n");
+    failed = true;
+  }
+}
+
 for (const check of checks) {
   process.stdout.write(`\n=== ${check.label} ===\n`);
   const result = spawnSync(packageManager, check.args, {

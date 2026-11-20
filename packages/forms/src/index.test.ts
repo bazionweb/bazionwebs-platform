@@ -4,6 +4,7 @@ import {
   prepareSiteEnquiry,
   siteEnquiryPolicyInputSchema,
   siteEnquiryRetentionDeadline,
+  siteEnquiryUpdateSchema,
   WEBSITE_ENQUIRY_PRIVACY_NOTICE_VERSION,
 } from "./index.js";
 
@@ -72,5 +73,17 @@ describe("site enquiry domain policy", () => {
   it("rejects missing consent and submissions without a reply contact", () => {
     expect(() => prepareSiteEnquiry({ ...validSubmission, privacyConsent: false })).toThrow();
     expect(() => prepareSiteEnquiry({ ...validSubmission, email: "", telephone: "" })).toThrow();
+  });
+
+  it("validates lead lifecycle updates and optional routing email", () => {
+    expect(siteEnquiryUpdateSchema.safeParse({ status: "responded", assignedTo: "sales-1" }).success).toBe(true);
+    expect(siteEnquiryUpdateSchema.safeParse({}).success).toBe(false);
+    expect(siteEnquiryPolicyInputSchema.safeParse({
+      enabled: true,
+      privacyNotice: "We use your contact details only to respond to this enquiry request cleanly.",
+      privacyNoticeVersion: "1.0.0",
+      retentionDays: 180,
+      routingEmail: "leads@example.test",
+    }).success).toBe(true);
   });
 });

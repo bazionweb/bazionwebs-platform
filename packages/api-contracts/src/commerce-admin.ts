@@ -92,4 +92,8 @@ export const orderListQuerySchema = z.object({
   status: z.enum(["pending_payment", "paid", "cancelled", "fulfilled", "refunded"]).optional(),
 }).strict();
 
-export const orderStatusInputSchema = z.object({ status: z.literal("fulfilled") }).strict();
+export const orderStatusInputSchema = z.object({
+  status: z.enum(["fulfilled", "cancelled", "refunded"]),
+  restock: z.boolean().optional(),
+  reason: z.string().trim().max(240).optional(),
+}).strict();

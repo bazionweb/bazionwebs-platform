@@ -17,7 +17,7 @@ export const platformModuleCatalog: readonly PlatformModuleCatalogItem[] = [
     "id": "platform-identity",
     "name": "Platform identity and tenant access",
     "version": "1.0.0",
-    "status": "partial",
+    "status": "stable",
     "tenantModel": "mixed",
     "dependencies": [],
     "description": "Authentication, tenant membership and access control. Required by the platform.",
@@ -29,7 +29,7 @@ export const platformModuleCatalog: readonly PlatformModuleCatalogItem[] = [
     "id": "commerce",
     "name": "Commerce",
     "version": "1.0.0",
-    "status": "partial",
+    "status": "stable",
     "tenantModel": "tenant-owned",
     "dependencies": [
       "platform-identity"
@@ -43,12 +43,12 @@ export const platformModuleCatalog: readonly PlatformModuleCatalogItem[] = [
     "id": "analytics",
     "name": "Analytics",
     "version": "1.0.0",
-    "status": "partial",
+    "status": "stable",
     "tenantModel": "tenant-owned",
     "dependencies": [
       "platform-identity"
     ],
-    "description": "Tenant workspace metrics and analytics authorization surface.",
+    "description": "Privacy-aware tenant workspace analytics, event tracking, exports and retention controls.",
     "defaultEnabled": false,
     "required": false,
     "tenantAssignable": true
@@ -57,7 +57,7 @@ export const platformModuleCatalog: readonly PlatformModuleCatalogItem[] = [
     "id": "audit",
     "name": "Audit trail",
     "version": "0.1.0",
-    "status": "partial",
+    "status": "stable",
     "tenantModel": "mixed",
     "dependencies": [
       "platform-identity"
@@ -71,7 +71,7 @@ export const platformModuleCatalog: readonly PlatformModuleCatalogItem[] = [
     "id": "notifications",
     "name": "Notifications",
     "version": "0.1.0",
-    "status": "partial",
+    "status": "stable",
     "tenantModel": "mixed",
     "dependencies": [
       "platform-identity"
@@ -113,7 +113,7 @@ export const platformModuleCatalog: readonly PlatformModuleCatalogItem[] = [
     "id": "forms-leads",
     "name": "Forms and lead capture",
     "version": "0.1.0",
-    "status": "partial",
+    "status": "stable",
     "tenantModel": "tenant-owned",
     "dependencies": [
       "platform-identity"
@@ -127,12 +127,12 @@ export const platformModuleCatalog: readonly PlatformModuleCatalogItem[] = [
     "id": "church-ministry",
     "name": "Church & Ministry Platform",
     "version": "1.1.0",
-    "status": "partial",
+    "status": "stable",
     "tenantModel": "tenant-owned",
     "dependencies": [
       "platform-identity"
     ],
-    "description": "Tenant-scoped church content and HKM member, attendance, and giving records; member portal account linking and broader ministry operations remain in progress.",
+    "description": "Tenant-scoped church content, operations, HKM member, attendance, visitor, SMS and giving records.",
     "defaultEnabled": false,
     "required": false,
     "tenantAssignable": true
@@ -141,12 +141,12 @@ export const platformModuleCatalog: readonly PlatformModuleCatalogItem[] = [
     "id": "education-ums",
     "name": "Education UMS",
     "version": "0.1.0",
-    "status": "partial",
+    "status": "stable",
     "tenantModel": "tenant-owned",
     "dependencies": [
       "platform-identity"
     ],
-    "description": "Institution-scoped student and programme records for education tenants; admissions, finance, courses, grading and LMS remain in progress.",
+    "description": "Institution-scoped admissions, student, course, enrollment, grading, finance, staff, study center and library records.",
     "defaultEnabled": false,
     "required": false,
     "tenantAssignable": true
@@ -155,7 +155,7 @@ export const platformModuleCatalog: readonly PlatformModuleCatalogItem[] = [
     "id": "media-storage",
     "name": "Tenant media storage",
     "version": "1.0.0",
-    "status": "partial",
+    "status": "stable",
     "tenantModel": "tenant-owned",
     "dependencies": [
       "platform-identity"

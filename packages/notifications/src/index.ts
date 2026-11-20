@@ -12,3 +12,5 @@ export interface NotificationProvider {
 }
 
 export * from "./outbox.js";
+export * from "./templates.js";
+export * from "./providers.js";

@@ -1432,7 +1432,7 @@ export async function troubleshootingRoutes(app: FastifyInstance): Promise<void>
       offset?: string;
     };
   }>("/admin/platform/audit", async (request, reply) => {
-    await requirePlatformRole(request.headers, ["platform_owner", "platform_admin"]);
+    await requirePlatformRole(request.headers, ["platform_owner", "platform_admin", "platform_support"]);
 
     const tenantId = request.query.tenantId?.trim();
     const action = request.query.action?.trim();

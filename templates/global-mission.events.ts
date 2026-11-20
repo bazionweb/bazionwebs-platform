@@ -1,0 +1,43 @@
+/** Public GMFC event archive included in every deployment seed artifact. */
+export const globalMissionEvents = [
+  {
+    title: "Awake You Who Sleep Conference 2022",
+    slug: "awake-you-who-sleep-2022",
+    startsAt: "2022-04-15T09:00:00+00:00",
+    endsAt: "2022-04-18T17:00:00+00:00",
+    excerpt: "The Siege is Now Over - 2 Kings 7. Join us at Kiamariga Nursery School Grounds.",
+    description: "<p>Theme: Awake You Who Sleep - Eph 5:14</p><p>The Siege is Now Over - 2 Kings 7.</p><p>Location: Kiamariga Nursery School Grounds (Near Sagana State Lodge).</p>",
+    imageUrl: "/images/gallery/IMG-20260515-WA0002.jpg",
+    location: "Kiamariga Nursery School Grounds",
+  },
+  {
+    title: "Mt. Kenya Revival 2024",
+    slug: "mt-kenya-revival-2024",
+    startsAt: "2024-04-14T14:00:00+00:00",
+    endsAt: "2024-04-21T21:00:00+00:00",
+    excerpt: "He changes times and season - Daniel 2:21. Mt. Kenya Revival.",
+    description: "<p>Theme: He changes times and season. Daniel 2:21</p><p>Location: Kiamariga Nursery Grounds, Near Sagana State Lodge, Nyeri.</p>",
+    imageUrl: "/images/gallery/IMG-20260514-WA0009.jpg",
+    location: "Kiamariga Nursery Grounds, Nyeri",
+  },
+  {
+    title: "Mission Impact Breakfast",
+    slug: "mission-impact-breakfast-2026",
+    startsAt: "2026-07-10T09:00:00+00:00",
+    endsAt: null,
+    excerpt: "Join us for a morning of fellowship, prayer, and inspiration as we unite in fundraising for the Great August Harvest.",
+    description: "<p>Join us for a morning of fellowship, prayer, and inspiration as we unite in fundraising for the Great August Harvest, 5th Annual Mega Conference &amp; Medical Camp.</p><p>Breakfast will be Served. Come Hungry - Leave Inspired.</p><p>Blessed are those who hunger and Thirst for righteousness, for they shall be filled. Mat 5:6 (NIV)</p>",
+    imageUrl: "/images/events/mission-impact-breakfast.jpg",
+    location: "Y.M.C.A. HALL - NYERI TOWN",
+  },
+  {
+    title: "5th Annual Mega Conference & Free Medical Camp 2026",
+    slug: "mega-conference-medical-camp-2026",
+    startsAt: "2026-08-09T06:00:00+00:00",
+    endsAt: "2026-08-16T18:00:00+00:00",
+    excerpt: "Global Mission for Christ Int'l presents the 5th Annual Mega Conference & Free Medical Camp. Theme: Healing the Land – Amos 9:14, From Exile to Divine Restoration.",
+    description: "<h2>5th Annual Mega Conference &amp; Free Medical Camp</h2>\n<p><strong>Theme: Healing the Land — Amos 9:14 \"From Exile to Divine Restoration\"</strong></p>\n<p>Global Mission for Christ International presents a powerful week of spiritual awakening, profound teachings, and divine encounters — combined with a Free Medical Camp serving the local community.</p>\n<p><strong>Dates:</strong> 9th – 16th August 2026, from 9 AM daily</p>\n<p><strong>Venue:</strong> Kiamariga Nursery Grounds</p>\n<h3>Featured Speakers</h3>\n<ul>\n  <li>Rev. Anthony Waithaka – Director, GMCI</li>\n  <li>Archbishop Simon Githigi – Elim Pentecostal Kenya</li>\n  <li>Apostle Anthony Ngumo – Reigners Chapel</li>\n  <li>Rev. James Nyaga – Excellent Glory Center</li>\n  <li>Bishop Moses Mbugua – Redeemed Gospel Church, Thika</li>\n  <li>Bishop Dr. Margaret Wangare – Anointed Christian Fellowship, Banana</li>\n</ul>\n<p><em>All are welcome!</em></p>",
+    imageUrl: "/images/events/mega-conference-2026.jpg",
+    location: "Kiamariga Nursery Grounds",
+  },
+];

@@ -76,7 +76,9 @@ export function CommerceDashboard({ initialTab = "products" }: { initialTab?: "p
   const [store, setStore] = useState<Store>(emptyStore);
   const [canCreateProduct, setCanCreateProduct] = useState(false);
   const [canEditProduct, setCanEditProduct] = useState(false);
+  const [canDeleteProduct, setCanDeleteProduct] = useState(false);
   const [canEditOrders, setCanEditOrders] = useState(false);
+  const [canRefundOrders, setCanRefundOrders] = useState(false);
   const [canEditStore, setCanEditStore] = useState(false);
   const [productError, setProductError] = useState("");
   const [orderError, setOrderError] = useState("");
@@ -91,14 +93,14 @@ export function CommerceDashboard({ initialTab = "products" }: { initialTab?: "p
 
   const loadProducts = useCallback(async () => {
     try {
-      const result = await api<{ items: Product[]; total: number; canCreate: boolean; canUpdate: boolean }>("/admin/commerce/products?limit=100");
-      setProducts(result.items); setProductTotal(result.total); setCanCreateProduct(result.canCreate); setCanEditProduct(result.canUpdate); setProductError("");
+      const result = await api<{ items: Product[]; total: number; canCreate: boolean; canUpdate: boolean; canDelete?: boolean }>("/admin/commerce/products?limit=100");
+      setProducts(result.items); setProductTotal(result.total); setCanCreateProduct(result.canCreate); setCanEditProduct(result.canUpdate); setCanDeleteProduct(Boolean(result.canDelete)); setProductError("");
     } catch (error) { setProductError(message(error)); }
   }, []);
   const loadOrders = useCallback(async () => {
     try {
-      const result = await api<{ items: Order[]; total: number; canUpdate: boolean }>("/admin/commerce/orders?limit=50");
-      setOrders(result.items); setOrderTotal(result.total); setCanEditOrders(result.canUpdate); setOrderError("");
+      const result = await api<{ items: Order[]; total: number; canUpdate: boolean; canRefund?: boolean }>("/admin/commerce/orders?limit=50");
+      setOrders(result.items); setOrderTotal(result.total); setCanEditOrders(result.canUpdate); setCanRefundOrders(Boolean(result.canRefund)); setOrderError("");
     } catch (error) { setOrderError(message(error)); }
   }, []);
   const loadStore = useCallback(async () => {
@@ -216,6 +218,69 @@ export function CommerceDashboard({ initialTab = "products" }: { initialTab?: "p
       setNotice("Order marked fulfilled.");
       await loadOrders();
     } catch (error) { setOrderError(message(error)); }
+    finally { setSaving(false); }
+  }
+
+  async function cancelOrder(orderId: string) {
+    const ok = await pulse.confirm({
+      title: "Cancel pending order?",
+      message: "This releases reserved inventory back into available stock.",
+      tone: "danger",
+      confirmLabel: "Cancel order",
+    });
+    if (!ok) return;
+    setSaving(true); setNotice(""); setOrderError("");
+    try {
+      await api(`/admin/commerce/orders/${orderId}`, { method: "PATCH", body: JSON.stringify({ status: "cancelled" }) });
+      setNotice("Order cancelled and stock reservation released.");
+      await loadOrders();
+      await loadProducts();
+    } catch (error) { setOrderError(message(error)); }
+    finally { setSaving(false); }
+  }
+
+  async function refundOrder(orderId: string) {
+    const ok = await pulse.confirm({
+      title: "Refund this order?",
+      message: "Marks the order as refunded and restores stock on hand.",
+      tone: "danger",
+      confirmLabel: "Refund & restock",
+    });
+    if (!ok) return;
+    setSaving(true); setNotice(""); setOrderError("");
+    try {
+      await api(`/admin/commerce/orders/${orderId}`, { method: "PATCH", body: JSON.stringify({ status: "refunded", restock: true }) });
+      setNotice("Order refunded and inventory updated.");
+      await loadOrders();
+      await loadProducts();
+    } catch (error) { setOrderError(message(error)); }
+    finally { setSaving(false); }
+  }
+
+  async function reconcileOrderPayment(orderId: string) {
+    setSaving(true); setNotice(""); setOrderError("");
+    try {
+      const res = await api<{ reconciled?: boolean; providerResultDesc?: string }>(`/admin/commerce/orders/${orderId}/reconcile-payment`, { method: "POST" });
+      setNotice(res.reconciled ? "Payment status reconciled from Daraja." : res.providerResultDesc || "Payment still pending with provider.");
+      await loadOrders();
+    } catch (error) { setOrderError(message(error)); }
+    finally { setSaving(false); }
+  }
+
+  async function deleteProduct(productId: string) {
+    const ok = await pulse.confirm({
+      title: "Remove product?",
+      message: "Unordered products are deleted; products linked to existing orders will be archived.",
+      tone: "danger",
+      confirmLabel: "Remove product",
+    });
+    if (!ok) return;
+    setSaving(true); setNotice(""); setProductError("");
+    try {
+      await api(`/admin/commerce/products/${productId}`, { method: "DELETE" });
+      setNotice("Product removed from active catalog.");
+      await loadProducts();
+    } catch (error) { setProductError(message(error)); }
     finally { setSaving(false); }
   }
 
@@ -359,6 +424,7 @@ export function CommerceDashboard({ initialTab = "products" }: { initialTab?: "p
           <div className="commerce-product-row-main"><span className="commerce-product-category">{product.category} · {product.sku}</span><h3>{product.name}</h3><p>{amount(product.priceMinor, product.currency, store.locale)}{product.compareAtPriceMinor ? ` · Compare ${amount(product.compareAtPriceMinor, product.currency, store.locale)}` : ""}</p></div>
           <div className="commerce-product-stock"><span className={product.active ? "status-active" : "status-muted"}>{product.active ? "Published" : "Draft"}</span><small>{product.stockTracked ? `${Math.max(product.stockOnHand - product.stockReserved, 0)} available` : "Inventory not tracked"}</small></div>
           {canEditProduct && <button type="button" className="commerce-secondary" onClick={() => editProduct(product)}>Edit</button>}
+          {canDeleteProduct && <button type="button" className="commerce-text-button" disabled={saving} onClick={() => void deleteProduct(product.id)}>Delete</button>}
         </article>)}
       </div>
     </section>}
@@ -371,7 +437,19 @@ export function CommerceDashboard({ initialTab = "products" }: { initialTab?: "p
         <div className="commerce-order-top"><div><span className="commerce-order-number">{order.orderNumber}</span><h3>{order.customerName}</h3><small>{new Date(order.createdAt).toLocaleString(store.locale)}</small></div><div className="commerce-order-state"><span className={`status-${order.status}`}>{order.status.replaceAll("_", " ")}</span><strong>{amount(order.totalMinor, order.currency, store.locale)}</strong></div></div>
         <div className="commerce-order-lines">{order.lines.map((line) => <div key={line.id}><span>{line.quantity} × {line.nameSnapshot}</span><small>{line.skuSnapshot}</small><strong>{amount(line.unitPriceMinor * line.quantity, order.currency, store.locale)}</strong></div>)}</div>
         <details className="commerce-order-customer"><summary>Delivery and customer details</summary><div><span>{order.customerEmail}</span><span>{order.customerPhone}</span><span>{[order.shippingAddress.line1, order.shippingAddress.city, order.shippingAddress.countryCode, order.shippingAddress.postalCode].filter(Boolean).join(", ")}</span></div></details>
-        <div className="commerce-order-bottom"><span>Subtotal {amount(order.subtotalMinor, order.currency, store.locale)} · Delivery {amount(order.shippingMinor, order.currency, store.locale)} · Tax {amount(order.taxMinor, order.currency, store.locale)}</span>{canEditOrders && order.status === "paid" && <button type="button" className="commerce-primary" disabled={saving} onClick={() => void fulfillOrder(order.id)}>Mark fulfilled</button>}</div>
+        <div className="commerce-order-bottom">
+          <span>Subtotal {amount(order.subtotalMinor, order.currency, store.locale)} · Delivery {amount(order.shippingMinor, order.currency, store.locale)} · Tax {amount(order.taxMinor, order.currency, store.locale)}</span>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {canEditOrders && order.status === "pending_payment" && (
+              <>
+                <button type="button" className="commerce-secondary" disabled={saving} onClick={() => void reconcileOrderPayment(order.id)}>Reconcile payment</button>
+                <button type="button" className="commerce-text-button" disabled={saving} onClick={() => void cancelOrder(order.id)}>Cancel order</button>
+              </>
+            )}
+            {canEditOrders && order.status === "paid" && <button type="button" className="commerce-primary" disabled={saving} onClick={() => void fulfillOrder(order.id)}>Mark fulfilled</button>}
+            {canRefundOrders && (order.status === "paid" || order.status === "fulfilled") && <button type="button" className="commerce-text-button" disabled={saving} onClick={() => void refundOrder(order.id)}>Refund</button>}
+          </div>
+        </div>
       </article>)}
     </section>}
 

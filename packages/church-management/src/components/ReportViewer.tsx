@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ArrowLeftIcon, ChevronDownIcon } from './Icons';
+import { useTenantConfig } from '../context/TenantContext';
 
 interface ReportViewerProps {
   title: string;
@@ -9,6 +10,7 @@ interface ReportViewerProps {
 }
 
 const ReportViewer: React.FC<ReportViewerProps> = ({ title, columns, data, onBack }) => {
+  const tenantConfig = useTenantConfig();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [copyText, setCopyText] = useState('Copy to Clipboard');
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -73,6 +75,7 @@ const ReportViewer: React.FC<ReportViewerProps> = ({ title, columns, data, onBac
                         #print-section h2 {
                             font-size: 16pt;
                             margin-bottom: 20px;
+                            color: ${tenantConfig.primaryColor || '#1f2937'} !important;
                         }
                         #print-section table {
                             width: 100%;
@@ -141,8 +144,15 @@ const ReportViewer: React.FC<ReportViewerProps> = ({ title, columns, data, onBac
       </div>
 
       <div id="print-section" className="bg-white rounded-lg shadow-sm overflow-hidden border">
+        <div className="p-4 flex items-center gap-4 border-b" style={{ borderColor: tenantConfig.primaryColor || '#1f2937' }}>
+          {tenantConfig.logoUrl && <img src={tenantConfig.logoUrl} alt={`${tenantConfig.shortName} logo`} style={{ width: 52, height: 52, objectFit: 'contain' }} />}
+          <div>
+            <div className="text-sm font-bold uppercase tracking-wide" style={{ color: tenantConfig.primaryColor || '#1f2937' }}>{tenantConfig.churchName}</div>
+            <div className="text-xs text-gray-500">{tenantConfig.contact?.address}{tenantConfig.contact?.phone ? ` • ${tenantConfig.contact.phone}` : ''}</div>
+          </div>
+        </div>
         <div className="p-4 border-b">
-          <h2 className="text-xl font-semibold text-gray-700">{title}</h2>
+          <h2 className="text-xl font-semibold" style={{ color: tenantConfig.primaryColor || '#1f2937' }}>{title}</h2>
           <p className="text-sm text-gray-500">Generated on {new Date().toLocaleDateString()}</p>
           <p className="text-sm text-gray-500">Total Records: {data.length}</p>
         </div>
@@ -151,7 +161,7 @@ const ReportViewer: React.FC<ReportViewerProps> = ({ title, columns, data, onBac
             <thead className="text-xs text-gray-700 uppercase bg-gray-50 sticky top-0 z-10 shadow-sm">
               <tr>
                 {columns.map((col) => (
-                  <th key={col.accessor} scope="col" className="px-6 py-3 bg-gray-50">
+                  <th key={col.accessor} scope="col" className="px-6 py-3 bg-gray-50" style={{ borderTop: `2px solid ${tenantConfig.primaryColor || '#1f2937'}` }}>
                     {col.Header}
                   </th>
                 ))}
@@ -170,6 +180,16 @@ const ReportViewer: React.FC<ReportViewerProps> = ({ title, columns, data, onBac
             </tbody>
           </table>
           {data.length === 0 && <p className="text-center p-8 text-gray-500">No data found for this report.</p>}
+        </div>
+        <div className="px-4 py-3 border-t text-xs text-gray-500 flex items-center justify-between gap-4">
+          <span>{tenantConfig.contact?.email ? `${tenantConfig.contact.email} • ` : ''}{tenantConfig.websiteUrl || tenantConfig.shortName}</span>
+          <span className="inline-flex items-center gap-1.5 shrink-0 font-semibold text-[#0B2F75]">
+            <picture>
+              <source type="image/webp" srcSet="/brand/bazion-platform-mark-64.webp 64w, /brand/bazion-platform-mark-128.webp 128w, /brand/bazion-platform-mark-256.webp 256w" sizes="32px" />
+              <img src="/brand/bazion-platform-mark.png" alt="Bazion Web" width={32} height={26} style={{ width: 32, height: 26, objectFit: 'contain', background: '#fff' }} />
+            </picture>
+            Powered by Bazion Web
+          </span>
         </div>
       </div>
     </div>

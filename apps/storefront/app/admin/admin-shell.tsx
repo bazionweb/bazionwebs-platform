@@ -5,6 +5,7 @@ import Link from "next/link";
 import { PulseActivityButton } from "@bazion/ui";
 import { authClient } from "@bazion/auth/client";
 import { AdminDashboard } from "./admin-dashboard";
+import { FormsLeadsAdminPanel } from "./forms-leads-admin";
 import { MinistryAdminDashboard } from "./ministry-admin";
 
 type AdminShellProps = {
@@ -14,9 +15,10 @@ type AdminShellProps = {
 };
 
 export function AdminShell({ tenantName, isPlatformOwner, notice }: AdminShellProps) {
-  const [view, setView] = useState<"ministry" | "team">("ministry");
+  const [view, setView] = useState<"ministry" | "leads" | "team">("ministry");
   const [showGuide, setShowGuide] = useState(false);
   const [commerceEnabled, setCommerceEnabled] = useState(false);
+  const [formsEnabled, setFormsEnabled] = useState(false);
   const organizations = authClient.useListOrganizations();
   const canSwitchTenant = (organizations.data?.length ?? 0) > 1;
 
@@ -25,9 +27,12 @@ export function AdminShell({ tenantName, isPlatformOwner, notice }: AdminShellPr
     void fetch("/v1/admin/tenant/modules", { credentials: "include", cache: "no-store" })
       .then(async (response) => response.ok ? await response.json() as { modules?: Array<{ id: string; enabled: boolean }> } : null)
       .then((result) => {
-        if (active) setCommerceEnabled(result?.modules?.some((module) => module.id === "commerce" && module.enabled) ?? false);
+        if (active) {
+          setCommerceEnabled(result?.modules?.some((module) => module.id === "commerce" && module.enabled) ?? false);
+          setFormsEnabled(result?.modules?.some((module) => module.id === "forms-leads" && module.enabled) ?? false);
+        }
       })
-      .catch(() => { if (active) setCommerceEnabled(false); });
+      .catch(() => { if (active) { setCommerceEnabled(false); setFormsEnabled(false); } });
     return () => { active = false; };
   }, []);
 
@@ -51,6 +56,7 @@ export function AdminShell({ tenantName, isPlatformOwner, notice }: AdminShellPr
       <div className="tenant-admin-nav-wrap">
         <nav className="tenant-admin-section-nav" aria-label="Tenant admin sections">
           <button type="button" aria-pressed={view === "ministry"} onClick={() => setView("ministry")}>Ministry operations</button>
+          {formsEnabled && <button type="button" aria-pressed={view === "leads"} onClick={() => setView("leads")}>Leads &amp; enquiries</button>}
           <button type="button" aria-pressed={view === "team"} onClick={() => setView("team")}>Team &amp; access <small>This tenant only</small></button>
         </nav>
       </div>
@@ -94,7 +100,7 @@ export function AdminShell({ tenantName, isPlatformOwner, notice }: AdminShellPr
           )}
         </div>
 
-        {view === "ministry" ? <MinistryAdminDashboard /> : <AdminDashboard />}
+        {view === "ministry" ? <MinistryAdminDashboard /> : view === "leads" ? <FormsLeadsAdminPanel /> : <AdminDashboard />}
       </div>
 
       <footer className="tenant-admin-footer">{tenantName} tenant workspace · Powered by Bazion Web</footer>

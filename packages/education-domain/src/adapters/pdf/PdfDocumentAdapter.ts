@@ -2,7 +2,75 @@ import { IDocumentGenerator, Document, DocumentRequest } from '../../ports';
 import { PDFDocument, rgb, StandardFonts, PDFFont, PDFImage } from '../../shims/external-adapters';
 
 const LOGO_URL = 'https://portal.bmiuniversities.org/bmi-logo.png';
-const VERIFY_BASE_URL = 'https://bmiuniversities.org/verify';
+
+function colorFromHex(input: unknown, fallback: string) {
+  const value = typeof input === 'string' && /^#[0-9a-fA-F]{6}$/.test(input) ? input : fallback;
+  return rgb(
+    parseInt(value.slice(1, 3), 16) / 255,
+    parseInt(value.slice(3, 5), 16) / 255,
+    parseInt(value.slice(5, 7), 16) / 255,
+  );
+}
+
+function tint(color: ReturnType<typeof rgb>, amount: number) {
+  return rgb(
+    color.r + (1 - color.r) * amount,
+    color.g + (1 - color.g) * amount,
+    color.b + (1 - color.b) * amount,
+  );
+}
+
+let activePalette = {
+  navyDark: rgb(0.035, 0.071, 0.137),
+  navy: rgb(0.055, 0.114, 0.220),
+  navyLight: rgb(0.122, 0.208, 0.353),
+  gold: rgb(0.773, 0.627, 0.282),
+  goldLight: rgb(0.957, 0.925, 0.847),
+};
+let pdfGenerationTail: Promise<void> = Promise.resolve();
+
+function setActivePalette(metadata?: Record<string, any>) {
+  const navy = colorFromHex(metadata?.primaryColor, '#0E1D38');
+  const accent = colorFromHex(metadata?.accentColor, '#C5A048');
+  activePalette = {
+    navyDark: tint(navy, 0.34),
+    navy,
+    navyLight: colorFromHex(metadata?.secondaryColor, '#172A4D'),
+    gold: accent,
+    goldLight: tint(accent, 0.84),
+  };
+}
+
+function institutionName(meta?: Record<string, any>): string {
+  const configured = meta?.institutionName ?? meta?.brandName;
+  return typeof configured === 'string' && configured.trim()
+    ? configured.trim()
+    : 'Bethel Ministries International University';
+}
+
+function institutionShortName(meta?: Record<string, any>): string {
+  const configured = meta?.shortName ?? meta?.brandName ?? (meta?.institutionName ? institutionName(meta) : undefined);
+  return typeof configured === 'string' && configured.trim()
+    ? configured.trim()
+    : 'BMI University';
+}
+
+function institutionCode(meta?: Record<string, any>): string {
+  const configured = typeof meta?.institutionCode === 'string' ? meta.institutionCode.trim() : '';
+  if (configured) return configured.replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, 12);
+  const shortName = institutionShortName(meta);
+  return shortName.toLowerCase().includes('bmi') ? 'BMI' : shortName.replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, 8) || 'ORG';
+}
+
+function verifiedUrl(value: unknown, base?: string): string {
+  if (typeof value !== 'string' || !value.trim()) return '';
+  try {
+    const url = new URL(value.trim(), base || process.env.PUBLIC_STOREFRONT_URL || undefined);
+    return url.protocol === 'http:' || url.protocol === 'https:' ? url.toString() : '';
+  } catch {
+    return '';
+  }
+}
 
 export class PdfDocumentAdapter implements IDocumentGenerator {
   public static readonly PAGE_W = 612; // Standard US Letter Width (8.5in @ 72dpi)
@@ -10,12 +78,12 @@ export class PdfDocumentAdapter implements IDocumentGenerator {
   public static readonly CARD_W = 340;
   public static readonly CARD_H = 214;
 
-  // Institutional Color Palette
-  private static readonly NAVY_DARK = rgb(0.035, 0.071, 0.137);   // #091223 Deep Oxford Navy
-  private static readonly NAVY = rgb(0.055, 0.114, 0.220);        // #0E1D38 University Primary Navy
-  private static readonly NAVY_LIGHT = rgb(0.122, 0.208, 0.353);  // #1F355A
-  private static readonly GOLD = rgb(0.773, 0.627, 0.282);        // #C5A048 Royal Gold
-  private static readonly GOLD_LIGHT = rgb(0.957, 0.925, 0.847);  // #F4ECE7 Subtle Gold Parchment
+  // Brand colors are selected for each serialized render from document metadata.
+  private static get NAVY_DARK() { return activePalette.navyDark; }
+  private static get NAVY() { return activePalette.navy; }
+  private static get NAVY_LIGHT() { return activePalette.navyLight; }
+  private static get GOLD() { return activePalette.gold; }
+  private static get GOLD_LIGHT() { return activePalette.goldLight; }
   private static readonly WHITE = rgb(1, 1, 1);
   private static readonly OFF_WHITE = rgb(0.988, 0.992, 0.996);
   private static readonly BLACK = rgb(0.08, 0.09, 0.11);
@@ -28,24 +96,69 @@ export class PdfDocumentAdapter implements IDocumentGenerator {
     return (pageW - font.widthOfTextAtSize(text, size)) / 2;
   }
 
-  private logoCache: Uint8Array | null = null;
+  private logoCache = new Map<string, { bytes: Uint8Array; format: 'png' | 'jpg' }>();
 
   async generateDocument(request: DocumentRequest): Promise<Document> {
+    const previous = pdfGenerationTail;
+    let release!: () => void;
+    pdfGenerationTail = new Promise<void>((resolve) => { release = resolve; });
+    await previous;
+    try {
+      setActivePalette(request.metadata);
+      return await this.renderDocument(request);
+    } finally {
+      release();
+    }
+  }
+
+  private async renderDocument(request: DocumentRequest): Promise<Document> {
     const { type, userId, metadata } = request;
     const pdfDoc = await PDFDocument.create();
 
+    const hasTenantIdentity = Boolean(metadata?.institutionName || metadata?.shortName || metadata?.brandName);
+    const configuredPublicUrl = verifiedUrl(metadata?.websiteUrl, process.env.PUBLIC_STOREFRONT_URL);
+    const websiteUrl = configuredPublicUrl || (!hasTenantIdentity ? (process.env.PUBLIC_STOREFRONT_URL || 'https://bmiuniversities.org') : '');
+    const verificationBaseUrl = verifiedUrl(
+      metadata?.verificationBaseUrl,
+      websiteUrl || process.env.PUBLIC_STOREFRONT_URL,
+    ) || (websiteUrl ? `${websiteUrl.replace(/\/$/, '')}/verify` : '/verify');
+    const customLogo = typeof metadata?.logoUrl === 'string' ? metadata.logoUrl.trim() : '';
+    const logoUrl = customLogo
+      ? verifiedUrl(customLogo, websiteUrl || process.env.PUBLIC_STOREFRONT_URL)
+      : (hasTenantIdentity ? '' : LOGO_URL);
+    const platformBrandBaseUrl = process.env.PUBLIC_STOREFRONT_URL || process.env.AUTH_APP_URL;
+    const platformLogoUrl = verifiedUrl(process.env.PLATFORM_BRAND_MARK_URL, platformBrandBaseUrl)
+      || verifiedUrl('/brand/bazion-platform-mark.png', platformBrandBaseUrl);
+    const enrichedMeta: Record<string, any> = {
+      ...metadata,
+      institutionName: institutionName(metadata),
+      shortName: institutionShortName(metadata),
+      institutionCode: institutionCode(metadata),
+      admissionsEmail: metadata?.admissionsEmail || metadata?.contactEmail || (hasTenantIdentity ? '' : 'admissions@bmiuniversities.org'),
+      registrarEmail: metadata?.registrarEmail || metadata?.contactEmail || (hasTenantIdentity ? '' : 'registrar@bmiuniversities.org'),
+      phone: metadata?.phone || metadata?.contactPhone || (hasTenantIdentity ? '' : '+254 721 341 793'),
+      address: metadata?.address || (hasTenantIdentity ? '' : 'Mukurwe-ini Plaza, Nyeri County, Kenya'),
+      websiteUrl,
+      verificationBaseUrl,
+      portalUrl: verifiedUrl(metadata?.portalUrl, websiteUrl || process.env.PUBLIC_STOREFRONT_URL) || (websiteUrl ? `${websiteUrl.replace(/\/$/, '')}/portal` : '/portal'),
+      platformBrandName: process.env.PLATFORM_BRAND_NAME?.trim() || 'Bazion Web',
+    };
+
     let logo: PDFImage | undefined;
     try {
-      const logoData = await this.getLogoBytes();
-      if (logoData) logo = await pdfDoc.embedPng(logoData);
+      const logoData = logoUrl ? await this.getLogoBytes(logoUrl) : null;
+      if (logoData) logo = logoData.format === 'jpg' ? await pdfDoc.embedJpg(logoData.bytes) : await pdfDoc.embedPng(logoData.bytes);
+    } catch {}
+    try {
+      const platformLogoData = platformLogoUrl ? await this.getLogoBytes(platformLogoUrl) : null;
+      if (platformLogoData) enrichedMeta.platformLogo = platformLogoData.format === 'jpg'
+        ? await pdfDoc.embedJpg(platformLogoData.bytes)
+        : await pdfDoc.embedPng(platformLogoData.bytes);
     } catch {}
 
-    const verificationCode = crypto.randomUUID().replace(/-/g, '').substring(0, 12).toUpperCase();
-    const enrichedMeta = {
-      ...metadata,
-      verificationCode: metadata?.verificationCode || verificationCode,
-      verificationUrl: `${VERIFY_BASE_URL}/verify?code=${metadata?.verificationCode || verificationCode}`,
-    };
+    const verificationCode = `${institutionCode(enrichedMeta)}-VER-${crypto.randomUUID().replace(/-/g, '').substring(0, 12).toUpperCase()}`;
+    enrichedMeta.verificationCode = metadata?.verificationCode || verificationCode;
+    enrichedMeta.verificationUrl = `${verificationBaseUrl}?code=${encodeURIComponent(enrichedMeta.verificationCode)}`;
 
     switch (type) {
       case 'admission_letter':
@@ -84,14 +197,21 @@ export class PdfDocumentAdapter implements IDocumentGenerator {
   async getDocumentsByUser(_userId: string): Promise<Document[]> { return []; }
   async verifyDocument(_verificationCode: string): Promise<Document | null> { return null; }
 
-  private async getLogoBytes(): Promise<Uint8Array | null> {
-    if (this.logoCache) return this.logoCache;
+  private async getLogoBytes(url: string): Promise<{ bytes: Uint8Array; format: 'png' | 'jpg' } | null> {
+    const cached = this.logoCache.get(url);
+    if (cached) return cached;
     try {
-      const res = await fetch(LOGO_URL, { signal: AbortSignal.timeout(1000) });
+      const res = await fetch(url, { signal: AbortSignal.timeout(1000) });
       if (!res.ok) return null;
       const buf = await res.arrayBuffer();
-      this.logoCache = new Uint8Array(buf);
-      return this.logoCache;
+      const bytes = new Uint8Array(buf);
+      const contentType = res.headers.get('content-type')?.split(';')[0].trim().toLowerCase();
+      const isPng = contentType === 'image/png' || (bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47);
+      const isJpg = contentType === 'image/jpeg' || contentType === 'image/jpg' || (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff);
+      if (!isPng && !isJpg) return null;
+      const image = { bytes, format: isJpg ? 'jpg' as const : 'png' as const };
+      this.logoCache.set(url, image);
+      return image;
     } catch { return null; }
   }
 
@@ -108,17 +228,17 @@ export class PdfDocumentAdapter implements IDocumentGenerator {
 
     const name = meta?.name || 'Applicant';
     const program = meta?.program || 'Bachelor of Science in Biblical Studies';
-    const regNo = meta?.regNo || 'BMI/UG-CS/226/001';
+    const regNo = meta?.regNo || `${institutionCode(meta)}/UG-CS/226/001`;
     const uid = meta?.uid || 'STD-2026-001';
     const date = meta?.date || new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
     const term = meta?.term || 'Fall Academic Term 2026';
-    const verificationCode = meta?.verificationCode || 'BMI-VER-88219';
-    const docRef = `BMI/ADM/${new Date().getFullYear()}/${verificationCode.slice(0, 6)}`;
+    const verificationCode = meta?.verificationCode || `${institutionCode(meta)}-VER-${crypto.randomUUID().replace(/-/g, '').slice(0, 12).toUpperCase()}`;
+    const docRef = `${institutionCode(meta)}/ADM/${new Date().getFullYear()}/${verificationCode.slice(0, 6)}`;
 
     const page = pdf.addPage([PdfDocumentAdapter.PAGE_W, PdfDocumentAdapter.PAGE_H]);
 
     // Letterhead Header
-    this.drawLetterhead(pdf, page, helvetica, bold, logo);
+    this.drawLetterhead(pdf, page, helvetica, bold, logo, meta);
 
     // Document Metadata Bar
     let y = 635;
@@ -156,7 +276,7 @@ export class PdfDocumentAdapter implements IDocumentGenerator {
     page.drawText(`Dear ${name},`, { x: 55, y, size: 10.5, font: timesBold, color: PdfDocumentAdapter.BLACK });
 
     y -= 18;
-    const p1 = `On behalf of the Faculty Senate, the Directorate of Admissions, and Bethel Ministries International University, it is our distinct honour to officially notify you of your acceptance and admission to BMI University for the ${program} degree program commencing in the ${term}.`;
+    const p1 = `On behalf of the Office of Admissions at ${institutionName(meta)}, we are pleased to notify you of your acceptance for the ${program} degree program commencing in the ${term}.`;
     this.drawParagraph(page, p1, 55, y, 502, 10, times, PdfDocumentAdapter.CHARCOAL, 14);
 
     y -= 46;
@@ -188,7 +308,7 @@ export class PdfDocumentAdapter implements IDocumentGenerator {
     page.drawText('MANDATORY ENROLLMENT & MATRICULATION PROCEDURES:', { x: 55, y, size: 9, font: bold, color: PdfDocumentAdapter.NAVY });
     
     const steps = [
-      '1. Student Portal Activation: Sign in to https://portal.bmiuniversities.org to complete your student profile.',
+      `1. Student Portal Activation: Sign in to ${meta?.portalUrl || '/portal'} to complete your student profile.`,
       '2. Document Verification: Submit certified copies of academic transcripts and passport photograph.',
       '3. Financial Settlement & Agreement: Review tuition schedule, scholarship awards, and select payment plan.',
       '4. Semester Course Registration: Register for your prescribed curriculum units prior to the term deadline.',
@@ -201,7 +321,7 @@ export class PdfDocumentAdapter implements IDocumentGenerator {
     }
 
     y -= 6;
-    page.drawText('We warmly welcome you to the Bethel Ministries International University community and pray for your academic and spiritual growth.', { x: 55, y, size: 9.5, font: timesItalic, color: PdfDocumentAdapter.NAVY });
+    page.drawText(`We warmly welcome you to the ${institutionName(meta)} community and wish you success in your academic and personal growth.`, { x: 55, y, size: 9.5, font: timesItalic, color: PdfDocumentAdapter.NAVY });
 
     // Dual Signatures & Seal Section
     y -= 46;
@@ -209,21 +329,21 @@ export class PdfDocumentAdapter implements IDocumentGenerator {
 
     // Left Signature
     this.drawHLine(page, y - 10, PdfDocumentAdapter.CHARCOAL, 55, 160, 1);
-    page.drawText('Dr. Melba Layne, Ph.D.', { x: 55, y: y - 22, size: 10, font: bold, color: PdfDocumentAdapter.NAVY });
-    page.drawText('Chief Registrar & Admissions Director', { x: 55, y: y - 33, size: 8, font: helvetica, color: PdfDocumentAdapter.DARK_GRAY });
-    page.drawText('Office of Academic Records', { x: 55, y: y - 43, size: 7.5, font: helvetica, color: PdfDocumentAdapter.LIGHT_GRAY });
+    page.drawText(meta?.authorizedBy || 'Authorized Signatory', { x: 55, y: y - 22, size: 10, font: bold, color: PdfDocumentAdapter.NAVY });
+    page.drawText(meta?.authorizedTitle || 'Director of Admissions', { x: 55, y: y - 33, size: 8, font: helvetica, color: PdfDocumentAdapter.DARK_GRAY });
+    page.drawText(institutionShortName(meta), { x: 55, y: y - 43, size: 7.5, font: helvetica, color: PdfDocumentAdapter.LIGHT_GRAY });
 
     // Official Stamp Graphic / Seal Rosette Center
-    this.drawSealEmblem(page, 306, y - 20, bold, helvetica);
+    this.drawSealEmblem(page, 306, y - 20, bold, helvetica, meta);
 
     // Right Signature
     this.drawHLine(page, y - 10, PdfDocumentAdapter.CHARCOAL, 397, 160, 1);
-    page.drawText('Dr. Christopher Cookhorne, Ph.D.', { x: 397, y: y - 22, size: 10, font: bold, color: PdfDocumentAdapter.NAVY });
-    page.drawText('President & Chancellor', { x: 397, y: y - 33, size: 8, font: helvetica, color: PdfDocumentAdapter.DARK_GRAY });
-    page.drawText('Bethel Ministries International University', { x: 397, y: y - 43, size: 7.5, font: helvetica, color: PdfDocumentAdapter.LIGHT_GRAY });
+    page.drawText(meta?.secondaryAuthorizedBy || institutionName(meta), { x: 397, y: y - 22, size: 10, font: bold, color: PdfDocumentAdapter.NAVY });
+    page.drawText(meta?.secondaryAuthorizedTitle || 'Institutional Authority', { x: 397, y: y - 33, size: 8, font: helvetica, color: PdfDocumentAdapter.DARK_GRAY });
+    page.drawText(institutionShortName(meta), { x: 397, y: y - 43, size: 7.5, font: helvetica, color: PdfDocumentAdapter.LIGHT_GRAY });
 
     // Footer with Verification Code & Microtext
-    this.drawFooter(pdf, page, helvetica, bold, verificationCode);
+    this.drawFooter(pdf, page, helvetica, bold, verificationCode, meta);
   }
 
   /**
@@ -238,11 +358,11 @@ export class PdfDocumentAdapter implements IDocumentGenerator {
 
     const name = meta?.name || 'Enrolled Student';
     const program = meta?.program || 'Bachelor of Science in Biblical Studies';
-    const regNo = meta?.regNo || 'BMI/UG-CS/226/001';
+    const regNo = meta?.regNo || `${institutionCode(meta)}/UG-CS/226/001`;
     const uid = meta?.uid || 'STD-2026-001';
     const date = meta?.date || new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-    const verificationCode = meta?.verificationCode || 'BMI-ENR-91823';
-    const docRef = `BMI/ENR/${new Date().getFullYear()}/${verificationCode.slice(0, 6)}`;
+    const verificationCode = meta?.verificationCode || `${institutionCode(meta)}-ENR-${crypto.randomUUID().replace(/-/g, '').slice(0, 12).toUpperCase()}`;
+    const docRef = `${institutionCode(meta)}/ENR/${new Date().getFullYear()}/${verificationCode.slice(0, 6)}`;
 
     const page = pdf.addPage([PdfDocumentAdapter.PAGE_W, PdfDocumentAdapter.PAGE_H]);
 
@@ -251,7 +371,7 @@ export class PdfDocumentAdapter implements IDocumentGenerator {
     this.drawRect(page, 24, 24, 564, 744, PdfDocumentAdapter.GOLD, true, 0.75);
 
     // Letterhead
-    this.drawLetterhead(pdf, page, helvetica, bold, logo);
+    this.drawLetterhead(pdf, page, helvetica, bold, logo, meta);
 
     let y = 635;
     page.drawText(`Document Ref: ${docRef}`, { x: 50, y, size: 8.5, font: helvetica, color: PdfDocumentAdapter.DARK_GRAY });
@@ -271,7 +391,7 @@ export class PdfDocumentAdapter implements IDocumentGenerator {
     page.drawText('TO WHOM IT MAY CONCERN:', { x: 50, y, size: 11, font: timesBold, color: PdfDocumentAdapter.NAVY_DARK });
 
     y -= 20;
-    const attestation = `This official document certifies that the individual named below is a bona fide, actively matriculated student in good standing at Bethel Ministries International (BMI University), pursuing an accredited course of higher learning.`;
+    const attestation = `This official document certifies that the individual named below is a bona fide, actively enrolled student in good standing at ${institutionName(meta)}.`;
     this.drawParagraph(page, attestation, 50, y, 512, 10.5, times, PdfDocumentAdapter.CHARCOAL, 15);
 
     // Student Particulars Grid
@@ -304,16 +424,16 @@ export class PdfDocumentAdapter implements IDocumentGenerator {
     // Signatures & Stamp
     y -= 60;
     this.drawHLine(page, y, PdfDocumentAdapter.CHARCOAL, 50, 170, 1);
-    page.drawText('Dr. E. Vance, Ph.D.', { x: 50, y: y - 12, size: 10, font: bold, color: PdfDocumentAdapter.NAVY });
-    page.drawText('University Registrar & Keeper of Records', { x: 50, y: y - 22, size: 8, font: helvetica, color: PdfDocumentAdapter.DARK_GRAY });
+    page.drawText(meta?.authorizedBy || 'Authorized Signatory', { x: 50, y: y - 12, size: 10, font: bold, color: PdfDocumentAdapter.NAVY });
+    page.drawText(meta?.authorizedTitle || 'Registrar & Keeper of Records', { x: 50, y: y - 22, size: 8, font: helvetica, color: PdfDocumentAdapter.DARK_GRAY });
 
-    this.drawSealEmblem(page, 306, y - 10, bold, helvetica);
+    this.drawSealEmblem(page, 306, y - 10, bold, helvetica, meta);
 
     this.drawHLine(page, y, PdfDocumentAdapter.CHARCOAL, 392, 170, 1);
     page.drawText('Academic Records Directorate', { x: 392, y: y - 12, size: 10, font: bold, color: PdfDocumentAdapter.NAVY });
     page.drawText('Division of Student Affairs & Enrollment', { x: 392, y: y - 22, size: 8, font: helvetica, color: PdfDocumentAdapter.DARK_GRAY });
 
-    this.drawFooter(pdf, page, helvetica, bold, verificationCode);
+    this.drawFooter(pdf, page, helvetica, bold, verificationCode, meta);
   }
 
   /**
@@ -326,10 +446,10 @@ export class PdfDocumentAdapter implements IDocumentGenerator {
 
     const name = meta?.name || 'STUDENT NAME';
     const uid = meta?.uid || 'STD-2026-001';
-    const regNo = meta?.regNo || 'BMI/UG-CS/226/001';
+    const regNo = meta?.regNo || `${institutionCode(meta)}/UG-CS/226/001`;
     const program = meta?.program || 'Biblical Studies';
     const validThru = meta?.validThru || '08/2028';
-    const verificationCode = meta?.verificationCode || 'BMI-IDC-8821';
+    const verificationCode = meta?.verificationCode || `${institutionCode(meta)}-IDC-${crypto.randomUUID().replace(/-/g, '').slice(0, 12).toUpperCase()}`;
 
     const page = pdf.addPage([PdfDocumentAdapter.CARD_W, PdfDocumentAdapter.CARD_H]);
 
@@ -346,12 +466,18 @@ export class PdfDocumentAdapter implements IDocumentGenerator {
       page.drawImage(logo, { x: 10, y: PdfDocumentAdapter.CARD_H - 36, width: logoDims.width, height: logoDims.height });
     }
 
-    page.drawText('BMI UNIVERSITY', { x: logo ? 40 : 12, y: PdfDocumentAdapter.CARD_H - 24, size: 12, font: bold, color: PdfDocumentAdapter.GOLD });
-    page.drawText('BETHEL MINISTRIES INTERNATIONAL', { x: logo ? 40 : 12, y: PdfDocumentAdapter.CARD_H - 35, size: 7, font: helvetica, color: PdfDocumentAdapter.WHITE });
+    page.drawText(institutionShortName(meta).toUpperCase(), { x: logo ? 40 : 12, y: PdfDocumentAdapter.CARD_H - 24, size: 12, font: bold, color: PdfDocumentAdapter.GOLD });
+    page.drawText(institutionName(meta).toUpperCase(), { x: logo ? 40 : 12, y: PdfDocumentAdapter.CARD_H - 35, size: 7, font: helvetica, color: PdfDocumentAdapter.WHITE });
 
     // Student Badge Pill
     this.drawRect(page, PdfDocumentAdapter.CARD_W - 65, PdfDocumentAdapter.CARD_H - 30, 55, 16, PdfDocumentAdapter.GOLD);
     page.drawText('STUDENT', { x: PdfDocumentAdapter.CARD_W - 55, y: PdfDocumentAdapter.CARD_H - 23, size: 7.5, font: bold, color: PdfDocumentAdapter.NAVY_DARK });
+    if (meta?.platformLogo) {
+      const brandMark = meta.platformLogo.scale(0.075);
+      page.drawImage(meta.platformLogo, { x: 210, y: PdfDocumentAdapter.CARD_H - 33, width: brandMark.width, height: brandMark.height });
+      page.drawText('POWERED BY', { x: 236, y: PdfDocumentAdapter.CARD_H - 22, size: 3.8, font: helvetica, color: PdfDocumentAdapter.LIGHT_GRAY });
+      page.drawText(String(meta.platformBrandName || 'Bazion Web').toUpperCase(), { x: 236, y: PdfDocumentAdapter.CARD_H - 29, size: 4.4, font: bold, color: PdfDocumentAdapter.WHITE });
+    }
 
     // Photo Box with Gold Border & Shadow effect
     this.drawRect(page, 14, 46, 75, 95, PdfDocumentAdapter.GOLD);
@@ -392,7 +518,7 @@ export class PdfDocumentAdapter implements IDocumentGenerator {
       barX += w + 1;
     }
 
-    page.drawText(`VERIFY: bmiuniversities.org/verify`, { x: 170, y: 22, size: 6.5, font: bold, color: PdfDocumentAdapter.NAVY });
+    page.drawText(`VERIFY: ${meta?.verificationBaseUrl || '/verify'}`, { x: 170, y: 22, size: 6.5, font: bold, color: PdfDocumentAdapter.NAVY });
     page.drawText(`SEC CODE: ${verificationCode}`, { x: 170, y: 12, size: 6.5, font: helvetica, color: PdfDocumentAdapter.DARK_GRAY });
   }
 
@@ -406,22 +532,23 @@ export class PdfDocumentAdapter implements IDocumentGenerator {
 
     const name = meta?.name || 'Student Name';
     const uid = meta?.uid || 'STD-2026-001';
-    const regNo = meta?.regNo || 'BMI/UG-CS/226/001';
+    const regNo = meta?.regNo || `${institutionCode(meta)}/UG-CS/226/001`;
     const program = meta?.program || 'Bachelor of Science in Biblical Studies';
     const gpa = meta?.gpa || '3.85';
     const courses = meta?.courses || [];
     const date = meta?.date || new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-    const verificationCode = meta?.verificationCode || 'BMI-TRN-10928';
+    const verificationCode = meta?.verificationCode || `${institutionCode(meta)}-TRN-${crypto.randomUUID().replace(/-/g, '').slice(0, 12).toUpperCase()}`;
 
     const page = pdf.addPage([PdfDocumentAdapter.PAGE_W, PdfDocumentAdapter.PAGE_H]);
 
     // Letterhead
-    this.drawLetterhead(pdf, page, helvetica, bold, logo);
+    this.drawLetterhead(pdf, page, helvetica, bold, logo, meta);
 
     let y = 635;
     this.drawRect(page, 45, y - 22, 522, 24, PdfDocumentAdapter.NAVY);
-    page.drawText('OFFICIAL ACADEMIC TRANSCRIPT • RECORD OF SCHOLARSHIP', {
-      x: PdfDocumentAdapter.centerX('OFFICIAL ACADEMIC TRANSCRIPT • RECORD OF SCHOLARSHIP', bold, 10.5, PdfDocumentAdapter.PAGE_W),
+    const transcriptHeading = `OFFICIAL ${institutionShortName(meta).toUpperCase()} ACADEMIC TRANSCRIPT • RECORD OF SCHOLARSHIP`;
+    page.drawText(transcriptHeading, {
+      x: PdfDocumentAdapter.centerX(transcriptHeading, bold, 10.5, PdfDocumentAdapter.PAGE_W),
       y: y - 15,
       size: 10.5,
       font: bold,
@@ -505,9 +632,9 @@ export class PdfDocumentAdapter implements IDocumentGenerator {
     page.drawText('Official transcripts bear the digital signature and cryptographic verification hash of the University Registrar.', { x: 45, y: sigY - 20, size: 6.5, font: helvetica, color: PdfDocumentAdapter.LIGHT_GRAY });
 
     this.drawHLine(page, sigY - 45, PdfDocumentAdapter.CHARCOAL, 395, 172, 1);
-    page.drawText('Dr. E. Vance, Ph.D. — University Registrar', { x: 395, y: sigY - 55, size: 8.5, font: bold, color: PdfDocumentAdapter.NAVY });
+    page.drawText(`${meta?.authorizedBy || 'Authorized Signatory'} — ${meta?.authorizedTitle || 'University Registrar'}`, { x: 395, y: sigY - 55, size: 8.5, font: bold, color: PdfDocumentAdapter.NAVY });
 
-    this.drawFooter(pdf, page, helvetica, bold, verificationCode);
+    this.drawFooter(pdf, page, helvetica, bold, verificationCode, meta);
   }
 
   /**
@@ -524,10 +651,10 @@ export class PdfDocumentAdapter implements IDocumentGenerator {
     const name = meta?.name || 'Graduate Name';
     const program = meta?.program || 'Bachelor of Science in Biblical Studies';
     const uid = meta?.uid || 'STD-2026-001';
-    const regNo = meta?.regNo || 'BMI/UG-CS/226/001';
+    const regNo = meta?.regNo || `${institutionCode(meta)}/UG-CS/226/001`;
     const awardDate = meta?.awardDate || new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
     const classification = meta?.classification || 'First Class Honours';
-    const verificationCode = meta?.verificationCode || 'BMI-DIP-77312';
+    const verificationCode = meta?.verificationCode || `${institutionCode(meta)}-DIP-${crypto.randomUUID().replace(/-/g, '').slice(0, 12).toUpperCase()}`;
 
     const page = pdf.addPage([PdfDocumentAdapter.PAGE_W, PdfDocumentAdapter.PAGE_H]);
 
@@ -550,8 +677,9 @@ export class PdfDocumentAdapter implements IDocumentGenerator {
     }
 
     let y = 620;
-    page.drawText('BETHEL MINISTRIES INTERNATIONAL UNIVERSITY', {
-      x: PdfDocumentAdapter.centerX('BETHEL MINISTRIES INTERNATIONAL UNIVERSITY', timesBold, 16),
+    const fullInstitutionName = institutionName(meta).toUpperCase();
+    page.drawText(fullInstitutionName, {
+      x: PdfDocumentAdapter.centerX(fullInstitutionName, timesBold, 16),
       y,
       size: 16,
       font: timesBold,
@@ -559,8 +687,9 @@ export class PdfDocumentAdapter implements IDocumentGenerator {
     });
 
     y -= 18;
-    page.drawText('BMI UNIVERSITY • ACCREDITED HIGHER EDUCATION', {
-      x: PdfDocumentAdapter.centerX('BMI UNIVERSITY • ACCREDITED HIGHER EDUCATION', bold, 8.5),
+    const accreditationLine = `${institutionShortName(meta).toUpperCase()} • ${meta?.accreditationLabel || 'OFFICIAL ACADEMIC RECORD'}`;
+    page.drawText(accreditationLine, {
+      x: PdfDocumentAdapter.centerX(accreditationLine, bold, 8.5),
       y,
       size: 8.5,
       font: bold,
@@ -649,18 +778,20 @@ export class PdfDocumentAdapter implements IDocumentGenerator {
     // Signatures & Gold Medallion
     y -= 60;
     this.drawHLine(page, y, PdfDocumentAdapter.CHARCOAL, 70, 150, 1);
-    page.drawText('Dr. Melba Layne, Ph.D.', { x: 95, y: y - 14, size: 9.5, font: bold, color: PdfDocumentAdapter.NAVY });
-    page.drawText('Chief Registrar', { x: 110, y: y - 24, size: 8, font: helvetica, color: PdfDocumentAdapter.DARK_GRAY });
+    page.drawText(meta?.authorizedBy || 'Authorized Signatory', { x: 95, y: y - 14, size: 9.5, font: bold, color: PdfDocumentAdapter.NAVY });
+    page.drawText(meta?.authorizedTitle || 'Chief Registrar', { x: 110, y: y - 24, size: 8, font: helvetica, color: PdfDocumentAdapter.DARK_GRAY });
 
-    this.drawSealEmblem(page, 306, y - 5, bold, helvetica);
+    this.drawSealEmblem(page, 306, y - 5, bold, helvetica, meta);
 
     this.drawHLine(page, y, PdfDocumentAdapter.CHARCOAL, 392, 150, 1);
-    page.drawText('Dr. Christopher Cookhorne, Ph.D.', { x: 388, y: y - 14, size: 9.5, font: bold, color: PdfDocumentAdapter.NAVY });
-    page.drawText('Chancellor & President', { x: 418, y: y - 24, size: 8, font: helvetica, color: PdfDocumentAdapter.DARK_GRAY });
+    page.drawText(meta?.secondaryAuthorizedBy || institutionName(meta), { x: 388, y: y - 14, size: 9.5, font: bold, color: PdfDocumentAdapter.NAVY });
+    page.drawText(meta?.secondaryAuthorizedTitle || 'Institutional Authority', { x: 418, y: y - 24, size: 8, font: helvetica, color: PdfDocumentAdapter.DARK_GRAY });
 
     // Microprint verification footer
-    page.drawText(`VERIFICATION CODE: ${verificationCode} • VALIDATE AUTHENTICITY AT: ${VERIFY_BASE_URL}`, {
-      x: PdfDocumentAdapter.centerX(`VERIFICATION CODE: ${verificationCode} • VALIDATE AUTHENTICITY AT: ${VERIFY_BASE_URL}`, helvetica, 7),
+    const verifyUrl = meta?.verificationBaseUrl || '/verify';
+    const verifyText = `VERIFICATION CODE: ${verificationCode} • VALIDATE AUTHENTICITY AT: ${verifyUrl}`;
+    page.drawText(verifyText, {
+      x: PdfDocumentAdapter.centerX(verifyText, helvetica, 7),
       y: 46,
       size: 7,
       font: helvetica,
@@ -673,7 +804,7 @@ export class PdfDocumentAdapter implements IDocumentGenerator {
     const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
     const page = pdf.addPage([PdfDocumentAdapter.PAGE_W, PdfDocumentAdapter.PAGE_H]);
 
-    this.drawLetterhead(pdf, page, font, bold);
+    this.drawLetterhead(pdf, page, font, bold, undefined, meta);
 
     page.drawText(`DOCUMENT TYPE: ${type.replace('_', ' ').toUpperCase()}`, { x: 50, y: 550, size: 18, font: bold, color: PdfDocumentAdapter.NAVY });
     page.drawText(`User ID: ${userId}`, { x: 50, y: 520, size: 11, font, color: PdfDocumentAdapter.DARK_GRAY });
@@ -685,12 +816,12 @@ export class PdfDocumentAdapter implements IDocumentGenerator {
         y -= 16;
       }
     }
-    this.drawFooter(pdf, page, font, bold, meta?.verificationCode || 'GEN-DOC');
+    this.drawFooter(pdf, page, font, bold, meta?.verificationCode || 'GEN-DOC', meta);
   }
 
   // ─── HELPER DRAWING FUNCTIONS ───────────────────────────────────────────────
 
-  private drawLetterhead(_pdf: PDFDocument, page: any, font: PDFFont, bold: PDFFont, logo?: PDFImage): void {
+  private drawLetterhead(_pdf: PDFDocument, page: any, font: PDFFont, bold: PDFFont, logo?: PDFImage, meta?: Record<string, any>): void {
     // Top Navy Header Bar
     this.drawRect(page, 0, 712, PdfDocumentAdapter.PAGE_W, 80, PdfDocumentAdapter.NAVY_DARK);
     this.drawHLine(page, 712, PdfDocumentAdapter.GOLD, 0, PdfDocumentAdapter.PAGE_W, 3);
@@ -701,26 +832,35 @@ export class PdfDocumentAdapter implements IDocumentGenerator {
     }
 
     const textX = logo ? 115 : 45;
-    page.drawText('BETHEL MINISTRIES INTERNATIONAL UNIVERSITY', { x: textX, y: 760, size: 15, font: bold, color: PdfDocumentAdapter.WHITE });
-    page.drawText('BMI UNIVERSITY • OFFICE OF THE REGISTRAR & ADMISSIONS', { x: textX, y: 742, size: 8.5, font: bold, color: PdfDocumentAdapter.GOLD });
-    page.drawText('www.bmiuniversities.org  |  admissions@bmiuniversities.org  |  bmiuniversities.org/verify', { x: textX, y: 725, size: 7.5, font, color: PdfDocumentAdapter.LIGHT_GRAY });
+    page.drawText(institutionName(meta).toUpperCase(), { x: textX, y: 760, size: 15, font: bold, color: PdfDocumentAdapter.WHITE });
+    page.drawText(`${institutionShortName(meta).toUpperCase()} • OFFICE OF THE REGISTRAR & ADMISSIONS`, { x: textX, y: 742, size: 8.5, font: bold, color: PdfDocumentAdapter.GOLD });
+    const contacts = [meta?.websiteUrl, meta?.admissionsEmail, meta?.verificationBaseUrl].filter(Boolean).join('  |  ');
+    page.drawText(contacts || meta?.address || '', { x: textX, y: 725, size: 7.5, font, color: PdfDocumentAdapter.LIGHT_GRAY });
   }
 
-  private drawFooter(_pdf: PDFDocument, page: any, font: PDFFont, _bold: PDFFont, verificationCode?: string): void {
+  private drawFooter(_pdf: PDFDocument, page: any, font: PDFFont, _bold: PDFFont, verificationCode?: string, meta?: Record<string, any>): void {
     this.drawHLine(page, 44, PdfDocumentAdapter.BORDER_GRAY, 45, 522, 0.75);
-    page.drawText(`Official University Document • Bethel Ministries International University (BMI) • Accredited Higher Education`, {
-      x: 45, y: 32, size: 7, font, color: PdfDocumentAdapter.DARK_GRAY,
+    const textWidth = meta?.platformLogo ? 392 : 522;
+    page.drawText(`Official Document • ${institutionName(meta)} • ${meta?.accreditationLabel || 'Institutional Record'}`, {
+      x: 45, y: 32, size: 6.6, maxWidth: textWidth, font, color: PdfDocumentAdapter.DARK_GRAY,
     });
-    page.drawText(`Digital Verification Code: ${verificationCode || 'VERIFIED'} • Verify at https://bmiuniversities.org/verify`, {
-      x: 45, y: 22, size: 7, font, color: PdfDocumentAdapter.LIGHT_GRAY,
+    page.drawText(`Digital Verification Code: ${verificationCode || 'VERIFIED'} • Verify at ${meta?.verificationBaseUrl || '/verify'} • ${meta?.registrarEmail || ''}`, {
+      x: 45, y: 22, size: 6.2, maxWidth: textWidth, font, color: PdfDocumentAdapter.LIGHT_GRAY,
     });
+    if (meta?.platformLogo) {
+      const dimensions = meta.platformLogo.scale(0.09);
+      page.drawImage(meta.platformLogo, { x: 523, y: 5, width: dimensions.width, height: dimensions.height });
+      page.drawText('POWERED BY', { x: 456, y: 22, size: 5.2, font, color: PdfDocumentAdapter.LIGHT_GRAY });
+      page.drawText(String(meta.platformBrandName || 'Bazion Web').toUpperCase(), { x: 456, y: 13, size: 5.6, font, color: PdfDocumentAdapter.NAVY });
+    }
   }
 
-  private drawSealEmblem(page: any, cx: number, cy: number, bold: PDFFont, helv: PDFFont): void {
+  private drawSealEmblem(page: any, cx: number, cy: number, bold: PDFFont, helv: PDFFont, meta?: Record<string, any>): void {
     this.drawRect(page, cx - 35, cy - 35, 70, 70, PdfDocumentAdapter.GOLD_LIGHT);
     this.drawRect(page, cx - 35, cy - 35, 70, 70, PdfDocumentAdapter.GOLD, true, 1.5);
     this.drawRect(page, cx - 31, cy - 31, 62, 62, PdfDocumentAdapter.NAVY, true, 0.75);
-    page.drawText('BMI', { x: cx - 12, y: cy + 4, size: 11, font: bold, color: PdfDocumentAdapter.GOLD });
+    const code = institutionCode(meta).slice(0, 6);
+    page.drawText(code, { x: cx - code.length * 3, y: cy + 4, size: 11, font: bold, color: PdfDocumentAdapter.GOLD });
     page.drawText('SEAL', { x: cx - 13, y: cy - 8, size: 8, font: bold, color: PdfDocumentAdapter.NAVY });
     page.drawText('OFFICIAL', { x: cx - 18, y: cy - 20, size: 6, font: helv, color: PdfDocumentAdapter.CHARCOAL });
   }

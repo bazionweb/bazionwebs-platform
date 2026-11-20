@@ -69,9 +69,24 @@ export function AuditPanel({ tenants }: { tenants: Tenant[] }) {
               Trace all administrative actions, lifecycle transitions, payment reconciliations, and troubleshooting overrides.
             </p>
           </div>
-          <button className="secondary" onClick={() => loadAuditLogs(0)} style={{ fontSize: "11px", padding: "8px 14px" }}>
-            ↻ Refresh Logs
-          </button>
+          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+            <a
+              className="secondary"
+              href={`/v1/admin/platform/audit/export?${new URLSearchParams({
+                ...(actionFilter ? { action: actionFilter } : {}),
+                ...(outcomeFilter !== "all" ? { outcome: outcomeFilter } : {}),
+                ...(tenantFilter ? { tenantId: tenantFilter } : {}),
+                ...(search ? { search } : {}),
+                format: "csv",
+              }).toString()}`}
+              style={{ fontSize: "11px", padding: "8px 14px", textDecoration: "none" }}
+            >
+              ⬇ Export CSV
+            </a>
+            <button className="secondary" onClick={() => loadAuditLogs(0)} style={{ fontSize: "11px", padding: "8px 14px" }}>
+              ↻ Refresh Logs
+            </button>
+          </div>
         </div>
 
         <div className="filters" style={{ flexWrap: "wrap" }}>
@@ -87,6 +102,7 @@ export function AuditPanel({ tenants }: { tenants: Tenant[] }) {
           <select value={outcomeFilter} onChange={(e) => setOutcomeFilter(e.target.value)}>
             <option value="all">All Outcomes</option>
             <option value="succeeded">Succeeded</option>
+            <option value="denied">Denied</option>
             <option value="failed">Failed</option>
           </select>
 

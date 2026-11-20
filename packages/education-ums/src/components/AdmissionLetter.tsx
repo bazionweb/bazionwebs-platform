@@ -5,6 +5,7 @@
  */
 
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import { PlatformBrandBadge } from "./PlatformBrandBadge";
 import {
   Search, Printer, Download, Mail, ShieldCheck,
   Sparkles, FileText,
@@ -14,6 +15,7 @@ import { PORTAL_URL, MARKETING_URL, ADMISSIONS_EMAIL, PROGRAMS as FALLBACK_PROGR
 import { Student } from '../types';
 import { documentService } from '../services/documentService';
 import { getHtml2Pdf } from '../services/pdfService';
+import { useUIStore } from '../stores/uiStore';
 import type { AdmissionLetter as AdmissionLetterType, DocumentSecurityFeatures } from '../types/documents';
 
 const _viteApiUrl = typeof process !== 'undefined' ? process.env?.NEXT_PUBLIC_API_URL : undefined;
@@ -36,6 +38,12 @@ const THEME = {
 };
 
 export const AdmissionLetter: React.FC<AdmissionLetterProps> = ({ students, logo }) => {
+  const institutionName = useUIStore((state) => state.institutionName);
+  const shortName = useUIStore((state) => state.shortName);
+  const configuredLogo = useUIStore((state) => state.logo);
+  const primaryColor = useUIStore((state) => state.primaryColor);
+  const accentColor = useUIStore((state) => state.accentColor);
+  const documentLogo = logo || configuredLogo;
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [showLetter, setShowLetter] = useState(false);
@@ -320,23 +328,23 @@ export const AdmissionLetter: React.FC<AdmissionLetterProps> = ({ students, logo
               </div>
 
               {/* Letter Document */}
-              <div id="modern-admission-letter" className="bg-white rounded-2xl shadow-2xl overflow-hidden border border-slate-200">
-                <div className="h-2 bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600" />
+              <div id="modern-admission-letter" className="bg-white rounded-2xl shadow-2xl overflow-hidden border border-slate-200" style={{ "--institution-primary": primaryColor, "--institution-accent": accentColor } as React.CSSProperties}>
+                <div className="h-2" style={{ background: `linear-gradient(90deg, ${primaryColor}, ${accentColor}, ${primaryColor})` }} />
 
                 <div className="p-10">
                   {/* Header */}
                   <div className="flex items-center justify-between mb-8 pb-6 border-b-2 border-slate-100">
                     <div className="flex items-center gap-4">
                       <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-slate-900 to-slate-800 flex items-center justify-center shadow-xl">
-                        <img src={logo} alt="BMI" className="w-10 h-10 object-contain brightness-0 invert" />
+                        <img src={documentLogo} alt={shortName} className="w-10 h-10 object-contain brightness-0 invert" />
                       </div>
                       <div>
-                        <h2 className="text-xl font-black text-slate-900 tracking-tight">BMI University</h2>
+                        <h2 className="text-xl font-black text-slate-900 tracking-tight">{institutionName}</h2>
                         <p className="text-sm text-slate-500 font-medium">Office of Admissions</p>
                       </div>
                     </div>
                     <div className="text-right">
-                      <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-bold text-xs shadow-lg">
+                      <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-white font-bold text-xs shadow-lg" style={{ backgroundColor: primaryColor }}>
                         <ShieldCheck size={14} />
                         Official Letter
                       </div>
@@ -362,7 +370,7 @@ export const AdmissionLetter: React.FC<AdmissionLetterProps> = ({ students, logo
                   {/* Subject */}
                   <div className="mb-6">
                     <p className="text-sm font-bold text-slate-900 uppercase tracking-wide">
-                      Subject: <span className="text-emerald-700">Offer of Admission</span>
+                      Subject: <span style={{ color: primaryColor }}>Offer of Admission</span>
                     </p>
                   </div>
 
@@ -371,7 +379,7 @@ export const AdmissionLetter: React.FC<AdmissionLetterProps> = ({ students, logo
                     <p className="font-bold text-slate-900">Dear {generatedLetter.studentName.split(' ')[0]},</p>
 
                     <p>
-                      We are delighted to inform you that your application for admission to BMI University has been
+                      We are delighted to inform you that your application for admission to {institutionName} has been
                       carefully reviewed, and it is with great pleasure that we offer you a place in our prestigious institution.
                     </p>
 
@@ -388,7 +396,7 @@ export const AdmissionLetter: React.FC<AdmissionLetterProps> = ({ students, logo
 
                     <p>
                       This offer is contingent upon your acceptance and fulfillment of all registration requirements
-                      by the specified deadline. We believe that your academic journey at BMI University will be
+                      by the specified deadline. We believe that your academic journey at {institutionName} will be
                       transformative, and we look forward to welcoming you to our vibrant academic community.
                     </p>
 
@@ -411,7 +419,7 @@ export const AdmissionLetter: React.FC<AdmissionLetterProps> = ({ students, logo
                         <div className="h-12 border-b border-slate-400 w-48 my-2"></div>
                         <p className="font-bold text-slate-900">Dr. Jane Mwangi</p>
                         <p className="text-sm text-slate-600">Director of Admissions</p>
-                        <p className="text-xs text-slate-500">BMI University</p>
+                        <p className="text-xs text-slate-500">{institutionName}</p>
                       </div>
 
                       <div className="text-right">
@@ -433,7 +441,8 @@ export const AdmissionLetter: React.FC<AdmissionLetterProps> = ({ students, logo
                   </div>
                 </div>
 
-                <div className="h-2 bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600" />
+                <div className="flex justify-end px-10 py-2"><PlatformBrandBadge compact /></div>
+                <div className="h-2" style={{ background: `linear-gradient(90deg, ${primaryColor}, ${accentColor}, ${primaryColor})` }} />
               </div>
             </div>
           ) : (

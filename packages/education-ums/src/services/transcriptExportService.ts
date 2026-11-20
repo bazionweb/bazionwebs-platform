@@ -10,10 +10,46 @@ export interface ExportContext {
   securityData: any;
   logo: string;
   selectedTerm: string;
+  institutionName?: string;
+  shortName?: string;
+  primaryColor?: string;
+  accentColor?: string;
+}
+
+function exportBrand(context: ExportContext) {
+  const hex = (value: string | undefined, fallback: string) =>
+    value && /^#[0-9a-fA-F]{6}$/.test(value) ? value.slice(1).toUpperCase() : fallback;
+  return {
+    institutionName: context.institutionName?.trim() || "Bethel Ministries International University",
+    shortName: context.shortName?.trim() || "BMI University",
+    primary: hex(context.primaryColor, "0E1D38"),
+    accent: hex(context.accentColor, "C5A048"),
+  };
+}
+
+function escapeXml(value: string): string {
+  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\"/g, "&quot;").replace(/'/g, "&apos;");
+}
+
+async function loadPlatformMarkDataUrl(): Promise<string> {
+  try {
+    const response = await fetch("/brand/bazion-platform-mark.png");
+    if (!response.ok) return "";
+    const blob = await response.blob();
+    return await new Promise<string>((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(typeof reader.result === "string" ? reader.result : "");
+      reader.onerror = () => resolve("");
+      reader.readAsDataURL(blob);
+    });
+  } catch {
+    return "";
+  }
 }
 
 export const downloadWord = async (context: ExportContext) => {
   const { selectedStudent, getAcademicRecommendation, fixedRows, stats, transcriptType, securityData, logo, selectedTerm } = context;
+  const brand = exportBrand(context);
   const formatNumber = (n: number, decimals: number = 2) => n.toFixed(decimals);
   const formatSimpleDate = (d: string) => new Date(d).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
   
@@ -57,6 +93,7 @@ export const downloadWord = async (context: ExportContext) => {
         // eslint-disable-next-line no-console
         console.warn("Could not fetch logo:", error);
       }
+      const platformMarkBase64 = await loadPlatformMarkDataUrl();
 
       // Create table rows for performance records - matching preview layout
       const tableRows = [
@@ -334,7 +371,7 @@ export const downloadWord = async (context: ExportContext) => {
             children: [
               // Microtext security line
               new Paragraph({
-                text: "BMI UNIVERSITY OFFICIAL ACADEMIC TRANSCRIPT • SECURITY VALIDATED RECORD • DO NOT REPRODUCE",
+                text: `${brand.shortName.toUpperCase()} OFFICIAL ACADEMIC TRANSCRIPT • SECURITY VALIDATED RECORD • DO NOT REPRODUCE`,
                 alignment: AlignmentType.CENTER,
                 spacing: { after: 100 },
                 style: "Normal",
@@ -367,7 +404,7 @@ export const downloadWord = async (context: ExportContext) => {
 
               // University name
               new Paragraph({
-                text: "BMI UNIVERSITY",
+                text: brand.institutionName.toUpperCase(),
                 alignment: AlignmentType.CENTER,
                 spacing: { after: 50 },
                 run: {
@@ -805,7 +842,7 @@ export const downloadWord = async (context: ExportContext) => {
 
               // Microtext security line
               new Paragraph({
-                text: "DO NOT REPRODUCE THIS DOCUMENT • BMI UNIVERSITY ACADEMIC RECORD SECURE VALIDATION LINE",
+                text: `DO NOT REPRODUCE THIS DOCUMENT • ${brand.shortName.toUpperCase()} ACADEMIC RECORD SECURE VALIDATION LINE`,
                 alignment: AlignmentType.CENTER,
                 spacing: { after: 200 },
                 run: {
@@ -978,7 +1015,7 @@ export const downloadWord = async (context: ExportContext) => {
                               new TextRun({
                                 text:
                                   securityData?.serialNumber ||
-                                  `BMI-TR-${selectedStudent.id.toUpperCase()}`,
+                                  `${brand.shortName.replace(/[^A-Z0-9]/gi, "").toUpperCase()}-TR-${selectedStudent.id.toUpperCase()}`,
                                 size: 16,
                                 font: "Courier New",
                                 color: "666666",
@@ -1100,7 +1137,7 @@ export const downloadWord = async (context: ExportContext) => {
                 },
               }),
               new Paragraph({
-                text: "This is an official document issued by BMI University",
+                text: `This is an official document issued by ${brand.institutionName}`,
                 alignment: AlignmentType.CENTER,
                 run: {
                   size: 16,
@@ -1108,6 +1145,16 @@ export const downloadWord = async (context: ExportContext) => {
                   font: "Arial",
                   color: "999999",
                 },
+              }),
+              new Paragraph({
+                alignment: AlignmentType.CENTER,
+                spacing: { before: 180 },
+                children: [
+                  ...(platformMarkBase64
+                    ? [new ImageRun({ type: "png", data: platformMarkBase64, transformation: { width: 28, height: 23 } })]
+                    : []),
+                  new TextRun({ text: "  Powered by Bazion Web", size: 13, bold: true, color: "0B2F75", font: "Arial" }),
+                ],
               }),
             ],
           },
@@ -1125,6 +1172,11 @@ export const downloadWord = async (context: ExportContext) => {
 
 export const downloadSVG = async (context: ExportContext) => {
   const { selectedStudent, getAcademicRecommendation, fixedRows, stats, transcriptType, securityData, logo } = context;
+  const brand = exportBrand(context);
+  const institutionNameXml = escapeXml(brand.institutionName);
+  const shortNameXml = escapeXml(brand.shortName.toUpperCase());
+  const primaryHex = `#${brand.primary}`;
+  const accentHex = `#${brand.accent}`;
   const formatNumber = (n: number, decimals: number = 2) => n.toFixed(decimals);
   const formatSimpleDate = (d: string) => new Date(d).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
   
@@ -1134,6 +1186,7 @@ export const downloadSVG = async (context: ExportContext) => {
     try {
       const fileName =
         `${transcriptType}_TRANSCRIPT_${selectedStudent.id}_${selectedStudent.last_name}`.toUpperCase();
+      const platformMarkDataUrl = await loadPlatformMarkDataUrl();
 
       // A4 dimensions at 96 DPI
       const width = 794;
@@ -1171,8 +1224,8 @@ export const downloadSVG = async (context: ExportContext) => {
               ? "#10B981"
               : rec.score < 40
                 ? "#DC2626"
-                : "#4B0082"
-            : "#4B0082";
+                : primaryHex
+            : primaryHex;
           const rawName = rec?.courseName ?? "";
           const courseName =
             rawName.length > 45 ? rawName.substring(0, 42) + "..." : rawName;
@@ -1180,7 +1233,7 @@ export const downloadSVG = async (context: ExportContext) => {
           return `
     <!-- Row ${idx + 1} -->
     <rect x="50" y="${y - 15}" width="694" height="${rowHeightUnits}" fill="${idx % 2 === 0 ? "#FFFFFF" : "#F9FAFB"}" />
-    <text x="60" y="${y}" font-family="Courier New, monospace" font-size="9" font-weight="bold" fill="#4B0082">${rec?.courseCode ?? ""}</text>
+    <text x="60" y="${y}" font-family="Courier New, monospace" font-size="9" font-weight="bold" fill="${primaryHex}">${rec?.courseCode ?? ""}</text>
     <text x="140" y="${y}" font-family="Arial, sans-serif" font-size="9" font-weight="bold" fill="#1F2937">${courseName.toUpperCase()}</text>
     <text x="520" y="${y}" font-family="Arial, sans-serif" font-size="9" fill="#374151" text-anchor="middle">${rec ? formatNumber(rec.credits, 2) : ""}</text>
     <text x="600" y="${y}" font-family="Arial, sans-serif" font-size="10" font-weight="bold" fill="${gradeColor}" text-anchor="middle">${rec ? `${rec.score}%` : ""}</text>
@@ -1202,9 +1255,9 @@ export const downloadSVG = async (context: ExportContext) => {
   <defs>
     <!-- Gold gradient for border -->
     <linearGradient id="goldGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#FFD700" />
-      <stop offset="50%" stop-color="#FFA500" />
-      <stop offset="100%" stop-color="#FFD700" />
+      <stop offset="0%" stop-color="${accentHex}" />
+      <stop offset="50%" stop-color="${accentHex}" />
+      <stop offset="100%" stop-color="${accentHex}" />
     </linearGradient>
 
     <!-- Security pattern -->
@@ -1223,19 +1276,24 @@ export const downloadSVG = async (context: ExportContext) => {
   <rect x="25" y="25" width="${width - 50}" height="${height - 50}"
         fill="none" stroke="url(#goldGradient)" stroke-width="3" rx="2"/>
   <rect x="30" y="30" width="${width - 60}" height="${height - 60}"
-        fill="none" stroke="#C9A84C" stroke-width="1" rx="1"/>
+        fill="none" stroke="${accentHex}" stroke-width="1" rx="1"/>
 
   <!-- Top microtext security line -->
   <text x="${width / 2}" y="15" font-family="Arial, sans-serif" font-size="5" fill="#999999" text-anchor="middle" opacity="0.6">
-    BMI UNIVERSITY OFFICIAL ACADEMIC TRANSCRIPT • SECURITY VALIDATED RECORD • DO NOT REPRODUCE • AUTHENTIC DOCUMENT • ID: ${securityData?.serialNumber || "PENDING"}
+    ${shortNameXml} OFFICIAL ACADEMIC TRANSCRIPT • SECURITY VALIDATED RECORD • DO NOT REPRODUCE • AUTHENTIC DOCUMENT • ID: ${securityData?.serialNumber || "PENDING"}
   </text>
 
   <!-- Logo -->
   <image x="${width / 2 - 35}" y="50" width="70" height="70" xlink:href="${logo}" preserveAspectRatio="xMidYMid meet"/>
 
+  <!-- Separate platform brand mark -->
+  ${platformMarkDataUrl ? `<image x="${width - 125}" y="52" width="34" height="28" xlink:href="${platformMarkDataUrl}" preserveAspectRatio="xMidYMid meet"/>` : ""}
+  <text x="${width - 84}" y="63" font-family="Arial, sans-serif" font-size="7" font-weight="bold" fill="#0B2F75">Powered by</text>
+  <text x="${width - 84}" y="75" font-family="Arial, sans-serif" font-size="8" font-weight="bold" fill="#0B2F75">Bazion Web</text>
+
   <!-- University Name -->
   <text x="${width / 2}" y="145" font-family="Georgia, serif" font-size="26" font-weight="bold"
-        fill="#4B0082" text-anchor="middle" letter-spacing="1">BMI University</text>
+        fill="${primaryHex}" text-anchor="middle" letter-spacing="1">${institutionNameXml}</text>
 
   <!-- Subtitle -->
   <text x="${width / 2}" y="165" font-family="Georgia, serif" font-size="11" font-style="italic"
@@ -1313,7 +1371,7 @@ export const downloadSVG = async (context: ExportContext) => {
   <!-- Performance Metrics Bar -->
   <rect x="50" y="${statsY - 20}" width="694" height="50" fill="#F9FAFB" stroke="#E5E7EB" stroke-width="1"/>
   <text x="${width / 2}" y="${statsY}" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="#374151" text-anchor="middle">
-    Current Term Average: <tspan fill="#4B0082">${stats.current}%</tspan>  |  Cumulative Average: <tspan fill="#4B0082">${stats.cumulative}%</tspan>
+    Current Term Average: <tspan fill="${primaryHex}">${stats.current}%</tspan>  |  Cumulative Average: <tspan fill="${primaryHex}">${stats.cumulative}%</tspan>
   </text>
 
   <!-- Grading Scale -->
@@ -1322,7 +1380,7 @@ export const downloadSVG = async (context: ExportContext) => {
   </text>
 
   <!-- Academic Recommendation -->
-  <rect x="50" y="${recommendationY - 10}" width="5" height="80" fill="#4B0082"/>
+  <rect x="50" y="${recommendationY - 10}" width="5" height="80" fill="${primaryHex}"/>
   <text x="65" y="${recommendationY + 5}" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="#000000">ACADEMIC RECOMMENDATION</text>
   ${recommendationLines
     .map(
@@ -1342,11 +1400,11 @@ export const downloadSVG = async (context: ExportContext) => {
   <text x="550" y="${signaturesY + 35}" font-family="Arial, sans-serif" font-size="8" font-style="italic" fill="#6B7280" text-anchor="middle">Dean, Faculty of Theology</text>
 
   <!-- Footer rule -->
-  <line x1="60" y1="${footerY}" x2="${width - 60}" y2="${footerY}" stroke="#C9A84C" stroke-width="1"/>
+  <line x1="60" y1="${footerY}" x2="${width - 60}" y2="${footerY}" stroke="${accentHex}" stroke-width="1"/>
 
   <!-- LEFT: issuance metadata -->
   <text x="60" y="${footerY + 18}" font-family="Arial, sans-serif" font-size="8" font-weight="bold" fill="#6B7280" text-transform="uppercase">ISSUED: ${securityData?.issuedAt ? new Date(securityData.issuedAt).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" }).toUpperCase() : new Date().toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" }).toUpperCase()}</text>
-  <text x="60" y="${footerY + 32}" font-family="Courier New, monospace" font-size="8" fill="#6B7280">ID: ${securityData?.serialNumber || `BMI-TR-${selectedStudent.id.toUpperCase()}`}</text>
+  <text x="60" y="${footerY + 32}" font-family="Courier New, monospace" font-size="8" fill="#6B7280">ID: ${securityData?.serialNumber || `${shortNameXml.replace(/[^A-Z0-9]/g, "")}-TR-${selectedStudent.id.toUpperCase()}`}</text>
 
   <!-- CENTRE: physical seal zone (dashed circle + label) -->
   <circle cx="${width / 2}" cy="${footerY}" r="100" fill="none" stroke="#D1D5DB" stroke-width="1.5" stroke-dasharray="5,4"/>
@@ -1356,15 +1414,15 @@ export const downloadSVG = async (context: ExportContext) => {
 
   <!-- RIGHT: digital validation badge -->
   <rect x="${width - 240}" y="${footerY + 8}" width="180" height="40" rx="0" fill="#FAF5FF" stroke="#DDD6FE" stroke-width="1"/>
-  <text x="${width - 150}" y="${footerY + 23}" font-family="Arial, sans-serif" font-size="8" font-weight="bold" fill="#4B0082" text-anchor="middle" letter-spacing="1">✓ DIGITAL VALIDATION ACTIVE</text>
+  <text x="${width - 150}" y="${footerY + 23}" font-family="Arial, sans-serif" font-size="8" font-weight="bold" fill="${primaryHex}" text-anchor="middle" letter-spacing="1">✓ DIGITAL VALIDATION ACTIVE</text>
   <text x="${width - 150}" y="${footerY + 36}" font-family="Arial, sans-serif" font-size="6.5" fill="#9CA3AF" text-anchor="middle" letter-spacing="1">CERTIFIED TRUE COPY • E-TRANSCRIPT</text>
 
   <!-- Bottom microtext -->
-  <text x="${width / 2}" y="${footerY + 80}" font-family="Arial, sans-serif" font-size="7" font-style="italic" fill="#9CA3AF" text-anchor="middle">This is an official document issued by BMI University</text>
+  <text x="${width / 2}" y="${footerY + 80}" font-family="Arial, sans-serif" font-size="7" font-style="italic" fill="#9CA3AF" text-anchor="middle">This is an official document issued by ${institutionNameXml}</text>
 
   <!-- Bottom microtext security line -->
   <text x="${width / 2}" y="${height - 10}" font-family="Arial, sans-serif" font-size="5" fill="#999999" text-anchor="middle" opacity="0.6">
-    OFFICIAL TRANSCRIPT • TAMPER-EVIDENT SECURITY FEATURES • VERIFY AT ${securityData?.verificationUrl || "BMI.EDU/VERIFY"}
+    OFFICIAL TRANSCRIPT • TAMPER-EVIDENT SECURITY FEATURES • VERIFY AT ${escapeXml(securityData?.verificationUrl || `${window.location.origin}/verify`)} • ${shortNameXml}
   </text>
 </svg>`;
 

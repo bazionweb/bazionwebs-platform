@@ -54,8 +54,10 @@ describe.skipIf(!runIntegration)("Phase 5 live PostgreSQL HTTP OIDC, BFF, claim 
   let claimantCookie = "";
   let adminCookie = "";
   let trustedOrigin = "http://localhost:3000";
+  let testStartTime: Date;
 
   beforeAll(async () => {
+    testStartTime = new Date();
     for (const key of [
       "NODE_ENV",
       "NOTIFICATION_ENCRYPTION_KEY",
@@ -72,7 +74,7 @@ describe.skipIf(!runIntegration)("Phase 5 live PostgreSQL HTTP OIDC, BFF, claim 
     }
 
     process.env.NODE_ENV = "test";
-    process.env.NOTIFICATION_ENCRYPTION_KEY = Buffer.alloc(32, 0x37).toString("base64");
+    process.env.NOTIFICATION_ENCRYPTION_KEY = savedEnv.NOTIFICATION_ENCRYPTION_KEY || Buffer.alloc(32, 0x37).toString("base64");
     process.env.OIDC_SIGNING_PRIVATE_KEY_PEM = rsa.privateKey;
     process.env.OIDC_SIGNING_KEY_ID = `phase5-http-${runSuffix}`;
     process.env.PLATFORM_CONSOLE_URL = "http://localhost:3001";
@@ -241,6 +243,9 @@ describe.skipIf(!runIntegration)("Phase 5 live PostgreSQL HTTP OIDC, BFF, claim 
         await serverModule?.authPool.query('DELETE FROM "session" WHERE "userId" = $1', [userId]);
         await serverModule?.authPool.query('DELETE FROM "account" WHERE "userId" = $1', [userId]);
         await serverModule?.authPool.query('DELETE FROM "user" WHERE id = $1', [userId]);
+      }
+      if (testStartTime) {
+        await migrationPool?.query("DELETE FROM public.notification_outbox WHERE created_at >= $1", [testStartTime]).catch(() => undefined);
       }
     } finally {
       await app?.close();

@@ -1,5 +1,5 @@
 import type { CSSProperties, ReactNode } from "react";
-import { Cluster, Container, Grid, SiteNavigation } from "@bazion/ui";
+import { Container, Grid, SiteNavigation } from "@bazion/ui";
 import { getPublicWebsiteNavigation } from "@bazion/website-contracts";
 import { isSmeEnquiryCollectionAvailable, isSmeWebsitePageEnabled, type SmeWebsiteTemplateConfig } from "./config.js";
 import { SmeContactForm } from "./contact-form.js";
@@ -51,39 +51,8 @@ export function SmeWebsiteShell({
 }
 
 export function SmeHomePage({ config }: { config: SmeWebsiteTemplateConfig }) {
-  const hasContactPage = isSmeWebsitePageEnabled(config, "contact");
-  const hasServicesPage = isSmeWebsitePageEnabled(config, "services");
-  return (
-    <main id="main-content">
-      <section className="sme-home-hero">
-        <Container>
-          {config.business.tagline && <p className="sme-eyebrow">{config.business.tagline}</p>}
-          <h1>{config.business.name}</h1>
-          <p className="sme-home-intro">{config.business.introduction}</p>
-          <Cluster>
-            {hasContactPage && <a className="sme-action" href="/contact">Talk to our team</a>}
-            {hasServicesPage && <a className="sme-secondary-action" href="/services">Explore services</a>}
-          </Cluster>
-        </Container>
-      </section>
-      <section className="bw-section">
-        <Container>
-          <div className="sme-section-heading">
-            <p className="sme-eyebrow">What we offer</p>
-            <h2>Practical services, delivered with care</h2>
-          </div>
-          <Grid columns="auto">
-            {config.business.services.slice(0, 3).map((service) => (
-              <article className="sme-service-card" key={service.id}>
-                <h3>{service.name}</h3>
-                <p>{service.description}</p>
-              </article>
-            ))}
-          </Grid>
-        </Container>
-      </section>
-    </main>
-  );
+  const page = config.website.pages.find((candidate) => candidate.id === "home" && candidate.path === "/")!;
+  return <SmeConfiguredPage config={config} page={page} />;
 }
 
 export function SmeAboutPage({ config }: { config: SmeWebsiteTemplateConfig }) {
@@ -176,13 +145,15 @@ export function SmePrivacyPage({ config }: { config: SmeWebsiteTemplateConfig })
 }
 
 /** Renders a configured non-core page from the same live template configuration used by navigation. */
-export function SmeConfiguredPage({ config, page }: {
+export function SmeConfiguredPage({ config, page, formsLeadsEnabled = false }: {
   config: SmeWebsiteTemplateConfig;
   page: SmeWebsiteTemplateConfig["website"]["pages"][number];
+  formsLeadsEnabled?: boolean;
 }) {
   const sections = new Set(page.sections);
-  const showOfferings = sections.has("feature-list") || sections.has("card-grid") || sections.has("gallery");
+  const showOfferings = sections.has("feature-list") || sections.has("card-grid");
   const hasContactPage = isSmeWebsitePageEnabled(config, "contact");
+  const canCollectEnquiries = isSmeEnquiryCollectionAvailable(config, formsLeadsEnabled);
 
   return (
     <main id="main-content">
@@ -226,16 +197,32 @@ export function SmeConfiguredPage({ config, page }: {
         <section className="bw-section">
           <Container>
             <h2>Questions about {config.business.name}?</h2>
-            <p className="sme-page-intro">Contact the team for details about services, availability, and next steps.</p>
+            {config.business.content.faqs.length
+              ? <div className="sme-faq-list">{config.business.content.faqs.map((faq, index) => <details key={`faq-${index}`}><summary>{faq.question}</summary><p>{faq.answer}</p></details>)}</div>
+              : <p className="sme-page-intro">Contact the team for details about services, availability, and next steps.</p>}
             {hasContactPage && <a className="sme-action" href="/contact">Contact us</a>}
           </Container>
         </section>
       )}
+      {sections.has("testimonials") && config.business.content.testimonials.length > 0 && (
+        <section className="bw-section"><Container><div className="sme-section-heading"><p className="sme-eyebrow">Client stories</p><h2>What people say</h2></div><Grid columns="auto">{config.business.content.testimonials.map((item) => <figure className="sme-service-card" key={item.id}><blockquote>{item.quote}</blockquote><figcaption><strong>{item.author}</strong>{item.role && <span> · {item.role}</span>}</figcaption></figure>)}</Grid></Container></section>
+      )}
+      {sections.has("gallery") && config.business.content.gallery.length > 0 && (
+        <section className="bw-section"><Container><div className="sme-section-heading"><p className="sme-eyebrow">Gallery</p><h2>{page.title}</h2></div><Grid columns="auto">{config.business.content.gallery.map((item) => <figure className="sme-service-card" key={item.id}><img src={item.imageUrl} alt={item.alt} loading="lazy" style={{ width: "100%", height: "auto", borderRadius: 8 }} />{item.caption && <figcaption>{item.caption}</figcaption>}</figure>)}</Grid></Container></section>
+      )}
+      {sections.has("events") && config.business.content.events.length > 0 && (
+        <section className="bw-section"><Container><div className="sme-section-heading"><p className="sme-eyebrow">Events</p><h2>{page.title}</h2></div><Grid columns="auto">{config.business.content.events.map((item) => <article className="sme-service-card" key={item.id}><p>{item.startsAt}</p><h3>{item.title}</h3>{item.description && <p>{item.description}</p>}{item.href && <a href={item.href}>Event details</a>}</article>)}</Grid></Container></section>
+      )}
+      {sections.has("media") && config.business.content.media.length > 0 && (
+        <section className="bw-section"><Container><div className="sme-section-heading"><p className="sme-eyebrow">Media</p><h2>{page.title}</h2></div><Grid columns="auto">{config.business.content.media.map((item) => <article className="sme-service-card" key={item.id}><h3>{item.title}</h3>{item.description && <p>{item.description}</p>}<a href={item.href} target={item.href.startsWith("/") ? undefined : "_blank"} rel={item.href.startsWith("/") ? undefined : "noopener noreferrer"}>Open media</a></article>)}</Grid></Container></section>
+      )}
       {sections.has("contact-form") && (
         <section className="bw-section">
           <Container>
-            {hasContactPage && <a className="sme-action" href="/contact">Contact us</a>}
-            {!hasContactPage && <p className="sme-contact-unavailable">Contact details are not published for this page.</p>}
+            <h2>Contact us</h2>
+            {canCollectEnquiries
+              ? <SmeContactForm privacyNoticeHref="/privacy" privacyNoticeVersion={config.business.privacyNoticeVersion} />
+              : <p className="sme-contact-unavailable" role="status">Enquiries are unavailable until this tenant enables enquiry capture and publishes its privacy notice.</p>}
           </Container>
         </section>
       )}

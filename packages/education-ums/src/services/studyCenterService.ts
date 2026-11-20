@@ -34,7 +34,7 @@ interface StudyCenterResponse<T> {
  * Get all active study centers (for dropdowns)
  */
 export async function getAllStudyCenters(): Promise<StudyCenter[]> {
-  const response = await authFetch(`${API_URL}/study-centers/all`);
+  const response = await authFetch(`${API_URL}/education/study-centers/all`);
   const data = await parseJsonSafe<StudyCenterResponse<StudyCenter[]>>(response);
   return data?.success && data.data ? data.data : [];
 }
@@ -54,7 +54,7 @@ export async function getStudyCenters(params?: {
   if (params?.status) query.append('status', params.status);
   if (params?.search) query.append('search', params.search);
 
-  const response = await authFetch(`${API_URL}/study-centers${query.toString() ? `?${query.toString()}` : ''}`);
+  const response = await authFetch(`${API_URL}/education/study-centers${query.toString() ? `?${query.toString()}` : ''}`);
   const data = await parseJsonSafe<StudyCenterResponse<StudyCenter[]>>(response);
   
   return {
@@ -67,7 +67,7 @@ export async function getStudyCenters(params?: {
  * Get a single study center by ID
  */
 export async function getStudyCenter(id: string): Promise<StudyCenter | null> {
-  const response = await authFetch(`${API_URL}/study-centers/${id}`);
+  const response = await authFetch(`${API_URL}/education/study-centers/${id}`);
   const data = await parseJsonSafe<StudyCenterResponse<StudyCenter>>(response);
   return data?.success ? data.data : null;
 }
@@ -76,7 +76,7 @@ export async function getStudyCenter(id: string): Promise<StudyCenter | null> {
  * Get study center statistics
  */
 export async function getStudyCenterStats(id: string): Promise<StudyCenterStats | null> {
-  const response = await authFetch(`${API_URL}/study-centers/${id}/stats`);
+  const response = await authFetch(`${API_URL}/education/study-centers/${id}/stats`);
   const data = await parseJsonSafe<StudyCenterResponse<StudyCenterStats>>(response);
   return data?.success ? data.data : null;
 }
@@ -93,7 +93,7 @@ export async function getStudyCenterStudents(
   if (params?.page) query.append('page', params.page.toString());
   if (params?.perPage) query.append('perPage', params.perPage.toString());
 
-  const response = await authFetch(`${API_URL}/study-centers/${id}/students${query.toString() ? `?${query.toString()}` : ''}`);
+  const response = await authFetch(`${API_URL}/education/study-centers/${id}/students${query.toString() ? `?${query.toString()}` : ''}`);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const data = await parseJsonSafe<StudyCenterResponse<any[]>>(response);
   
@@ -115,7 +115,7 @@ export async function getStudyCenterStaff(
   if (params?.page) query.append('page', params.page.toString());
   if (params?.perPage) query.append('perPage', params.perPage.toString());
 
-  const response = await authFetch(`${API_URL}/study-centers/${id}/staff${query.toString() ? `?${query.toString()}` : ''}`);
+  const response = await authFetch(`${API_URL}/education/study-centers/${id}/staff${query.toString() ? `?${query.toString()}` : ''}`);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const data = await parseJsonSafe<StudyCenterResponse<any[]>>(response);
   
@@ -137,7 +137,7 @@ export async function getStudyCenterCourses(
   if (params?.page) query.append('page', params.page.toString());
   if (params?.perPage) query.append('perPage', params.perPage.toString());
 
-  const response = await authFetch(`${API_URL}/study-centers/${id}/courses${query.toString() ? `?${query.toString()}` : ''}`);
+  const response = await authFetch(`${API_URL}/education/study-centers/${id}/courses${query.toString() ? `?${query.toString()}` : ''}`);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const data = await parseJsonSafe<StudyCenterResponse<any[]>>(response);
   
@@ -156,7 +156,7 @@ export async function createStudyCenter(data: {
   location: string;
   status?: 'active' | 'inactive';
 }): Promise<StudyCenter | null> {
-  const response = await authFetch(`${API_URL}/study-centers`, {
+  const response = await authFetch(`${API_URL}/education/study-centers`, {
     method: 'POST',
     body: JSON.stringify(data),
   });
@@ -176,7 +176,7 @@ export async function updateStudyCenter(
     status: 'active' | 'inactive';
   }>
 ): Promise<StudyCenter | null> {
-  const response = await authFetch(`${API_URL}/study-centers/${id}`, {
+  const response = await authFetch(`${API_URL}/education/study-centers/${id}`, {
     method: 'PATCH',
     body: JSON.stringify(data),
   });
@@ -188,7 +188,7 @@ export async function updateStudyCenter(
  * Delete a study center (admin only)
  */
 export async function deleteStudyCenter(id: string): Promise<boolean> {
-  const response = await authFetch(`${API_URL}/study-centers/${id}`, {
+  const response = await authFetch(`${API_URL}/education/study-centers/${id}`, {
     method: 'DELETE',
   });
   return response.ok;

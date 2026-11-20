@@ -4,6 +4,7 @@ import { fetchTenantPublicData } from "./server-tenant-api";
 interface PublicPackageConfigResponse {
   configuration?: unknown;
   template?: { id: string; configuredVersion: string; currentVersion: string; updateMode: "automatic" | "pinned" } | null;
+  capabilities?: { formsLeadsEnabled?: boolean };
 }
 
 export interface PublicTenantWebsiteConfig {
@@ -11,6 +12,7 @@ export interface PublicTenantWebsiteConfig {
   templateId: string;
   templateVersion: string;
   updateMode: "automatic" | "pinned";
+  formsLeadsEnabled: boolean;
   website: SmeWebsiteTemplateConfig["website"];
   smeConfig: SmeWebsiteTemplateConfig;
 }
@@ -32,6 +34,7 @@ export async function getPublicTenantWebsiteConfig(): Promise<PublicTenantWebsit
     templateId: template?.id ?? record.templateId,
     templateVersion: template?.currentVersion ?? String(record.templateVersion ?? "1.0.0"),
     updateMode: template?.updateMode ?? "automatic",
+    formsLeadsEnabled: response?.capabilities?.formsLeadsEnabled === true,
     website: parsedSmeConfig.data.website,
     smeConfig: parsedSmeConfig.data,
   };

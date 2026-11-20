@@ -127,6 +127,7 @@ export {
   bmiUniversityTenantConfig,
   bemiTrainingInstituteTenantConfig,
   createWhiteLabeledEducationConfig,
+  isEducationInstitutionWebsitePageEnabled,
   resolveEducationInstitutionWebsiteConfig,
   createEducationInstitutionWebsiteOverlay,
 } from './whitelabel.js';

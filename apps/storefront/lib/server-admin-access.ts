@@ -2,8 +2,7 @@ import "server-only";
 
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-
-const apiBaseUrl = (process.env.API_BASE_URL ?? "http://localhost:4000").replace(/\/$/, "");
+import { getServerApiBaseUrl } from "./server-api-base-url";
 
 export interface AdminIdentity {
   user: { id: string; email: string; name: string; emailVerified: boolean };
@@ -16,6 +15,7 @@ async function loadAdminIdentity(): Promise<AdminIdentity | null> {
   const incomingHeaders = await headers();
   const cookie = incomingHeaders.get("cookie");
   if (!cookie) return null;
+  const apiBaseUrl = getServerApiBaseUrl();
   try {
     const response = await fetch(`${apiBaseUrl}/v1/auth/me`, {
       headers: { cookie },
@@ -23,9 +23,14 @@ async function loadAdminIdentity(): Promise<AdminIdentity | null> {
       signal: AbortSignal.timeout(5_000),
     });
     if (response.status === 401) return null;
-    if (!response.ok) return null;
+    if (!response.ok) {
+      throw new Error(`Admin identity API returned HTTP ${response.status}.`);
+    }
     return (await response.json()) as AdminIdentity;
-  } catch {
+  } catch (error) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("Could not verify the tenant admin session with the API.", { cause: error });
+    }
     return null;
   }
 }
@@ -44,6 +49,7 @@ export async function requireTenantModuleAccess(moduleId: string): Promise<Admin
   const incomingHeaders = await headers();
   const cookie = incomingHeaders.get("cookie");
   if (!cookie) redirect("/login?callbackURL=%2Fadmin%2Fcommerce");
+  const apiBaseUrl = getServerApiBaseUrl();
 
   let response: Response;
   try {

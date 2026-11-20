@@ -10,6 +10,7 @@ import { ADD_AUDIT_LOG_MUTATION, ADD_NOTIFICATION_LOG_MUTATION } from '../servic
 import { sendPinNotification } from '../services/pinNotificationService';
 import { generateMemberPin } from '../services/provisioning';
 import { generateOrgEmail, createAlias, checkAliasExists, loadImprovMXConfig } from '../services/improvmxService';
+import { useTenantConfig } from '../context/TenantContext';
 
 interface QueueItem {
   id: string;
@@ -38,6 +39,7 @@ interface ProcessingResult {
 }
 
 export function useProvisioningQueue() {
+  const tenantConfig = useTenantConfig();
   const { data, loading, refetch } = useQuery(GET_PROVISIONING_QUEUE_QUERY, {
     fetchPolicy: 'network-only',
     errorPolicy: 'all',
@@ -209,6 +211,20 @@ export function useProvisioningQueue() {
           email: memberNode.email,
           pin: generatedPin,
           orgEmail: orgEmail || undefined,
+          branding: {
+            name: tenantConfig.churchName,
+            shortName: tenantConfig.shortName,
+            tagline: tenantConfig.tagline,
+            logoUrl: tenantConfig.logoUrl,
+            primaryColor: tenantConfig.primaryColor,
+            secondaryColor: tenantConfig.secondaryColor,
+            accentColor: tenantConfig.accentColor,
+            websiteUrl: tenantConfig.websiteUrl,
+            portalUrl: tenantConfig.portalUrl,
+            contactEmail: tenantConfig.contact?.email,
+            contactPhone: tenantConfig.contact?.phone,
+            address: tenantConfig.contact?.address,
+          },
         });
 
         try {
@@ -271,6 +287,7 @@ export function useProvisioningQueue() {
     addAuditLog,
     addNotificationLog,
     refetch,
+    tenantConfig,
   ]);
 
   const retryItem = useCallback(

@@ -31,21 +31,19 @@ export function stripHtmlToExcerpt(raw: string | null | undefined, maxLength = 1
 }
 
 export function isEventUpcoming(event: PublicChurchEvent, nowMs = Date.now()): boolean {
+  if (event.status === "cancelled" || event.status === "completed") return false;
   const startMs = new Date(event.startsAt).getTime();
-  return event.status === "upcoming" || event.status === "in_progress" || startMs >= nowMs;
+  if (Number.isNaN(startMs)) return false;
+  const endMs = event.endsAt ? new Date(event.endsAt).getTime() : startMs + 24 * 60 * 60 * 1000;
+  return endMs >= nowMs;
 }
 
 export function pickBannerEvent(events: PublicChurchEvent[], nowMs = Date.now()): PublicChurchEvent | null {
-  if (events.length === 0) return null;
-  const strictFuture = events
-    .filter((e) => new Date(e.startsAt).getTime() >= nowMs && e.status !== "cancelled")
+  if (!events || events.length === 0) return null;
+  const upcoming = events
+    .filter((e) => isEventUpcoming(e, nowMs))
     .sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime());
-  if (strictFuture[0]) return strictFuture[0];
-
-  const featured2026 = [...events]
-    .filter((e) => e.status !== "cancelled")
-    .sort((a, b) => new Date(b.startsAt).getTime() - new Date(a.startsAt).getTime());
-  return featured2026[0] ?? null;
+  return upcoming[0] ?? null;
 }
 
 export function pickHighlightEvents(
@@ -53,15 +51,11 @@ export function pickHighlightEvents(
   limit = 2,
   nowMs = Date.now(),
 ): PublicChurchEvent[] {
-  const valid = events.filter((e) => e.status !== "cancelled");
-  const strictFuture = valid
-    .filter((e) => new Date(e.startsAt).getTime() >= nowMs)
+  if (!events || events.length === 0) return [];
+  const upcoming = events
+    .filter((e) => isEventUpcoming(e, nowMs))
     .sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime());
-  if (strictFuture.length > 0) return strictFuture.slice(0, limit);
-
-  return [...valid]
-    .sort((a, b) => new Date(b.startsAt).getTime() - new Date(a.startsAt).getTime())
-    .slice(0, limit);
+  return upcoming.slice(0, limit);
 }
 
 export function sanitizeRichEventHtml(raw: string): string {

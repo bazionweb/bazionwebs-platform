@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams } from '../../shims/react-router-dom';
 import { api } from '../../lib/api';
+import { PlatformBrandStamp } from '../../components/PlatformBrandStamp';
+import { useTenantConfig } from '../../context/TenantContext';
 import ScheduleVisualizer from './ScheduleVisualizer';
 import type { ScheduleConflict } from './ScheduleVisualizer';
 
@@ -45,6 +47,7 @@ interface CourseItem {
 }
 
 export default function RegistrationWizard() {
+  const tenantConfig = useTenantConfig();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [currentStep, setCurrentStep] = useState(0);
@@ -397,6 +400,13 @@ export default function RegistrationWizard() {
     return (
       <div className="page-center" style={{ padding: '4rem 1.5rem' }}>
         <div className="card" style={{ maxWidth: 540, textAlign: 'center', padding: '3.5rem 2.5rem', border: '2px solid var(--success)' }}>
+          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.6rem', marginBottom: '1.25rem' }}>
+            {tenantConfig.branding.logoUrl && <img src={tenantConfig.branding.logoUrl} alt={`${tenantConfig.shortName} logo`} style={{ width: 42, height: 42, objectFit: 'contain' }} />}
+            <div style={{ textAlign: 'left' }}>
+              <div style={{ color: tenantConfig.branding.primaryColor, fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase' }}>{tenantConfig.shortName}</div>
+              <div style={{ color: 'var(--slate)', fontSize: '0.7rem' }}>{tenantConfig.institutionName} • Institutional Record</div>
+            </div>
+          </div>
           <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>🎉</div>
           <h1 style={{ fontFamily: 'var(--font-heading)', fontSize: '1.8rem', color: 'var(--navy)', marginBottom: '0.5rem' }}>
             Registration Complete!
@@ -410,6 +420,7 @@ export default function RegistrationWizard() {
             <div style={{ marginBottom: '0.5rem' }}><strong>Registered Load:</strong> {totalSelectedCredits} Credits ({selectedCourseIds.length} Modules)</div>
             <div><strong>Net Balance:</strong> ${feeAgreement?.net_balance_due.toFixed(2) || '0.00'}</div>
           </div>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1rem' }}><PlatformBrandStamp compact /></div>
 
           <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
             <button

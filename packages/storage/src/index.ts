@@ -11,12 +11,15 @@ export {
   type SupportedImageContentType,
 } from "./image-upload.js";
 export {
+  IMAGE_VARIANT_PRESETS,
   ImageOptimizationBusyError,
   InvalidUploadedImageError,
   MAX_IMAGE_INPUT_PIXELS,
   MAX_IMAGE_OUTPUT_EDGE,
   optimizeUploadedImage,
+  transformImageVariant,
   UploadedImageTooLargeError,
+  type ImageVariantName,
   type OptimizedImageUpload,
 } from "./image-optimization.js";
 export {

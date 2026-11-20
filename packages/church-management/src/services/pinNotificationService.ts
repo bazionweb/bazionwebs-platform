@@ -34,6 +34,30 @@ export interface PinNotificationPayload {
   email?: string | null;
   pin: string;
   orgEmail?: string;
+  branding?: {
+    name?: string;
+    shortName?: string;
+    tagline?: string;
+    logoUrl?: string;
+    primaryColor?: string;
+    secondaryColor?: string;
+    accentColor?: string;
+    websiteUrl?: string;
+    portalUrl?: string;
+    contactEmail?: string;
+    contactPhone?: string;
+    address?: string;
+  };
+  platformBranding?: {
+    name?: string;
+    logoUrl?: string;
+    markUrl?: string;
+    websiteUrl?: string;
+    tagline?: string;
+    primaryColor?: string;
+    secondaryColor?: string;
+    accentColor?: string;
+  };
 }
 
 export interface NotificationResult {
@@ -241,14 +265,76 @@ async function sendSmsViaAfricasTalking(
 
 // ─── Email via Resend ─────────────────────────────────────────────────────────
 
+function escapeHtml(value: string): string {
+  return value.replace(/[&<>"']/g, (character) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;",
+  })[character] || character);
+}
+
+function safeEmailUrl(value: string | undefined, baseUrl: string): string | undefined {
+  if (!value?.trim()) return undefined;
+  try {
+    const url = new URL(value, baseUrl);
+    return url.protocol === "https:" || url.protocol === "http:" ? url.toString() : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 function buildPinEmailHtml(
   memberName: string,
   memberId: string,
   pin: string,
   portalUrl: string,
   orgEmail?: string,
+  branding: PinNotificationPayload["branding"] = {},
+  platformBranding: PinNotificationPayload["platformBranding"] = {},
 ): string {
-  const logoUrl = 'https://admin.hkmministries.org/hkm-logo.webp';
+  const safeColor = (value: string | undefined, fallback: string) =>
+    value && /^#[0-9a-f]{6}$/i.test(value) ? value : fallback;
+  const platformName = escapeHtml(platformBranding.name || "Bazion Web");
+  const platformPrimaryColor = safeColor(platformBranding.primaryColor, "#0B2F75");
+  const platformSecondaryColor = safeColor(platformBranding.secondaryColor, "#17345E");
+  const platformAccentColor = safeColor(platformBranding.accentColor, "#EF3024");
+  const platformLogoUrl = safeEmailUrl(platformBranding.logoUrl, portalUrl)
+    || safeEmailUrl("/brand/bazion-platform-email-logo.png", portalUrl);
+  const safePlatformLogoUrl = platformLogoUrl ? escapeHtml(platformLogoUrl) : "";
+  const platformMarkUrl = safeEmailUrl(platformBranding.markUrl, portalUrl)
+    || safeEmailUrl(platformBranding.logoUrl?.replace(/bazion-platform-(?:email-logo|logo)\.png$/, "bazion-platform-mark.png"), portalUrl)
+    || safeEmailUrl("/brand/bazion-platform-mark.png", portalUrl);
+  const safePlatformMarkUrl = platformMarkUrl ? escapeHtml(platformMarkUrl) : "";
+  const safePlatformWebsiteUrl = safeEmailUrl(platformBranding.websiteUrl, portalUrl);
+  const platformLogo = safePlatformLogoUrl
+    ? `<img src="${safePlatformLogoUrl}" alt="${platformName}" width="88" height="78" style="display:block;width:88px;height:78px;object-fit:contain;border:0;background:#ffffff;border-radius:6px;">`
+    : "";
+  const platformFooterLogo = safePlatformMarkUrl
+    ? `<img src="${safePlatformMarkUrl}" alt="${platformName}" width="48" height="39" style="display:block;width:48px;height:39px;object-fit:contain;border:0;background:#ffffff;border-radius:4px;">`
+    : "";
+  const name = escapeHtml(branding.name || "Heavenly God Kingdom Churches (HKM Ministries)");
+  const shortName = escapeHtml(branding.shortName || "HKM Church");
+  const tagline = escapeHtml(branding.tagline || "Church Management & Member Discipleship Portal");
+  const websiteHref = safeEmailUrl(branding.websiteUrl, portalUrl) || safeEmailUrl(portalUrl, "https://hkmministries.org")?.replace(/\/[^/]*$/, "") || "https://hkmministries.org";
+  const configuredPortal = branding.portalUrl || (branding.websiteUrl ? `${branding.websiteUrl.replace(/\/$/, "")}/portal/login` : portalUrl);
+  const portalHref = safeEmailUrl(configuredPortal, websiteHref) || "https://hkmministries.org/login";
+  const hasCustomBrand = Boolean(branding.name || branding.shortName || branding.logoUrl || branding.websiteUrl);
+  const logoUrl = safeEmailUrl(branding.logoUrl, websiteHref) || (hasCustomBrand ? "" : "https://admin.hkmministries.org/hkm-logo.webp");
+  const safeLogoUrl = escapeHtml(logoUrl);
+  const safePortalHref = escapeHtml(portalHref);
+  const safeWebsiteHref = escapeHtml(websiteHref);
+  const primaryColor = safeColor(branding.primaryColor, "#16a34a");
+  const secondaryColor = safeColor(branding.secondaryColor, "#0f172a");
+  const accentColor = safeColor(branding.accentColor, "#d4af37");
+  const logo = logoUrl
+    ? `<img src="${safeLogoUrl}" alt="${shortName} Logo" width="72" height="72" style="display:block;width:72px;height:72px;border-radius:50%;border:2px solid ${accentColor};background-color:#ffffff;object-fit:contain;" />`
+    : `<span style="display:inline-flex;width:90px;height:90px;align-items:center;justify-content:center;border-radius:50%;border:2px solid ${accentColor};background:${primaryColor};color:#ffffff;font:700 32px Arial,Helvetica,sans-serif;">${escapeHtml(shortName.slice(0, 1).toUpperCase())}</span>`;
+  const safeMemberName = escapeHtml(memberName);
+  const safeMemberId = escapeHtml(memberId);
+  const safePin = escapeHtml(pin);
+  const safeOrgEmail = orgEmail ? escapeHtml(orgEmail) : undefined;
   const year = new Date().getFullYear();
 
   return `<!DOCTYPE html>
@@ -257,7 +343,7 @@ function buildPinEmailHtml(
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-  <title>Your HKM Member Portal PIN</title>
+  <title>Your ${shortName} Member Portal PIN</title>
   <!--[if mso]>
   <style type="text/css">
     body, table, td { font-family: Arial, Helvetica, sans-serif !important; }
@@ -276,42 +362,34 @@ function buildPinEmailHtml(
 
           <!-- ── Header ──────────────────────────────────────────── -->
           <tr>
-            <td style="background:linear-gradient(160deg,#0f172a 0%,#1e1a3c 55%,#2d1a4a 100%);padding:0;text-align:center;position:relative;">
-              <!-- Gold top border -->
+            <td style="background:linear-gradient(160deg,${platformSecondaryColor} 0%,${platformPrimaryColor} 100%);padding:0;text-align:center;position:relative;">
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
                 <tr>
-                  <td style="height:3px;background:linear-gradient(90deg,transparent,#d4af37,#f5e27e,#d4af37,transparent);"></td>
+                  <td style="height:3px;background:${platformAccentColor};"></td>
                 </tr>
               </table>
-              <!-- Logo + Church Name -->
-              <table role="presentation" cellpadding="0" cellspacing="0" align="center" style="margin:36px auto 28px;">
+              <!-- Platform identity -->
+              <table role="presentation" cellpadding="0" cellspacing="0" align="center" style="margin:24px auto 18px;">
                 <tr>
                   <td align="center">
-                    <img src="${logoUrl}" alt="HKM Ministries Logo" width="90" height="90"
-                         style="display:block;width:90px;height:90px;border-radius:50%;
-                                border:2px solid rgba(212,175,55,0.6);
-                                background-color:#e0f2fe;object-fit:contain;
-                                box-shadow:0 0 24px rgba(212,175,55,0.2);" />
+                    ${platformLogo}
                   </td>
                 </tr>
                 <tr>
-                  <td align="center" style="padding:16px 40px 0;">
-                    <p style="margin:0;color:#d4af37;font-family:Arial,Helvetica,sans-serif;
-                               font-size:11px;font-weight:700;letter-spacing:3px;
-                               text-transform:uppercase;">Heavenly God Kingdom Churches</p>
-                    <div style="width:48px;height:1px;background:linear-gradient(90deg,transparent,#d4af37,transparent);
-                                margin:12px auto 10px;"></div>
-                    <h1 style="margin:0;color:#ffffff;font-family:Arial,Helvetica,sans-serif;
-                                font-size:22px;font-weight:700;letter-spacing:-0.3px;">Member Portal Access</h1>
-                    <p style="margin:8px 0 0;color:rgba(255,255,255,0.45);font-family:Arial,Helvetica,sans-serif;
-                               font-size:13px;">Secure Account Activation</p>
+                  <td align="center" style="padding:12px 40px 0;">
+                    <p style="margin:0;color:#ffffff;font-family:Arial,Helvetica,sans-serif;font-size:18px;font-weight:800;">${platformName}</p>
+                    <p style="margin:4px 0 0;color:#dbeafe;font-family:Arial,Helvetica,sans-serif;font-size:12px;">${escapeHtml(platformBranding.tagline || "Build, Host n Grow")}</p>
+                    <div style="width:64px;height:1px;background:${platformAccentColor};margin:16px auto 14px;"></div>
+                    <p style="margin:0;color:${accentColor};font-family:Arial,Helvetica,sans-serif;font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;">${name}</p>
+                    <div style="margin:12px auto 10px;">${logo}</div>
+                    <h1 style="margin:0;color:#ffffff;font-family:Arial,Helvetica,sans-serif;font-size:22px;font-weight:700;letter-spacing:-0.3px;">Member Portal Access</h1>
+                    <p style="margin:8px 0 0;color:#dbeafe;font-family:Arial,Helvetica,sans-serif;font-size:13px;">${tagline}</p>
                   </td>
                 </tr>
               </table>
-              <!-- Gold bottom border -->
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
                 <tr>
-                  <td style="height:3px;background:linear-gradient(90deg,transparent,#d4af37,#f5e27e,#d4af37,transparent);"></td>
+                  <td style="height:3px;background:${platformAccentColor};"></td>
                 </tr>
               </table>
             </td>
@@ -327,11 +405,11 @@ function buildPinEmailHtml(
               </p>
               <p style="margin:0 0 20px;color:#0f172a;font-family:Arial,Helvetica,sans-serif;
                          font-size:20px;font-weight:700;">
-                Dear ${memberName},
+                Dear ${safeMemberName},
               </p>
               <p style="margin:0 0 28px;color:#475569;font-family:Arial,Helvetica,sans-serif;
                          font-size:15px;line-height:1.75;">
-                Welcome to the <strong style="color:#0f172a;">HKM Ministries Member Portal</strong>.
+                Welcome to the <strong style="color:${primaryColor};">${shortName} Member Portal</strong>.
                 Your account has been activated following confirmation of your Registration Fee.
                 Use the secure credentials below to sign in.
               </p>
@@ -350,7 +428,7 @@ function buildPinEmailHtml(
                     </p>
                     <p style="margin:0 0 6px;color:#4c1d95;font-family:Arial,Helvetica,sans-serif;
                                font-size:18px;font-weight:700;">
-                      ${orgEmail}
+                      ${safeOrgEmail}
                     </p>
                     <p style="margin:0;color:#7c3aed;font-family:Arial,Helvetica,sans-serif;font-size:12px;">
                       This email forwards to your personal inbox.
@@ -364,7 +442,7 @@ function buildPinEmailHtml(
 
               <!-- ── Credentials Box ───────────────────────────── -->
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
-                     style="background:linear-gradient(160deg,#0f172a 0%,#1e1a3c 100%);
+                     style="background:linear-gradient(160deg,${secondaryColor} 0%,${primaryColor} 100%);
                             border-radius:16px;margin:0 0 28px;
                             box-shadow:0 8px 32px rgba(15,23,42,0.2);">
                 <tr>
@@ -376,10 +454,10 @@ function buildPinEmailHtml(
                     </p>
                     <p style="margin:0 0 24px;color:#ffffff;font-family:'Courier New',Courier,monospace;
                                font-size:22px;font-weight:700;letter-spacing:6px;">
-                      ${memberId}
+                      ${safeMemberId}
                     </p>
                     <!-- Gold divider -->
-                    <div style="height:1px;background:linear-gradient(90deg,transparent,rgba(212,175,55,0.5),transparent);
+                    <div style="height:1px;background:${accentColor};
                                 margin:0 0 24px;"></div>
                     <!-- PIN label -->
                     <p style="margin:0 0 8px;color:rgba(255,255,255,0.4);font-family:Arial,Helvetica,sans-serif;
@@ -387,16 +465,16 @@ function buildPinEmailHtml(
                       Your Personal PIN
                     </p>
                     <!-- PIN digits -->
-                    <p style="margin:0;color:#d4af37;font-family:'Courier New',Courier,monospace;
+                    <p style="margin:0;color:${accentColor};font-family:'Courier New',Courier,monospace;
                                font-size:48px;font-weight:700;letter-spacing:16px;
                                text-shadow:0 0 20px rgba(212,175,55,0.3);">
-                      ${pin}
+                      ${safePin}
                     </p>
                   </td>
                 </tr>
                 <!-- Gold bottom accent -->
                 <tr>
-                  <td style="height:3px;background:linear-gradient(90deg,transparent,#d4af37,#f5e27e,#d4af37,transparent);
+                  <td style="height:3px;background:${accentColor};
                               border-radius:0 0 16px 16px;"></td>
                 </tr>
               </table>
@@ -404,12 +482,12 @@ function buildPinEmailHtml(
               <!-- ── CTA Button ─────────────────────────────────── -->
               <table role="presentation" cellpadding="0" cellspacing="0" align="center" style="margin:0 auto 32px;">
                 <tr>
-                  <td style="border-radius:10px;background:linear-gradient(135deg,#0f172a,#1e1a3c);">
-                    <a href="${portalUrl}"
-                       style="display:inline-block;padding:15px 40px;color:#d4af37;font-family:Arial,Helvetica,sans-serif;
+                  <td style="border-radius:10px;background:${secondaryColor};">
+                    <a href="${safePortalHref}"
+                       style="display:inline-block;padding:15px 40px;color:${accentColor};font-family:Arial,Helvetica,sans-serif;
                               font-size:14px;font-weight:700;letter-spacing:1px;text-transform:uppercase;
                               text-decoration:none;border-radius:10px;
-                              border:1.5px solid rgba(212,175,55,0.4);">
+                              border:1.5px solid ${accentColor};">
                       Sign In to Member Portal &rarr;
                     </a>
                   </td>
@@ -424,8 +502,8 @@ function buildPinEmailHtml(
                     <p style="margin:0;color:#78350f;font-family:Arial,Helvetica,sans-serif;
                                font-size:13px;line-height:1.65;">
                       &#9888;&#65039; <strong>Keep your PIN private.</strong>
-                      HKM Ministries staff will <strong>never</strong> ask you to share your PIN or password.
-                      If you did not expect this email, please contact the church office immediately.
+                      ${shortName} staff will <strong>never</strong> ask you to share your PIN or password.
+                      If you did not expect this email, please contact ${shortName} immediately.
                     </p>
                   </td>
                 </tr>
@@ -437,7 +515,7 @@ function buildPinEmailHtml(
               <p style="margin:0;color:#94a3b8;font-family:Arial,Helvetica,sans-serif;
                          font-size:13px;line-height:1.7;">
                 Blessings,<br />
-                <strong style="color:#475569;">The HKM Ministries Team</strong>
+                <strong style="color:${primaryColor};">The ${shortName} Team</strong>
               </p>
             </td>
           </tr>
@@ -447,13 +525,20 @@ function buildPinEmailHtml(
             <td style="background:#f8fafc;border-top:1px solid #e2e8f0;
                         padding:22px 44px;text-align:center;">
               <p style="margin:0 0 6px;color:#94a3b8;font-family:Arial,Helvetica,sans-serif;font-size:12px;">
-                &copy; ${year} Heavenly God Kingdom Churches &bull; Utawala, Mihango, Nairobi, Kenya
+                &copy; ${year} ${name}${branding.address ? ` &bull; ${escapeHtml(branding.address)}` : ""}
               </p>
               <p style="margin:0;font-family:Arial,Helvetica,sans-serif;font-size:12px;">
-                <a href="https://hkmministries.org" style="color:#94a3b8;text-decoration:none;">hkmministries.org</a>
+                <a href="${safeWebsiteHref}" style="color:${primaryColor};text-decoration:none;">${escapeHtml(branding.websiteUrl || "Visit our website")}</a>
                 &nbsp;&bull;&nbsp;
-                <a href="${portalUrl}" style="color:#94a3b8;text-decoration:none;">Member Portal</a>
+                <a href="${safePortalHref}" style="color:${primaryColor};text-decoration:none;">${shortName} Portal</a>
               </p>
+              ${branding.contactEmail ? `<p style="margin:6px 0 0;color:#94a3b8;font-family:Arial,Helvetica,sans-serif;font-size:12px;">${escapeHtml(branding.contactEmail)}${branding.contactPhone ? ` &bull; ${escapeHtml(branding.contactPhone)}` : ""}</p>` : ""}
+              <table role="presentation" cellpadding="0" cellspacing="0" align="center" style="margin:18px auto 0;border-top:1px solid #e2e8f0;padding-top:14px;">
+                <tr>
+                  ${safePlatformMarkUrl ? `<td valign="middle" style="padding-right:8px;">${platformFooterLogo}</td>` : ""}
+                  <td valign="middle" style="font-family:Arial,Helvetica,sans-serif;font-size:11px;font-weight:700;color:${platformPrimaryColor};">Powered by ${platformName}${safePlatformWebsiteUrl ? `<br /><a href="${escapeHtml(safePlatformWebsiteUrl)}" style="font-size:10px;font-weight:400;color:#64748b;text-decoration:none;">${escapeHtml(safePlatformWebsiteUrl.replace(/^https?:\/\//, ""))}</a>` : ""}</td>
+                </tr>
+              </table>
             </td>
           </tr>
 
@@ -481,13 +566,27 @@ async function sendEmailViaResend(
     };
   }
 
+  const platformBranding = payload.platformBranding ?? {
+    name: "Bazion Web",
+    logoUrl: safeEmailUrl("/brand/bazion-platform-email-logo.png", settings.portalUrl),
+    markUrl: safeEmailUrl("/brand/bazion-platform-mark.png", settings.portalUrl),
+    tagline: "Build, Host n Grow",
+    primaryColor: "#0B2F75",
+    secondaryColor: "#17345E",
+    accentColor: "#EF3024",
+  };
   const html = buildPinEmailHtml(
     payload.memberName,
     payload.memberId,
     payload.pin,
     settings.portalUrl,
     payload.orgEmail,
+    payload.branding,
+    platformBranding,
   );
+  const senderDisplayName = `${platformBranding.name || "Bazion Web"} · ${payload.branding?.shortName || "Member Portal"}`
+    .replace(/[<>\"\r\n]/g, "")
+    .slice(0, 100);
 
   try {
     const response = await withRetry(async () => {
@@ -504,9 +603,9 @@ async function sendEmailViaResend(
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          from: `HKM Ministries <${settings.resendFromEmail}>`,
+          from: `${senderDisplayName} <${settings.resendFromEmail}>`,
           to: [payload.email],
-          subject: 'Your HKM Member Portal PIN — Keep This Private',
+          subject: `${platformBranding.name || "Bazion Web"} · Your ${payload.branding?.shortName || "Member Portal"} PIN — Keep This Private`,
           html,
         }),
       });

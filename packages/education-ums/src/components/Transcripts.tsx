@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from "react";
+import { PlatformBrandBadge } from "./PlatformBrandBadge";
 import {
   Search,
   Printer,
@@ -88,6 +89,10 @@ export const Transcripts: React.FC<TranscriptsProps> = (props) => {
 
   const storeStudents = studentsRes?.data?.items || [];
   const storeLogo = useUIStore((s) => s.logo);
+  const institutionName = useUIStore((s) => s.institutionName);
+  const shortName = useUIStore((s) => s.shortName);
+  const primaryColor = useUIStore((s) => s.primaryColor);
+  const accentColor = useUIStore((s) => s.accentColor);
   const students = props.students ?? storeStudents ?? [];
   const logo = props.logo ?? storeLogo ?? "";
   const [searchTerm, setSearchTerm] = useState("");
@@ -786,9 +791,9 @@ export const Transcripts: React.FC<TranscriptsProps> = (props) => {
             pdf.setProperties({
               title: `Official Transcript - ${selectedStudent.first_name} ${selectedStudent.last_name}`,
               subject: "Official Academic Record",
-              author: "BMI University Systems",
-              keywords: "transcript, academic, record, BMI",
-              creator: "BMI UMS",
+              author: institutionName,
+              keywords: `transcript, academic record, ${shortName}`,
+              creator: `${shortName} Student Records`,
             });
           })
           .save();
@@ -821,7 +826,7 @@ export const Transcripts: React.FC<TranscriptsProps> = (props) => {
         pdf.setProperties({
           title: `Official Transcript - ${selectedStudent.first_name} ${selectedStudent.last_name}`,
           subject: "Official Academic Record",
-          author: "BMI University Systems",
+          author: institutionName,
         });
         
         pdf.save(`${fileName}.pdf`);
@@ -1138,17 +1143,17 @@ export const Transcripts: React.FC<TranscriptsProps> = (props) => {
   };
 
   return (
-    <div className="h-full flex flex-col animate-fade-in relative">
+    <div className="h-full flex flex-col animate-fade-in relative" style={{ "--institution-primary": primaryColor, "--institution-accent": accentColor } as React.CSSProperties}>
       {/* Responsive Header */}
       <div className="flex-shrink-0 bg-white/95 dark:bg-gray-900/95 backdrop-blur-md border-b border-gray-200 dark:border-gray-700 px-3 sm:px-6 py-3 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 shadow-xs">
         <div className="flex items-center gap-3 w-full sm:w-auto">
-          <div className="w-1.5 h-6 bg-[#FFD700] rounded-full flex-shrink-0"></div>
+          <div className="w-1.5 h-6 bg-[var(--institution-accent)] rounded-full flex-shrink-0"></div>
           <div className="flex flex-col">
-            <h2 className="text-base sm:text-lg font-bold text-[#2E004F] dark:text-white tracking-tight uppercase leading-tight">
+            <h2 className="text-base sm:text-lg font-bold text-[var(--institution-primary)] dark:text-white tracking-tight uppercase leading-tight">
               Academic Records & Transcripts
             </h2>
             <p className="text-[9px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-widest">
-              BMI Registrar • Automated Grade Aggregation Node
+              {shortName} Registrar • Automated Grade Aggregation Node
             </p>
           </div>
         </div>
@@ -1168,8 +1173,8 @@ export const Transcripts: React.FC<TranscriptsProps> = (props) => {
             onClick={() => setTranscriptType(type as "Official" | "Provisional")}
             className={`px-3.5 sm:px-5 py-1.5 rounded-full text-[9px] sm:text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap flex-shrink-0 ${
               transcriptType === type
-                ? "bg-[#4B0082] text-white shadow-md shadow-purple-500/20 border border-purple-500/50"
-                : "bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-[#4B0082]"
+                ? "bg-[var(--institution-primary)] text-white shadow-md shadow-purple-500/20 border border-[var(--institution-accent)]"
+                : "bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-[var(--institution-primary)]"
             }`}
           >
             {type}
@@ -1192,7 +1197,7 @@ export const Transcripts: React.FC<TranscriptsProps> = (props) => {
                   placeholder="Search Registry..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-none text-xs font-bold uppercase tracking-tight outline-none focus:ring-1 focus:ring-[#4B0082]"
+                  className="w-full pl-10 pr-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-none text-xs font-bold uppercase tracking-tight outline-none focus:ring-1 focus:ring-[var(--institution-primary)]"
                 />
               </div>
               <div className="space-y-4">
@@ -1203,7 +1208,7 @@ export const Transcripts: React.FC<TranscriptsProps> = (props) => {
                   <select
                     value={programFilter}
                     onChange={(e) => setProgramFilter(e.target.value)}
-                    className="w-full px-4 py-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-none text-[10px] font-black uppercase outline-none focus:ring-1 focus:ring-[#4B0082] cursor-pointer dark:text-gray-200"
+                    className="w-full px-4 py-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-none text-[10px] font-black uppercase outline-none focus:ring-1 focus:ring-[var(--institution-primary)] cursor-pointer dark:text-gray-200"
                   >
                     <option value="All Programs">All {t('academic.programs')}</option>
                     {programOptions.map((p) => (
@@ -1223,7 +1228,7 @@ export const Transcripts: React.FC<TranscriptsProps> = (props) => {
                         setSelectedStudent(student);
                         setShowTranscript(false);
                       }}
-                      className={`w-full text-left p-3 rounded-none transition-all flex items-center justify-between group ${selectedStudent?.id === student.id ? "bg-[#4B0082] text-white shadow-lg" : "hover:bg-purple-50 dark:hover:bg-gray-700"}`}
+                      className={`w-full text-left p-3 rounded-none transition-all flex items-center justify-between group ${selectedStudent?.id === student.id ? "bg-[var(--institution-primary)] text-white shadow-lg" : "hover:bg-purple-50 dark:hover:bg-gray-700"}`}
                     >
                       <div>
                         <p className="text-[11px] font-black uppercase tracking-tight leading-none">
@@ -1239,7 +1244,7 @@ export const Transcripts: React.FC<TranscriptsProps> = (props) => {
                         size={14}
                         className={
                           selectedStudent?.id === student.id
-                            ? "text-[#FFD700]"
+                            ? "text-[var(--institution-accent)]"
                             : "text-gray-300"
                         }
                       />
@@ -1254,11 +1259,11 @@ export const Transcripts: React.FC<TranscriptsProps> = (props) => {
             {selectedStudent ? (
               <div className="space-y-6 animate-slide-up">
                 <div className="bg-white dark:bg-gray-800 rounded-none shadow-xl border border-gray-100 dark:border-gray-700 overflow-hidden relative">
-                  <div className="absolute top-0 left-0 w-2 h-full bg-[#4B0082]"></div>
+                  <div className="absolute top-0 left-0 w-2 h-full bg-[var(--institution-primary)]"></div>
                   <div className="p-8 flex flex-col md:flex-row justify-between items-center gap-8">
                     <div className="flex items-center gap-8">
                       <div
-                        className={`w-28 h-28 rounded-none ${selectedStudent.avatar_color} border-2 border-[#FFD700] p-1 shadow-2xl overflow-hidden`}
+                        className={`w-28 h-28 rounded-none ${selectedStudent.avatar_color} border-2 border-[var(--institution-accent)] p-1 shadow-2xl overflow-hidden`}
                       >
                         {selectedStudent.photo ? (
                           <img
@@ -1279,14 +1284,14 @@ export const Transcripts: React.FC<TranscriptsProps> = (props) => {
                           {selectedStudent.first_name}{" "}
                           {selectedStudent.last_name}
                         </h3>
-                        <p className="text-xs font-bold text-[#4B0082] dark:text-[#FFD700] uppercase tracking-widest mt-3">
+                        <p className="text-xs font-bold text-[var(--institution-primary)] dark:text-[var(--institution-accent)] uppercase tracking-widest mt-3">
                           {selectedStudent.program_code} • {selectedStudent.id}
                         </p>
                       </div>
                     </div>
                     <button
                       onClick={() => setShowTranscript(true)}
-                      className="px-10 py-4 bg-[#FFD700] text-[#4B0082] rounded-none font-black text-xs uppercase tracking-widest shadow-xl hover:bg-white transition-all flex items-center gap-3"
+                      className="px-10 py-4 bg-[var(--institution-accent)] text-[var(--institution-primary)] rounded-none font-black text-xs uppercase tracking-widest shadow-xl hover:bg-white transition-all flex items-center gap-3"
                     >
                       <FileText size={18} /> Generate Transcript
                     </button>
@@ -1296,7 +1301,7 @@ export const Transcripts: React.FC<TranscriptsProps> = (props) => {
                 <div className="bg-white dark:bg-gray-800 rounded-none shadow-xl border border-gray-100 dark:border-gray-700 overflow-hidden">
                   <div className="p-6 bg-gray-900 text-white flex justify-between items-center border-b border-gray-800">
                     <div className="flex items-center gap-3">
-                      <BookOpen size={18} className="text-[#FFD700]" />
+                      <BookOpen size={18} className="text-[var(--institution-accent)]" />
                       <h3 className="font-black text-xs uppercase tracking-[0.25em]">
                         Live Academic Performance Node
                       </h3>
@@ -1323,7 +1328,7 @@ export const Transcripts: React.FC<TranscriptsProps> = (props) => {
                             key={i}
                             className="hover:bg-purple-50/20 dark:hover:bg-gray-700/20 transition-all group"
                           >
-                            <td className="px-6 py-4 font-mono text-xs font-bold text-[#4B0082] dark:text-purple-300">
+                            <td className="px-6 py-4 font-mono text-xs font-bold text-[var(--institution-primary)] dark:text-purple-300">
                               {rec.courseCode}
                             </td>
                             <td className="px-6 py-4 text-xs font-black text-gray-900 dark:text-white uppercase tracking-tight leading-none">
@@ -1334,7 +1339,7 @@ export const Transcripts: React.FC<TranscriptsProps> = (props) => {
                             </td>
                             <td className="px-6 py-4 text-center">
                               <span
-                                className={`text-xl font-black ${rec.score >= 70 ? "text-emerald-600" : rec.score < 40 ? "text-red-600" : "text-[#4B0082] dark:text-[#FFD700]"}`}
+                                className={`text-xl font-black ${rec.score >= 70 ? "text-emerald-600" : rec.score < 40 ? "text-red-600" : "text-[var(--institution-primary)] dark:text-[var(--institution-accent)]"}`}
                               >
                                 {rec.grade}
                               </span>
@@ -1365,18 +1370,18 @@ export const Transcripts: React.FC<TranscriptsProps> = (props) => {
         <div className="fixed inset-0 z-[130] flex flex-col items-center bg-black/95 backdrop-blur-3xl overflow-y-auto">
           {/* Action Buttons - Fixed at top, not zoomed */}
           <div className="sticky top-0 z-50 w-full flex flex-wrap gap-4 items-center justify-between no-print p-6 bg-gray-900/95 backdrop-blur-xl border-b border-white/10 shadow-2xl">
-            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-[#4B0082] via-[#FFD700] to-[#4B0082]"></div>
+            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-[var(--institution-primary)] via-[var(--institution-accent)] to-[var(--institution-primary)]"></div>
             <div className="flex flex-wrap gap-4 items-center">
               <div className="flex bg-gray-800 p-1 border border-white/10 rounded-none mr-2">
                 <button
                   onClick={() => setTranscriptType("Official")}
-                  className={`px-5 py-2.5 text-[10px] font-black uppercase tracking-widest transition-all ${transcriptType === "Official" ? "bg-[#FFD700] text-[#4B0082]" : "text-gray-400 hover:text-white"}`}
+                  className={`px-5 py-2.5 text-[10px] font-black uppercase tracking-widest transition-all ${transcriptType === "Official" ? "bg-[var(--institution-accent)] text-[var(--institution-primary)]" : "text-gray-400 hover:text-white"}`}
                 >
                   Complete Registry
                 </button>
                 <button
                   onClick={() => setTranscriptType("Provisional")}
-                  className={`px-5 py-2.5 text-[10px] font-black uppercase tracking-widest transition-all ${transcriptType === "Provisional" ? "bg-[#FFD700] text-[#4B0082]" : "text-gray-400 hover:text-white"}`}
+                  className={`px-5 py-2.5 text-[10px] font-black uppercase tracking-widest transition-all ${transcriptType === "Provisional" ? "bg-[var(--institution-accent)] text-[var(--institution-primary)]" : "text-gray-400 hover:text-white"}`}
                 >
                   Term Provisional
                 </button>
@@ -1527,7 +1532,7 @@ export const Transcripts: React.FC<TranscriptsProps> = (props) => {
 
               <button
                 onClick={() => handlePrint("print")}
-                className="flex items-center gap-2 px-8 py-3.5 bg-[#4B0082] text-white text-[10px] font-black uppercase tracking-widest hover:bg-black transition-all shadow-lg border border-white/10"
+                className="flex items-center gap-2 px-8 py-3.5 bg-[var(--institution-primary)] text-white text-[10px] font-black uppercase tracking-widest hover:bg-black transition-all shadow-lg border border-white/10"
               >
                 <Printer size={18} /> Print Record
               </button>
@@ -1588,6 +1593,8 @@ export const Transcripts: React.FC<TranscriptsProps> = (props) => {
                   padding: "7mm",
                   boxSizing: "border-box",
                   overflow: "hidden",
+                  ["--institution-primary" as any]: primaryColor,
+                  ["--institution-accent" as any]: accentColor,
                 }}
                 onMouseDown={() => {
                   // Click on empty A4 background → clear all selection
@@ -1668,7 +1675,7 @@ export const Transcripts: React.FC<TranscriptsProps> = (props) => {
                         <path
                           d="M0,150 Q75,50 150,150 T300,150"
                           fill="none"
-                          stroke="#4B0082"
+                          stroke={primaryColor}
                           strokeWidth="0.4"
                           opacity="0.4"
                         />
@@ -1689,7 +1696,7 @@ export const Transcripts: React.FC<TranscriptsProps> = (props) => {
                           y1="20"
                           x2="200"
                           y2="20"
-                          stroke="#4B0082"
+                          stroke={primaryColor}
                           strokeWidth="0.15"
                           opacity="0.3"
                         />
@@ -1698,7 +1705,7 @@ export const Transcripts: React.FC<TranscriptsProps> = (props) => {
                           y1="40"
                           x2="200"
                           y2="40"
-                          stroke="#4B0082"
+                          stroke={primaryColor}
                           strokeWidth="0.15"
                           opacity="0.3"
                         />
@@ -1707,7 +1714,7 @@ export const Transcripts: React.FC<TranscriptsProps> = (props) => {
                           y1="60"
                           x2="200"
                           y2="60"
-                          stroke="#4B0082"
+                          stroke={primaryColor}
                           strokeWidth="0.15"
                           opacity="0.3"
                         />
@@ -1716,7 +1723,7 @@ export const Transcripts: React.FC<TranscriptsProps> = (props) => {
                           y1="80"
                           x2="200"
                           y2="80"
-                          stroke="#4B0082"
+                          stroke={primaryColor}
                           strokeWidth="0.15"
                           opacity="0.3"
                         />
@@ -1747,21 +1754,21 @@ export const Transcripts: React.FC<TranscriptsProps> = (props) => {
                           cx="25"
                           cy="25"
                           r="1"
-                          fill="#4B0082"
+                          fill={primaryColor}
                           opacity="0.15"
                         />
                         <circle
                           cx="0"
                           cy="0"
                           r="0.5"
-                          fill="#FFD700"
+                          fill={accentColor}
                           opacity="0.1"
                         />
                         <circle
                           cx="50"
                           cy="50"
                           r="0.5"
-                          fill="#FFD700"
+                          fill={accentColor}
                           opacity="0.1"
                         />
                       </pattern>
@@ -1777,13 +1784,13 @@ export const Transcripts: React.FC<TranscriptsProps> = (props) => {
                       >
                         <path
                           d="M0,50 L100,50"
-                          stroke="#4B0082"
+                          stroke={primaryColor}
                           strokeWidth="0.2"
                           opacity="0.25"
                         />
                         <path
                           d="M50,0 L50,100"
-                          stroke="#4B0082"
+                          stroke={primaryColor}
                           strokeWidth="0.2"
                           opacity="0.25"
                         />
@@ -1792,7 +1799,7 @@ export const Transcripts: React.FC<TranscriptsProps> = (props) => {
                           cy="50"
                           r="20"
                           fill="none"
-                          stroke="#FFD700"
+                          stroke={accentColor}
                           strokeWidth="0.3"
                           opacity="0.2"
                         />
@@ -1811,17 +1818,17 @@ export const Transcripts: React.FC<TranscriptsProps> = (props) => {
                           x="0"
                           y="15"
                           fontSize="3"
-                          fill="#4B0082"
+                          fill={primaryColor}
                           opacity="0.3"
                           fontFamily="monospace"
                         >
-                          BMI-SECURE
+                          {shortName.toUpperCase()}-SECURE
                         </text>
                         <text
                           x="75"
                           y="15"
                           fontSize="3"
-                          fill="#4B0082"
+                          fill={primaryColor}
                           opacity="0.3"
                           fontFamily="monospace"
                         >
@@ -1886,7 +1893,7 @@ export const Transcripts: React.FC<TranscriptsProps> = (props) => {
                   {/* Large Center Logo Watermark */}
                   <div className="absolute inset-0 flex items-center justify-center opacity-[0.08] pointer-events-none">
                     <img
-                      src={logo || "/BMI.svg"}
+                      src={logo || storeLogo}
                       className="h-[32%] w-auto object-contain"
                       alt=""
                       style={{
@@ -1904,7 +1911,7 @@ export const Transcripts: React.FC<TranscriptsProps> = (props) => {
                     {Array.from({ length: 12 }).map((_, i) => (
                       <img
                         key={`watermark-${i}`}
-                        src={logo || "/BMI.svg"}
+                        src={logo || storeLogo}
                         className="w-32 h-32 object-contain grayscale"
                         alt=""
                         style={{
@@ -1926,16 +1933,16 @@ export const Transcripts: React.FC<TranscriptsProps> = (props) => {
                   onMouseDown={(e) => startBlockDrag("microTop", e)}
                 >
                   <MicroText
-                    text={`BMI UNIVERSITY OFFICIAL ACADEMIC TRANSCRIPT • SECURITY VALIDATED RECORD • DO NOT REPRODUCE • UV PROTECTED INK • ANTI-FORGERY • ID: ${securityData?.serialNumber || "PENDING"}`}
+                    text={`${shortName.toUpperCase()} OFFICIAL ACADEMIC TRANSCRIPT • SECURITY VALIDATED RECORD • DO NOT REPRODUCE • UV PROTECTED INK • ANTI-FORGERY • ID: ${securityData?.serialNumber || "PENDING"}`}
                   />
                 </div>
 
                 {/* Seal — top left, mirrors the QR code on the right */}
                 <div className="absolute top-8 left-8 flex flex-col items-center gap-1 z-20">
                   <img
-                    src="/BMI SEAL.png"
+                    src={logo || storeLogo}
                     className="w-16 h-16 object-cover scale-110"
-                    alt="BMI University Seal"
+                    alt={`${institutionName} seal`}
                     onError={(e) => {
                       (e.target as HTMLImageElement).style.display = "none";
                     }}
@@ -1952,7 +1959,7 @@ export const Transcripts: React.FC<TranscriptsProps> = (props) => {
                       />
                     ) : (
                       <img
-                        src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&ecc=H&margin=1&data=${encodeURIComponent(`BMI UNIVERSITY - OFFICIAL ACADEMIC RECORD\nSTUDENT: ${selectedStudent.first_name} ${selectedStudent.last_name}\nID: ${selectedStudent.id}\nSTATUS: VERIFIED`)}`}
+                        src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&ecc=H&margin=1&data=${encodeURIComponent(`${shortName.toUpperCase()} - OFFICIAL ACADEMIC RECORD\nSTUDENT: ${selectedStudent.first_name} ${selectedStudent.last_name}\nID: ${selectedStudent.id}\nSTATUS: VERIFIED`)}`}
                         className="w-16 h-16"
                         alt="Security QR"
                       />
@@ -1967,20 +1974,20 @@ export const Transcripts: React.FC<TranscriptsProps> = (props) => {
                   onMouseDown={(e) => startBlockDrag("headerTitle", e)}
                 >
                   <img
-                    src={logo || "/BMI.svg"}
+                    src={logo || storeLogo}
                     className="h-10 mb-1 object-contain filter contrast-125"
-                    alt="BMI Logo"
+                    alt={`${institutionName} logo`}
                     onError={(e) => {
-                      (e.target as HTMLImageElement).src = "/BMI.svg";
+                      (e.target as HTMLImageElement).src = storeLogo;
                     }}
                   />
-                  <h1 className="text-[24px] leading-none font-serif font-black tracking-tight text-gray-900 uppercase">
-                    BMI UNIVERSITY
+                  <h1 className="text-[24px] leading-none font-serif font-black tracking-tight uppercase" style={{ color: primaryColor }}>
+                    {institutionName}
                   </h1>
                   <p className="text-[7px] font-sans font-black text-gray-600 uppercase tracking-[0.35em] mt-0.5">
                     OFFICE OF THE REGISTRAR
                   </p>
-                  <div className="mt-1 px-7 py-0.5 border-y border-gray-900 bg-gradient-to-r from-purple-50/80 via-white to-purple-50/80">
+                  <div className="mt-1 px-7 py-0.5 border-y bg-gradient-to-r from-purple-50/80 via-white to-purple-50/80" style={{ borderColor: primaryColor }}>
                     <h2 className="text-[11px] font-serif font-black uppercase tracking-[0.26em] leading-tight">
                       {transcriptType} Academic Transcript
                       {transcriptType === "Provisional" && (
@@ -2003,7 +2010,7 @@ export const Transcripts: React.FC<TranscriptsProps> = (props) => {
                       STUDENT NAME:
                     </span>
                     <div className="w-full text-center">
-                      <span className="text-[16px] leading-none font-serif font-bold text-[#4B0082] uppercase tracking-[0.15em]">
+                      <span className="text-[16px] leading-none font-serif font-bold text-[var(--institution-primary)] uppercase tracking-[0.15em]">
                         {selectedStudent.full_name ||
                           `${selectedStudent.first_name} ${selectedStudent.last_name}`}
                       </span>
@@ -2221,7 +2228,7 @@ export const Transcripts: React.FC<TranscriptsProps> = (props) => {
                       </span>
                       <span className="text-gray-600">
                         Cumulative GPA:{" "}
-                        <span className="text-[#4B0082] font-black">
+                        <span className="text-[var(--institution-primary)] font-black">
                           {allRecords.length
                             ? (
                                 allRecords.reduce(
@@ -2256,7 +2263,7 @@ export const Transcripts: React.FC<TranscriptsProps> = (props) => {
                       </span>
                       <span className="text-gray-600">
                         Cumulative Avg:{" "}
-                        <span className="text-[#4B0082] font-black">
+                        <span className="text-[var(--institution-primary)] font-black">
                           {stats.cumulative}%
                         </span>
                       </span>
@@ -2268,7 +2275,7 @@ export const Transcripts: React.FC<TranscriptsProps> = (props) => {
                       FINAL CLASSIFICATION
                     </span>
                     <div className="h-full flex items-end justify-center w-full pt-4">
-                      <span className="text-[#4B0082] text-[11px] font-black uppercase tracking-wider">
+                      <span className="text-[var(--institution-primary)] text-[11px] font-black uppercase tracking-wider">
                         {parseFloat(stats.cumulative) >= 70
                           ? "DISTINCTION"
                           : parseFloat(stats.cumulative) >= 60
@@ -2293,7 +2300,7 @@ export const Transcripts: React.FC<TranscriptsProps> = (props) => {
                     <span className="flex-shrink-0 text-[8px] font-black uppercase text-gray-400 tracking-widest pt-1">
                       RECOMMENDATION:
                     </span>
-                    <div className="border-l-[3px] border-[#4B0082] pl-3 py-0.5">
+                    <div className="border-l-[3px] border-[var(--institution-primary)] pl-3 py-0.5">
                       <p className="uppercase leading-snug text-gray-950 font-serif font-bold text-[9px] tracking-tight">
                         {getAcademicRecommendation()}
                       </p>
@@ -2386,7 +2393,7 @@ export const Transcripts: React.FC<TranscriptsProps> = (props) => {
                         <span className="text-[7px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">
                           ID:{" "}
                           {securityData?.serialNumber ||
-                            `BMI-TR-${selectedStudent.id.toUpperCase()}`}
+                            `${shortName.toUpperCase()}-TR-${selectedStudent.id.toUpperCase()}`}
                         </span>
                       </div>
                     </div>
@@ -2436,6 +2443,7 @@ export const Transcripts: React.FC<TranscriptsProps> = (props) => {
                       <span className="text-[7px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">
                         CERTIFIED E-TRANSCRIPT
                       </span>
+                      <div className="mt-1 rounded-sm bg-white px-1 py-0.5"><PlatformBrandBadge compact /></div>
                     </div>
                   </div>
                 </div>
@@ -2448,7 +2456,7 @@ export const Transcripts: React.FC<TranscriptsProps> = (props) => {
                   onMouseDown={(e) => startBlockDrag("microBottom", e)}
                 >
                   <MicroText
-                    text={`OFFICIAL TRANSCRIPT • TAMPER-EVIDENT SECURITY FEATURES • VERIFY AT ${securityData?.verificationUrl || "BMI.EDU/VERIFY"} • BMI UNIVERSITY`}
+                    text={`OFFICIAL TRANSCRIPT • TAMPER-EVIDENT SECURITY FEATURES • VERIFY AT ${securityData?.verificationUrl || (typeof window !== "undefined" ? `${window.location.origin}/verify` : "/verify")} • ${shortName.toUpperCase()}`}
                   />
                 </div>
 

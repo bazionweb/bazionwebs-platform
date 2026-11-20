@@ -4,6 +4,8 @@
  */
 
 import React, { useState, useEffect } from "react";
+import { PlatformBrandBadge } from '../PlatformBrandBadge';
+import { useUIStore } from '../../stores/uiStore';
 import { X, BarChart3, TrendingUp, Users } from '../../shims/lucide-react';
 import { Grade, GradeDistribution } from "../../grading/types";
 import { getCourseGrades } from "../../grading/services/GradeAPIService";
@@ -26,6 +28,8 @@ const CourseGradeDistribution: React.FC<CourseGradeDistributionProps> = ({
   isOpen,
   onClose,
 }) => {
+  const institutionName = useUIStore((state) => state.institutionName);
+  const institutionLogo = useUIStore((state) => state.logo);
   const [distribution, setDistribution] = useState<GradeDistribution | null>(
     null,
   );
@@ -79,13 +83,13 @@ const CourseGradeDistribution: React.FC<CourseGradeDistributionProps> = ({
       <div className="bg-white dark:bg-gray-800 w-full max-w-5xl max-h-[90vh] overflow-hidden border-4 border-[#4B0082] shadow-2xl flex flex-col">
         {/* Header */}
         <div className="bg-gray-900 text-white px-6 py-4 flex justify-between items-center">
-          <div>
-            <h2 className="text-xl font-black uppercase tracking-widest">
-              Grade Distribution
-            </h2>
-            <p className="text-xs text-gray-400 mt-1">
-              {courseCode} - {courseName} ({semester} {academicYear})
-            </p>
+          <div className="flex items-center gap-3">
+            {institutionLogo && <img src={institutionLogo} alt={`${institutionName} logo`} className="w-10 h-10 object-contain bg-white rounded p-1" />}
+            <div>
+              <p className="text-[10px] font-bold text-gray-300 uppercase tracking-wider">{institutionName}</p>
+              <h2 className="text-xl font-black uppercase tracking-widest">Grade Distribution</h2>
+              <p className="text-xs text-gray-400 mt-1">{courseCode} - {courseName} ({semester} {academicYear})</p>
+            </div>
           </div>
           <button
             onClick={onClose}
@@ -406,7 +410,8 @@ const CourseGradeDistribution: React.FC<CourseGradeDistributionProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="bg-gray-50 dark:bg-gray-900 px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-2">
+        <div className="bg-gray-50 dark:bg-gray-900 px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex justify-between items-center gap-2">
+          <PlatformBrandBadge compact />
           <button
             onClick={() => window.print()}
             className="px-6 py-2 bg-[#4B0082] text-white font-black text-xs uppercase tracking-widest hover:bg-black transition-all"

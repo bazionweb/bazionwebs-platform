@@ -1,8 +1,11 @@
 import { useState, useEffect } from 'react';
 import { api } from '../../lib/api';
 import { useAuth } from '../../hooks/useAuth';
+import { useTenantConfig } from '../../context/TenantContext';
+import { PlatformBrandStamp } from '../../components/PlatformBrandStamp';
 
 export default function Documents() {
+  const tenantConfig = useTenantConfig();
   const { user: authUser } = useAuth();
   const [dashboardData, setDashboardData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
@@ -44,16 +47,35 @@ export default function Documents() {
   const rawFirstName = authUser?.first_name || dashboardData?.user?.first_name || dashboardData?.first_name || '';
   const rawLastName = authUser?.last_name || dashboardData?.user?.last_name || dashboardData?.last_name || '';
   const studentName = (rawFirstName || rawLastName) ? `${rawFirstName} ${rawLastName}`.trim() : (authUser?.email ? authUser.email.split('@')[0] : 'Enrolled Student');
+  const institutionName = tenantConfig.institutionName;
+  const legalEntityName = tenantConfig.legalEntityName || institutionName;
+  const shortName = tenantConfig.shortName;
+  const institutionCode = shortName.toUpperCase().includes('BMI') ? 'BMI' : shortName.replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, 8) || 'ORG';
+  const registrarName = tenantConfig.leadership?.find((person) => /registrar/i.test(person.role))?.name || 'Office of the Registrar';
+  const presidentName = tenantConfig.leadership?.find((person) => /president|chancellor/i.test(person.role))?.name || 'Institutional Representative';
+  const primaryColor = tenantConfig.branding.primaryColor;
+  const accentColor = tenantConfig.branding.accentColor;
+  const logoUrl = tenantConfig.branding.logoUrl;
+  const verificationUrl = typeof window !== 'undefined' ? `${window.location.origin}/verify` : '/verify';
   const programName = dashboardData?.program_name || dashboardData?.user?.program_name || 'Bachelor of Science in Biblical Studies';
-  const regNo = dashboardData?.reg_no || dashboardData?.user?.reg_no || 'BMI/UG-CS/226/001';
+  const regNo = dashboardData?.reg_no || dashboardData?.user?.reg_no || `${institutionCode}/REG/PENDING`;
+  const idExpiryDate = new Date();
+  idExpiryDate.setFullYear(idExpiryDate.getFullYear() + 4);
+  const idExpiryLabel = idExpiryDate.toLocaleDateString('en-GB', { month: '2-digit', year: 'numeric' });
+  const handlePrintDocument = (target: 'id-card' | 'official-document') => {
+    document.body.dataset.printTarget = target;
+    window.print();
+    window.setTimeout(() => delete document.body.dataset.printTarget, 1000);
+  };
   // studentIdNumber is the official registration number shown to students — the internal UID is never exposed
   const studentIdNumber = regNo;
   const termName = 'Fall Academic Term 2026';
   const currentDate = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-  const verificationCode = `BMI-VER-${regNo.replace(/[^A-Z0-9]/gi, '').slice(-6).toUpperCase()}`;
+  const verificationCode = `${institutionCode}-VER-${regNo.replace(/[^A-Z0-9]/gi, '').slice(-6).toUpperCase()}`;
 
   return (
-    <div style={{ maxWidth: 1140, margin: '0 auto', paddingBottom: '3rem' }}>
+    <div style={{ maxWidth: 1140, margin: '0 auto', paddingBottom: '3rem', '--navy': primaryColor, '--gold': accentColor, '--gold-dark': accentColor, '--gold-light': `${accentColor}22` } as React.CSSProperties}>
+      <style>{`@media print { body * { visibility: hidden !important; } body[data-print-target="id-card"] #printable-student-card, body[data-print-target="id-card"] #printable-student-card *, body[data-print-target="official-document"] #student-official-document, body[data-print-target="official-document"] #student-official-document * { visibility: visible !important; } body[data-print-target="id-card"] #printable-student-card, body[data-print-target="official-document"] #student-official-document { position: fixed !important; inset: 0 auto auto 0 !important; width: 100% !important; max-width: none !important; max-height: none !important; overflow: visible !important; box-shadow: none !important; border: 0 !important; padding: 1rem !important; } .no-print { display: none !important; } }`}</style>
       
       {/* ─── Page Title Header ─── */}
       <div style={{ marginBottom: '2rem', borderBottom: '1px solid var(--border)', paddingBottom: '1.25rem' }}>
@@ -85,11 +107,11 @@ export default function Documents() {
       )}
 
       {/* ─── Digital Student ID Card Section ─── */}
-      <div className="card" style={{ marginBottom: '2.5rem', background: 'linear-gradient(135deg, #091223 0%, #0e1d38 50%, #172a4d 100%)', color: 'white', border: '1px solid rgba(197, 160, 72, 0.3)', boxShadow: '0 20px 45px rgba(9, 18, 35, 0.4)', borderRadius: 16, overflow: 'hidden' }}>
+      <div className="card" style={{ marginBottom: '2.5rem', background: `linear-gradient(135deg, ${tenantConfig.branding.primaryColor} 0%, ${tenantConfig.branding.secondaryColor} 55%, ${tenantConfig.branding.primaryColor} 100%)`, color: 'white', border: `1px solid ${accentColor}`, boxShadow: '0 20px 45px rgba(9, 18, 35, 0.4)', borderRadius: 16, overflow: 'hidden' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '0.75rem', paddingBottom: '1rem', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
           <div>
-            <div style={{ fontSize: '0.75rem', color: 'var(--gold)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.12em', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-              <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: 'var(--gold)' }} />
+            <div style={{ fontSize: '0.75rem', color: accentColor, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.12em', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+              <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: accentColor }} />
               OFFICIAL DIGITAL STUDENT IDENTITY • SMART CARD
             </div>
             <h2 style={{ fontSize: '1.4rem', color: 'white', margin: '0.25rem 0 0 0', fontWeight: 800 }}>Digital Student Identification Card</h2>
@@ -104,7 +126,7 @@ export default function Documents() {
             </button>
             <button
               className="btn btn-outline btn-sm"
-              onClick={() => window.print()}
+              onClick={() => handlePrintDocument('id-card')}
               style={{ borderColor: 'rgba(255,255,255,0.3)', color: 'white', fontSize: '0.8rem' }}
             >
               🖨️ Print Card
@@ -113,15 +135,15 @@ export default function Documents() {
         </div>
 
         {/* Realistic ISO CR80 PVC Smart Card Container */}
-        <div style={{ perspective: 1000, maxWidth: 460, margin: '0.5rem auto 1rem' }}>
-          <div style={{
+              <div style={{ perspective: 1000, maxWidth: 460, margin: '0.5rem auto 1rem' }}>
+          <div id="printable-student-card" style={{
             background: !idCardFlipped 
-              ? 'linear-gradient(135deg, #091223 0%, #132242 45%, #1a2f58 100%)' 
-              : 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
+              ? `linear-gradient(135deg, ${tenantConfig.branding.primaryColor} 0%, ${tenantConfig.branding.secondaryColor} 55%, ${tenantConfig.branding.primaryColor} 100%)`
+              : `linear-gradient(135deg, ${tenantConfig.branding.secondaryColor} 0%, ${tenantConfig.branding.primaryColor} 100%)`,
             borderRadius: 18,
             padding: '1.75rem',
             boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.7), inset 0 1px 1px rgba(255, 255, 255, 0.2)',
-            border: '2px solid rgba(197, 160, 72, 0.8)',
+            border: `2px solid ${accentColor}`,
             position: 'relative',
             overflow: 'hidden',
             minHeight: 250,
@@ -134,7 +156,7 @@ export default function Documents() {
               left: 0,
               right: 0,
               bottom: 0,
-              background: 'radial-gradient(ellipse at 85% 15%, rgba(197, 160, 72, 0.15), transparent 60%), linear-gradient(45deg, transparent 40%, rgba(255,255,255,0.05) 50%, transparent 60%)',
+              background: `radial-gradient(ellipse at 85% 15%, ${accentColor}33, transparent 60%), linear-gradient(45deg, transparent 40%, rgba(255,255,255,0.05) 50%, transparent 60%)`,
               pointerEvents: 'none',
             }} />
 
@@ -148,7 +170,7 @@ export default function Documents() {
               pointerEvents: 'none',
               userSelect: 'none',
               fontFamily: 'serif',
-              color: 'var(--gold)',
+              color: accentColor,
             }}>
               🏛️
             </div>
@@ -156,18 +178,27 @@ export default function Documents() {
             {!idCardFlipped ? (
               <div>
                 {/* Card Header Banner */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1.5px solid rgba(197, 160, 72, 0.4)', paddingBottom: '0.75rem', marginBottom: '1.25rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: `1.5px solid ${accentColor}`, paddingBottom: '0.75rem', marginBottom: '1.25rem' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
                     <div style={{ background: 'white', padding: '3px 6px', borderRadius: 6, display: 'flex', alignItems: 'center' }}>
-                      <img src="/bmi-logo.png" alt="BMI" style={{ height: 22, width: 'auto' }} />
+                      <img src={logoUrl} alt={`${shortName} logo`} style={{ height: 22, maxWidth: 120, objectFit: 'contain' }} />
                     </div>
                     <div>
-                      <div style={{ fontSize: '0.95rem', fontWeight: 900, color: 'var(--gold)', letterSpacing: '0.06em', lineHeight: 1.1 }}>BMI UNIVERSITY</div>
-                      <div style={{ fontSize: '0.62rem', color: '#94a3b8', letterSpacing: '0.05em' }}>BETHEL MINISTRIES INTERNATIONAL</div>
+                      <div style={{ fontSize: '0.95rem', fontWeight: 900, color: accentColor, letterSpacing: '0.06em', lineHeight: 1.1 }}>{shortName.toUpperCase()}</div>
+                      <div style={{ fontSize: '0.62rem', color: '#94a3b8', letterSpacing: '0.05em' }}>{legalEntityName}</div>
                     </div>
                   </div>
-                  <div style={{ background: 'linear-gradient(135deg, #c5a048 0%, #e5c578 100%)', color: '#091223', padding: '3px 10px', borderRadius: 99, fontSize: '0.7rem', fontWeight: 900, letterSpacing: '0.08em', boxShadow: '0 2px 8px rgba(197, 160, 72, 0.4)' }}>
-                    STUDENT
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div style={{ background: accentColor, color: tenantConfig.branding.primaryColor, padding: '3px 10px', borderRadius: 99, fontSize: '0.7rem', fontWeight: 900, letterSpacing: '0.08em', boxShadow: `0 2px 8px ${accentColor}66` }}>
+                      STUDENT
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 6px', borderRadius: 6, background: '#fff' }}>
+                      <picture>
+                        <source type="image/webp" srcSet="/brand/bazion-platform-mark-64.webp 64w, /brand/bazion-platform-mark-128.webp 128w, /brand/bazion-platform-mark-256.webp 256w" sizes="24px" />
+                        <img src="/brand/bazion-platform-mark.png" alt="Bazion Web" width={24} height={20} style={{ width: 24, height: 20, objectFit: 'contain' }} />
+                      </picture>
+                      <span style={{ color: '#0B2F75', fontSize: '0.55rem', fontWeight: 800, lineHeight: 1.1 }}>Powered by<br />Bazion Web</span>
+                    </div>
                   </div>
                 </div>
 
@@ -194,7 +225,7 @@ export default function Documents() {
                     ) : (
                       '👤'
                     )}
-                    <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'rgba(9, 18, 35, 0.85)', padding: '2px 0', textAlign: 'center', fontSize: '0.55rem', color: 'var(--gold)', fontWeight: 800 }}>
+                    <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: `${tenantConfig.branding.primaryColor}dd`, padding: '2px 0', textAlign: 'center', fontSize: '0.55rem', color: accentColor, fontWeight: 800 }}>
                       VERIFIED
                     </div>
                   </div>
@@ -226,7 +257,7 @@ export default function Documents() {
                     </div>
 
                     <div style={{ fontSize: '0.68rem', color: '#94a3b8', marginTop: '0.5rem', display: 'flex', gap: '0.6rem' }}>
-                      <span>Valid Thru: <strong style={{ color: 'white' }}>08/2028</strong></span>
+                      <span>Valid Thru: <strong style={{ color: 'white' }}>{idExpiryLabel}</strong></span>
                       <span>•</span>
                       <span>Status: <strong style={{ color: '#4ade80' }}>Active</strong></span>
                     </div>
@@ -239,7 +270,7 @@ export default function Documents() {
                     ||||| | |||| ||| ||||| || |||
                   </div>
                   <span style={{ fontSize: '0.65rem', color: 'var(--gold)', fontWeight: 700 }}>
-                    bmiuniversities.org/verify
+                    {new URL(verificationUrl, typeof window !== 'undefined' ? window.location.origin : 'https://example.org').host}/verify
                   </span>
                 </div>
               </div>
@@ -253,23 +284,26 @@ export default function Documents() {
                     TERMS & EMERGENCY SERVICES
                   </div>
                   <p style={{ fontSize: '0.68rem', color: '#94a3b8', lineHeight: 1.4, margin: '0 0 0.75rem 0' }}>
-                    This card remains the property of Bethel Ministries International University (BMI) and is non-transferable. It serves as official proof of student status, campus access, and library borrowing authorization.
+                    This card remains the property of {legalEntityName} and is non-transferable. It serves as proof of student status, campus access, and library borrowing authorization.
                   </p>
 
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', background: 'rgba(255,255,255,0.05)', padding: '0.6rem', borderRadius: 8, fontSize: '0.7rem', color: '#cbd5e1' }}>
                     <div>
                       <div style={{ color: '#94a3b8', fontSize: '0.6rem', fontWeight: 700 }}>CAMPUS SECURITY</div>
-                      <div>+1 (800) 555-BMI-HELP</div>
+                      <div>{tenantConfig.contact.phones[0]}</div>
                     </div>
                     <div>
                       <div style={{ color: '#94a3b8', fontSize: '0.6rem', fontWeight: 700 }}>OFFICE OF REGISTRAR</div>
-                      <div>registrar@bmiuniversities.org</div>
+                      <div>{tenantConfig.contact.registrarEmail}</div>
                     </div>
                   </div>
                 </div>
 
-                <div style={{ textAlign: 'center', paddingTop: '0.5rem', borderTop: '1px solid rgba(255,255,255,0.1)', fontSize: '0.62rem', color: '#64748b', letterSpacing: '0.04em' }}>
-                  BETHEL MINISTRIES INTERNATIONAL UNIVERSITY • ACCREDITED GLOBAL HIGHER LEARNING
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, paddingTop: '0.5rem', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+                  <div style={{ fontSize: '0.62rem', color: '#64748b', letterSpacing: '0.04em' }}>
+                    {institutionName.toUpperCase()}{tenantConfig.accreditationLabel ? ` • ${tenantConfig.accreditationLabel.toUpperCase()}` : ''}
+                  </div>
+                  <PlatformBrandStamp compact />
                 </div>
               </div>
             )}
@@ -408,7 +442,7 @@ export default function Documents() {
             </h3>
             <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', lineHeight: 1.5, margin: 0 }}>
               All documents generated through this portal carry a cryptographic security code. Third parties (embassies, employers, academic institutions) can instantly verify authenticity at{' '}
-              <strong style={{ color: 'var(--navy)' }}>verify.bmiuniversities.org</strong>.
+              <strong style={{ color: primaryColor }}>{new URL(verificationUrl, typeof window !== 'undefined' ? window.location.origin : 'https://example.org').host}</strong>.
             </p>
           </div>
 
@@ -419,7 +453,7 @@ export default function Documents() {
       {/* ─── Official Document Modals ─── */}
       {activeModal && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(9, 18, 35, 0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '1.5rem', backdropFilter: 'blur(4px)' }}>
-          <div className="card" style={{ maxWidth: 740, width: '100%', maxHeight: '92vh', overflowY: 'auto', background: '#fff', padding: '2.5rem', borderRadius: 16, boxShadow: '0 25px 60px rgba(0,0,0,0.4)', position: 'relative' }}>
+          <div id="student-official-document" className="card" style={{ maxWidth: 740, width: '100%', maxHeight: '92vh', overflowY: 'auto', background: '#fff', padding: '2.5rem', borderRadius: 16, boxShadow: '0 25px 60px rgba(0,0,0,0.4)', position: 'relative' }}>
             
             {/* Modal Actions Bar (Top) */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '1rem', marginBottom: '1.5rem' }}>
@@ -428,11 +462,11 @@ export default function Documents() {
                   OFFICIAL INSTITUTIONAL RECORD
                 </span>
                 <span style={{ fontSize: '0.75rem', color: 'var(--slate)' }}>
-                  Ref: BMI-{activeModal.toUpperCase()}-{new Date().getFullYear()}-001
+                  Ref: {institutionCode}-{activeModal.toUpperCase()}-{new Date().getFullYear()}-001
                 </span>
               </div>
               <div style={{ display: 'flex', gap: '0.5rem' }}>
-                <button className="btn btn-gold btn-sm" onClick={() => window.print()} style={{ fontWeight: 800 }}>
+                <button className="btn btn-gold btn-sm" onClick={() => handlePrintDocument('official-document')} style={{ fontWeight: 800 }}>
                   🖨️ Print Letter
                 </button>
                 <button className="btn btn-outline btn-sm" onClick={() => setActiveModal(null)} style={{ fontWeight: 700 }}>
@@ -445,17 +479,17 @@ export default function Documents() {
             <div style={{ borderBottom: '3px solid var(--gold)', paddingBottom: '1.25rem', marginBottom: '1.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                 <div style={{ background: 'var(--navy)', padding: '6px 10px', borderRadius: 8, display: 'flex', alignItems: 'center' }}>
-                  <img src="/bmi-logo.png" alt="BMI" style={{ height: 38, width: 'auto' }} />
+                  <img src={logoUrl} alt={`${shortName} logo`} style={{ height: 38, maxWidth: 150, objectFit: 'contain' }} />
                 </div>
                 <div>
                   <h2 style={{ fontSize: '1.4rem', color: 'var(--navy)', margin: 0, fontWeight: 900, letterSpacing: '0.02em' }}>
-                    BETHEL MINISTRIES INTERNATIONAL UNIVERSITY
+                    {institutionName.toUpperCase()}
                   </h2>
                   <div style={{ fontSize: '0.85rem', color: 'var(--gold-dark)', fontWeight: 800 }}>
-                    BMI UNIVERSITY • OFFICE OF THE REGISTRAR & ADMISSIONS
+                    {shortName.toUpperCase()} • OFFICE OF THE REGISTRAR & ADMISSIONS
                   </div>
                   <div style={{ fontSize: '0.72rem', color: 'var(--slate)', marginTop: '0.15rem' }}>
-                    www.bmiuniversities.org • admissions@bmiuniversities.org • bmiuniversities.org/verify
+                    {tenantConfig.contact.address} • {tenantConfig.contact.admissionsEmail} • {new URL(verificationUrl, typeof window !== 'undefined' ? window.location.origin : 'https://example.org').host}/verify
                   </div>
                 </div>
               </div>
@@ -490,7 +524,7 @@ export default function Documents() {
                   Dear <strong>{studentName}</strong>,
                 </p>
                 <p style={{ fontSize: '0.92rem', lineHeight: 1.7, color: '#334155', marginBottom: '1rem' }}>
-                  On behalf of the Faculty Senate, the Directorate of Admissions, and Bethel Ministries International University, it is our distinct honour to officially notify you of your acceptance and admission to <strong>BMI University</strong> in the <strong>{programName}</strong> program for the <strong>{termName}</strong>.
+                  On behalf of the Directorate of Admissions at {legalEntityName}, we are pleased to notify you of your admission to <strong>{shortName}</strong> in the <strong>{programName}</strong> program for the <strong>{termName}</strong>.
                 </p>
                 <p style={{ fontSize: '0.92rem', lineHeight: 1.7, color: '#334155', marginBottom: '1rem' }}>
                   Your application and academic credentials have demonstrated exceptional dedication to scholarship, integrity, and servant leadership. We are confident that you will contribute meaningfully to our global academic community.
@@ -516,7 +550,7 @@ export default function Documents() {
                   TO WHOM IT MAY CONCERN:
                 </p>
                 <p style={{ fontSize: '0.92rem', lineHeight: 1.7, color: '#334155', marginBottom: '1.5rem' }}>
-                  This official institutional document certifies that <strong>{studentName}</strong> (Student Identification Number: <strong>{studentIdNumber}</strong>, Registration Number: <strong>{regNo}</strong>) is currently a fully matriculated, active student in good academic standing at Bethel Ministries International (BMI University), enrolled in the <strong>{programName}</strong>.
+                  This institutional document certifies that <strong>{studentName}</strong> (Student Identification Number: <strong>{studentIdNumber}</strong>, Registration Number: <strong>{regNo}</strong>) is currently an active student in good academic standing at {legalEntityName} ({shortName}), enrolled in the <strong>{programName}</strong>.
                 </p>
 
                 <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: '1rem 1.25rem', marginBottom: '1.5rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem', fontSize: '0.85rem' }}>
@@ -593,7 +627,7 @@ export default function Documents() {
             <div style={{ marginTop: '2rem', paddingTop: '1.5rem', borderTop: '2px solid #e2e8f0', display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', gap: '1.5rem' }}>
               <div>
                 <div style={{ borderBottom: '1px solid #334155', width: '180px', marginBottom: '0.35rem', height: 20 }} />
-                <div style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--navy)' }}>Dr. Melba Layne, Ph.D.</div>
+                <div style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--navy)' }}>{registrarName}</div>
                 <div style={{ fontSize: '0.75rem', color: 'var(--slate)' }}>Chief Registrar</div>
                 <div style={{ fontSize: '0.7rem', color: '#94a3b8' }}>Office of Academic Records</div>
               </div>
@@ -602,26 +636,27 @@ export default function Documents() {
               <div style={{ border: '2px solid var(--gold)', borderRadius: 12, padding: '0.5rem 0.75rem', textAlign: 'center', background: 'var(--gold-light)' }}>
                 <div style={{ fontSize: '0.7rem', fontWeight: 900, color: 'var(--gold-dark)', letterSpacing: '0.05em' }}>OFFICIAL SEAL</div>
                 <div style={{ fontSize: '1.2rem', margin: '2px 0' }}>🏛️</div>
-                <div style={{ fontSize: '0.62rem', fontWeight: 800, color: 'var(--navy)' }}>BMI UNIVERSITY</div>
+                <div style={{ fontSize: '0.62rem', fontWeight: 800, color: primaryColor }}>{shortName.toUpperCase()}</div>
               </div>
 
               <div style={{ textAlign: 'right' }}>
                 <div style={{ borderBottom: '1px solid #334155', width: '180px', marginBottom: '0.35rem', height: 20, marginLeft: 'auto' }} />
-                <div style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--navy)' }}>Dr. Christopher Cookhorne, Ph.D.</div>
-                <div style={{ fontSize: '0.75rem', color: 'var(--slate)' }}>President & Chancellor</div>
-                <div style={{ fontSize: '0.7rem', color: '#94a3b8' }}>Bethel Ministries International</div>
+                <div style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--navy)' }}>{presidentName}</div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--slate)' }}>{tenantConfig.leadership?.find((person) => /president|chancellor/i.test(person.role))?.role || 'Authorized Institutional Officer'}</div>
+                <div style={{ fontSize: '0.7rem', color: '#94a3b8' }}>{legalEntityName}</div>
               </div>
             </div>
 
             {/* Modal Bottom Footer */}
             <div style={{ marginTop: '1.75rem', paddingTop: '1rem', borderTop: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.75rem', color: 'var(--slate)' }}>
               <div>
-                🔒 Verification Code: <strong style={{ color: 'var(--navy)' }}>{verificationCode}</strong> • Validate at <strong>bmiuniversities.org/verify</strong>
+                🔒 Verification Code: <strong style={{ color: primaryColor }}>{verificationCode}</strong> • Validate at <strong>{new URL(verificationUrl, typeof window !== 'undefined' ? window.location.origin : 'https://example.org').host}/verify</strong>
               </div>
               <button className="btn btn-outline btn-sm" onClick={() => setActiveModal(null)}>
                 Close Window
               </button>
             </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.75rem' }}><PlatformBrandStamp compact /></div>
 
           </div>
         </div>

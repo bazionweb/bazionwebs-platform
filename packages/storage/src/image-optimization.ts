@@ -146,3 +146,57 @@ export async function optimizeUploadedImage(
     };
   });
 }
+
+export const IMAGE_VARIANT_PRESETS = {
+  thumbnail: { maxWidth: 320, maxHeight: 320, quality: 78 },
+  card: { maxWidth: 800, maxHeight: 800, quality: 82 },
+  hero: { maxWidth: 1600, maxHeight: 1600, quality: 84 },
+  canonical: { maxWidth: MAX_IMAGE_OUTPUT_EDGE, maxHeight: MAX_IMAGE_OUTPUT_EDGE, quality: 84 },
+} as const;
+
+export type ImageVariantName = keyof typeof IMAGE_VARIANT_PRESETS;
+
+export async function transformImageVariant(
+  input: Uint8Array,
+  variant: ImageVariantName | { width: number; height?: number; quality?: number },
+): Promise<{ body: Uint8Array; contentType: "image/webp"; width: number; height: number }> {
+  const preset = typeof variant === "string" ? IMAGE_VARIANT_PRESETS[variant] : {
+    maxWidth: Math.min(Math.max(variant.width, 32), MAX_IMAGE_OUTPUT_EDGE),
+    maxHeight: Math.min(Math.max(variant.height ?? variant.width, 32), MAX_IMAGE_OUTPUT_EDGE),
+    quality: Math.min(Math.max(variant.quality ?? 82, 40), 95),
+  };
+
+  return withOptimizationSlot(async () => {
+    const metadata = await sharp(input, {
+      failOn: "warning",
+      limitInputPixels: false,
+      sequentialRead: true,
+    }).metadata();
+    if (!metadata.width || !metadata.height) throw new InvalidUploadedImageError();
+    if (metadata.width * metadata.height > MAX_IMAGE_INPUT_PIXELS) throw new UploadedImageTooLargeError();
+
+    const encoded = await sharp(input, {
+      failOn: "warning",
+      limitInputPixels: MAX_IMAGE_INPUT_PIXELS,
+      sequentialRead: true,
+    })
+      .rotate()
+      .resize({
+        width: preset.maxWidth,
+        height: preset.maxHeight,
+        fit: "inside",
+        withoutEnlargement: true,
+        fastShrinkOnLoad: true,
+      })
+      .webp({ quality: preset.quality, alphaQuality: 100, effort: 3, smartSubsample: true })
+      .toBuffer({ resolveWithObject: true });
+
+    return {
+      body: encoded.data,
+      contentType: "image/webp",
+      width: encoded.info.width,
+      height: encoded.info.height,
+    };
+  });
+}
+
