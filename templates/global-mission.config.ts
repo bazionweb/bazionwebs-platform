@@ -26,11 +26,14 @@ export const globalMissionConfig: MinistryConfig = {
     subtitle: "Revive the Nations. Preach the Gospel. Win Souls. — Propagating Revival from Kenya to the ends of the earth.",
     rotatorWords: ["TO THE NATIONS", "TO THE COMMUNITIES", "TO THE WORLD"],
   },
+  // GMFC is a borderless mission network, not a localized entity: contact is
+  // digital-first (email, WhatsApp, socials, hub coordinators) and the PO Box
+  // is demoted to registered-office mailing detail rather than public identity.
   contact: {
     phones: ["+1 (512) 785 6994", "+254 721 341793", "+254 710 642 232"],
     email: "globalmissionfc@gmail.com",
-    address: "P.O. Box 444 – 10100, Kenya",
-    poBox: "P.O. Box 444 – 10100, Kenya",
+    address: "Digital-first mission network — coordinated online across timezones (no campus address). Registered-office mailing: P.O. Box 444 – 10100, Kenya.",
+    poBox: "P.O. Box 444 – 10100, Kenya (registered office mailing)",
     whatsappNumber: "254721341793",
   },
   social: {
@@ -61,13 +64,58 @@ export const globalMissionConfig: MinistryConfig = {
     instructions: "Account No: 262518 — M-Pesa → Lipa na M-Pesa → Paybill → Business No: 247 247 (Equity Bank) → Account No: 262518 (GLOBAL · YINV)",
     suggestedAmounts: [500, 1000, 2500, 5000],
   },
-  serviceTimes: [],
-  locations: [],
+  // Network rhythms (replacing localized Sunday-service times): global,
+  // multi-timezone gatherings streamed through the network's broadcast channel.
+  serviceTimes: [
+    {
+      label: "Global Prayer Call",
+      day: "Daily",
+      time: "05:30 & 21:00 EAT",
+      note: "Network-wide intercession line — join from any timezone.",
+    },
+    {
+      label: "Global Worship & Word Service",
+      day: "Sunday",
+      time: "09:00 EAT",
+      note: "Streamed live on the GMFC broadcast channel.",
+    },
+    {
+      label: "Revival Night",
+      day: "Wednesday",
+      time: "19:00 EAT",
+      note: "Online gathering with worship, the Word and prayer ministry.",
+    },
+    {
+      label: "Leaders' Conclave",
+      day: "Monthly (last Friday)",
+      time: "18:00 EAT",
+      note: "Coordination and fellowship for network leaders across nations.",
+    },
+  ],
+  // Network presence (replacing campus locations): regional hubs and the
+  // online campus, described by their coordination role. No street addresses,
+  // no map links — the network is not a localized entity.
+  locations: [
+    {
+      name: "East & Central Africa Hub",
+      address: "Regional coordination hub serving partner ministries across East and Central Africa — connect with the hub coordinator for nation-specific engagements.",
+    },
+    {
+      name: "Global Network Office",
+      address: "Network coordination office (Nairobi, Kenya) — administration, partnerships and broadcast coordination for the global network.",
+    },
+    {
+      name: "Online Network Campus",
+      address: "The network's always-on digital campus: live streams, prayer lines and online gatherings accessible from every timezone.",
+    },
+  ],
+  // Partner onboarding (replacing campus visitor info): the four steps a
+  // ministry or missionary takes to join the network.
   visitorInfo: {
-    arrival: "",
-    children: "",
-    accessibility: "",
-    parking: "",
+    arrival: "Step 1 — Reach out: contact the network team through email, WhatsApp or the contact form with a short introduction of your ministry.",
+    children: "Step 2 — Discovery call: meet the network coordination team online to share your vision, coverage and calling, and hear how the network operates.",
+    accessibility: "Step 3 — Alignment & covenant: review the network's statement of faith and values together, and agree the covenant that frames the partnership.",
+    parking: "Step 4 — Onboarding: receive your network orientation, coordination contacts and rhythm of gatherings, and be commissioned as a partner ministry.",
   },
   online: {
     liveStreamUrl: "https://www.youtube.com/@GlobalMissionfc",
@@ -79,7 +127,35 @@ export const globalMissionConfig: MinistryConfig = {
     version: "NIV",
   },
   departments: [],
-  ministries: [],
+  // Network departments (replacing local church departments): the five
+  // operational arms that coordinate the mission network across nations.
+  ministries: [
+    {
+      title: "Missions & Church Planting",
+      description: "Sends and supports church-planting teams and missionaries across the network's nations, from Kenya to the ends of the earth.",
+      audience: "Network-wide",
+    },
+    {
+      title: "Prayer Mobilization",
+      description: "Coordinates the Global Prayer Call, prayer summits and intercession chains that sustain revival across partner ministries.",
+      audience: "Intercessors",
+    },
+    {
+      title: "Media & Broadcast",
+      description: "Produces and broadcasts network teaching, worship and revival content through the GMFC YouTube channel and partner media outlets.",
+      audience: "Media volunteers",
+    },
+    {
+      title: "Training & Leadership Development",
+      description: "Raises and equips ministers and church leaders through network schools, mentorship tracks and leadership summits.",
+      audience: "Emerging leaders",
+    },
+    {
+      title: "Compassion & Medical Outreach",
+      description: "Organizes free medical camps, compassion outreaches and community care initiatives together with partner ministries.",
+      audience: "Outreach partners",
+    },
+  ],
   groups: [],
   volunteerTeams: [],
   testimonies: [],
@@ -109,10 +185,28 @@ export const globalMissionConfig: MinistryConfig = {
       alt: "IMG 20260517 WA0013 845x530",
     },
   ],
-  faqs: [],
+  // Network-positioning FAQs (answering the localized-church assumption head-on).
+  faqs: [
+    {
+      question: "Is GMFC a local church?",
+      answer: "No. Global Mission for Christ International is a mission network — a family of partner ministries, congregations and missionaries across nations. We do not operate as a single local congregation and there is no campus or local membership boundary.",
+    },
+    {
+      question: "Where is GMFC located?",
+      answer: "GMFC is coordinated digitally from the Global Network Office in Nairobi, Kenya, with regional hubs and an always-on online campus. The network deliberately has no single street address because it is not a localized entity — registered-office mail goes to P.O. Box 444 – 10100, Kenya.",
+    },
+    {
+      question: "How can my ministry join the network?",
+      answer: "Reach out through our contact channels, join a discovery call, move through alignment and covenant, and complete onboarding. Partner ministries keep their identity and local coverage while gaining the network's prayer rhythms, training, media and mission support.",
+    },
+    {
+      question: "How can I partner or give?",
+      answer: "You can give toward missions through M-Pesa Paybill 247 247 (Equity Bank, account 262518), or contact the network office to discuss partnerships, mission sponsorship and compassion outreach support.",
+    },
+  ],
   metadata: {
-    title: "Global Mission for Christ International",
-    description: "Propagating revival to the nations through prayer, the Word of God, evangelism, and community outreach. From Kenya to the ends of the earth — Christ for every nation.",
+    title: "Global Mission for Christ International — Mission Network",
+    description: "A borderless mission network of partner ministries and missionaries — propagating revival to the nations through prayer, the Word, evangelism and compassion, coordinated digitally from Nairobi. Not a local church: a global network with no campus boundary.",
   },
   vision: {
     title: "Vision",

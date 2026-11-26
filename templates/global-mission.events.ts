@@ -40,4 +40,36 @@ export const globalMissionEvents = [
     imageUrl: "/images/events/mega-conference-2026.jpg",
     location: "Kiamariga Nursery Grounds",
   },
+  // Upcoming network events (post 2026-11-25) — keep the upcoming-events banner
+  // populated while the network is live on its staging domain.
+  {
+    title: "Global Prayer Summit 2026",
+    slug: "global-prayer-summit-2026",
+    startsAt: "2026-12-04T15:00:00+00:00",
+    endsAt: "2026-12-06T18:00:00+00:00",
+    excerpt: "A weekend of sustained network intercession — partner ministries across nations gather online for prayer, fasting and commissioning for the 2027 mission year.",
+    description: "<h2>Global Prayer Summit 2026</h2>\n<p>Partner ministries and intercessors across the GMFC network gather on the Online Network Campus for a weekend of sustained prayer — seeking God for revival in every nation the network touches and commissioning the 2027 mission calendar.</p>\n<p><strong>When:</strong> 4th – 6th December 2026, daily from 18:00 EAT</p>\n<p><strong>Where:</strong> Online Network Campus (live stream + prayer lines, all timezones)</p>\n<p><em>All partner ministries, intercessors and friends of the network are welcome.</em></p>",
+    imageUrl: "/images/events/conference.jpg",
+    location: "Online Network Campus",
+  },
+  {
+    title: "21 Days of Prayer & Fasting 2027",
+    slug: "21-days-of-prayer-and-fasting-2027",
+    startsAt: "2027-01-04T03:00:00+00:00",
+    endsAt: "2027-01-24T18:00:00+00:00",
+    excerpt: "The network opens 2027 with 21 days of corporate prayer and fasting — daily Global Prayer Call at 05:30 & 21:00 EAT with teaching themes for each week.",
+    description: "<h2>21 Days of Prayer &amp; Fasting 2027</h2>\n<p>The whole GMFC network opens the year with 21 days of corporate prayer and fasting. Daily Global Prayer Call gatherings continue at 05:30 and 21:00 EAT, joined by partner ministries in every timezone, with weekly themes of personal revival, family, church, nation and the mission field.</p>\n<p><strong>When:</strong> 4th – 24th January 2027</p>\n<p><strong>Where:</strong> Global — prayer lines and Online Network Campus</p>",
+    imageUrl: "/images/events/conference.jpg",
+    location: "Global — all timezones",
+  },
+  {
+    title: "Network Leaders' Summit 2027",
+    slug: "network-leaders-summit-2027",
+    startsAt: "2027-02-19T06:00:00+00:00",
+    endsAt: "2027-02-21T15:00:00+00:00",
+    excerpt: "Leaders of partner ministries convene at the Global Network Office for equipping, covenant renewal and network planning for the year ahead.",
+    description: "<h2>Network Leaders' Summit 2027</h2>\n<p>Leaders and coordinators of GMFC partner ministries convene for three days of equipping, covenant renewal and network planning — training and leadership development, missions and church-planting strategy, and the media &amp; broadcast roadmap for 2027.</p>\n<p><strong>When:</strong> 19th – 21st February 2027</p>\n<p><strong>Where:</strong> Global Network Office, Nairobi (with online participation for overseas partners)</p>\n<p><em>Registration opens through hub coordinators in January 2027.</em></p>",
+    imageUrl: "/images/events/conference.jpg",
+    location: "Global Network Office, Nairobi",
+  },
 ];

@@ -25,6 +25,40 @@ interface SiteResponse {
   siteSettingsStored?: boolean;
 }
 
+/** Shape of GET /v1/public/church/directory — admin-managed live directory. */
+interface DirectoryResponse {
+  departments?: Array<{
+    id: string;
+    name: string;
+    slug: string;
+    description: string | null;
+    icon: string | null;
+    leaderName: string | null;
+    leaderRole: string | null;
+    meetingSchedule: string | null;
+  }>;
+  smallGroups?: Array<{
+    id: string;
+    name: string;
+    slug: string;
+    category: string | null;
+    description: string | null;
+    leaderName: string | null;
+    meetingSchedule: string | null;
+    publicLocationLabel: string | null;
+    acceptingMembers: boolean | null;
+  }>;
+  volunteerTeams?: Array<{
+    id: string;
+    name: string;
+    slug: string;
+    description: string | null;
+    requirements: string | null;
+    coordinatorName: string | null;
+    acceptingApplications: boolean | null;
+  }>;
+}
+
 const siteRequests = new Map<string, Promise<SiteResponse | null>>();
 const resolvedSiteKeys = new Set<string>();
 
@@ -46,6 +80,81 @@ async function loadMinistrySite(): Promise<SiteResponse | null> {
     siteRequests.set(cacheKey, siteRequest);
   }
   return siteRequest;
+}
+
+const directoryRequests = new Map<string, Promise<DirectoryResponse | null>>();
+
+/**
+ * Loads the admin-managed public directory (active departments, small groups
+ * and volunteer teams) behind the settings values. Fail-soft: any error or
+ * non-OK response resolves to null and the site keeps its settings-derived
+ * directory sections.
+ */
+async function loadDirectory(): Promise<DirectoryResponse | null> {
+  const cacheKey = getSiteCacheKey();
+  let directoryRequest = directoryRequests.get(cacheKey);
+  if (!directoryRequest) {
+    directoryRequest = fetch("/v1/public/church/directory", {
+      cache: "no-store",
+      headers: getClientTenantHeaders(),
+    })
+      .then(async (response) => (response.ok ? await response.json() as DirectoryResponse : null))
+      .catch(() => null);
+    directoryRequests.set(cacheKey, directoryRequest);
+  }
+  return directoryRequest;
+}
+
+function optionalText(value: string | null | undefined, max = 500): string | undefined {
+  const trimmed = typeof value === "string" ? value.trim() : "";
+  if (!trimmed) return undefined;
+  return trimmed.slice(0, max);
+}
+
+function requiredText(value: string | null | undefined, fallback: string, max = 500): string {
+  return optionalText(value, max) ?? fallback;
+}
+
+/** Maps the live directory rows onto the site's directory sections, preferring
+ * admin-managed records over template defaults when they exist. */
+function directoryOverlay(directory: DirectoryResponse): Partial<Pick<MinistryConfig, "departments" | "groups" | "volunteerTeams">> {
+  const overlay: Partial<Pick<MinistryConfig, "departments" | "groups" | "volunteerTeams">> = {};
+  const departments = (directory.departments ?? []).filter((row) => row.name.trim().length > 1);
+  if (departments.length > 0) {
+    overlay.departments = departments.map((row) => ({
+      id: row.id,
+      name: requiredText(row.name, "Department", 120),
+      description: requiredText(row.description, "Contact the network team for details.", 1000),
+      icon: optionalText(row.icon, 32),
+      leaderName: optionalText(row.leaderName, 160),
+      leaderRole: optionalText(row.leaderRole, 120),
+      meetingSchedule: optionalText(row.meetingSchedule, 200),
+    }));
+  }
+  const smallGroups = (directory.smallGroups ?? []).filter((row) => row.name.trim().length > 1);
+  if (smallGroups.length > 0) {
+    overlay.groups = smallGroups.map((row) => ({
+      id: row.id,
+      name: requiredText(row.name, "Fellowship", 120),
+      category: requiredText(row.category, "Fellowship", 80),
+      leaderName: requiredText(row.leaderName, "Network coordination", 160),
+      meetingSchedule: requiredText(row.meetingSchedule, "By arrangement", 200),
+      locationOrVirtual: requiredText(row.publicLocationLabel, "Online / by arrangement", 300),
+      description: optionalText(row.description, 800),
+    }));
+  }
+  const volunteerTeams = (directory.volunteerTeams ?? []).filter((row) => row.name.trim().length > 1);
+  if (volunteerTeams.length > 0) {
+    overlay.volunteerTeams = volunteerTeams.map((row) => ({
+      id: row.id,
+      title: requiredText(row.name, "Volunteer team", 120),
+      department: "Network volunteering",
+      description: requiredText(row.description, "Serve with the network in this team.", 1000),
+      requirements: optionalText(row.requirements, 500),
+      coordinatorName: optionalText(row.coordinatorName, 160),
+    }));
+  }
+  return overlay;
 }
 
 function stringRecord(value: unknown): Record<string, string> {
@@ -182,6 +291,15 @@ export function useMinistrySite(): MinistryConfig {
             }))
           : profile || !isGlobalMission ? leaders : fallback.leadership,
       });
+    });
+    // Live directory wiring for /ministries: the admin-managed public directory
+    // (GET /v1/public/church/directory) overrides the settings-derived sections
+    // once it loads. Fail-soft — on any error the settings values above stand.
+    void loadDirectory().then((directory) => {
+      if (!active || !directory) return;
+      const overlay = directoryOverlay(directory);
+      if (Object.keys(overlay).length === 0) return;
+      setSite((prev) => ({ ...prev, ...overlay }));
     });
     return () => { active = false; };
   }, []);

@@ -211,21 +211,24 @@ export async function registerChurchSiteSettingsVersionsRoutes(app: FastifyInsta
         ))
         .limit(1);
 
-      let settingsToPublish: unknown = draft ? draft.settings : null;
-      let profileToPublish = draft ? (draft.profile as ChurchSiteSettingsInput["profile"]) : null;
-
-      // If no draft was pending, check if a body was supplied directly to publish
-      if (!settingsToPublish || !profileToPublish) {
-        const directParse = churchSiteSettingsInputSchema.safeParse(request.body);
-        if (directParse.success) {
-          settingsToPublish = directParse.data.settings;
-          profileToPublish = directParse.data.profile;
-        } else {
-          return reply.code(400).send({
-            error: "NO_DRAFT_TO_PUBLISH",
-            message: "No unpublished draft exists. Supply settings in the body to publish directly.",
-          });
-        }
+      // Publish preference: an explicit settings body always wins and supersedes
+      // any stored draft (prevents publish/draft skew, where a stale draft would
+      // shadow the settings an admin just published). A body-less publish falls
+      // back to the pending draft.
+      const directParse = churchSiteSettingsInputSchema.safeParse(request.body);
+      let settingsToPublish: unknown;
+      let profileToPublish: ChurchSiteSettingsInput["profile"] | null = null;
+      if (directParse.success) {
+        settingsToPublish = directParse.data.settings;
+        profileToPublish = directParse.data.profile;
+      } else if (draft) {
+        settingsToPublish = draft.settings;
+        profileToPublish = draft.profile as ChurchSiteSettingsInput["profile"];
+      } else {
+        return reply.code(400).send({
+          error: "NO_DRAFT_TO_PUBLISH",
+          message: "No unpublished draft exists. Supply settings in the body to publish directly.",
+        });
       }
 
       const effectiveSettings = resolveEffectiveChurchSiteSettings(settingsToPublish, {
@@ -247,15 +250,28 @@ export async function registerChurchSiteSettingsVersionsRoutes(app: FastifyInsta
           eq(ministrySiteSettingsVersions.status, "published"),
         ));
 
+      // A direct body publish also supersedes the pending draft row itself, so
+      // a stale draft can never be published later over what was just published.
+      if (directParse.success && draft) {
+        await tx
+          .update(ministrySiteSettingsVersions)
+          .set({ status: "superseded" })
+          .where(and(
+            eq(ministrySiteSettingsVersions.tenantId, context.tenantId),
+            eq(ministrySiteSettingsVersions.id, draft.id),
+          ));
+      }
+
       // Calculate version number
       const [maxVerRow] = await tx
         .select({ maxVer: max(ministrySiteSettingsVersions.versionNumber) })
         .from(ministrySiteSettingsVersions)
         .where(eq(ministrySiteSettingsVersions.tenantId, context.tenantId));
 
-      const nextVersion = draft ? draft.versionNumber : ((maxVerRow?.maxVer ?? 0) + 1);
+      const publishingDraft = draft !== undefined && !directParse.success;
+      const nextVersion = publishingDraft ? draft.versionNumber : ((maxVerRow?.maxVer ?? 0) + 1);
 
-      if (draft) {
+      if (publishingDraft) {
         await tx
           .update(ministrySiteSettingsVersions)
           .set({
