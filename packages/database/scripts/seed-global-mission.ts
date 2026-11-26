@@ -8,6 +8,11 @@ import { mapGlobalMissionEvents } from "../src/global-mission-migration.js";
 import { globalMissionEvents } from "../../../templates/global-mission.events.js";
 
 const TENANT_ID = "7a80eaae-6f8c-44c1-b22a-3dca458f0ec1";
+// GMFC launches on the platform staging domain while the client's custom
+// domain is pending. The binding below is idempotent; promoting the client
+// domain later follows the documented custom-domain runbook (verify, route +
+// TLS, flip primary) — this row simply guarantees the staging host resolves.
+const STAGING_HOSTNAME = "church-staging.bazionweb.com";
 const connectionString = process.env.MIGRATION_DATABASE_URL;
 const dryRun = process.argv.includes("--dry-run");
 
@@ -71,7 +76,7 @@ const settingsOverlay = createChurchSiteSettingsOverlay({
 const mappedEvents = mapGlobalMissionEvents(globalMissionEvents);
 
 if (dryRun) {
-  console.log(`GMFC seed preview: ${globalMissionConfig.leadership.length} baseline leaders, ${globalMissionConfig.galleryImages.length} gallery items, ${mappedEvents.events.length} public events, and a template-backed site settings overlay.`);
+  console.log(`GMFC seed preview: ${globalMissionConfig.leadership.length} baseline leaders, ${globalMissionConfig.galleryImages.length} gallery items, ${mappedEvents.events.length} public events, the mission-network site settings overlay, and the staging domain binding ${STAGING_HOSTNAME}.`);
   process.exit(0);
 }
 if (!connectionString) {
@@ -131,6 +136,27 @@ try {
     );
     if (churchModule.rows[0]?.enabled !== true) {
       throw new SeedSkippedError("Skipped GMFC content seed because Church Ministry is explicitly disabled.");
+    }
+
+    // Staging domain binding (DNS TXT verified through the platform domain
+    // workflow; status active). Idempotent, and refuses to shadow a hostname
+    // that already belongs to a different tenant.
+    const stagedDomain = await client.query<{ tenant_id: string }>(
+      `INSERT INTO public.tenant_domains (tenant_id, hostname, status, verified_at)
+       VALUES ($1, $2, 'active', now())
+       ON CONFLICT (hostname) DO NOTHING
+       RETURNING tenant_id`,
+      [tenantId, STAGING_HOSTNAME],
+    );
+    if (!stagedDomain.rowCount) {
+      const existingDomain = await client.query<{ tenant_id: string; status: string }>(
+        "SELECT tenant_id, status FROM public.tenant_domains WHERE hostname = $1",
+        [STAGING_HOSTNAME],
+      );
+      if (existingDomain.rows[0]?.tenant_id !== tenantId) {
+        throw new Error(`Refusing to seed GMFC: staging hostname '${STAGING_HOSTNAME}' is already bound to another tenant.`);
+      }
+      console.log(`GMFC staging domain ${STAGING_HOSTNAME} already bound (status '${existingDomain.rows[0]?.status ?? "unknown"}') — binding preserved.`);
     }
 
     await client.query(
@@ -198,7 +224,7 @@ try {
     }
 
     await client.query("COMMIT");
-    console.log(`Seeded GMFC tenant ${tenantId}: template-backed public site, ${globalMissionConfig.leadership.length} baseline leaders and ${mappedEvents.events.length} public events (existing admin values preserved).`);
+    console.log(`Seeded GMFC tenant ${tenantId}: mission-network public site, ${globalMissionConfig.leadership.length} baseline leaders, ${mappedEvents.events.length} public events, and the staging domain binding ${STAGING_HOSTNAME} (existing admin values preserved).`);
   }
 } catch (error) {
   await client.query("ROLLBACK").catch(() => undefined);

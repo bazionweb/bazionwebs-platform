@@ -2,7 +2,12 @@
 
 ## Reporting a vulnerability
 
-Do not report exploitable vulnerabilities in public issues. For a private Bazion-owned repository, report privately to the platform owner or the designated security contact. Before making this repository public, configure GitHub private vulnerability reporting and publish a monitored security contact.
+Do not report exploitable vulnerabilities in public issues. Report privately through either of these channels:
+
+- **Email:** `security@bazionweb.com` (monitored platform security inbox — include reproduction steps and affected components; expect an acknowledgement within 72 hours).
+- **GitHub private vulnerability reporting:** Security tab → *Report a vulnerability* on this repository.
+
+Both channels reach the platform owner and the designated security contact directly. When the repository becomes public, keep GitHub private vulnerability reporting enabled and this section updated with the monitored contact.
 
 ## Supported versions
 
